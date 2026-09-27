@@ -370,7 +370,9 @@ export function App() {
 					if (++attempts < 40) window.setTimeout(reveal, 100);
 					return;
 				}
-				const row = document.querySelector<HTMLElement>(`.fp-line[data-line="${line}"], .fp-edit-line[data-line="${line}"]`);
+				const row = document.querySelector<HTMLElement>(`.fp-line[data-line="${line}"], .fp-edit-line[data-line="${line}"], .fp-markdown [data-source-start="${line}"]`) ??
+					Array.from(document.querySelectorAll<HTMLElement>(".fp-markdown [data-source-start][data-source-end]")).find((element) =>
+						Number(element.dataset.sourceStart) <= line && Number(element.dataset.sourceEnd) >= line);
 				if (row) {
 					const editor = row.closest(".fp-code-editor")?.querySelector<HTMLTextAreaElement>(".fp-editor");
 					if (editor) {

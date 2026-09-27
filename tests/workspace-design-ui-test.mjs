@@ -14,6 +14,8 @@ const cwd=join(root,'youwei-trading-agent');mkdirSync(cwd);
 for(const path of ['.assets','.scratch/trading-agent-cockpit','.scratch/us-stock-research','docs'])mkdirSync(join(cwd,path),{recursive:true});
 writeFileSync(join(cwd,'AGENTS.md'),'# Workspace\n\n| Module | File | Details |\n| --- | --- | --- |\n| Model | `docs/architecture-core.md` | preserved cell content |\n| Globals | `some/very/long/path/to/a/module.ts` | more contents |\n');writeFileSync(join(cwd,'CONTEXT.md'),'# Context\n');
 writeFileSync(join(cwd,'docs/note.md'),'# Nested note\n');
+mkdirSync(join(cwd,'docs/research'),{recursive:true});
+writeFileSync(join(cwd,'docs/research/llm-gateway-options.md'),Array.from({length:30},(_,i)=>`Gateway paragraph ${i+1}`).join('\n\n'));
 writeFileSync(join(cwd,'.scratch/us-stock-research/spec.md'),'# Spec\n');
 execFileSync('git',['init','-q'],{cwd});execFileSync('git',['add','.'],{cwd});
 execFileSync('git',['-c','user.name=UI test','-c','user.email=ui@example.test','commit','-qm','fixture'],{cwd});
@@ -191,12 +193,13 @@ console.log('PASS review: goal events, timing, font actually rendered, single fo
 
 const shortPage=await context.newPage();
 const shortAt=Date.now()-6*60*60*1000;
+let shortSocket,shortState;
 const shortMessages=[
 {id:'short-question',role:'user',timestamp:shortAt,content:[{type:'text',text:'请帮我看一下'}]},
 {id:'short-answer',role:'assistant',timestamp:shortAt+60_000,content:[{type:'thinking',thinking:'检查中'},{type:'text',text:'已经检查。'}]},
 {id:'short-goal',role:'user',timestamp:shortAt+5*60*60*1000,content:[{type:'text',text:'【目标已设定】\n\n继续审查\n\n请现在开始实现这个目标。'}]},
 ];
-await shortPage.routeWebSocket('**/ws',route=>{const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot')Object.assign(message.state,{messages:shortMessages,piConfigured:true});route.send(JSON.stringify(message));});});
+await shortPage.routeWebSocket('**/ws',route=>{shortSocket=route;const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot'){Object.assign(message.state,{messages:shortMessages,piConfigured:true});shortState=message.state;}route.send(JSON.stringify(message));});});
 await shortPage.goto(`http://localhost:${PORT}`);
 await shortPage.locator('.goal-event').waitFor();
 await shortPage.locator('.qn-bar').waitFor();
@@ -211,20 +214,65 @@ assert(shortLayout.distance<80,JSON.stringify(shortLayout));
 assert(Math.abs(shortLayout.markerPosition-shortLayout.questionPosition)<.06,JSON.stringify(shortLayout));
 assert((await shortPage.locator('.thinking-duration').textContent()).includes('未记录'));
 assert((await shortPage.locator('.time-gap').getAttribute('title')).includes(String(new Date(shortAt).getFullYear())));
+const helloMessage={id:'spacing-hello',role:'user',content:[{type:'text',text:'hello'}]};
+const showSpacing=(streamingMessage)=>{shortState={...shortState,rev:shortState.rev+1,messages:[helloMessage],isStreaming:true,streamingMessage,model:{id:'glm-5.3',name:'GLM 5.3',provider:'volc-glm'}};shortSocket.send(JSON.stringify({type:'snapshot',state:shortState}));};
+const measureSpacing=()=>shortPage.evaluate(()=>{
+const bubble=document.querySelector('[data-msg-id="spacing-hello"] .msg-body').getBoundingClientRect();
+const placeholder=document.querySelector('.agent-working-placeholder');
+const meta=placeholder.querySelector('.msg-meta').getBoundingClientRect();
+const status=placeholder.querySelector('.agent-working').getBoundingClientRect();
+return {betweenMessages:meta.top-bubble.bottom,headingToStatus:status.top-meta.bottom,emptyAssistant:document.querySelector('[data-msg-id="spacing-empty"]')!==null,emptyBody:placeholder.querySelector('.msg-body')!==null};
+});
+showSpacing(null);
+await shortPage.locator('.agent-working-placeholder .agent-working',{hasText:'正在分析请求'}).waitFor();
+const pendingSpacing=await measureSpacing();
+showSpacing({id:'spacing-empty',role:'assistant',model:'glm-5.3',content:[{type:'thinking',thinking:''},{type:'text',text:''}]});
+await shortPage.waitForTimeout(50);
+const emptySpacing=await measureSpacing();
+for(const spacing of [pendingSpacing,emptySpacing]){
+assert(spacing.betweenMessages>=20&&spacing.betweenMessages<=24,JSON.stringify(spacing));
+assert(spacing.headingToStatus>=6&&spacing.headingToStatus<=8,JSON.stringify(spacing));
+assert.equal(spacing.emptyAssistant,false,JSON.stringify(spacing));
+assert.equal(spacing.emptyBody,false,JSON.stringify(spacing));
+}
+showSpacing({id:'spacing-content',role:'assistant',model:'glm-5.3',content:[{type:'thinking',thinking:''},{type:'text',text:'回复开始'}]});
+await shortPage.locator('[data-msg-id="spacing-content"] .msg-text',{hasText:'回复开始'}).waitFor();
+assert.equal(await shortPage.locator('[data-msg-id="spacing-content"] .thinking').count(),0,'empty thinking shell is omitted after text starts');
+assert.equal(await shortPage.locator('.agent-working-placeholder').count(),0);
 await shortPage.close();
 
 const navPage=await context.newPage();
 const longQuestion='1. Q1 使用范围：确认研究计划\n\nCampaign\n├── Batch\n│  └── Forecast\n\n'+Array.from({length:36},(_,i)=>`说明 ${i+1}：这是一段需要保留的长消息。`).join('\n\n');
-const navMessages=[...Array.from({length:5},(_,i)=>({id:`nav-${i}`,role:'user',timestamp:timestamp+i*60_000,content:[{type:'text',text:i===0?longQuestion:`${i+1}. Q${i+1} 继续确认` }]})),{id:'nav-reply',role:'assistant',timestamp:timestamp+6*60_000,content:[{type:'text',text:Array.from({length:80},(_,i)=>`回答段落 ${i+1}。`).join('\n\n')}]}];
-await navPage.routeWebSocket('**/ws',route=>{const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot')Object.assign(message.state,{messages:navMessages,piConfigured:true});route.send(JSON.stringify(message));});});
+const asciiTable=['另外四处需要修正','位置 │ 问题 │ 修改建议','─'.repeat(180),'网关文档:23 (docs/research/llm-gateway-options.md:23) │ TPM/RPM 被写成并发限额 │ 单独定义在途请求数','─'.repeat(180),'Tiingo 文档:48 │ EODHD 价格不准确 │ 改为候选之一','─'.repeat(180),'gVisor 文档:21 │ mmap 默认错误 │ 分别测试','─'.repeat(180),'运行时文档:9 │ 标签缺失 │ 补齐标签'].join('\n');
+const navMessages=[...Array.from({length:5},(_,i)=>({id:`nav-${i}`,role:'user',timestamp:timestamp+i*60_000,content:[{type:'text',text:i===0?longQuestion:i===1?asciiTable:i===2?'3. Q3 继续确认 docs/research/llm-gateway-options.md:23':`${i+1}. Q${i+1} 继续确认` }]})),{id:'nav-reply',role:'assistant',timestamp:timestamp+6*60_000,content:[{type:'text',text:Array.from({length:80},(_,i)=>`回答段落 ${i+1}。`).join('\n\n')}]}];
+await navPage.routeWebSocket('**/ws',route=>{const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot')Object.assign(message.state,{messages:navMessages,piConfigured:true});if(message.type==='scm_data'){message.files=[];message.notRepo=false;}route.send(JSON.stringify(message));});});
 await navPage.goto(`http://localhost:${PORT}`);
 await navPage.locator('.qn-rail.many').waitFor();
 await navPage.locator('.messages').evaluate(el=>el.scrollTop=0);
-await navPage.locator('.user-message-expand').waitFor();
-assert.match(await navPage.locator('.user-message-expand').textContent(),/展开全部 · \d+ 行/);
+await navPage.locator('[data-msg-id="nav-0"] .user-message-expand').waitFor();
+assert.equal(await navPage.locator('[data-msg-id="nav-1"] .user-message-content.collapsed').count(),1,'long pasted tables fold by default');
+assert.equal(await navPage.locator('[data-msg-id="nav-1"] .ascii-table').count(),1,'box-drawing tables use a dedicated preserved block');
+const asciiGeometry=await navPage.locator('[data-msg-id="nav-1"] .msg-body').evaluate(el=>({bubble:el.getBoundingClientRect().width,content:el.scrollWidth,table:el.querySelector('.ascii-table pre')?.scrollWidth,viewport:el.querySelector('.ascii-table pre')?.clientWidth}));
+assert(asciiGeometry.content<=asciiGeometry.bubble+2,JSON.stringify(asciiGeometry));
+assert(asciiGeometry.table>asciiGeometry.viewport,'wide table scrolls inside its block');
+await navPage.locator('[data-msg-id="nav-1"] .user-message-expand').click();
+await navPage.screenshot({path:'/private/tmp/pi-ascii-table-fix.png'});
+await navPage.locator('[data-msg-id="nav-1"] .ascii-table a',{hasText:'docs/research/llm-gateway-options.md:23'}).click();
+await navPage.locator('.fp-file-path',{hasText:'llm-gateway-options.md'}).waitFor();
+await navPage.locator('.fp-line[data-line="23"].from-tool, .fp-edit-line[data-line="23"].from-tool, .fp-markdown [data-source-start="23"].from-tool').waitFor();
+await navPage.locator('.fp-back').click();
+await navPage.locator('[data-msg-id="nav-2"] .md a',{hasText:'docs/research/llm-gateway-options.md:23'}).click();
+await navPage.locator('.fp-markdown [data-source-start="23"].from-tool').waitFor();
+await navPage.locator('.fp-back').click();
+assert.equal(await navPage.locator('.panel-right .tree-filter').count(),0,'zero changes is hidden');
+assert.equal(await navPage.locator('.panel-right .tree-hidden-toggle').isVisible(),false,'hidden-file control stays in the menu');
+await navPage.locator('.panel-right .tree-menu-trigger').click();
+assert.equal(await navPage.locator('.panel-right .tree-hidden-toggle').getAttribute('role'),'switch');
+await navPage.locator('.topbar').click({position:{x:20,y:20}});
+assert.match(await navPage.locator('[data-msg-id="nav-0"] .user-message-expand').textContent(),/展开全部 · \d+ 行/);
 assert.equal(await navPage.locator('.msg-user pre code').first().textContent(),'Campaign\n├── Batch\n│  └── Forecast\n');
 assert.equal(await navPage.locator('[data-msg-id="nav-0"] .user-message-content.collapsed').count(),1);
-await navPage.locator('.user-message-expand').click();
+await navPage.locator('[data-msg-id="nav-0"] .user-message-expand').click();
 assert.equal(await navPage.locator('[data-msg-id="nav-0"] .user-message-content.collapsed').count(),0);
 await navPage.locator('.qn-rail').hover();
 await navPage.locator('.qn-rail.open').waitFor();

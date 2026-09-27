@@ -211,7 +211,8 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	const completedTool = lastBlock?.type === "toolCall" && typeof lastBlock.id === "string" && (toolStatuses.has(lastBlock.id) || toolResults.has(lastBlock.id));
 	const activityLabel = runningTool ? runningTool.name === "bash" ? t("waitingCommand") : t(runningTool.name === "read" ? "activityReading" : "activityTool", { name: runningTool.name === "read" ? toolTarget(runningTool) : runningTool.name }) : t(completedTool ? "waitingModel" : lastBlock?.type === "text" ? "activityReply" : "activityAnalyze");
 	const activityPhase = `${state.conversationId}:${runningTool?.id ?? state.streamingMessage?.id ?? "waiting"}:${state.streamingMessage?.content.length ?? 0}:${lastBlock?.type ?? ""}`;
-	const awaitingFirstAssistant = state.isStreaming && !state.streamingMessage && lastUserIndex >= 0 && !state.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
+	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
+	const awaitingFirstAssistant = state.isStreaming && !streamingHasContent && lastUserIndex >= 0 && !state.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
 	const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
 	// Only the last KEEP_RECENT persisted messages are fully rendered; older
 	// ones collapse to summary rows (unless the user expanded them).
@@ -740,7 +741,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						</LazyMount>
 					);
 				})}
-				{state.streamingMessage && (
+				{state.streamingMessage && streamingHasContent && (
 					<Message
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}

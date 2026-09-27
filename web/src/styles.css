@@ -8535,15 +8535,21 @@ img.brand-logo, img.empty-logo { background: transparent; object-fit: contain; }
 .design-workspace .messages-wrap::after { content: ""; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
 .design-workspace .messages-wrap::before { top: 0; height: 16px; background: linear-gradient(to bottom, var(--bg), transparent); }
 .design-workspace .messages-wrap::after { display: none; }
-.design-workspace .msg { width: 100%; max-width: 780px; padding-inline: 28px; margin: 0 auto 28px; }
+.design-workspace .msg { width: 100%; max-width: 780px; padding-inline: 28px; margin: 0 auto 22px; }
 .design-workspace .msg-text { font-size: 14.5px; line-height: 1.75; }
 .design-workspace .msg-user { display: flex; flex-direction: column; align-items: flex-end; }
 .design-workspace .msg-user > .msg-body { max-width: 78%; background: var(--bubble-bg); border: 0; border-radius: 14px 14px 4px 14px; padding: 10px 14px; }
 .design-workspace .msg-user .msg-text { background: transparent; padding: 0; border: 0; border-radius: 0; line-height: 1.6; }
+.design-workspace .msg-user > .msg-body, .design-workspace .msg-user .msg-text, .design-workspace .msg-user .md, .design-workspace .user-message-content { min-width: 0; overflow-wrap: anywhere; }
+.design-workspace .user-message-content { max-width: 100%; }
 .design-workspace .user-message-content.collapsed { max-height: 12.8em; overflow: hidden; }
 .design-workspace .user-message-expand { display: block; margin: 6px 0 0; padding: 2px 0; border: 0; background: transparent; color: var(--accent); font: 12px var(--sans); cursor: pointer; }
 .design-workspace .user-message-expand:hover { text-decoration: underline; }
 .design-workspace .msg-user .user-message-content pre { white-space: pre; overflow-x: auto; font-variant-ligatures: none; }
+.design-workspace .msg-user .ascii-table { min-width: 0; max-width: 100%; }
+.design-workspace .msg-user .ascii-table pre { max-width: 100%; background: color-mix(in srgb, var(--bubble-bg) 78%, #fff) !important; color: var(--text); }
+.design-workspace .msg-user .ascii-table code { white-space: pre; }
+.design-workspace .msg-user .ascii-table a { color: var(--accent); text-decoration: underline; }
 .design-workspace .msg-user > .msg-meta { display: none; }
 .design-workspace .msg-assistant .msg-role::before { content: "π"; width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: 6px; background: var(--accent); color: white; font-size: 12px; margin-right: 8px; }
 .design-workspace .msg-model { font: 11.5px var(--mono); color: var(--text-faint); }
@@ -8936,6 +8942,8 @@ body { -webkit-font-smoothing: antialiased; }
 .design-workspace .scroll-bottom { right: max(var(--composer-gutter), calc((100% - 780px) / 2)); }
 .agent-working { width: calc(100% - 56px); max-width: 724px; margin: 12px auto 20px; }
 .agent-working-placeholder .agent-working { width: 100%; max-width: none; margin: 0; }
+.agent-working-placeholder .msg-meta { margin-bottom: 7px; }
+.msg-body:empty { display: none; }
 @media (max-width: 768px) { .design-workspace .main { --composer-gutter: 12px; } }
 
 /* Folded turns share the same rail as full turns and the composer. */

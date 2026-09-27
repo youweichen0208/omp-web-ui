@@ -14,6 +14,8 @@ interface MarkdownProps {
 	imageSrc?: (source: string) => string;
 	/** Source positions let the file preview quote rendered text with Markdown syntax. */
 	sourceLines?: boolean;
+	/** Interpret local file references in user-pasted text. */
+	fileLinks?: boolean;
 }
 
 /** Shared markdown pipeline + codeblock chrome (copy button). Exported so
@@ -38,33 +40,64 @@ const sourceLineComponents: Components = {
 	h6: ({ node, ...props }) => <h6 {...props} data-source-start={node?.position?.start.line} data-source-end={node?.position?.end.line} />,
 };
 
-export function MarkdownBody({ text, imageSrc, sourceLines }: MarkdownProps) {
+export function MarkdownBody({ text, imageSrc, sourceLines, fileLinks }: MarkdownProps) {
 	return (
-		<ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={{ pre: PreWithCopy, ...(sourceLines ? sourceLineComponents : {}), ...(imageSrc ? { img: ({ node: _node, src, ...props }) => <img {...props} src={imageSrc(src ?? "")} /> } : {}) }}>
+		<ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={{ pre: ({ children, ...props }) => <PreWithCopy {...props} fileLinks={fileLinks}>{children}</PreWithCopy>, ...(fileLinks ? { a: ({ node: _node, href, ...props }) => <a {...props} href={href} onClick={(event) => { if (href?.startsWith("#pi-file=")) { event.preventDefault(); openLocalFile(href.slice(9)); } }} /> } : {}), ...(sourceLines ? sourceLineComponents : {}), ...(imageSrc ? { img: ({ node: _node, src, ...props }) => <img {...props} src={imageSrc(src ?? "")} /> } : {}) }}>
 			{text}
 		</ReactMarkdown>
 	);
 }
 
 /** GFM markdown with syntax highlighting; code blocks get a copy button. */
-export const Markdown = memo(function Markdown({ text, imageSrc, sourceLines }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, imageSrc, sourceLines, fileLinks }: MarkdownProps) {
 	return (
 		<div className="md">
-			<MarkdownBody text={text} imageSrc={imageSrc} sourceLines={sourceLines} />
+			<MarkdownBody text={text} imageSrc={imageSrc} sourceLines={sourceLines} fileLinks={fileLinks} />
 		</div>
 	);
 });
 
-export function PreWithCopy({ children, ...props }: JSX.IntrinsicElements["pre"]) {
+export function PreWithCopy({ children, fileLinks, ...props }: JSX.IntrinsicElements["pre"] & { fileLinks?: boolean }) {
 	if (isMermaidCodeBlock(children)) {
 		return <MermaidDiagram code={codeText(children)} />;
 	}
+	const asciiTable = fileLinks && isAsciiTableCodeBlock(children);
+	const code = codeText(children);
 	return (
-		<div className="codeblock">
-			<CopyButton text={codeText(children)} />
-			<pre {...props}>{children}</pre>
+		<div className={`codeblock${asciiTable ? " ascii-table" : ""}`}>
+			<CopyButton text={code} />
+			<pre {...props}>{asciiTable ? <code>{linkedFilePaths(code)}</code> : children}</pre>
 		</div>
 	);
+}
+
+function isAsciiTableCodeBlock(children: unknown): boolean {
+	const child = Array.isArray(children) ? children[0] : children;
+	return !!child && typeof child === "object" && "props" in child &&
+		/(^|\s)language-ascii-table(\s|$)/.test(String((child as { props?: { className?: unknown } }).props?.className ?? ""));
+}
+
+function openLocalFile(reference: string): void {
+	const match = /^(.+):([1-9]\d*)$/.exec(reference);
+	if (!match) return;
+	try {
+		window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: decodeURIComponent(match[1]), line: Number(match[2]) } }));
+	} catch { /* Ignore malformed links pasted into a message. */ }
+}
+
+function linkedFilePaths(code: string) {
+	const pattern = /((?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+):([1-9]\d*)/g;
+	const parts: (string | JSX.Element)[] = [];
+	let offset = 0;
+	for (const match of code.matchAll(pattern)) {
+		const start = match.index;
+		if (start > offset) parts.push(code.slice(offset, start));
+		const reference = `${match[1]}:${match[2]}`;
+		parts.push(<a key={start} href={`#pi-file=${encodeURIComponent(match[1])}:${match[2]}`} onClick={(event) => { event.preventDefault(); openLocalFile(`${encodeURIComponent(match[1])}:${match[2]}`); }}>{reference}</a>);
+		offset = start + match[0].length;
+	}
+	if (offset < code.length) parts.push(code.slice(offset));
+	return parts;
 }
 
 /** True when `children` is the single ```mermaid fenced-code element that

@@ -223,18 +223,8 @@ export const Message = memo(function Message({
 	const questionText = questionPreviewText(skillBlock
 		? skillBlock.userMessage ?? `skill:${skillBlock.name}`
 		: userText);
-	// Streaming bubble with no content yet (first token not arrived) — show a
-	// visible “thinking…” placeholder instead of an invisible empty bubble.
-	// Both this placeholder and the trailing blinking caret below are meant
-	// for the assistant's own in-progress reply — never for the user's own
-	// just-sent bubble, which is briefly "the last message" (and the
-	// conversation is already marked streaming) in the gap before the
-	// assistant's placeholder message is appended.
-	const isEmptyStreaming =
-		streaming && isLast && message.role !== "user" && message.content.length === 0;
-
 	const canEdit =
-		message.role === "user" && !streaming && !isEmptyStreaming && !!onEdit;
+		message.role === "user" && !streaming && !!onEdit;
 	/** Paste/drop handler inside the edit composer — same downscale pipeline
 	 *  as the main input bar so payloads stay under the server's cap. */
 	const addEditImageFiles = async (files: File[]) => {
@@ -540,7 +530,7 @@ export const Message = memo(function Message({
 								<SkillCard block={skillBlock} />
 								{skillBlock.userMessage && (
 									<div className="msg-text">
-										<Markdown text={preserveUserTree(skillBlock.userMessage)} />
+										<Markdown text={preserveUserTree(skillBlock.userMessage)} fileLinks />
 									</div>
 								)}
 								{renderContentBlocks(true)}
@@ -756,6 +746,7 @@ function Block({
 		// which is precisely when the user is watching.
 		const leak = splitLeakedThinking(text.text);
 		const body = leak ? leak.visible : text.text;
+		if (!body.trim() && !leak?.leaked.trim() && !text.truncated) return null;
 		return (
 			<div className="msg-text">
 				{leak && <LeakedThinkingBlock text={leak.leaked} />}
@@ -763,7 +754,7 @@ function Block({
 					(live ? (
 						<StreamMarkdown text={user ? preserveUserTree(body) : body} />
 					) : (
-						<Markdown text={user ? preserveUserTree(body) : body} />
+						<Markdown text={user ? preserveUserTree(body) : body} fileLinks={user} />
 					))}
 				{text.truncated && <div className="trunc-note">{t("truncated")}</div>}
 			</div>
@@ -772,6 +763,7 @@ function Block({
 
 	const thinking = asThinking(block);
 	if (thinking) {
+		if (!thinking.thinking.trim()) return null;
 		return (
 			<ThinkingBlock
 				thinking={thinking.thinking}
