@@ -70,7 +70,6 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	const hasResult = task.status !== "running" && !single && !!(result.commit || result.tests || result.changes);
 	const finalTestPhase = phases.findLast((phase) => phase.kind === "test" || phase.kind === "fix")?.id;
 	const title = plainTitle(conversationTitle || task.title);
-	const showTitle = !!title;
 	const preview = (path: string) => { const relative = path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path; onPreview(relative, relative.split("/").at(-1) ?? relative); };
 	const activeArtifact = task.steps.findLast((step) => step.status === "running" && step.artifacts.length)?.artifacts.at(-1)?.label;
 	const planChangesFor = (item: NonNullable<TaskProgress["plan"]>["items"][number]) => item.startedAt ? task.steps.filter((step) => step.startedAt >= item.startedAt! && step.startedAt < (item.endedAt ?? Infinity)).flatMap((step) => step.artifacts.filter((artifact) => changes.has(artifact.toolCallId)).map((artifact) => ({ messageId: step.messageId, toolCallId: artifact.toolCallId, count: changes.get(artifact.toolCallId)! }))) : [];
@@ -83,7 +82,6 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	return <div className="task-progress" aria-label={t("taskProgress")}>
 		<div className="task-progress-head">
 			<div className="task-progress-heading">
-				{showTitle && <strong title={title}>{title}</strong>}
 				<div className="task-progress-menu" ref={menuRef}>
 					<button type="button" className="task-progress-menu-trigger" aria-label={t("more")} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><FiMoreHorizontal /></button>
 					{menuOpen && <div className="task-progress-menu-list">
@@ -109,7 +107,7 @@ function PlanStepRow({ item, index, now, activeArtifact, changes, onJumpTool }: 
 	const removed = changes.reduce((sum, change) => sum + change.count.removed, 0);
 	return <div className={`task-plan-step ${item.status}`}>
 		<span className="task-plan-mark">{item.status === "done" ? "✓" : item.status === "running" ? "●" : item.status === "removed" ? "−" : index + 1}</span>
-		<div><span>{item.title}</span>{item.added && <small className="task-plan-added">{t("taskPlanAdded")}</small>}{actions && <small className="task-plan-actions">{actions}</small>}{item.status === "running" && activeArtifact && <small className="task-plan-current-file">{activeArtifact}</small>}</div>
+		<div><span className="task-plan-step-title" title={item.title}>{item.title}</span>{item.added && <small className="task-plan-added">{t("taskPlanAdded")}</small>}{actions && <small className="task-plan-actions">{actions}</small>}{item.status === "running" && activeArtifact && <small className="task-plan-current-file" title={activeArtifact}>{activeArtifact}</small>}</div>
 		{changes.length > 0 && <button type="button" className="task-phase-change" title={t("taskJumpToChat")} onClick={() => onJumpTool(changes[0].messageId, changes[0].toolCallId)}>+{added}{removed > 0 && ` −${removed}`}</button>}
 		{item.startedAt && item.status !== "removed" && <small className="task-plan-step-duration">{duration(Math.max(0, Math.floor(((item.endedAt ?? now) - item.startedAt) / 1000)), t("taskUnderSecond"))}</small>}
 	</div>;

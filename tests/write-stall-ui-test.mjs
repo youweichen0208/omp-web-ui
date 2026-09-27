@@ -55,7 +55,7 @@ try {
 	await page.locator('.change-card').first().waitFor();
 	assert.equal(await page.locator('.change-card').count(), 2, 'two writes keep separate diff cards');
 	await page.locator('.task-progress-head').waitFor();
-	assert.equal(await page.locator('.task-progress-heading > strong').textContent(), await page.locator('.header-location > strong').textContent(), 'task and header share the conversation title');
+	assert.equal(await page.locator('.task-progress-heading > strong').count(), 0, 'task panel does not repeat the top-bar title');
 	assert.equal(await page.locator('.task-step-head').count(), 0, 'a single phase lists actions directly');
 	assert.equal(await page.locator('.change-card').first().locator('.change-line.add').count(), 1);
 	assert((await page.locator('.change-card').first().locator('.change-counts').textContent()).includes('+1'));
@@ -72,6 +72,12 @@ try {
 	await page.locator('.change-card[data-tool-call-id="edit-unchanged"]').waitFor();
 	assert.equal(await page.locator('.change-card[data-tool-call-id="edit-unchanged"] .change-counts').textContent(), '', 'unchanged edit hides +0');
 	assert.equal(await page.locator('.change-card[data-tool-call-id="edit-unchanged"] .change-card-body').count(), 0, 'unchanged edit omits empty diff body');
+	const fallbackEdit = { id: 'fallback-edit', role: 'assistant', content: [{ type: 'toolCall', id: 'edit-fallback', name: 'edit', argumentsText: JSON.stringify({ path: 'youwei_core/api/main.py', oldText: 'print(1)', newText: 'print(2)' }) }] };
+	const fallbackResult = { id: 'fallback-result', role: 'toolResult', toolCallId: 'edit-fallback', content: [{ type: 'text', text: 'Successfully replaced text' }] };
+	state = { ...state, rev: state.rev + 1, messages: [...messages, fallbackEdit, fallbackResult] };
+	socket.send(JSON.stringify({ type: 'snapshot', state }));
+	await page.locator('.change-card[data-tool-call-id="edit-fallback"]').waitFor();
+	assert.equal(await page.locator('.change-card[data-tool-call-id="edit-fallback"] .change-line.add').count(), 1, 'successful edit shows replacement even without SDK diff');
 	const grouped = { ...state, rev: state.rev + 1, messages: [messages[0], { ...messages[1], content: [...messages[1].content, write('w3', 'youwei_core/api/extra.py', 'a\nb\n')] }, messages[2], messages[3], { id: 'r3', role: 'toolResult', toolCallId: 'w3', toolName: 'write', isError: false, content: [{ type: 'text', text: 'Successfully wrote 4 bytes' }] }] };
 	socket.send(JSON.stringify({ type: 'snapshot', state: grouped }));
 	await page.locator('.change-group-head', { hasText: '写入 3 个文件' }).waitFor();

@@ -35,6 +35,8 @@ try {
 	state = { ...state, rev: state.rev + 1, isStreaming: true, piConfigured: true, model: { id: 'glm-5.3', name: 'GLM 5.3 (Volc)', provider: 'volc' }, thinkingLevel: 'high', availableThinkingLevels: ['minimal', 'medium', 'high'] };
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
 	await page.locator('.thinking-control .chip', { hasText: '思考 · 深度' }).waitFor();
+	const thinkingStyle = await page.locator('.thinking-control .chip').evaluate((element) => ({ border: getComputedStyle(element).borderColor, modelBorder: getComputedStyle(document.querySelector('.input-tools-left > .dropdown .chip')).borderColor }));
+	assert.equal(thinkingStyle.border, thinkingStyle.modelBorder, 'thinking and model triggers share the same border treatment');
 	assert.equal(await page.locator('.input-tools .btn.supplement:visible, .input-tools .btn.steer:visible').count(), 0, 'empty composer hides queue and steer');
 	assert(await page.locator('.usage-cache-short').isVisible(), 'wide composer shows cache summary');
 	await page.locator('.thinking-control .chip').click();

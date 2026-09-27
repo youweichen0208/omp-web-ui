@@ -29,7 +29,7 @@ function ChangeBody({ change }: { change: EditWriteChange }) {
 			if (remaining <= 0) return null;
 			const visible = hunk.lines.slice(0, remaining);
 			remaining -= visible.length;
-			return <div className="change-hunk" key={index}><div className="change-hunk-head">{change.error ? change.kind === "write" ? t("changeAttemptedWrite") : t("changeOriginal") : change.kind === "write" ? t("changeWrittenLines", { n: change.added }) : t("changeAtLine", { n: hunk.line })}{hunk.functionName && <span> · {hunk.functionName}</span>}</div><Lines lines={visible} path={change.path} /></div>;
+			return <div className="change-hunk" key={index}><div className="change-hunk-head">{change.error ? change.kind === "write" ? t("changeAttemptedWrite") : t("changeOriginal") : change.kind === "write" ? t("changeWrittenLines", { n: change.added }) : change.fromArguments ? t("changeReplacement") : t("changeAtLine", { n: hunk.line })}{hunk.functionName && <span> · {hunk.functionName}</span>}</div><Lines lines={visible} path={change.path} /></div>;
 		})}
 		{allLines > 12 && <button type="button" className="change-more" onClick={() => setExpanded((value) => !value)}>{expanded ? t("collapseCode") : t("expandRemainingLines", { n: allLines - 12 })}</button>}
 	</div>;
@@ -52,7 +52,7 @@ export function EditWriteCard({ item, compact = false, retried = false }: { item
 	const state = retried ? "retried" : status(item);
 	const noDiff = change.kind === "edit" && change.empty && !change.error && state === "done";
 	const path = change.path || item.block.name;
-	const openFile = () => window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: change.path, line: change.firstChangedLine } }));
+	const openFile = () => window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: change.path, ...(change.fromArguments ? {} : { line: change.firstChangedLine }) } }));
 	return <div className={`change-card ${state}`} data-tool-call-id={item.block.id} onMouseEnter={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: item.block.id } }))} onMouseLeave={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: null } }))}>
 		<div className="change-card-head">
 			<button type="button" className="change-card-toggle" aria-expanded={open && !noDiff} disabled={noDiff} onClick={() => setOpen((value) => !value)}>{!noDiff && <FiChevronRight className={open ? "open" : ""} />}<span className="change-verb">{item.block.name === "edit" ? t("changeEdit") : t("changeWrite")}</span><code title={path}>{path}</code></button>

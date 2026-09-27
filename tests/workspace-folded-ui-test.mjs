@@ -16,10 +16,11 @@ writeFileSync(join(cwd,'docs/spec.md'),'# Spec\n');
 const timestamp=Date.now();
 const earlier=timestamp-2*60*60*1000;
 const messages=[
-	...Array.from({length:34},(_,i)=>({id:`old-${i}`,role:i%2?'assistant':'user',timestamp:earlier,content:[{type:'text',text:`历史消息 ${i}`}]})),
+	...Array.from({length:34},(_,i)=>({id:`old-${i}`,role:i%2?'assistant':'user',timestamp:earlier,content:[{type:'text',text:`历史消息 ${i}`},...(i===1?[{type:'thinking',thinking:'分析文件'}]:[])]})),
 	{id:'q',role:'user',timestamp,content:[{type:'text',text:'查看两个文件'}]},
-	{id:'read',role:'assistant',timestamp,model:'glm-5.3',content:[{type:'thinking',thinking:'先看文件'},{type:'thinking',thinking:'再看结果',durationMs:2000},{type:'toolCall',id:'r',name:'read',argumentsText:JSON.stringify({path:'AGENTS.md'})},{type:'toolCall',id:'b',name:'bash',argumentsText:JSON.stringify({command:'grep -n pattern docs/spec.md'})}]},
+	{id:'read',role:'assistant',timestamp,model:'glm-5.3',content:[{type:'thinking',thinking:'先看文件'},{type:'thinking',thinking:'再看结果',durationMs:2000},{type:'toolCall',id:'r',name:'read',argumentsText:JSON.stringify({path:'AGENTS.md'})},{type:'toolCall',id:'b',name:'bash',argumentsText:JSON.stringify({command:'grep -n pattern docs/spec.md'})},{type:'toolCall',id:'sed',name:'bash',argumentsText:JSON.stringify({command:"sed -n '35,50p' youwei_core/ledger/monthly.py"})}]},
 	{id:'result',role:'toolResult',timestamp,toolCallId:'b',toolName:'bash',content:[{type:'text',text:`15: ${'很长的匹配内容'.repeat(40)}\n27: 匹配二\n`}]},
+	{id:'sed-result',role:'toolResult',timestamp,toolCallId:'sed',toolName:'bash',content:[{type:'text',text:Array.from({length:16},(_,i)=>`source line ${i+35}`).join('\n')}]},
 	{id:'answer',role:'assistant',timestamp,content:[{type:'text',text:'已经查看。'}]},
 ];
 let server,browser;
@@ -49,7 +50,7 @@ try {
 	assert.equal(await page.locator('.time-gap').count(),1);
 	assert.equal(await page.getByText('本次对话涉及').count(),0);
 	assert.equal(await page.locator('.conversation-files').count(),0);
-	assert.equal(await page.locator('.status-branch-name').textContent(),'非 Git 仓库');
+	await page.locator('.status-branch-name', {hasText:'非 Git 仓库'}).waitFor();
 	await page.locator('.msg-collapsed').first().waitFor();
 	const widths=await page.evaluate(()=>Object.fromEntries(['.msg-collapsed','.msg','.inputbox'].map(s=>[s,document.querySelector(s).getBoundingClientRect().width])));
 	assert.equal(widths['.msg-collapsed'],widths['.msg']);
@@ -90,12 +91,22 @@ try {
 	assert.notEqual(await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).borderColor),idleBorder);
 	assert.equal(await page.locator('.msg-collapsed-role.role-assistant').first().evaluate(e=>getComputedStyle(e,'::before').content),'"π"');
 	assert.equal(await page.locator('.msg-collapsed-action svg polyline').first().getAttribute('points'),'9 18 15 12 9 6');
+	const foldedMeta = await page.locator('.msg-collapsed-role.role-assistant').first().locator('..').evaluate((row) => {
+		const preview = row.querySelector('.msg-collapsed-preview').getBoundingClientRect();
+		const chips = row.querySelector('.msg-collapsed-chips').getBoundingClientRect();
+		return {previewBottom:preview.bottom, chipsTop:chips.top};
+	});
+	assert(foldedMeta.chipsTop >= foldedMeta.previewBottom, 'folded metadata sits below the message preview');
 	const lines=page.locator('.bash-output-line');
 	assert.equal(await lines.first().locator('.bash-line-number').textContent(),'15');
 	assert.equal(await lines.nth(1).locator('.bash-line-number').textContent(),'27');
 	await page.locator('.bash-output-lines.has-overflow').waitFor();
-	assert((await page.locator('.bash-output-lines').evaluate(el=>getComputedStyle(el).maskImage)).includes('gradient'));
-	await page.locator('.toolcall-bash').hover();
+	assert((await page.locator('.bash-output-lines').first().evaluate(el=>getComputedStyle(el).maskImage)).includes('gradient'));
+	await page.locator('.toolcall-bash').last().hover();
+	await page.setViewportSize({width:1200,height:900});
+	const bashHeader = await page.locator('.toolcall-bash').last().locator('.toolcall-head').evaluate((head) => ({height:head.getBoundingClientRect().height, labels:[...head.querySelectorAll('button')].map((button)=>({height:button.getBoundingClientRect().height, scrollWidth:button.scrollWidth, width:button.clientWidth}))}));
+	assert(bashHeader.height <= 50 && bashHeader.labels.every((label)=>label.height <= 32 && label.scrollWidth <= label.width + 1), `bash actions stay on one line: ${JSON.stringify(bashHeader)}`);
+	await page.setViewportSize({width:1600,height:900});
 	const buttonAlignment=await page.evaluate(()=>{
 		const center=s=>{const r=document.querySelector(s).getBoundingClientRect();return r.y+r.height/2};
 		return Math.abs(center('.toolcall-bash .toolcall-wrap')-center('.toolcall-bash .toolcall-copy'));

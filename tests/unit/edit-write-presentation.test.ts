@@ -33,6 +33,18 @@ test("write counts actual lines and failed edits preserve sought text", () => {
 	expect(failed?.hunks[0].lines.map((line) => line.text)).toEqual(["def enqueue():", "  pass"]);
 });
 
+test("successful edit without SDK diff still shows the applied replacement", () => {
+	const change = editWriteChange(call("e-fallback", "edit", { path: "ledger/monthly.py", oldText: "month = digest[\"month\"]", newText: "month = state.month" }), result("e-fallback"));
+	expect(change).toMatchObject({ kind: "edit", added: 1, removed: 1, empty: false });
+	expect(change?.hunks[0].lines.map((line) => [line.marker, line.text])).toEqual([["-", "month = digest[\"month\"]"], ["+", "month = state.month"]]);
+});
+
+test("replacement fallback excludes unchanged surrounding lines from counts", () => {
+	const change = editWriteChange(call("e-context", "edit", { path: "a.py", oldText: "before\nold\nafter", newText: "before\nnew\nafter" }), result("e-context"));
+	expect(change).toMatchObject({ added: 1, removed: 1, fromArguments: true });
+	expect(change?.hunks[0].lines.map((line) => line.marker)).toEqual([" ", "-", "+", " "]);
+});
+
 test("a later successful edit of the same path marks only the earlier failure as retried", () => {
 	const failedCall = call("e1", "edit", { path: "src/a.ts", oldText: "old" });
 	const successCall = call("e2", "edit", { path: "src/a.ts", oldText: "new" });

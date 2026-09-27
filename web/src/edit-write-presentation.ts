@@ -24,6 +24,8 @@ export interface EditWriteChange {
 	errorText: string;
 	output: string;
 	empty: boolean;
+	/** Replacement text from the completed tool call when the SDK supplied no diff. */
+	fromArguments?: boolean;
 }
 
 const functionLine = /^\s*(?:(?:async\s+)?def\s+\w+|(?:export\s+)?(?:async\s+)?function\s+\w+|(?:public|private|protected)\s+\w+\s*\(|(?:async\s+)?\w+\s*\([^)]*\)\s*[:{])/;
@@ -78,7 +80,31 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 	}
 	const details = result?.details as { diff?: unknown; firstChangedLine?: unknown } | undefined;
 	const diff = !error && typeof details?.diff === "string" ? details.diff : "";
-	const hunks = parseEditDiff(diff);
+	let hunks = parseEditDiff(diff);
+	let fromArguments = false;
+	if (!error && result && hunks.length === 0) {
+		const edits = Array.isArray(args.edits) ? args.edits : [args];
+		hunks = edits.flatMap((edit) => {
+			if (!edit || typeof edit !== "object") return [];
+			const { oldText, newText } = edit as { oldText?: unknown; newText?: unknown };
+			if (typeof oldText !== "string" || typeof newText !== "string" || oldText === newText) return [];
+			const oldLines = oldText ? oldText.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n") : [];
+			const newLines = newText ? newText.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n") : [];
+			let prefix = 0;
+			while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix++;
+			let suffix = 0;
+			while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - suffix - 1] === newLines[newLines.length - suffix - 1]) suffix++;
+			const contextBefore = oldLines.slice(Math.max(0, prefix - 2), prefix).map((text) => ({ marker: " " as const, text }));
+			const contextAfter = oldLines.slice(oldLines.length - suffix, Math.min(oldLines.length, oldLines.length - suffix + 2)).map((text) => ({ marker: " " as const, text }));
+			return [{ line: 1, lines: [
+				...contextBefore,
+				...oldLines.slice(prefix, oldLines.length - suffix).map((text) => ({ marker: "-" as const, text })),
+				...newLines.slice(prefix, newLines.length - suffix).map((text) => ({ marker: "+" as const, text })),
+				...contextAfter,
+			] }];
+		});
+		fromArguments = hunks.length > 0;
+	}
 	const lines = hunks.flatMap((hunk) => hunk.lines);
 	if (error) {
 		const edits = Array.isArray(args.edits) ? args.edits : [args];
@@ -86,7 +112,7 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 		const missing = oldTexts.join("\n\n");
 		return { path, kind: "edit", added: 0, removed: 0, firstChangedLine: 1, hunks: missing ? [{ line: 1, lines: missing.replace(/\n$/, "").split("\n").map((text) => ({ marker: " ", text })) }] : [], error, errorText: output, output, empty: !missing };
 	}
-	return { path, kind: "edit", added: lines.filter((line) => line.marker === "+").length, removed: lines.filter((line) => line.marker === "-").length, firstChangedLine: typeof details?.firstChangedLine === "number" ? details.firstChangedLine : hunks[0]?.line ?? 1, hunks, error, errorText: "", output, empty: !hunks.length };
+	return { path, kind: "edit", added: lines.filter((line) => line.marker === "+").length, removed: lines.filter((line) => line.marker === "-").length, firstChangedLine: typeof details?.firstChangedLine === "number" ? details.firstChangedLine : hunks[0]?.line ?? 1, hunks, error, errorText: "", output, empty: !hunks.length, fromArguments };
 }
 
 export function changeLineCount(block: UiToolCallBlock, result?: UiMessage): { added: number; removed: number } | null {
