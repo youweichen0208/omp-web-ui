@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiPlus, FiX } from "react-icons/fi";
+import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiX } from "react-icons/fi";
 import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, UiMessage } from "../types";
 import { useT } from "../i18n";
 import { downloadFile } from "../download";
@@ -36,6 +36,16 @@ export const RightPanel = memo(function RightPanel({ active, files, conversation
 	const [notRepo, setNotRepo] = useState(false);
 	const [onlyChanged, setOnlyChanged] = useState(false);
 	const [showHidden, setShowHidden] = useState(true);
+	const [controlsOpen, setControlsOpen] = useState(false);
+	const controlsRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (!controlsOpen) return;
+		const closeOutside = (event: PointerEvent) => { if (!controlsRef.current?.contains(event.target as Node)) setControlsOpen(false); };
+		const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setControlsOpen(false); };
+		document.addEventListener("pointerdown", closeOutside, true);
+		document.addEventListener("keydown", closeEscape);
+		return () => { document.removeEventListener("pointerdown", closeOutside, true); document.removeEventListener("keydown", closeEscape); };
+	}, [controlsOpen]);
 	const [fileCheck, setFileCheck] = useState<{ key: string; reqId: number } | null>(null);
 	const allMessages = streamingMessage ? [...messages, streamingMessage] : messages;
 	const fileCandidates = conversationFileEntries(allMessages, cwd);
@@ -113,9 +123,10 @@ export const RightPanel = memo(function RightPanel({ active, files, conversation
 	}, [active, cwd, scmDirty, send]);
 	useEffect(() => {
 		if (scmData?.type !== "scm_data" || scmData.reqId !== statusRequest.current || scmData.cwd !== cwd) return;
-		setChanged(scmData.ok ? (scmData.files ?? []).map((entry) => ({ ...entry, path: entry.path.replaceAll("\\", "/") })) : []);
+		const files = scmData.ok ? (scmData.files ?? []).map((entry) => ({ ...entry, path: entry.path.replaceAll("\\", "/") })) : [];
+		setChanged(files);
 		setNotRepo(!!scmData.notRepo);
-		if (scmData.notRepo) setOnlyChanged(false);
+		if (scmData.notRepo || files.length === 0) setOnlyChanged(false);
 	}, [scmData, cwd]);
 	const toggle = (path: string) => {
 		setExpanded((previous) => {
@@ -171,7 +182,7 @@ export const RightPanel = memo(function RightPanel({ active, files, conversation
 	const actionLabel = (action: "read" | "grep" | "used") => t(action === "read" ? "readVerb" : action === "grep" ? "grepSearch" : "fileUsed");
 	const involvedGroups = (["read", "grep", "used"] as const).map((action) => ({ action, files: involved.filter((file) => file.action === action) })).filter((group) => group.files.length > 0);
 	return <aside className={`panel panel-right${involved.length ? " has-conversation-files" : ""}`}>
-		<div className="panel-title"><span>{t("workspaceFiles")}</span><button type="button" className="tree-hidden-toggle" aria-pressed={showHidden} onClick={() => setShowHidden(value => !value)}>{t("showHiddenFiles")}</button>{!notRepo && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}</div>
+		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
 			if (!button) return;

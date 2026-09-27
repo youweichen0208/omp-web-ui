@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { UiMessage } from "../../server/protocol.js";
 import { conversationFileEntries, conversationFiles, mentionedHiddenDirs } from "../../web/src/conversation-files.js";
-import { numberedOutputLine, selectVisibleOutputLines, displayBashCommand, isLikelyErrorLine } from "../../web/src/bash-presentation.js";
+import { numberedOutputLine, selectVisibleOutputLines, displayBashCommand, isLikelyErrorLine, isSearchCommand, searchOutputKind } from "../../web/src/bash-presentation.js";
 import { existingConversationFiles } from "../../server/files-service.js";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,6 +21,15 @@ test("grep source lines replace generated output line numbers", () => {
 	expect(numberedOutputLine("spec.md:27:  another match", 1, true)).toEqual({ number: "27", text: "spec.md: another match" });
 	expect(numberedOutputLine("ordinary output", 2)).toEqual({ number: "3", text: "ordinary output" });
 	expect(numberedOutputLine("12:34: started", 0)).toEqual({ number: "1", text: "12:34: started" });
+	expect(numberedOutputLine("2026-09-27", 0, true)).toEqual({ number: "1", text: "2026-09-27" });
+	expect(numberedOutputLine("---", 2, true)).toEqual({ number: "3", text: "---" });
+	expect(numberedOutputLine("docs/ARCHITECTURE.md:212: matched", 3, true)).toEqual({ number: "212", text: "docs/ARCHITECTURE.md: matched" });
+	expect(numberedOutputLine("2026-09-27", 0, "mixed")).toEqual({ number: "1", text: "2026-09-27" });
+	expect(numberedOutputLine("docs/ARCHITECTURE.md:212: matched", 3, "mixed")).toEqual({ number: "212", text: "docs/ARCHITECTURE.md: matched" });
+	expect(numberedOutputLine("331:      ordinary code", 0, false)).toEqual({ number: "1", text: "331:      ordinary code" });
+	expect(isSearchCommand(JSON.stringify({ command: "date +%F; grep -rn pattern docs" }))).toBe(true);
+	expect(isSearchCommand(JSON.stringify({ command: "grep pattern docs" }))).toBe(false);
+	expect(searchOutputKind(JSON.stringify({ command: "date +%F; grep -rn pattern docs" }))).toBe("mixed");
 });
 
 test("bash output separators are not treated as filename prefixes", () => {

@@ -862,7 +862,7 @@ export function App() {
 								currentFile={!switching && currentFile?.cwd === chat.state?.cwd ? currentFile : null}
 								contextReader={contextReader}
 								contextSaver={contextSaver}
-								contextUsage={chat.state?.stats.contextUsage}
+								stats={chat.state?.stats}
 								promptResult={chat.promptResult}
 								send={send}
 								ready={chat.ready}

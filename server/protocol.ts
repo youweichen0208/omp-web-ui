@@ -62,6 +62,8 @@ export interface UiMessage {
 	model?: string;
 	provider?: string;
 	stopReason?: string;
+	/** Provider-reported usage for one assistant response. */
+	usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	errorMessage?: string;
 	/** Present on toolResult messages; links to the assistant message's toolCall block. */
 	toolCallId?: string;
@@ -147,6 +149,8 @@ export interface UiState {
 			contextWindow: number;
 			percent: number | null;
 		};
+		/** Estimated allocation of the current context; providers report only totals. */
+		contextParts?: { system: number; tools: number; conversation: number; attachments: number } | null;
 	};
 }
 

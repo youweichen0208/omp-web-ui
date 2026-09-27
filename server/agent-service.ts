@@ -51,6 +51,7 @@ import {
 // 调用，不是我们临时拼出来的私活。声明成显式依赖、锁成跟 pi-coding-agent 完全
 // 一致的版本号，保证两边用的是同一份实现。
 import { contentText } from "@earendil-works/pi-ai";
+import { estimateContextParts } from "./context-breakdown.js";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { Type } from "typebox";
 import { BgServerTracker } from "./bg-servers.js";
@@ -1618,6 +1619,7 @@ export class ClientSession {
 			tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 			cost: 0,
 			contextUsage: { tokens: null, contextWindow: 0, percent: null },
+			contextParts: null,
 		};
 		try {
 			const s = this.session.getSessionStats();
@@ -1632,6 +1634,7 @@ export class ClientSession {
 							percent: s.contextUsage.percent,
 						}
 					: stats.contextUsage,
+				contextParts: estimateContextParts(this.session.messages, this.session.systemPrompt, s.contextUsage?.tokens ?? null),
 			};
 		} catch {
 			// stats are best-effort

@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react";
+import { memo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
 	FiChevronDown,
 	FiChevronRight,
@@ -28,6 +28,8 @@ import { splitLeakedThinking } from "../leaked-thinking";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
 import { isRasterImage, fileToProcessedImage } from "../image-paste";
 import { splitFrontmatter } from "../read-presentation";
+import { questionPreviewText } from "../question-markers";
+import { preserveUserTree } from "../user-message-presentation";
 
 /** 编辑重问编辑器里直接拖入/粘贴文件的上限（与服务端 MAX_UPLOAD_BYTES 一致）。 */
 const MAX_EDIT_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -174,6 +176,27 @@ export const Message = memo(function Message({
 	// Transient inline notice for the editor (oversized/unreadable dropped
 	// files) — Message has no toast access, so it renders under the chips.
 	const [editNotice, setEditNotice] = useState<string | null>(null);
+	const foldableUser = message.role === "user" && message.content.length > 0 && message.content.every((block) => block.type === "text");
+	const userContentRef = useRef<HTMLDivElement>(null);
+	const [userExpanded, setUserExpanded] = useState(false);
+	const [userOverflow, setUserOverflow] = useState(false);
+	const [userLineCount, setUserLineCount] = useState(0);
+	useLayoutEffect(() => {
+		if (!foldableUser || editing || userExpanded) return;
+		const node = userContentRef.current;
+		if (!node) return;
+		const measure = () => {
+			setUserOverflow(node.scrollHeight > node.clientHeight + 2);
+			const text = message.content.map((block) => asText(block)?.text ?? "").filter(Boolean).join("\n");
+			const explicitLines = text.split(/\r?\n/).length;
+			const lineHeight = parseFloat(getComputedStyle(node).lineHeight) || 22;
+			setUserLineCount(Math.max(explicitLines, Math.ceil(node.scrollHeight / lineHeight)));
+		};
+		const observer = new ResizeObserver(measure);
+		observer.observe(node);
+		measure();
+		return () => observer.disconnect();
+	}, [foldableUser, message.content, editing, userExpanded]);
 	const pushEditNotice = (msg: string) => {
 		setEditNotice(msg);
 		window.setTimeout(
@@ -197,9 +220,9 @@ export const Message = memo(function Message({
 	// expansion) renders as a compact collapsible skill card instead of dumping
 	// the whole SKILL.md into the user bubble — same as the pi CLI.
 	const skillBlock = message.role === "user" ? parseSkillBlock(userText) : null;
-	const questionText = skillBlock
+	const questionText = questionPreviewText(skillBlock
 		? skillBlock.userMessage ?? `skill:${skillBlock.name}`
-		: userText.split("\n").join(" ").trim();
+		: userText);
 	// Streaming bubble with no content yet (first token not arrived) — show a
 	// visible “thinking…” placeholder instead of an invisible empty bubble.
 	// Both this placeholder and the trailing blinking caret below are meant
@@ -338,7 +361,7 @@ export const Message = memo(function Message({
 				elements.push(<GrepSummary key={`${message.id}-${first.id}`} block={first} view={viewFor(first)} wrap={toolsWrap} />);
 				continue;
 			}
-			elements.push(<Block key={`${message.id}-${i}`} block={block} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
+			elements.push(<Block key={`${message.id}-${i}`} block={block} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
 		}
 		return elements;
 	};
@@ -517,14 +540,17 @@ export const Message = memo(function Message({
 								<SkillCard block={skillBlock} />
 								{skillBlock.userMessage && (
 									<div className="msg-text">
-										<Markdown text={skillBlock.userMessage} />
+										<Markdown text={preserveUserTree(skillBlock.userMessage)} />
 									</div>
 								)}
 								{renderContentBlocks(true)}
 							</>
+						) : message.role === "user" ? (
+							<div ref={userContentRef} className={`user-message-content${foldableUser && !userExpanded ? " collapsed" : ""}`}>{renderContentBlocks(false)}</div>
 						) : (
 							renderContentBlocks(false)
 						)}
+						{foldableUser && userOverflow && !editing && !skillBlock && <button type="button" className="user-message-expand" onClick={() => setUserExpanded(value => !value)}>{userExpanded ? t("collapseCode") : t("expandAllLines", { n: userLineCount })}</button>}
 
 					</>
 				)}
@@ -696,6 +722,7 @@ function SkillCard({ block }: { block: SkillBlock }) {
 
 function Block({
 	block,
+	user,
 	toolResults,
 	liveOutputs,
 	toolStatuses,
@@ -706,6 +733,7 @@ function Block({
 	toolsWrap,
 }: {
 	block: UiContentBlock;
+	user?: boolean;
 	toolResults: ReadonlyMap<string, UiMessage>;
 	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
@@ -733,9 +761,9 @@ function Block({
 				{leak && <LeakedThinkingBlock text={leak.leaked} />}
 				{body &&
 					(live ? (
-						<StreamMarkdown text={body} />
+						<StreamMarkdown text={user ? preserveUserTree(body) : body} />
 					) : (
-						<Markdown text={body} />
+						<Markdown text={user ? preserveUserTree(body) : body} />
 					))}
 				{text.truncated && <div className="trunc-note">{t("truncated")}</div>}
 			</div>

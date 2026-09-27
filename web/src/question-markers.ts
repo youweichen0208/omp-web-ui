@@ -1,4 +1,8 @@
 /** Merge marks that would visually overlap on the question rail. */
+export function questionPreviewText(text: string): string {
+	return text.trim().replace(/^\d+[.)、．]\s*/, "").replace(/\s+/g, " ");
+}
+
 export function clusterQuestionMarkers(
 	markers: readonly { id: string; position: number }[],
 	railHeight: number,

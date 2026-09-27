@@ -113,6 +113,7 @@ export function serializeMessage(
 				model: m.model,
 				provider: m.provider,
 				stopReason: m.stopReason,
+				usage: m.usage ? { input: m.usage.input, output: m.usage.output, cacheRead: m.usage.cacheRead, cacheWrite: m.usage.cacheWrite } : undefined,
 				errorMessage: m.errorMessage,
 			};
 

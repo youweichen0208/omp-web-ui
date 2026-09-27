@@ -26,7 +26,7 @@ const messages=[
 {id:'user',role:'user',timestamp,content:[{type:'text',text:'审查一下最近的代码改动请求，先看看项目里都有哪些文件，最近改了什么。'}]},
 {id:'assistant-tool',role:'assistant',model:'glm-5.3',timestamp,content:[{type:'thinking',thinking:'先检查目录与最近修改，再核对项目约束。',durationMs:3000},{type:'toolCall',id:'bash-design',name:'bash',argumentsText:JSON.stringify({command})}]},
 {id:'result',role:'toolResult',toolCallId:'bash-design',toolName:'bash',isError:false,content:[{type:'text',text:lines.join('\n')+'\n'},...[...lines.slice(0,11),'docs/CONTEXT.md'].map((path,i)=>({type:'toolCall',id:`grep-${i}`,name:'grep',argumentsText:JSON.stringify({path})}))]},
-{id:'assistant',role:'assistant',model:'glm-5.3',timestamp,content:[{type:'thinking',thinking:'Confirmed: the workspace contains only docs — no code at all.'},{type:'text',text:'这个仓库目前**只有文档，没有代码**。最近的改动集中在 `.scratch/us-stock-research/issues/`，共 8 个 issue 草稿，另外有两份 ADR。要我逐个审查这些 issue 吗？'}]},
+{id:'assistant',role:'assistant',model:'glm-5.3',timestamp,usage:{input:7500,output:1000,cacheRead:86000,cacheWrite:6500},content:[{type:'thinking',thinking:'Confirmed: the workspace contains only docs — no code at all.'},{type:'text',text:'这个仓库目前**只有文档，没有代码**。最近的改动集中在 `.scratch/us-stock-research/issues/`，共 8 个 issue 草稿，另外有两份 ADR。要我逐个审查这些 issue 吗？'}]},
 ];
 let server,browser;
 try{
@@ -47,6 +47,8 @@ const message=JSON.parse(wire.toString());
 if(message.type==='snapshot'){
 Object.assign(message.state,{messages,piConfigured:true,model:{id:'glm-5.3',name:'GLM 5.3',provider:'volc-glm'},thinkingLevel:'minimal',availableThinkingLevels:['off','minimal','low','medium','high']});
 message.state.stats.contextUsage={tokens:17300,contextWindow:1000000,percent:1.73};
+message.state.stats.tokens={input:7500,output:1000,cacheRead:86000,cacheWrite:6500,total:101000};
+message.state.stats.contextParts={system:1800,tools:5200,conversation:9300,attachments:1000};
 message.state.cwdEvents=[{cwd,timestamp:Date.now()}];
 }
 if(message.type==='projects')message.projects=[{path:'/',lastUsed:1,firstAdded:1,conversationCount:1},{path:join(root,'recent'),lastUsed:100,firstAdded:100,conversationCount:1},{path:cwd,lastUsed:50,firstAdded:50,conversationCount:1}];
@@ -65,9 +67,11 @@ assert.deepEqual((await page.locator('.project-item .project-name').allTextConte
 for(const button of await page.locator('.thinking.open .thinking-toggle').all())await button.click();
 await page.locator('.file-dir-main',{hasText:'.scratch'}).click();
 await page.locator('.file-dir-main',{hasText:'us-stock-research'}).waitFor();
+await page.locator('.tree-menu-trigger').click();
 await page.locator('.tree-hidden-toggle').click();
 assert.equal(await page.locator('.file-dir-main',{hasText:'.scratch'}).count(),0);
 await page.locator('.tree-hidden-toggle').click();
+assert.equal(await page.locator('.tree-hidden-toggle').getAttribute('aria-checked'),'true');
 await page.locator('.file-dir-main',{hasText:'.scratch'}).waitFor();
 assert.equal(await page.locator('.file-name-text',{hasText:'AGENTS.md'}).isVisible(),true,'root siblings remain visible');
 await page.locator('.file-dir-main',{hasText:'docs'}).click();
@@ -89,10 +93,10 @@ return {left:box('.drawer-left'),right:box('.drawer-right'),header:box('.topbar'
 assert.equal(geometry.left.w,264);assert.equal(geometry.right.w,272);assert.equal(geometry.header.h,52);assert.equal(geometry.composer.w,780);assert(geometry.font.includes('IBM Plex Sans'));
 const readingEdges=await page.evaluate(()=>{
 const messages=document.querySelector('.messages');const composer=document.querySelector('.main > .inputbar');const wrap=document.querySelector('.messages-wrap');
-return {bottom:parseFloat(getComputedStyle(messages).paddingBottom),composer:composer.getBoundingClientRect().height,topFade:getComputedStyle(wrap,'::before').height,bottomFade:getComputedStyle(wrap,'::after').height};
+return {bottom:parseFloat(getComputedStyle(messages).paddingBottom),composer:composer.getBoundingClientRect().height,topFade:getComputedStyle(wrap,'::before').height,bottomFade:getComputedStyle(wrap,'::after').display};
 });
 assert.equal(readingEdges.bottom,24,JSON.stringify(readingEdges));
-assert.equal(readingEdges.topFade,'16px');assert.equal(readingEdges.bottomFade,'56px');
+assert.equal(readingEdges.topFade,'16px');assert.equal(readingEdges.bottomFade,'none');
 assert.equal(await page.locator('.thinking-control-label').textContent(),'思考');
 await page.locator('.conversation-file').first().waitFor();
 assert.equal(await page.locator('.conversation-files-title').textContent(),'本次对话涉及');
@@ -104,7 +108,6 @@ assert.equal(await page.locator('.conversation-file',{hasText:'CONTEXT.md'}).cou
 assert.equal(await page.locator('.conversation-file',{hasText:'spec.md'}).count(),1);
 assert.equal(await page.locator('.conversation-file',{hasText:'data-source-research.md'}).count(),0,'missing history paths stay out of the current workspace');
 assert.match(await page.locator('.status-version').textContent(),/^v\d+\.\d+\.\d+/);
-assert.equal(await page.locator('.tree-hidden-toggle').getAttribute('aria-pressed'),'true');
 const involvedLayout=await page.evaluate(()=>{
 const panel=document.querySelector('.panel-right').getBoundingClientRect();const tree=document.querySelector('.panel-right > .panel-body').getBoundingClientRect();const section=document.querySelector('.conversation-files').getBoundingClientRect();const list=document.querySelector('.conversation-files-list');
 return {panel:panel.height,tree:tree.height,section:section.height,bottom:section.bottom-panel.bottom,scrollable:list.scrollHeight>list.clientHeight};
@@ -127,7 +130,27 @@ assert((await page.locator('.thinking-duration').first().textContent()).includes
 assert.equal(await page.locator('.sidebar-connection').isVisible(),false);
 assert.equal((await page.locator('.design-workspace > .statusbar').boundingBox()).width,1600);
 assert.equal(await page.locator('.project-item.active').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
-assert((await page.locator('.composer-meter i').boundingBox()).width >= 2);
+assert.equal(await page.locator('.usage-popover').count(),0);
+assert.match(await page.locator('.usage-trigger').textContent(),/2%.*86%/);
+await page.locator('.usage-trigger').hover();
+await page.locator('.usage-popover').waitFor();
+assert.match(await page.locator('.usage-popover').textContent(),/17.3K \/ 1M/);
+assert.match(await page.locator('.usage-popover').textContent(),/86K/);
+await page.locator('.usage-trigger').click();
+await page.mouse.move(300,300);
+assert.equal(await page.locator('.usage-popover').count(),1,'click pins the usage details');
+await page.locator('.topbar').click({position:{x:20,y:20}});
+assert.equal(await page.locator('.usage-popover').count(),0);
+await page.locator('.usage-trigger').click();
+await page.locator('.usage-demo').click();
+assert.equal(await page.locator('.usage-demo-notice').textContent(),'演示数据');
+await page.locator('.usage-demo').click();
+assert.equal(await page.locator('.usage-trigger.warn').count(),1,'80% context turns the ring amber');
+await page.locator('.usage-demo').click();
+assert.equal(await page.locator('.usage-cache-short strong.warn').count(),1,'low cache hit turns the number amber');
+await page.locator('.usage-demo').click();
+assert.equal(await page.locator('.usage-demo-notice').count(),0,'demo cycles back to live usage');
+await page.locator('.topbar').click({position:{x:20,y:20}});
 await page.evaluate(()=>document.fonts.ready);
 const cdp=await context.newCDPSession(page);
 await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
@@ -190,6 +213,33 @@ assert((await shortPage.locator('.thinking-duration').textContent()).includes('�
 assert((await shortPage.locator('.time-gap').getAttribute('title')).includes(String(new Date(shortAt).getFullYear())));
 await shortPage.close();
 
+const navPage=await context.newPage();
+const longQuestion='1. Q1 使用范围：确认研究计划\n\nCampaign\n├── Batch\n│  └── Forecast\n\n'+Array.from({length:36},(_,i)=>`说明 ${i+1}：这是一段需要保留的长消息。`).join('\n\n');
+const navMessages=[...Array.from({length:5},(_,i)=>({id:`nav-${i}`,role:'user',timestamp:timestamp+i*60_000,content:[{type:'text',text:i===0?longQuestion:`${i+1}. Q${i+1} 继续确认` }]})),{id:'nav-reply',role:'assistant',timestamp:timestamp+6*60_000,content:[{type:'text',text:Array.from({length:80},(_,i)=>`回答段落 ${i+1}。`).join('\n\n')}]}];
+await navPage.routeWebSocket('**/ws',route=>{const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot')Object.assign(message.state,{messages:navMessages,piConfigured:true});route.send(JSON.stringify(message));});});
+await navPage.goto(`http://localhost:${PORT}`);
+await navPage.locator('.qn-rail.many').waitFor();
+await navPage.locator('.messages').evaluate(el=>el.scrollTop=0);
+await navPage.locator('.user-message-expand').waitFor();
+assert.match(await navPage.locator('.user-message-expand').textContent(),/展开全部 · \d+ 行/);
+assert.equal(await navPage.locator('.msg-user pre code').first().textContent(),'Campaign\n├── Batch\n│  └── Forecast\n');
+assert.equal(await navPage.locator('[data-msg-id="nav-0"] .user-message-content.collapsed').count(),1);
+await navPage.locator('.user-message-expand').click();
+assert.equal(await navPage.locator('[data-msg-id="nav-0"] .user-message-content.collapsed').count(),0);
+await navPage.locator('.qn-rail').hover();
+await navPage.locator('.qn-rail.open').waitFor();
+await navPage.locator('.qn-list').waitFor({state:'visible'});
+await navPage.waitForTimeout(200);
+const navGeometry=await navPage.locator('.qn-list').evaluate(el=>({height:el.getBoundingClientRect().height,viewport:innerHeight,background:getComputedStyle(el).backgroundColor,opacity:getComputedStyle(el).opacity}));
+assert(navGeometry.height<300&&navGeometry.height<=navGeometry.viewport*.6,JSON.stringify(navGeometry));
+assert.equal(navGeometry.background,'rgb(255, 255, 255)');
+assert.equal(navGeometry.opacity,'1');
+assert.match(await navPage.locator('.qn-list-text').first().textContent(),/^Q1 使用范围/);
+await navPage.screenshot({path:'/private/tmp/pi-question-nav-fix.png'});
+await navPage.locator('.topbar').click({position:{x:20,y:20}});
+assert.equal(await navPage.locator('.qn-list').isVisible(),false);
+await navPage.close();
+
 const bashPage=await context.newPage();
 const bashCommand='echo "=== FIRST ==="; pwd; echo "=== SECOND ==="; ls '+Array.from({length:6},()=>'/Users/alice/projects/missing').join(' ')+'; ls .assets';
 const bashLines=['=== FIRST ===','/tmp','=== SECOND ===',...Array.from({length:9},(_,i)=>`normal output ${i}`),'ls: /Users/alice/projects/missing: No such file or directory',...Array.from({length:7},(_,i)=>`more output ${i}`),'Command exited with code 1'];
@@ -215,9 +265,26 @@ assert.equal(await bashPage.locator('.toolcall-bash code').first().evaluate(el=>
 await bashPage.screenshot({path:'/private/tmp/pi-bash-presentation.png'});
 await bashPage.close();
 
+const searchPage=await context.newPage();
+const searchMessages=[
+{id:'search-user',role:'user',content:[{type:'text',text:'Check the date and matching lines'}]},
+{id:'search-call',role:'assistant',content:[{type:'toolCall',id:'mixed-grep',name:'bash',argumentsText:JSON.stringify({command:'date +%F; git branch --show-current; echo "---"; grep -rn pattern docs'})}]},
+{id:'search-result',role:'toolResult',toolCallId:'mixed-grep',toolName:'bash',isError:false,content:[{type:'text',text:'2026-09-27\nmain\n---\ndocs/ARCHITECTURE.md:212: matched\n'}]},
+];
+await searchPage.routeWebSocket('**/ws',route=>{const upstream=route.connectToServer();route.onMessage(wire=>upstream.send(wire));upstream.onMessage(wire=>{const message=JSON.parse(wire.toString());if(message.type==='snapshot')Object.assign(message.state,{messages:searchMessages,piConfigured:true});route.send(JSON.stringify(message));});});
+await searchPage.goto(`http://localhost:${PORT}`);
+await searchPage.locator('.bash-output-line').first().waitFor();
+assert.equal(await searchPage.locator('.bash-output-line').first().locator('.bash-line-number').textContent(),'1');
+assert.equal(await searchPage.locator('.bash-output-line').first().locator('.bash-line-text').textContent(),'2026-09-27');
+assert.equal(await searchPage.locator('.bash-output-line').nth(3).locator('.bash-line-number').textContent(),'212');
+await searchPage.close();
+
 for(const width of [1100,900,390]){
 await page.setViewportSize({width,height:900});await page.waitForTimeout(250);
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`overflow at ${width}`);
+assert.equal(await page.locator('.usage-trigger').isVisible(),true,`usage control remains visible at ${width}`);
+if(width<1100)assert.equal(await page.locator('.usage-cache-short').isVisible(),false);
+assert((await page.locator('.input-tools .btn.send').first().boundingBox()).width>=30,`send control shrank at ${width}`);
 }
 assert.deepEqual(errors,[]);
 }finally{await browser?.close();server?.kill('SIGTERM');await sleep(200);}

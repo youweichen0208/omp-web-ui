@@ -1,4 +1,4 @@
-import { numberedOutputLine, differentCommandDirectory, isSearchCommand, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
+import { numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
 import { WorkspacePathContext } from "../workspace-context";
 import { Fragment, memo, useContext, useEffect, useRef, useState } from "react";
 import {
@@ -413,7 +413,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 					)}
 				</div>
 			)}
-			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={isSearchCommand(block.argumentsText)} /> : (
+			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">
 						{isError ? t("errorOutput") : block.name === "read" ? t("modelReadOnly") : t("output")}
@@ -613,7 +613,7 @@ function BashFailure({ diagnostics, output, wrap }: { diagnostics: ReturnType<ty
 	</div>;
 }
 
-function BashOutput({ output, wrap, cwd, searchOutput }: { output: string; wrap: boolean; cwd: string; searchOutput: boolean }) {
+function BashOutput({ output, wrap, cwd, searchOutput }: { output: string; wrap: boolean; cwd: string; searchOutput: "standalone" | "mixed" | "none" }) {
 	const t = useT();
 	const [all, setAll] = useState(false);
 	const scroller = useRef<HTMLDivElement>(null);
@@ -634,7 +634,7 @@ function BashOutput({ output, wrap, cwd, searchOutput }: { output: string; wrap:
 		<div className="bash-output-label"><span>{t("output")} · {t("toolLineCount", { n: lines.length })}{errorCount > 0 ? ` · ${t("bashLikelyErrorLines", { n: errorCount })}` : ""}</span>{cwd && <span title={cwd}>{t("toolRelativeTo", { path: cwd })}</span>}</div>
 		<div ref={scroller} className={`bash-output-lines ${wrap ? "wrap" : ""} ${overflow ? "has-overflow" : ""}`}>{visible.map((index, position) => {
 			const rawLine = lines[index];
-			const { number: lineNumber, text: line } = numberedOutputLine(rawLine, index, searchOutput);
+			const { number: lineNumber, text: line } = numberedOutputLine(rawLine, index, searchOutput === "mixed" ? "mixed" : searchOutput === "standalone");
 			const path = /^(?:[.~/\w-]+\/)*[.\w-]+(?:\.[\w-]+)$/.test(line);
 			const split = path ? line.lastIndexOf("/") + 1 : 0;
 			return <Fragment key={index}>{position > 0 && index > visible[position - 1] + 1 && <div className="bash-output-gap">{t("bashHiddenLines", { n: index - visible[position - 1] - 1 })}</div>}<div className={`bash-output-line${isLikelyErrorLine(rawLine) ? " error" : ""}`}><span className="bash-line-number">{lineNumber}</span><span className="bash-line-text">{path ? <><span className="bash-path-dir">{line.slice(0, split)}</span><span className={split ? "bash-path-file" : "bash-root-file"}>{line.slice(split)}</span></> : line || " "}</span></div></Fragment>;

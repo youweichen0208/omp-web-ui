@@ -30,7 +30,7 @@ import {
 	type WinRect,
 } from "../lazy-window";
 import { SearchBar } from "./SearchBar";
-import { clusterQuestionMarkers } from "../question-markers";
+import { clusterQuestionMarkers, questionPreviewText } from "../question-markers";
 import { useT, type Translate } from "../i18n";
 
 /** Stable shared empty map — passing this (instead of a fresh Map) lets
@@ -353,7 +353,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 			// Skill invocations show the user's own args (or the skill name),
 			// never the expanded SKILL.md dump.
 			const sb = parseSkillBlock(joined);
-			const text = sb ? (sb.userMessage ?? `skill:${sb.name}`) : joined.trim();
+			const text = questionPreviewText(sb ? (sb.userMessage ?? `skill:${sb.name}`) : joined);
 			if (!text) continue;
 			qs.push({ id: m.id, text });
 		}
@@ -587,6 +587,15 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	// The rail is a pointer-event target so it can expand on hover; forward
 	// wheel over it (collapsed strip or expanded panel) to the message list.
 	const railRef = useRef<HTMLDivElement>(null);
+	const [navOpen, setNavOpen] = useState(false);
+	useEffect(() => {
+		if (!navOpen) return;
+		const closeOutside = (event: PointerEvent) => { if (!railRef.current?.contains(event.target as Node)) setNavOpen(false); };
+		const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setNavOpen(false); };
+		document.addEventListener("pointerdown", closeOutside, true);
+		document.addEventListener("keydown", closeEscape);
+		return () => { document.removeEventListener("pointerdown", closeOutside, true); document.removeEventListener("keydown", closeEscape); };
+	}, [navOpen]);
 	useEffect(() => {
 		const rail = railRef.current;
 		const el = scrollRef.current;
@@ -799,9 +808,12 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 			/>
 			{questions.length > 0 && (
 				<div
-					className={`qn-rail ${many ? "many" : ""}`}
+					className={`qn-rail ${many ? "many" : ""} ${navOpen ? "open" : ""}`}
 					ref={railRef}
 					aria-label={t("questionNavTitle")}
+					onPointerEnter={() => setNavOpen(true)}
+					onPointerLeave={() => setNavOpen(false)}
+					onFocusCapture={() => setNavOpen(true)}
 				>
 					{markerGroups.map((group) => {
 						const q = positionedQuestions.find((question) => question.id === group.ids[0])!;
@@ -812,7 +824,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							className={`qn-bar ${group.ids.length > 1 ? "cluster" : ""} ${group.ids.includes(questions[activeIdx]?.id ?? "") ? "active" : ""}`}
 							style={{ top: `${group.position * 100}%` }}
 							aria-label={group.ids.length > 1 ? t("questionMarkerGroup", { n: group.ids.length }) : `${questions.indexOf(q) + 1}. ${q.text}`}
-							onClick={() => jumpTo(q.id)}
+							onClick={() => { jumpTo(q.id); setNavOpen(false); }}
 						>
 							<span className="qn-bar-text">{questions.indexOf(q) + 1}. {q.text}</span>
 						</button>
@@ -826,7 +838,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 									key={q.id}
 									className={`qn-list-item ${i === activeIdx ? "active" : ""}`}
 									aria-label={`${i + 1}. ${q.text}`}
-									onClick={() => jumpTo(q.id)}
+									onClick={() => { jumpTo(q.id); setNavOpen(false); }}
 								>
 									<span className="qn-list-idx">{i + 1}</span>
 									<span className="qn-list-text">{q.text}</span>

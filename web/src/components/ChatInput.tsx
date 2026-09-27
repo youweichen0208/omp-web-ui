@@ -9,6 +9,7 @@ import { useT, useI18n } from "../i18n";
 import { isRasterImage } from "../image-paste";
 
 import { ModelThinking } from "./ModelThinking";
+import { UsagePopover } from "./UsagePopover";
 
 /** Props are deliberately NARROW (no whole-ChatState object): every field is
  *  stable while tokens stream in (the messages ARRAY reference is kept stable
@@ -22,7 +23,7 @@ interface ChatInputProps {
 	contextReader: MutableRefObject<ReadCurrentFile | null>;
 	/** 发送即保存：当前文件有未保存修改时先落盘再发送。 */
 	contextSaver: MutableRefObject<SaveCurrentFile | null>;
-	contextUsage?: UiState["stats"]["contextUsage"];
+	stats?: UiState["stats"];
 	promptResult: Extract<ServerMessage, { type: "prompt_result" }> | null;
 	ready: boolean;
 	streaming: boolean;
@@ -76,7 +77,7 @@ interface ChatInputProps {
 
 export const ChatInput = memo(function ChatInput({
 	currentFile, contextReader, contextSaver,
-	contextUsage,
+	stats,
 	ready, promptResult,
 	streaming,
 	messages,
@@ -653,7 +654,7 @@ export const ChatInput = memo(function ChatInput({
 						/>
 					</div>
 					<div className="input-tools-right">
-						{contextUsage && <span className="composer-context" title={t("context")}><span className="composer-meter"><i style={{ width: `${Math.min(contextUsage.percent ?? 0, 100)}%`, minWidth: (contextUsage.tokens ?? 0) > 0 ? 2 : 0 }} /></span><span>{contextUsage.tokens === null ? "—" : `${new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(contextUsage.tokens)} / ${new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(contextUsage.contextWindow)}`}</span></span>}
+						<UsagePopover stats={stats} messages={messages} canCompact={connected && !streaming} onCompact={() => { send({ type: "prompt", text: "/compact", requestId: randomUuid() }); }} />
 						<button
 							type="button"
 							className="btn attach-img"

@@ -4,11 +4,14 @@ export function compactSearchLine(line: string) {
 }
 
 /** Reuse grep's source line in the gutter instead of adding a second count. */
-export function numberedOutputLine(raw: string, index: number, searchOutput = false): { number: string; text: string } {
-	const match = searchOutput ? /^(?:([^:\s]+):)?(\d+)[:-]\s*(.*)$/.exec(raw) : null;
+export function numberedOutputLine(raw: string, index: number, searchOutput: boolean | "mixed" = false): { number: string; text: string } {
+	// A chained command can print dates, separators and other output before grep.
+	// In that case only path:line: records identify their source unambiguously.
+	const match = searchOutput === "mixed" ? /^([^:\s]+):(\d+):\s*(.*)$/.exec(raw)
+		: searchOutput ? /^(?:([^:\s]+):)?(\d+):\s*(.*)$/.exec(raw) : null;
 	return match
 		? { number: match[2], text: match[1] ? `${match[1]}: ${match[3]}` : match[3] }
-		: { number: String(index + 1), text: compactSearchLine(raw) };
+		: { number: String(index + 1), text: raw };
 }
 
 /** The SDK flattens stdout and stderr into one string, so this is a visual
@@ -32,12 +35,14 @@ export function displayBashCommand(command: string, cwd: string): string {
 	return home ? command.replaceAll(home, "~") : command;
 }
 
-export function isSearchCommand(argumentsText?: string): boolean {
+export function searchOutputKind(argumentsText?: string): "standalone" | "mixed" | "none" {
 	try {
 		const command = (JSON.parse(argumentsText ?? "{}") as { command?: unknown }).command;
-		return typeof command === "string" && /(?:^|[;&|(\s])(?:grep|rg)(?:\s|$)/.test(command);
-	} catch { return false; }
+		if (typeof command !== "string" || !/(?:^|[;&|(\s])(?:grep|rg)\s+(?:-[\w-]*n[\w-]*\s+|--line-number\s+)/.test(command)) return "none";
+		return /^\s*(?:grep|rg)\b/.test(command) && !/[;&|]/.test(command) ? "standalone" : "mixed";
+	} catch { return "none"; }
 }
+export function isSearchCommand(argumentsText?: string): boolean { return searchOutputKind(argumentsText) !== "none"; }
 export function differentCommandDirectory(argumentsText: string | undefined, cwd: string): string | null {
 	try {
 		const args = JSON.parse(argumentsText ?? "{}");
