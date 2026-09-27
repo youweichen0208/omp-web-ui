@@ -74,6 +74,8 @@ export interface ChatState {
 	 */
 	toolStatuses: Map<string, ToolStatus>;
 	notices: Notice[];
+	agentSilence: Extract<ServerMessage, { type: "agent_silence" }> | null;
+	agentSilenceByConversation: Record<string, Extract<ServerMessage, { type: "agent_silence" }>>;
 	serverVersion?: string;
 	/** Persisted session list for the left panel. */
 	sessions: SessionSummary[];
@@ -217,6 +219,7 @@ type Action =
 	| { type: "message_delta"; msg: MessageDeltaMsg }
 	| { type: "tool_status"; status: ToolStatus }
 	| { type: "notice"; notice: Notice }
+	| { type: "agent_silence"; event: Extract<ServerMessage, { type: "agent_silence" }> }
 	| { type: "reload_status"; event: ReloadStatus }
 	| { type: "dismiss_notice"; id: number }
 	| { type: "ready"; serverVersion: string; protocolVersion?: number }
@@ -439,6 +442,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 				status: action.status,
 				// A new socket is not ready until its hello/ready round-trip completes.
 				ready: action.status === "open" ? state.ready : false,
+				agentSilence: action.status === "closed" ? null : state.agentSilence,
+				agentSilenceByConversation: action.status === "closed" ? {} : state.agentSilenceByConversation,
 				// PTYs are conversation-owned and survive socket reconnects. Clear only
 				// the browser views so xterm writers remount when the server replays them.
 				terminals: action.status === "closed" ? [] : state.terminals,
@@ -461,6 +466,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 				state: action.state,
 				...(state.state?.cwd !== action.state.cwd ? { sessions: [], files: null, conversationFilesChecked: null, fileContent: null, scmData: null } : {}),
 				activeConversationId: action.state.conversationId,
+				agentSilence: action.state.isStreaming ? state.agentSilenceByConversation[action.state.conversationId] ?? null : null,
 				liveOutputs: pruneLiveOutputs(state.liveOutputs, action.state),
 				toolStatuses: pruneToolStatuses(state.toolStatuses, action.state),
 				// A full resync always reflects reality as of now — whatever we
@@ -489,6 +495,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 				...state,
 				ready: true,
 				state: merged,
+				agentSilence: merged.isStreaming ? state.agentSilenceByConversation[merged.conversationId] ?? null : null,
 				activeConversationId: merged.conversationId,
 				liveOutputs: pruneLiveOutputs(state.liveOutputs, merged),
 				toolStatuses: pruneToolStatuses(state.toolStatuses, merged),
@@ -537,6 +544,12 @@ function reducer(state: ChatState, action: Action): ChatState {
 			};
 		case "notice":
 			return { ...state, notices: [...state.notices, action.notice].slice(-6) };
+		case "agent_silence": {
+			const byConversation = { ...state.agentSilenceByConversation };
+			if (action.event.phase === "active") delete byConversation[action.event.conversationId];
+			else byConversation[action.event.conversationId] = action.event;
+			return { ...state, agentSilenceByConversation: byConversation, agentSilence: byConversation[state.activeConversationId] ?? null };
+		}
 		case "reload_status": {
 			const existing = state.reloadEvents.findIndex((event) => event.requestId === action.event.requestId && event.conversationId === action.event.conversationId);
 			const reloadEvents = existing < 0
@@ -718,6 +731,8 @@ export function useChat() {
 		liveOutputs: new Map(),
 		toolStatuses: new Map(),
 		notices: [],
+		agentSilence: null,
+		agentSilenceByConversation: {},
 		sessions: [],
 		conversations: [],
 		activeConversationId: "",
@@ -1007,6 +1022,9 @@ export function useChat() {
 					});
 					break;
 				}
+				case "agent_silence":
+					dispatch({ type: "agent_silence", event: msg });
+					break;
 				case "reload_status":
 					dispatch({ type: "reload_status", event: msg });
 					break;

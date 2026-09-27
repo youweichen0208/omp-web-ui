@@ -102,6 +102,7 @@ import {
 	serializeStreamingMessage,
 	type AgentMessage,
 } from "./serialize.js";
+import { deriveTaskProgress } from "./task-progress.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -384,13 +385,15 @@ interface Conversation {
 	/** Last time this conversation became active — set_cwd picks the target
 	 *  project's most recently active conversation. */
 	lastActiveAt: number;
-	/** Last time ANY SDK event arrived for this conversation — drives the
-	 *  model-stall watchdog (#7): a run that produces no events at all for
-	 *  STALL_NOTIFY_MS is probably a half-open API connection. */
+	/** Last SDK event time for this conversation. This detects a quiet run;
+	 *  WebSocket heartbeat separately reports browser/server connectivity. */
 	lastSdkEventAt: number;
-	/** Set once the stall notice has been sent for the current silent period;
+	/** Set once the silence state has been sent for the current quiet period;
 	 *  cleared on every SDK event and on each new prompt. */
 	stallNoticed: boolean;
+	/** Names of in-flight tools, so a quiet command is not mistaken for a silent model. */
+	runningToolNames: Map<string, string>;
+	toolsExecutedSincePrompt: boolean;
 	/** Independent goal/review state for this conversation. */
 	goal: GoalStatus;
 	goalGeneration: number;
@@ -1127,6 +1130,8 @@ export class ClientSession {
 			lastActiveAt: Date.now(),
 			lastSdkEventAt: Date.now(),
 			stallNoticed: false,
+			runningToolNames: new Map(),
+			toolsExecutedSincePrompt: false,
 			goal: this.makeGoalStatus(),
 			goalGeneration: 0,
 			goalReviewGeneration: 0,
@@ -1175,6 +1180,7 @@ export class ClientSession {
 	/** Add a socket to this client's broadcast set; flushes buffered startup notices. */
 	attachSink(send: (msg: ServerMessage) => void): void {
 		this.sinks.add(send);
+		for (const conv of this.convs.values()) if (conv.stallNoticed && conv.session.isStreaming) send({ type: "agent_silence", conversationId: conv.id, phase: "silent", since: conv.lastSdkEventAt, activity: conv.runningToolNames.size ? "tool" : "model" });
 		for (const msg of this.pendingNotices) send(msg);
 		this.pendingNotices = [];
 		// Replay current extension widgets (setWidget may have fired during
@@ -1247,10 +1253,8 @@ export class ClientSession {
 		}, WIDGET_REFRESH_MS);
 	}
 
-	/** Model-stall watchdog: warn when a streaming run went completely silent
-	 *  (no SDK events at all) for STALL_NOTIFY_MS. Deliberately does NOT abort:
-	 *  deep-thinking models can legitimately be quiet for minutes — the notice
-	 *  just tells the user the run looks stuck so they can Stop it themselves. */
+	/** Report a quiet model or tool as conversation-scoped state. The WebSocket
+	 * heartbeat is separate: a live socket does not imply a live model request. */
 	private startStallTimer(): void {
 		if (this.stallTimer || STALL_NOTIFY_MS === 0) return;
 		this.stallTimer = setInterval(() => {
@@ -1263,12 +1267,7 @@ export class ClientSession {
 					now - conv.lastSdkEventAt > STALL_NOTIFY_MS
 				) {
 					conv.stallNoticed = true;
-					const mins = Math.round((now - conv.lastSdkEventAt) / 60_000);
-					this.emit({
-						type: "notice",
-						level: "warning",
-						text: `对话「${conv.title}」已 ${mins} 分钟无任何响应，可能已失联（网络中断或服务端挂起）。可点击停止后重试。`,
-					});
+					this.emit({ type: "agent_silence", conversationId: conv.id, phase: "silent", since: conv.lastSdkEventAt, activity: conv.runningToolNames.size ? "tool" : "model" });
 				}
 			}
 		}, 30_000);
@@ -1315,6 +1314,7 @@ export class ClientSession {
 
 	private onEvent(conv: Conversation, event: AgentSessionEvent): void {
 		// Any SDK event proves the run is alive — feeds the stall watchdog below.
+		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: conv.runningToolNames.size ? "tool" : "model" });
 		conv.lastSdkEventAt = Date.now();
 		conv.stallNoticed = false;
 		switch (event.type) {
@@ -1332,6 +1332,8 @@ export class ClientSession {
 				break;
 			}
 			case "tool_execution_start": {
+				conv.runningToolNames.set(event.toolCallId, event.toolName);
+				conv.toolsExecutedSincePrompt = true;
 				// Record the moment the tool actually starts so tool_status can
 				// report real execution time (vs. time spent waiting on the model).
 				conv.toolStartTimes.set(event.toolCallId, Date.now());
@@ -1346,6 +1348,7 @@ export class ClientSession {
 				break;
 			}
 			case "tool_execution_end": {
+				conv.runningToolNames.delete(event.toolCallId);
 				const startedAt = conv.toolStartTimes.get(event.toolCallId);
 				conv.toolStartTimes.delete(event.toolCallId);
 				this.clearToolWatchdog(conv, event.toolCallId);
@@ -1610,10 +1613,14 @@ export class ClientSession {
 	/** Build every UiState field EXCEPT messages (the expensive part). */
 	private buildLightState(
 		rev: number,
+		messages: UiMessage[],
 	): Omit<UiState, "messages" | "rev"> & { rev: number } {
 		const conv = this.conv;
 		const state = conv.session.agent.state;
 		const model = state.model;
+		const streamingMessage = state.streamingMessage
+			? conv.thinkingTimings.annotate(serializeStreamingMessage(state.streamingMessage), state.streamingMessage.timestamp ?? 0)
+			: null;
 		let stats: UiState["stats"] = {
 			totalMessages: 0,
 			tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
@@ -1654,9 +1661,8 @@ export class ClientSession {
 			// (the SDK only pushes it into state.messages at message_end). Surfacing
 			// it here is what makes thinking + text stream into the browser at
 			// ~60ms granularity instead of appearing only when the turn finishes.
-			streamingMessage: state.streamingMessage
-				? this.conv.thinkingTimings.annotate(serializeStreamingMessage(state.streamingMessage), state.streamingMessage.timestamp ?? 0)
-				: null,
+			streamingMessage,
+			taskProgress: deriveTaskProgress(conv.id, messages, streamingMessage, conv.session.isStreaming),
 			isStreaming: this.session.isStreaming,
 			model: model
 				? {
@@ -1719,7 +1725,7 @@ export class ClientSession {
 				rev,
 				baseRev,
 				appended: cur.slice(prev.length),
-				state: this.buildLightState(rev),
+				state: this.buildLightState(rev, cur),
 			});
 		} else {
 			this.emittedMessages = cur;
@@ -1727,7 +1733,7 @@ export class ClientSession {
 			this.emittedRev = rev;
 			this.emit({
 				type: "snapshot",
-				state: { ...this.buildLightState(rev), messages: cur },
+				state: { ...this.buildLightState(rev, cur), messages: cur },
 			});
 		}
 	}
@@ -2271,6 +2277,7 @@ export class ClientSession {
 				},
 				attachments,
 			);
+			if (!s.isStreaming) conv.toolsExecutedSincePrompt = false;
 			await deliverPrompt(s, text, asides, queue, acknowledge);
 		} catch (err) {
 			acknowledge(false);
@@ -2287,6 +2294,7 @@ export class ClientSession {
 		conv.lastActiveAt = Date.now();
 		// Fresh run — restart the stall watchdog window.
 		conv.lastSdkEventAt = Date.now();
+		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: conv.lastSdkEventAt, activity: "model" });
 		conv.stallNoticed = false;
 		this.flushSnapshot();
 	}
@@ -2316,8 +2324,24 @@ export class ClientSession {
 	async abort(): Promise<void> {
 		// 只停止智能体运行本身；AI 在后台启动的服务由「后台任务」面板单独
 		// 管理（可逐个停止或全部关闭），不会在停止对话时被连带杀掉。
-		await this.interruptRun(this.conv, "已停止");
+		const conv = this.conv;
+		await this.interruptRun(conv, "已停止");
+		conv.runningToolNames.clear();
+		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: "model" });
+		conv.stallNoticed = false;
 		this.flushSnapshot();
+	}
+
+	/** Retry only a silent model request with no tool side effects in this turn. */
+	async retrySilentPrompt(conversationId: string, text: string): Promise<void> {
+		const conv = this.conv;
+		if (conv.id !== conversationId || !conv.stallNoticed || conv.toolsExecutedSincePrompt || conv.runningToolNames.size || !text.trim()) {
+			this.emit({ type: "notice", level: "warning", text: "当前运行状态已变化，无法自动重试；请检查对话后手动发送。" });
+			return;
+		}
+		await this.abort();
+		if (this.conv.id !== conversationId) return;
+		await this.prompt(text);
 	}
 
 	/** Re-push the current list on request (panel opened); prunes dead entries first. */

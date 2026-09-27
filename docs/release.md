@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.6.5 正式版
+
+`0.6.5` 增加从对话记录推断的当前任务步骤、工具与模型静默状态区分、连续写入卡片和文件操作分组，并修复长命令展开／收起。发布顺序：自检 → 推送源码 → 发布 npm `latest` → 推送 `v0.6.5` 标签触发三平台桌面包 → 核对 Release 附件。
+
 ## 0.6.4 正式版
 
 `0.6.4` 将 npm、GitHub Release 和三平台桌面安装包统一到同一个版本，包含输入框用量显示、终端字符表格与路径链接、长消息折叠、等待状态间距修正等。发布前运行类型检查、构建、单测、协议冒烟、浏览器回归及 `npm pack --dry-run`。推送源码后发布 `@youweichen/pi-web-ui@0.6.4` 到 npm `latest`，再推送 `v0.6.4` 标签触发桌面安装包构建。最终核对 npm `latest`、工作流和 macOS/Windows/Linux 附件。

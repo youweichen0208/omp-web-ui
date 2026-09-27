@@ -1,6 +1,6 @@
 import type { UiMessage } from "../../server/protocol.js";
 
-export interface ConversationFileEntry { path: string; action: "read" | "grep" | "used" }
+export interface ConversationFileEntry { path: string; action: "write" | "read" | "grep" | "used" }
 
 /** Files explicitly named by tools in this conversation, newest first. */
 export function conversationFileEntries(messages: UiMessage[], cwd: string): ConversationFileEntry[] {
@@ -22,7 +22,7 @@ export function conversationFileEntries(messages: UiMessage[], cwd: string): Con
 			if (block.type !== "toolCall" || typeof block.argumentsText !== "string") continue;
 			let args: { path?: unknown; command?: unknown };
 			try { args = JSON.parse(block.argumentsText); } catch { continue; }
-			if (typeof args.path === "string") add(args.path, block.name === "read" ? "read" : block.name === "grep" ? "grep" : "used");
+			if (typeof args.path === "string") add(args.path, block.name === "write" || block.name === "edit" ? "write" : block.name === "read" ? "read" : block.name === "grep" ? "grep" : "used");
 			if (block.name === "bash" && typeof args.command === "string") {
 				const action = /\b(?:grep|rg)\b/.test(args.command) ? "grep" : "read";
 				const matches = args.command.matchAll(/(?:^|[\s'"=])((?:\.{0,2}\/|\/?[\w.-]+\/)*[\w.-]+\.(?:md|markdown|tsx?|jsx?|mjs|cjs|json|css|html|ya?ml|py|go|rs|sh|sql))(?![\w.-])/gi);

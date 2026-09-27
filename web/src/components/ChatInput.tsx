@@ -27,6 +27,7 @@ interface ChatInputProps {
 	promptResult: Extract<ServerMessage, { type: "prompt_result" }> | null;
 	ready: boolean;
 	streaming: boolean;
+	silentActivity?: "model" | "tool" | null;
 	/** Persisted messages (stable reference while unchanged) — used by /copy. */
 	messages: UiMessage[];
 	slashCommands: SlashCommandInfo[];
@@ -80,6 +81,7 @@ export const ChatInput = memo(function ChatInput({
 	stats,
 	ready, promptResult,
 	streaming,
+	silentActivity,
 	messages,
 	slashCommands,
 	modelState,
@@ -624,7 +626,7 @@ export const ChatInput = memo(function ChatInput({
 														placeholder={
 															connected
 																? streaming
-																	? t("placeholderStreaming")
+																	? silentActivity ? t(silentActivity === "model" ? "placeholderModelSilent" : "placeholderToolSilent") : t("placeholderStreaming")
 																	: t("composerPlaceholder")
 																: t("placeholderConnecting")
 														}

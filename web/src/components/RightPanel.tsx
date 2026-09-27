@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiX } from "react-icons/fi";
-import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, UiMessage } from "../types";
+import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, TaskProgress, UiMessage } from "../types";
 import { useT } from "../i18n";
 import { downloadFile } from "../download";
 import { conversationFileEntries, mentionedHiddenDirs } from "../conversation-files";
+import { TaskProgressPanel } from "./TaskProgressPanel";
 
 type AttachMode = "inline" | "reference";
 interface RightPanelProps {
@@ -17,6 +18,8 @@ interface RightPanelProps {
 	widgets: { key: string; lines: string[] }[];
 	messages: UiMessage[];
 	streamingMessage: UiMessage | null;
+	taskProgress?: TaskProgress | null;
+	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
 	send: (msg: { type: "list_files"; path?: string } | { type: "scm_status"; reqId: number } | { type: "check_conversation_files"; cwd: string; reqId: number; paths: string[] }) => boolean;
 	onAttach: (path: string, name: string, mode: AttachMode, isDir?: boolean) => void;
@@ -27,8 +30,10 @@ interface RightPanelProps {
 // Negative IDs keep tree status requests separate from SCMPanel's positive IDs.
 let treeStatusId = -100;
 let conversationFilesId = 0;
-export const RightPanel = memo(function RightPanel({ active, files, conversationFilesChecked, ready, fileChanged, scmData, scmDirty, widgets, messages, streamingMessage, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ active, files, conversationFilesChecked, ready, fileChanged, scmData, scmDirty, widgets, messages, streamingMessage, taskProgress, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
 	const t = useT();
+	const [lowerTab, setLowerTab] = useState<"task" | "files">("task");
+	useEffect(() => setLowerTab("task"), [taskProgress?.id]);
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -179,9 +184,9 @@ export const RightPanel = memo(function RightPanel({ active, files, conversation
 	</>;
 	const confirmed = fileCheck?.key === fileCheckKey && conversationFilesChecked?.cwd === cwd && conversationFilesChecked.reqId === fileCheck.reqId ? new Set(conversationFilesChecked.paths) : new Set<string>();
 	const involved = fileCandidates.filter((file) => confirmed.has(file.path)).slice(0, 12);
-	const actionLabel = (action: "read" | "grep" | "used") => t(action === "read" ? "readVerb" : action === "grep" ? "grepSearch" : "fileUsed");
-	const involvedGroups = (["read", "grep", "used"] as const).map((action) => ({ action, files: involved.filter((file) => file.action === action) })).filter((group) => group.files.length > 0);
-	return <aside className={`panel panel-right${involved.length ? " has-conversation-files" : ""}`}>
+	const actionLabel = (action: "write" | "read" | "grep" | "used") => t(action === "write" ? "writeVerb" : action === "read" ? "readVerb" : action === "grep" ? "grepSearch" : "fileUsed");
+	const involvedGroups = (["write", "read", "grep", "used"] as const).map((action) => ({ action, files: involved.filter((file) => file.action === action) })).filter((group) => group.files.length > 0);
+	return <aside className={`panel panel-right${involved.length || taskProgress ? " has-conversation-files" : ""}${taskProgress ? " has-task-progress" : ""}`}>
 		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
@@ -205,7 +210,7 @@ export const RightPanel = memo(function RightPanel({ active, files, conversation
 		}}>
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 		</div>
-		{involved.length > 0 && <div className="conversation-files"><div className="conversation-files-title"><span>{t("conversationFiles")}</span></div><div className="conversation-files-list">{involvedGroups.map(({ action, files }) => <section className="conversation-file-group" key={action}><h3>{actionLabel(action)} · {files.length}</h3>{files.map(({ path }) => { const name = path.split("/").at(-1) ?? path; const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "."; return <button type="button" key={path} className="conversation-file" title={path} onClick={() => onPreview(path, name)}><span className="conversation-file-name">{name}</span><small className="conversation-file-directory">{directory}</small></button>; })}</section>)}</div></div>}
+		{(taskProgress || involved.length > 0) && <div className="panel-lower">{taskProgress && involved.length > 0 && <div className="panel-lower-tabs"><button type="button" className={lowerTab === "task" ? "active" : ""} onClick={() => setLowerTab("task")}>{t("taskProgress")}</button><button type="button" className={lowerTab === "files" ? "active" : ""} onClick={() => setLowerTab("files")}>{t("conversationFiles")}</button></div>}{taskProgress && (lowerTab === "task" || !involved.length) ? <TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} onPreview={onPreview} /> : involved.length > 0 && <div className="conversation-files"><div className="conversation-files-title"><span>{t("conversationFiles")}</span><span>{involvedGroups.map(({ action, files }) => `${actionLabel(action)} ${files.length}`).join(" · ")}</span></div><div className="conversation-files-list">{involvedGroups.map(({ action, files }) => { const directories = new Map<string, typeof files>(); for (const file of files) { const directory = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "."; directories.set(directory, [...(directories.get(directory) ?? []), file]); } return <section className="conversation-file-group" key={action}><h3>{actionLabel(action)}</h3>{[...directories].map(([directory, entries]) => <div className="conversation-file-directory-group" key={directory}><div className="conversation-file-directory-title">{directory}</div>{entries.map(({ path }) => { const name = path.split("/").at(-1) ?? path; return <button type="button" key={path} className="conversation-file" title={path} onClick={() => onPreview(path, name)}><span className="conversation-file-name">{name}</span></button>; })}</div>)}</section>; })}</div></div>}</div>}
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (
 				<div className="panel-widgets">
 					{widgets

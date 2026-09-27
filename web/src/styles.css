@@ -8976,6 +8976,88 @@ body { -webkit-font-smoothing: antialiased; }
 .conversation-file > .conversation-file-name, .conversation-file > .conversation-file-directory { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conversation-file small { color: var(--text-faint); font-size: 11px; }
 
+/* Silence belongs to the active conversation, directly above its composer. */
+.agent-silence { width: calc(100% - 2 * var(--composer-gutter, 28px)); max-width: 780px; margin: 0 auto 8px; padding: 8px 11px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--amber) 7%, var(--bg-elev)); color: var(--text-dim); font: 12px var(--sans); }
+.agent-silence.tool { border-color: var(--border); background: var(--bg-elev); }
+.agent-silence-label { flex: 1; min-width: 0; }
+.agent-silence-actions { display: flex; align-items: center; gap: 6px; }
+.agent-silence button { padding: 3px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.agent-silence button:hover { background: var(--accent-soft); }
+.agent-silence button:disabled { color: var(--text-faint); cursor: not-allowed; }
+.conversation-file-directory-title { padding: 5px 5px 2px; color: var(--text-faint); font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-file-directory-group .conversation-file { padding-left: 15px; }
+
+/* A sequence of write calls is one compact file list. Code stays inside each
+   expanded row, with line numbers and a bottom-only truncation control. */
+.write-group { margin: 10px 0; border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; background: var(--bg-elev); }
+.write-group-head, .write-file-head { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 9px 12px; border: 0; background: transparent; color: var(--text-dim); text-align: left; font: 12px var(--sans); cursor: pointer; }
+.write-group-head svg, .write-file-head svg { flex: none; width: 13px; height: 13px; transition: transform .15s; }
+.write-group-head svg.open, .write-file-head svg.open { transform: rotate(90deg); }
+.write-group-head strong { color: var(--text); font-weight: 600; }
+.write-group-summary { color: var(--text-faint); }
+.write-group-state { margin-left: auto; color: var(--green); }
+.write-group.err .write-group-state, .write-file-row.err .write-file-head { color: var(--red); }
+.write-group-items { border-top: 1px solid var(--border-soft); }
+.write-file-row + .write-file-row { border-top: 1px solid var(--border-soft); }
+.write-file-head code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 12px var(--mono); }
+.write-file-head > span { flex: none; color: var(--text-faint); }
+.write-file-head i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.write-file-head i.done { background: var(--green); }
+.write-file-head i.error { background: var(--red); }
+.write-file-body { padding: 0 12px 10px 34px; }
+.write-file-code { overflow: auto; background: var(--code-bg); border-radius: 6px; padding: 7px 0; font: 12px/1.6 var(--mono); font-variant-ligatures: none; }
+.write-file-line { display: flex; min-width: max-content; padding-right: 12px; white-space: pre; }
+.write-file-number { flex: none; width: 38px; padding-right: 11px; color: color-mix(in srgb, var(--code-fg) 42%, transparent); text-align: right; user-select: none; }
+.write-file-line code { color: var(--code-fg); }
+.write-file-empty { padding: 8px 10px; color: var(--text-faint); background: var(--bg-elev2); border-radius: 5px; font: 12px var(--sans); }
+.write-file-more { width: 100%; padding: 7px; border: 0; border-radius: 0 0 6px 6px; background: var(--code-bg); color: var(--accent); font: 11px var(--sans); cursor: pointer; }
+.write-file-error { overflow: auto; color: var(--red); white-space: pre-wrap; font: 12px var(--mono); }
+
+/* Task progress occupies the lower half of the right rail. The segmented
+   track is a real ordered step list, so each segment maps to one step. */
+.panel-lower { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; border-top: 1px solid var(--border-soft); }
+.panel-lower-tabs { display: flex; gap: 4px; padding: 8px 10px 0; flex: none; }
+.panel-lower-tabs button { padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--text-faint); font: 11px var(--sans); cursor: pointer; }
+.panel-lower-tabs button.active { color: var(--accent); background: var(--accent-soft); }
+.panel-lower .conversation-files { border-top: 0; }
+.task-progress { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.task-progress-head { display: flex; flex-direction: column; gap: 5px; padding: 12px 13px 11px; border-bottom: 1px solid var(--border-soft); flex: none; }
+.task-progress-eyebrow { display: flex; align-items: center; justify-content: space-between; color: var(--text-faint); font: 11px var(--sans); }
+.task-progress-eyebrow small { color: var(--text-faint); font-size: 10px; }
+.task-progress-head > strong { max-width: 100%; color: var(--text); font: 600 13px/1.45 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-progress-meta { color: var(--text-faint); font: 11px var(--mono); }
+.task-progress-track { display: flex; height: 4px; gap: 2px; margin-top: 4px; overflow: hidden; border-radius: 4px; }
+.task-progress-track span { flex: 1; min-width: 3px; background: var(--border); }
+.task-progress-track span.done { background: var(--green); }
+.task-progress-track span.running { background: var(--accent); }
+.task-progress-track span.stalled { background: var(--amber); }
+.task-progress-track span.failed { background: var(--red); }
+.task-progress-list { min-height: 0; overflow-y: auto; padding: 6px 0 12px; }
+.task-step { position: relative; margin-left: 20px; border-left: 1px solid var(--border-soft); }
+.task-step:last-child { border-color: transparent; }
+.task-step-head { display: flex; align-items: flex-start; gap: 7px; width: 100%; min-width: 0; padding: 8px 10px 8px 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.task-step-head:hover { background: var(--bg-elev2); }
+.task-step.linked .task-step-head { background: var(--accent-soft); }
+.task-step-mark { display: grid; place-items: center; width: 17px; height: 17px; margin-left: -9px; flex: none; border-radius: 50%; background: var(--bg-elev); border: 1px solid var(--border); color: var(--text-faint); font: 10px var(--sans); }
+.task-step.done .task-step-mark { color: var(--green); border-color: var(--green); }
+.task-step.running .task-step-mark { color: var(--accent); border-color: var(--accent); }
+.task-step.stalled .task-step-mark { color: var(--amber); border-color: var(--amber); }
+.task-step.failed .task-step-mark { color: var(--red); border-color: var(--red); }
+.task-step-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.task-step-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 12px/1.4 var(--sans); }
+.task-step-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); font: 10.5px var(--sans); }
+.task-step-order { flex: none; color: var(--text-faint); font: 10px var(--mono); }
+.task-step-head > svg { flex: none; width: 12px; height: 12px; margin-top: 3px; color: var(--text-faint); transition: transform .15s; }
+.task-step-head > svg.open { transform: rotate(90deg); }
+.task-step-detail { display: flex; flex-direction: column; gap: 3px; padding: 1px 10px 9px 15px; }
+.task-artifact { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 4px 5px; border: 0; border-radius: 4px; background: var(--bg-elev2); text-align: left; cursor: pointer; }
+.task-artifact.command { cursor: default; }
+.task-artifact span { flex: none; color: var(--text-faint); font: 10px var(--mono); }
+.task-artifact code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font: 10.5px var(--mono); }
+.task-artifact:not(.command):hover code { color: var(--accent); }
+.task-step-jump, .task-completed-toggle { align-self: flex-start; padding: 5px; border: 0; background: transparent; color: var(--accent); font: 10.5px var(--sans); cursor: pointer; }
+.task-completed-toggle { margin-left: 24px; }
+
 /* The readable content, folded rows and composer now end on one common rail. */
 .design-workspace .msg,
 .design-workspace .msg-collapsed,
@@ -9115,7 +9197,7 @@ body { -webkit-font-smoothing: antialiased; }
 .bash-output-line.error .bash-line-number { color: #d98b8b; }
 .bash-output-gap { padding: 5px 14px 5px 42px; color: oklch(0.7 0.01 80); background: oklch(0.245 0.008 80); font: 11px/1.5 var(--mono); }
 .design-workspace .bash-output-more { display: block; margin: 8px auto 0; background: oklch(0.245 0.008 80); }
-.bash-command-preview .clipped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.bash-command-preview .clipped { max-height: calc(2 * 1.7 * 12.5px); overflow: hidden; }
 .bash-command-preview > button { margin: 5px 0 0 20px; border: 0; background: transparent; color: var(--accent); font: 11px var(--sans); cursor: pointer; }
 .bash-steps { background: var(--bg-elev); }
 .bash-step { border-top: 1px solid var(--border-soft); }

@@ -17,6 +17,7 @@ import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
 import { MessageList } from "./components/MessageList";
 import { ChatInput } from "./components/ChatInput";
+import { AgentSilenceStatus } from "./components/AgentSilenceStatus";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "./current-file";
 import { GoalBar } from "./components/GoalBar";
 import { FooterBar } from "./components/FooterBar";
@@ -855,6 +856,7 @@ export function App() {
 								modelsLoading={chat.modelsLoading}
 								activeConversationId={chat.activeConversationId}
 							/>
+							<AgentSilenceStatus chat={chat} send={send} />
 							{/* 扩展问卷：非模态内联面板，插在输入框上方，对话内容保持可见 */}
 							{chat.dialog && <Dialog dialog={chat.dialog} send={send} />}
 							{chat.notices.length > 0 && <div className="notices">
@@ -869,6 +871,7 @@ export function App() {
 								send={send}
 								ready={chat.ready}
 								streaming={chat.state?.isStreaming ?? false}
+								silentActivity={chat.agentSilence?.conversationId === chat.activeConversationId ? chat.agentSilence.activity : null}
 										messages={chat.state?.messages ?? EMPTY_MESSAGES}
 								slashCommands={chat.slashCommands}
 								modelState={modelState}
@@ -904,6 +907,8 @@ export function App() {
 									widgets={chat.widgets}
 									messages={chat.state?.messages ?? []}
 									streamingMessage={chat.state?.streamingMessage ?? null}
+									taskProgress={chat.state?.taskProgress}
+									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}
 									onAttach={(path, name, mode, isDir) => {
 										setDrawer(null);

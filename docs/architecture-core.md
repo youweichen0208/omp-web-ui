@@ -67,6 +67,14 @@
 
 服务端 `onEvent` 监听 `tool_execution_start/end`（AI 调工具路径，注意区别于 `bash_execution_update`——那是 `!cmd`/终端直接执行路径专属）。`tool_execution_end` 触发时立即推 `tool_status`（toolCallId/toolName/isError/exitCode/durationMs），**先于** toolResult 快照落盘——浏览器 tool 卡片随即从「执行中」切到「已结束 · 等模型 · 耗时」，一眼区分「命令还在跑」vs「命令完了在等模型响应」。bash 工具的 details 不带 exitCode（成功时返回 truncation 信息，失败时错误文本含 `Command exited with code N`），服务端从错误文本正则提取；`tool_execution_start` 时刻记在 `conv.toolStartTimes`（按对话隔离）算真实执行耗时。前端 `toolStatuses` Map 在 toolResult 落盘（snapshot prune）后清除，回落到权威的 toolResult 状态。
 
+### 模型／工具静默状态（`agent_silence`）
+
+服务端在运行中连续 3 分钟没有 SDK 事件时，按 `conversationId` 推送 `agent_silence`，并根据正在执行的工具区分模型等待和工具运行。任意后续 SDK 事件会发送 `active` 清除状态；重连时重放仍有效的静默状态。浏览器把它放在输入框上方的状态行，同步输入框和底栏，并持续更新时间。浏览器只为纯文本、无工具调用的模型静默轮次提供自动重试；服务端再核对当前对话及工具记录，先完成中断再重新发送，以免重复执行工具副作用。WebSocket 心跳只表示浏览器与本机服务连接正常，不代表模型接口已响应。
+
+### 当前任务进度（`taskProgress`）
+
+服务端从当前对话最后一条用户消息后的权威 transcript 推断一个当前任务：助手说明文字与相邻工具调用组成步骤，工具结果决定完成或失败；流式回复期间工具已完成但模型尚未继续时保留“正在分析请求”步骤。`taskProgress` 随全量和增量快照传递，ID 来源于原消息 ID，切换对话不会串进度。它是界面摘要，不写回模型上下文，也不代表模型提供了正式计划。P0 只显示当前任务；历史任务、显式计划与步骤级重试属于后续阶段。
+
 ### 工具挂死看门狗
 
 每个 `tool_execution_start` 都会为 toolCallId arm 一个 `TOOL_WATCHDOG_TIMEOUT_MS`（默认 20 分钟，环境变量 `PI_WEB_TOOL_TIMEOUT_MS`（毫秒）覆盖）的 timer——超时仍在跑就 `session.abort()`（杀进程树）+ warning notice，`tool_execution_end` / `removeConversation` / `dispose` 都会清掉对应 timer。恢复重建 + 重绑会话（同一 conv 记录，UI 不掉线）；看门狗超时也走同一 `interruptRun`。**只停止运行，不碰后台服务**——那些由「后台任务」面板单独管理。

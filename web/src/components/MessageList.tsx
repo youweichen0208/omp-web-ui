@@ -514,6 +514,14 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		},
 		[state.messages, recentStart, expanded, expand],
 	);
+	useEffect(() => {
+		const onTaskJump = (event: Event) => {
+			const id = (event as CustomEvent<{ messageId?: string }>).detail?.messageId;
+			if (id && messages.some((message) => message.id === id)) jumpTo(id);
+		};
+		window.addEventListener("pi:jump-message", onTaskJump);
+		return () => window.removeEventListener("pi:jump-message", onTaskJump);
+	}, [jumpTo, messages]);
 
 	const onScroll = useCallback(() => {
 		const el = scrollRef.current;

@@ -591,6 +591,9 @@ wss.on("connection", (ws) => {
 			case "abort":
 				void cs.abort();
 				break;
+			case "retry_silent_prompt":
+				void cs.retrySilentPrompt(msg.conversationId, msg.text);
+				break;
 			case "abort_bash":
 				void cs.abortBash();
 				break;

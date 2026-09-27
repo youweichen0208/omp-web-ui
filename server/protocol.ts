@@ -75,6 +75,30 @@ export interface UiMessage {
 	details?: unknown;
 }
 
+/** Current task inferred from the authoritative transcript. P0 has one task
+ * per active conversation; historical tasks and explicit plans come later. */
+export interface TaskProgress {
+	id: string;
+	conversationId: string;
+	sourceMessageId: string;
+	title: string;
+	status: "running" | "done" | "failed" | "cancelled";
+	startedAt: number;
+	completed: number;
+	steps: TaskStep[];
+}
+
+export interface TaskStep {
+	id: string;
+	messageId: string;
+	title: string;
+	status: "running" | "done" | "failed";
+	startedAt: number;
+	endedAt?: number;
+	hint?: string;
+	artifacts: { toolCallId: string; kind: string; label: string; path?: string }[];
+}
+
 export interface UiModelInfo {
 	id: string;
 	name: string;
@@ -103,6 +127,8 @@ export interface UiState {
 	 * `messages` once the turn finishes (message_end). Null when idle.
 	 */
 	streamingMessage: UiMessage | null;
+	/** Server-derived current task; null before the first user prompt. */
+	taskProgress?: TaskProgress | null;
 	isStreaming: boolean;
 	model: UiModelInfo | null;
 	thinkingLevel: string;
@@ -287,6 +313,7 @@ export type ClientMessage =
 	| { type: "list_commands" }
 	| { type: "save_commands"; commands: CommandDef[] }
 	| { type: "abort" }
+	| { type: "retry_silent_prompt"; conversationId: string; text: string }
 	/** Kill only the running bash command(s) — the agent run itself continues. */
 	| { type: "abort_bash" }
 	// -- background tasks (AI-started servers) ------------------------------
@@ -926,6 +953,7 @@ export type ServerMessage =
 			protocolVersion?: number;
 	  }
 	| { type: "snapshot"; state: UiState }
+	| { type: "agent_silence"; conversationId: string; phase: "silent" | "active"; since: number; activity: "model" | "tool" }
 	| {
 			/** Incremental snapshot: everything EXCEPT `messages` travels in
 			 *  `state`, and only messages appended since baseRev ride in

@@ -16,6 +16,17 @@ test("conversation files include recent workspace tool targets and bash referenc
 	expect(conversationFileEntries(messages, "/tmp/work")).toEqual([{ path: ".scratch/spec.md", action: "grep" }, { path: "CONTEXT.md", action: "read" }]);
 });
 
+test("write targets are classified as writes and keep their directory", () => {
+	const messages = [{ id: "1", role: "assistant", content: [
+		{ type: "toolCall", id: "w1", name: "write", argumentsText: JSON.stringify({ path: "youwei_core/api/main.py", content: "hello" }) },
+		{ type: "toolCall", id: "w2", name: "write", argumentsText: JSON.stringify({ path: "youwei_core/worker/__init__.py", content: "" }) },
+	] }] as UiMessage[];
+	expect(conversationFileEntries(messages, "/tmp/work")).toEqual([
+		{ path: "youwei_core/worker/__init__.py", action: "write" },
+		{ path: "youwei_core/api/main.py", action: "write" },
+	]);
+});
+
 test("grep source lines replace generated output line numbers", () => {
 	expect(numberedOutputLine("15:  匹配内容", 0, true)).toEqual({ number: "15", text: "匹配内容" });
 	expect(numberedOutputLine("spec.md:27:  another match", 1, true)).toEqual({ number: "27", text: "spec.md: another match" });

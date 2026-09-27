@@ -187,7 +187,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 					<span className="status-sep">·</span>
 					<span className="status-item working">
 						<WorkingDots />
-						{t("working")}
+						{chat.agentSilence?.conversationId === chat.activeConversationId ? t(chat.agentSilence.activity === "tool" ? "toolSilentShort" : "modelSilentShort") : t("working")}
 						{queueTotal > 0 && (
 							<span className="status-queue">
 								⏳ {queueTotal} {t("queued")}

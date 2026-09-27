@@ -22,7 +22,7 @@ import { LeakedThinkingBlock } from "./LeakedThinkingBlock";
 import { Markdown } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
-import { GrepSummary, isSubagentCall, ReadGroup, SubagentGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
+import { GrepSummary, isSubagentCall, ReadGroup, SubagentGroup, ToolCallBlock, WriteGroup, type ToolView } from "./ToolCallBlock";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
@@ -325,6 +325,17 @@ export const Message = memo(function Message({
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
 			const first = asToolCall(block);
+			if (first?.name === "write") {
+				const writes: UiToolCallBlock[] = [first];
+				while (i + 1 < message.content.length) {
+					const next = asToolCall(message.content[i + 1]);
+					if (next?.name !== "write") break;
+					writes.push(next);
+					i++;
+				}
+				elements.push(<WriteGroup key={`${message.id}-${first.id}`} items={writes.map((item) => ({ block: item, view: viewFor(item) }))} />);
+				continue;
+			}
 			if (first?.name === "read") {
 				const reads: UiToolCallBlock[] = [first];
 				while (i + 1 < message.content.length) {
