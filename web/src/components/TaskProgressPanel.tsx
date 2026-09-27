@@ -69,7 +69,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("working") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
 	const hasResult = task.status !== "running" && !single && !!(result.commit || result.tests || result.changes);
 	const finalTestPhase = phases.findLast((phase) => phase.kind === "test" || phase.kind === "fix")?.id;
-	const title = plainTitle(task.title || conversationTitle);
+	const title = plainTitle(conversationTitle || task.title);
 	const showTitle = !!title;
 	const preview = (path: string) => { const relative = path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path; onPreview(relative, relative.split("/").at(-1) ?? relative); };
 	const activeArtifact = task.steps.findLast((step) => step.status === "running" && step.artifacts.length)?.artifacts.at(-1)?.label;
@@ -93,7 +93,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 					</div>}
 				</div>
 			</div>
-			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}>● {single && `${t("taskProgress")} · `}{statusLabel}</span>{task.plan && task.status === "running" ? <span>· {t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total })}</span> : task.plan ? <span>· {completed} {t("taskPlanSteps")}</span> : !single && <span>· {t("taskCompletedCount", { n: completed })}{runningPhases.length > 0 && ` · ${t("taskRunningCount", { n: runningPhases.length })}`}</span>}<span>· {t("taskDuration")} {duration(elapsed, t("taskUnderSecond"))}</span></div>
+			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}>● {statusLabel}</span>{task.plan && task.status === "running" ? <span>· {t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total })}</span> : task.plan ? <span>· {completed} {t("taskPlanSteps")}</span> : task.status !== "running" && !single && <span>· {t("taskCompletedCount", { n: completed })}</span>}<span>· {t("taskDuration")} {duration(elapsed, t("taskUnderSecond"))}</span></div>
 			{task.plan && <div className="task-progress-track" aria-hidden="true">{planItems.map((item) => <span key={item.id} className={item.status} />)}</div>}
 		</div>
 		{hasResult && <div className="task-result"><div className="task-result-label">{t("taskResult")}</div>{result.commit && <div className="task-result-row"><span>{t("taskCommit")}</span><code>{result.commit.hash}</code>{result.commit.subject && <span className="task-result-subject">{plainTitle(result.commit.subject)}</span>}</div>}{result.tests && <div className="task-result-row"><span>{t("taskTests")}</span><strong className="success">{result.tests.passed} / {result.tests.total} {t("taskPassed")}</strong></div>}{result.changes && <div className="task-result-row"><span>{t("taskChanges")}</span><strong className="success">+{result.changes.added}</strong><strong className="removed">−{result.changes.deleted}</strong><span>· {result.changes.files} {t("taskFiles")}</span></div>}<div className="task-result-actions"><button type="button" onClick={() => onViewChanges(result.commit?.hash)}>{t("taskViewChanges")}</button>{finalMessage && <button type="button" onClick={() => jump(finalMessage.id)}>{t("taskFinalReply")}</button>}</div></div>}

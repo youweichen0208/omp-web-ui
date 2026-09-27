@@ -40,6 +40,7 @@ export function EditWriteCard({ item, compact = false, retried = false }: { item
 	const change = useMemo(() => editWriteChange(item.block, item.view.result), [item.block, item.view.result]);
 	const [open, setOpen] = useState(!compact && !retried);
 	useEffect(() => { if (retried) setOpen(false); }, [retried]);
+	useEffect(() => { if (change?.kind === "edit" && change.empty && !change.error && item.view.result) setOpen(false); }, [change, item.view.result]);
 	useEffect(() => {
 		const onJump = (event: Event) => {
 			if ((event as CustomEvent<{ toolCallId?: string }>).detail?.toolCallId === item.block.id) setOpen(true);
@@ -49,17 +50,18 @@ export function EditWriteCard({ item, compact = false, retried = false }: { item
 	}, [item.block.id]);
 	if (!change) return null;
 	const state = retried ? "retried" : status(item);
+	const noDiff = change.kind === "edit" && change.empty && !change.error && state === "done";
 	const path = change.path || item.block.name;
 	const openFile = () => window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: change.path, line: change.firstChangedLine } }));
 	return <div className={`change-card ${state}`} data-tool-call-id={item.block.id} onMouseEnter={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: item.block.id } }))} onMouseLeave={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: null } }))}>
 		<div className="change-card-head">
-			<button type="button" className="change-card-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><span className="change-verb">{item.block.name === "edit" ? t("changeEdit") : t("changeWrite")}</span><code title={path}>{path}</code></button>
-			<span className="change-counts">{!change.error && <><span className="add">+{change.added}</span>{change.removed > 0 && <span className="del">−{change.removed}</span>}</>}</span>
+			<button type="button" className="change-card-toggle" aria-expanded={open && !noDiff} disabled={noDiff} onClick={() => setOpen((value) => !value)}>{!noDiff && <FiChevronRight className={open ? "open" : ""} />}<span className="change-verb">{item.block.name === "edit" ? t("changeEdit") : t("changeWrite")}</span><code title={path}>{path}</code></button>
+			<span className="change-counts">{!change.error && <>{change.added > 0 && <span className="add">+{change.added}</span>}{change.removed > 0 && <span className="del">−{change.removed}</span>}</>}</span>
 			<span className={`change-state ${state}`}><i />{retried ? t("changeRetried") : state === "err" ? t("error") : state === "done" ? t("done") : state === "running" ? t("running") : t("toolQueued")}</span>
 			{change.path && <button type="button" className="change-open" onClick={openFile}>{t("changeOpen")}</button>}
 			<details className="change-raw"><summary aria-label={t("more")}><FiMoreHorizontal /></summary><div><strong>{t("changeRawArgs")}</strong><pre>{item.block.argumentsText}</pre>{change.output && <><strong>{t("changeRawOutput")}</strong><pre>{change.output}</pre></>}</div></details>
 		</div>
-		{open && <ChangeBody change={change} />}
+		{open && !noDiff && <ChangeBody change={change} />}
 	</div>;
 }
 
@@ -80,5 +82,5 @@ export function EditWriteGroup({ items, retriedIds }: { items: Item[]; retriedId
 	const failed = items.some((item) => status(item) === "err" && !retriedIds?.has(item.block.id));
 	const done = items.every((item) => ["done", "err"].includes(status(item)));
 	const verb = items.every((item) => item.block.name === "edit") ? t("changeEdit") : items.every((item) => item.block.name === "write") ? t("changeWrite") : t("taskChanges");
-	return <div className={`change-group ${failed ? "err" : done ? "done" : "running"}`}><button type="button" className="change-group-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><strong>{verb} {items.length} {t("taskFiles")}</strong><span className="change-counts"><span className="add">+{added}</span>{removed > 0 && <span className="del">−{removed}</span>}</span><span className="change-state">{failed ? t("error") : done ? t("done") : t("running")}</span></button>{open && <div className="change-group-items">{items.map((item) => <EditWriteCard key={item.block.id} item={item} compact retried={retriedIds?.has(item.block.id)} />)}</div>}</div>;
+	return <div className={`change-group ${failed ? "err" : done ? "done" : "running"}`}><button type="button" className="change-group-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><strong>{verb} {items.length} {t("taskFiles")}</strong><span className="change-counts">{added > 0 && <span className="add">+{added}</span>}{removed > 0 && <span className="del">−{removed}</span>}</span><span className="change-state">{failed ? t("error") : done ? t("done") : t("running")}</span></button>{open && <div className="change-group-items">{items.map((item) => <EditWriteCard key={item.block.id} item={item} compact retried={retriedIds?.has(item.block.id)} />)}</div>}</div>;
 }

@@ -8980,6 +8980,7 @@ body { -webkit-font-smoothing: antialiased; }
 .change-card-head, .change-group-head { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 43px; padding: 6px 10px; }
 .change-card-toggle, .change-group-head { color: var(--text); cursor: pointer; }
 .change-card-toggle { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: none; text-align: left; }
+.change-card-toggle:disabled { cursor: default; opacity: 1; }
 .change-card-toggle svg, .change-group-head svg { width: 13px; height: 13px; flex: none; color: var(--text-faint); transition: transform .15s; }
 .change-card-toggle svg.open, .change-group-head svg.open { transform: rotate(90deg); }
 .change-verb { flex: none; color: var(--text-dim); font: 12px var(--sans); }
@@ -9459,7 +9460,18 @@ body { -webkit-font-smoothing: antialiased; }
 .task-artifact-row button { min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
 .task-artifact-row button:hover { color: var(--accent); }
 .task-artifact-row code { font: 11px/1.5 var(--mono); overflow-wrap: anywhere; }
+.task-artifact-row button { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-artifact-row code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-artifact-row small { flex: none; color: var(--text-faint); white-space: nowrap; }
+.task-step-active-action { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bash-head-command { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 12px var(--mono); }
+.bash-head-count { flex: none; color: var(--text-faint); font: 11px var(--mono); white-space: nowrap; }
+.toolcall-bash:has(.bash-head-command) > .toolcall-head > .toolcall-spacer { display: none; }
+.bash-output-gap-button { display: block; width: 100%; border: 0; text-align: center; cursor: pointer; }
+.bash-output-gap-button:hover { color: var(--accent-soft); background: oklch(0.29 0.015 285); }
+.bash-git-status.git-modified { color: #e1b85a; }
+.bash-git-status.git-untracked { color: #a8a8a8; }
+.bash-git-status.git-deleted { color: #e68f8f; }
 .task-raw-summary { color: var(--text-dim); font: 11px/1.5 var(--sans); margin-bottom: 4px; }
 .task-plan-change { margin: 8px 14px 0; color: var(--accent); font: 11px var(--sans); }
 .task-plan-list { min-height: 0; overflow-y: auto; padding: 9px 13px 14px; }

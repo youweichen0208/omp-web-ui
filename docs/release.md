@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.6.9 正式版
+
+`0.6.9` 修正工作中输入框提示、任务标题和阶段展示、命令输出卡片及编辑零差异卡片；底栏显示 pi-web-ui 自身版本号。Web、npm 包及三平台桌面安装包统一使用 `0.6.9`。发布说明见 `.github/release-notes/v0.6.9.md`。
+
 ## 0.6.8 正式版
 
 `0.6.8` 统一发布编辑／写入逐行 diff 卡片、任务面板状态与阶段摘要修正，以及精简后的上下文窗口和缓存命中用量弹窗。Web、npm 包和 macOS／Windows／Linux 桌面安装包使用同一版本号。发布说明见 `.github/release-notes/v0.6.8.md`。

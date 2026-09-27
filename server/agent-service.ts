@@ -27,7 +27,6 @@ import {
 	watch,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
 	createAgentSessionFromServices,
 	createAgentSessionRuntime,
@@ -53,6 +52,7 @@ import {
 import { contentText } from "@earendil-works/pi-ai";
 import { estimateContextParts } from "./context-breakdown.js";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
+import { appVersion } from "./app-version.js";
 import { Type } from "typebox";
 import { BgServerTracker } from "./bg-servers.js";
 import type { PluginAgentTool, PluginCommandDef, PluginToolEvent } from "./plugins.js";
@@ -1860,20 +1860,10 @@ export class ClientSession {
 	 */
 
 	/**
-	 * Version of the RUNNING pi-web-ui package (read from its own package.json,
-	 * resolved from this compiled module: <pkg>/dist/server → <pkg>).
+	 * Version of the RUNNING pi-web-ui package, shared with the ready handshake.
 	 */
 	private static currentAppVersion(): string {
-		try {
-			const here = dirname(fileURLToPath(import.meta.url));
-			const pkgRoot = resolve(here, "..", "..");
-			const pkg = JSON.parse(
-				readFileSync(join(pkgRoot, "package.json"), "utf8"),
-			) as { version?: string };
-			return pkg.version ?? "0.0.0";
-		} catch {
-			return "0.0.0";
-		}
+		return appVersion();
 	}
 
 	/** Simple numeric semver compare: >0 means a newer than b. */

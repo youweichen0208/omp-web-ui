@@ -29,6 +29,7 @@ import compression from "compression";
 import { WebSocket, WebSocketServer } from "ws";
 import { VERSION, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { PROTOCOL_VERSION } from "./protocol-version.js";
+import { appVersion } from "./app-version.js";
 import {
 	AgentService,
 	workspacePath,
@@ -241,6 +242,7 @@ function resolvePkgRoot(): string {
 	return candidates[0];
 }
 const pkgRoot = resolvePkgRoot();
+const APP_VERSION = appVersion(pkgRoot);
 // Plugin client bundles: <dataDir>/plugins/<id>/client/* served at
 // /plugins/<id>/client/* so the frontend can import() plugin views. Only the
 // client/ subtree is exposed — manifest.json and the server-side index.mjs
@@ -865,7 +867,7 @@ wss.on("connection", (ws) => {
 					send({
 						type: "ready",
 						clientId: cid,
-						serverVersion: VERSION,
+						serverVersion: APP_VERSION,
 						protocolVersion: PROTOCOL_VERSION,
 					});
 					cs.flushSnapshot();

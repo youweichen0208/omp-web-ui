@@ -91,7 +91,7 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 
 export function changeLineCount(block: UiToolCallBlock, result?: UiMessage): { added: number; removed: number } | null {
 	const change = editWriteChange(block, result);
-	return change ? { added: change.added, removed: change.removed } : null;
+	return change && !change.error && (change.added > 0 || change.removed > 0) ? { added: change.added, removed: change.removed } : null;
 }
 
 /** A later successful edit of the same file resolves earlier failed attempts. */

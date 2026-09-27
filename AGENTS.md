@@ -32,6 +32,7 @@ Windows 计划任务部署。
 pi-web-ui/
 ├── server/                     # 后端（Node ESM，编译到 dist/server/）
 │   ├── index.ts                # 入口：express 静态 + /ws 端点、消息分发、心跳、优雅停机
+│   ├── app-version.ts          # 运行中 pi-web-ui 包版本（区别于 pi SDK VERSION）
 │   ├── protocol.ts             # ★ 唯一事实源：wire 协议类型（client↔server 消息）
 │   ├── agent-service.ts        # 核心：ClientSession（每客户端一个会话组，可并行多个对话）+ AgentService
 │   ├── serialize.ts            # SDK 消息 → UiMessage 序列化

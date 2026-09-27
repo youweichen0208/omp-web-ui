@@ -118,7 +118,7 @@ assert.equal(await page.locator('.status-item.working .working-dots i').count(),
 assert.equal(await page.locator('.agent-working').count(),0,'visible thinking replaces the waiting footer');
 assert.equal(await page.locator('.inputbox .working-dots,.inputbox .status-dot,.inputbox .thinking-spinner').count(),0,'no extra working dot in composer');
 assert.equal(await page.locator('.msg-assistant > .msg-meta:visible').count(),1);
-assert.equal(await page.locator('.inputbox textarea').getAttribute('placeholder'),'智能体工作中…');
+assert.equal(await page.locator('.inputbox textarea').getAttribute('placeholder'),'继续输入消息…');
 const actions=page.locator('.input-tools .inputbox-actions');
 await page.locator('.inputbox textarea').fill('queued question');
 assert.equal(await actions.locator('.supplement').isVisible(),true);

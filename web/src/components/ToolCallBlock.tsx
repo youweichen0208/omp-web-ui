@@ -366,6 +366,8 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	const bashExit = view.status?.exitCode ?? Number(/(?:exited with code\s*|exit(?:ed)?\s+)(\d+)/i.exec(output)?.[1] ?? NaN);
 	const outputLines = output.replace(/\r\n/g, "\n").split("\n");
 	if (outputLines.at(-1) === "") outputLines.pop();
+	const command = block.name === "bash" ? bashCommand(block.argumentsText) : null;
+	const compactBash = !!command && !bashRun && !bashDiagnostics.length && !command.includes("\n") && command.length <= 90;
 	const limitedOutput = block.name !== "bash" && outputLines.length > 10 && !expanded && !zoomed;
 	const visibleOutput = limitedOutput ? outputLines.slice(0, 10).join("\n") : output;
 	const markdownRead = isMarkdown && markdownPreview && !isError ? splitFrontmatter(visibleOutput) : null;
@@ -410,7 +412,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	// the two views can never drift apart.
 	const bodyContent = (
 		<>
-			{block.argumentsText && (
+			{block.argumentsText && !compactBash && (
 				<div className="toolcall-args">
 					{targetPath ? (
 						<button type="button" className="toolcall-read-path" title={targetPath} onClick={() => setZoomed(true)}>{displayReadPath(targetPath)}</button>
@@ -429,7 +431,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					)}
 				</div>
 			)}
-			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} /> : (
+			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} compact={compactBash} gitStatus={!!command && /^\s*git\s+status(?:\s|$)/.test(command)} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">
 						{isError ? t("errorOutput") : block.name === "read" ? t("modelReadOnly") : t("output")}
@@ -477,7 +479,8 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 		<div className={`toolcall ${statusClass} ${block.name === "bash" ? "toolcall-bash" : ""} ${bashRun ? "toolcall-steps" : ""} ${bashDiagnostics.length ? "toolcall-diagnostics" : ""}`} onMouseEnter={() => notifyToolHover(block.id)} onMouseLeave={() => notifyToolHover(null)}>
 			<div className="toolcall-head">
 				<span className="toolcall-icon">{toolIcon(block.name)}</span>
-				<span className="toolcall-name">{block.name}</span>
+				{compactBash ? <code className="bash-head-command" title={command ?? ""}>$ {displayBashCommand(command!, cwd)}</code> : <span className="toolcall-name">{block.name}</span>}
+				{compactBash && output && <span className="bash-head-count">{t("toolLineCount", { n: outputLines.length })}</span>}
 				<span className="toolcall-status">
 					{statusLabel}
 					{running && block.name === "bash" && <span className="working-dots" aria-hidden="true"><i /><i /><i /></span>}
@@ -629,7 +632,7 @@ function BashFailure({ diagnostics, output, wrap }: { diagnostics: ReturnType<ty
 	</div>;
 }
 
-function BashOutput({ output, wrap, cwd, searchOutput }: { output: string; wrap: boolean; cwd: string; searchOutput: "standalone" | "mixed" | "none" }) {
+function BashOutput({ output, wrap, cwd, searchOutput, compact = false, gitStatus = false }: { output: string; wrap: boolean; cwd: string; searchOutput: "standalone" | "mixed" | "none"; compact?: boolean; gitStatus?: boolean }) {
 	const t = useT();
 	const [all, setAll] = useState(false);
 	const scroller = useRef<HTMLDivElement>(null);
@@ -646,15 +649,18 @@ function BashOutput({ output, wrap, cwd, searchOutput }: { output: string; wrap:
 	if (lines.at(-1) === "") lines.pop();
 	const visible = selectVisibleOutputLines(lines, all);
 	const errorCount = lines.filter(isLikelyErrorLine).length;
+	const hasGap = visible.some((index, position) => position > 0 && index > visible[position - 1] + 1);
 	return <div className="bash-output">
-		<div className="bash-output-label"><span>{t("output")} · {t("toolLineCount", { n: lines.length })}{errorCount > 0 ? ` · ${t("bashLikelyErrorLines", { n: errorCount })}` : ""}</span>{cwd && <span title={cwd}>{t("toolRelativeTo", { path: cwd })}</span>}</div>
+		{!compact && <div className="bash-output-label"><span>{t("output")} · {t("toolLineCount", { n: lines.length })}{errorCount > 0 ? ` · ${t("bashLikelyErrorLines", { n: errorCount })}` : ""}</span>{cwd && <span title={cwd}>{t("toolRelativeTo", { path: cwd })}</span>}</div>}
 		<div ref={scroller} className={`bash-output-lines ${wrap ? "wrap" : ""} ${overflow ? "has-overflow" : ""}`}>{visible.map((index, position) => {
 			const rawLine = lines[index];
 			const { number: lineNumber, text: line } = numberedOutputLine(rawLine, index, searchOutput === "mixed" ? "mixed" : searchOutput === "standalone");
 			const path = /^(?:[.~/\w-]+\/)*[.\w-]+(?:\.[\w-]+)$/.test(line);
 			const split = path ? line.lastIndexOf("/") + 1 : 0;
-			return <Fragment key={index}>{position > 0 && index > visible[position - 1] + 1 && <div className="bash-output-gap">{t("bashHiddenLines", { n: index - visible[position - 1] - 1 })}</div>}<div className={`bash-output-line${isLikelyErrorLine(rawLine) ? " error" : ""}`}><span className="bash-line-number">{lineNumber}</span><span className="bash-line-text">{path ? <><span className="bash-path-dir">{line.slice(0, split)}</span><span className={split ? "bash-path-file" : "bash-root-file"}>{line.slice(split)}</span></> : line || " "}</span></div></Fragment>;
+			const status = gitStatus ? /^(?:[ MADRCU?!]{2})\s/.exec(line)?.[0].trim() : "";
+			const gitClass = status === "??" ? " git-untracked" : status?.includes("D") ? " git-deleted" : status ? " git-modified" : "";
+			return <Fragment key={index}>{position > 0 && index > visible[position - 1] + 1 && <button type="button" className="bash-output-gap bash-output-gap-button" onClick={() => setAll(true)}>{t("toolMoreLines", { n: index - visible[position - 1] - 1 })}</button>}<div className={`bash-output-line${isLikelyErrorLine(rawLine) ? " error" : ""}`}><span className="bash-line-number">{lineNumber}</span><span className="bash-line-text">{gitClass ? <><span className={`bash-git-status${gitClass}`}>{line.slice(0, 2)}</span>{line.slice(2)}</> : path ? <><span className="bash-path-dir">{line.slice(0, split)}</span><span className={split ? "bash-path-file" : "bash-root-file"}>{line.slice(split)}</span></> : line || " "}</span></div></Fragment>;
 		})}</div>
-		{lines.length > 8 && <button type="button" className="bash-output-more" onClick={() => setAll((value) => !value)}>{all ? t("collapseCode") : t("toolMoreLines", { n: lines.length - visible.length })}</button>}
+		{lines.length > 8 && (all || !hasGap) && <button type="button" className="bash-output-more" onClick={() => setAll((value) => !value)}>{all ? t("collapseCode") : t("toolMoreLines", { n: lines.length - visible.length })}</button>}
 	</div>;
 }

@@ -48,7 +48,9 @@ import type {
 	PromptAttachment,
 	UiMessage,
 } from "./types";
-import { useT } from "./i18n";
+import { useI18n, useT } from "./i18n";
+import { conversationDisplayTitle } from "./conversation-display-title";
+import { skillAwarePreview } from "./skill-block";
 import { FiAlertCircle, FiAlertTriangle, FiInfo, FiX } from "react-icons/fi";
 import type { Notice } from "./use-chat";
 import { fileToProcessedImage, isRasterImage, type ProcessedImage } from "./image-paste";
@@ -201,7 +203,18 @@ type ViewName = "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
 
 export function App() {
 	const t = useT();
+	const { locale } = useI18n();
 	const { chat, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
+	const activeConversation = chat.conversations.find((item) => item.id === chat.activeConversationId);
+	const activeSession = chat.sessions.find((item) => item.path === chat.state?.sessionFile);
+	const activeConversationTitle = conversationDisplayTitle(
+		activeConversation?.title || skillAwarePreview(activeSession?.firstMessage ?? "") || t("newChat"),
+		activeSession?.firstMessage,
+		activeSession?.name,
+		Math.max(activeSession?.messageCount ?? 0, activeConversation?.messageCount ?? 0, chat.state?.messages.length ?? 0),
+		locale,
+		chat.state?.messages,
+	);
 	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const attachmentDrafts = useRef(new Map<string, PendingAttachment[]>());
 	const attachmentKey = useRef(chat.activeConversationId);
@@ -840,7 +853,7 @@ export function App() {
 									toolStatuses={chat.toolStatuses}
 									onEdit={onEditMessage}
 									onKillBash={() => send({ type: "abort_bash" })}
-									thinkingWrap={chat.settings?.thinkingWrap ?? true}
+									thinkingWrap={chat.settings?.thinkingWrap ?? false}
 								toolsWrap={chat.settings?.toolsWrap ?? true}
 								pendingEcho={chat.pendingEcho}
 								reloadEvents={chat.reloadEvents}
@@ -908,7 +921,7 @@ export function App() {
 									messages={chat.state?.messages ?? []}
 									streamingMessage={chat.state?.streamingMessage ?? null}
 									taskProgress={chat.state?.taskProgress}
-									conversationTitle={chat.conversations.find((item) => item.id === chat.activeConversationId)?.title ?? ""}
+									conversationTitle={activeConversationTitle}
 									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}
 									onAttach={(path, name, mode, isDir) => {

@@ -26,7 +26,7 @@
 
 ### 协议版本协商
 
-`hello` 可带 `protocolVersion`，`ready` 回带服务端版本；前端比对不一致时显示持久刷新横幅（应用原地更新后「界面新的/WS 旧的」混跑防护）。常量在 server/ 与 web/ 各一份 protocol-version.ts，`check:protocol` 校验两份一致——改协议时必须同步 bump。
+`hello` 可带 `protocolVersion`，`ready.serverVersion` 回带运行中 pi-web-ui 包的版本（不是 pi SDK 的 `VERSION`，底栏也显示此值）；前端比对协议不一致时显示持久刷新横幅（应用原地更新后「界面新的/WS 旧的」混跑防护）。常量在 server/ 与 web/ 各一份 protocol-version.ts，`check:protocol` 校验两份一致——改协议时必须同步 bump。
 
 ## 协议单源（types.ts 是 re-export shim，不再手工同步）
 

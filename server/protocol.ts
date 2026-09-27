@@ -957,6 +957,7 @@ export type ServerMessage =
 	| {
 			type: "ready";
 			clientId: string;
+			/** Running pi-web-ui package version, independent of the pi SDK version. */
 			serverVersion: string;
 			/** Wire-protocol version (server/protocol-version.ts). The client
 			 *  compares it against its own copy — a mismatch means the page was
