@@ -16,7 +16,7 @@
 
 `message_update` 事件 → 只对**活动对话**推 `message_delta`（`conversationId` + 每对话单调 `seq` + `messageId = stream-<ts>`（与 `serializeStreamingMessage` 的稳定 id 一致）+ 实时 usage + 剥离 `partial` 后的 thinking/text delta）。它**不经 snapshot 通道**——`send()` 背压只丢 snapshot，增量永远可达，大会话不再因背压停更。前端 `applyMessageDelta`（`web/src/message-delta.ts` 纯函数、不可变——StrictMode 双调 reducer 会把原地 mutation 加倍）patch `streamingMessage` + `stats.tokens`；seq 缺口触发防抖 `get_state` 重同步；snapshot 权威收敛。
 
-输入框用量入口使用 SDK `getSessionStats()` 的当前上下文总量、窗口大小和累计 token 用量；每条 assistant 消息序列化其模型返回的 `input/cacheRead/cacheWrite/output`，供最近 12 次缓存命中图和本轮明细使用。缓存命中率按 `cacheRead / (input + cacheRead + cacheWrite)` 计算。模型接口不返回「系统提示、工具、对话、附件」四类上下文精确值，`server/context-breakdown.ts` 按消息内容估算比例，并以 SDK 总量归一化；界面明确标注估算。缓存数据只能说明读写和未缓存输入的比例，不能推断服务商缓存失效的具体原因。
+输入框用量入口使用 SDK `getSessionStats()` 的当前上下文总量、窗口大小和累计 token 用量；每条 assistant 消息仍序列化其模型返回的 `input/cacheRead/cacheWrite/output`。弹窗只显示上下文窗口总量与缓存命中率，后者按 `cacheRead / (input + cacheRead + cacheWrite)` 计算。模型接口不返回「系统提示、工具、对话、附件」四类上下文精确值；`server/context-breakdown.ts` 保留归一化估算供协议数据使用，界面不展示分类估算。缓存数据不能推断服务商缓存失效的具体原因。
 
 同时：delta 活跃期（1.5s 内有增量）snapshot 降为**事件驱动检查点**——agent_end / tool_execution_end 立即 flush，其余事件走 2s 兜底定时器（增量负责流畅度、快照只做边界校准）。单测：`tests/unit/message-delta.test.ts`。
 

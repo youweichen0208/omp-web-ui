@@ -116,7 +116,7 @@ pi-web-ui/
 | `RightPanel.tsx` / `TaskProgressPanel.tsx` | 可展开目录树、Git 改动标记、文件预览；当前任务进度由服务端 transcript 推断，右栏展示合并后的任务阶段和结果；布局见 `docs/ui-design.md` |
 | `ChatInput.tsx` | 输入框 + 附件 chips（inline/reference/lines 三色）+ 当前文件 chip（镜像预览面板，发送取编辑器快照）；全窗口拖放目标；followUp 排队/steer 插队；斜杠命令选择器 |
 | `Message.tsx` / `MessageList.tsx` / `WorkingStatus.tsx` | 消息渲染、流式等待标题与静默状态、tool 结果关联；编辑重问、惰性窗口化、问题导航；等待态切换与间距见 `docs/ui-design.md` |
-| `ToolCallBlock.tsx` / `ThinkingBlock.tsx` / `BashBlock` | 工具调用卡片、思考块、bash 输出 |
+| `ToolCallBlock.tsx` / `EditWriteCard.tsx` / `ThinkingBlock.tsx` / `BashBlock` | 通用工具卡片、编辑与写入的逐行 diff 卡片、思考块、bash 输出；编辑卡片的数据整理在 `web/src/edit-write-presentation.ts`，交互规则见 `docs/ui-design.md` |
 | `TerminalPanel.tsx` / `TermXterm.tsx` | 终端视图 + xterm 实例桥接 |
 | `SCMPanel.tsx` | 源代码管理（Git）视图：status/branch/diff；提交/推送/拉取/切换分支 |
 | `TopBar.tsx` / `FooterBar.tsx` | 顶栏（项目／会话标题、后台任务、视图切换、文件栏开关）、状态栏（版本／分支／消息／工作目录）；模型与思考强度在 `ChatInput.tsx` 底部 |
@@ -153,7 +153,7 @@ pi-web-ui/
 | **SSH 节点** | `docs/architecture-nodes.md` | 本机 ssh2 连接、主机密钥信任、加密凭据、PTY/SFTP 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
-| **当前任务进度** | `docs/architecture-core.md` | 修改任务判定、单阶段列表、阶段展开或长任务计划时阅读：工具调用后生成任务；`task_plan` 调用从 transcript 恢复显式步骤与调整；结果来自本轮记录，历史任务尚未实现 |
+| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、阶段摘要或长任务计划时阅读：工具调用后生成任务；`task_plan` 才提供总步数进度，普通任务只显示已观察到的阶段；结果来自本轮记录，历史任务尚未实现 |
 | **工具挂死看门狗** | `docs/architecture-core.md` | 20 分钟超时自动 abort 会话；只停止运行不碰后台服务 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |

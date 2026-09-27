@@ -6,16 +6,21 @@ const short = (text: string, limit: number) => {
 };
 
 const continuation = /^(?:继续(?:吧|吗)?|可以(?:的|吧|了)?|好的?|开始|接着|可以(?:帮我)?继续(?:吗|吧)?|帮我继续(?:吗|吧)?|please continue|continue)[\s，。！!？?]*$/i;
+const nextStep = /^(?:(?:可以|能)?(?:帮我)?(?:开始|继续|接着|进行)(?:下一步|下个阶段|后续工作)?(?:吗|吧|了)?|下一步(?:呢|是什么)?)[\s，。！!？?]*$/i;
+const vagueRequest = (text: string) => continuation.test(text.trim()) || nextStep.test(text.trim());
+const greeting = /^(?:hi|hello|hey|你好|嗨|在吗|谢谢)[\s，。！!？?]*$/i;
 
-function taskTitle(messages: UiMessage[], userIndex: number): string {
+function taskTitle(messages: UiMessage[], userIndex: number, steps: TaskStep[]): string {
 	const textOf = (message: UiMessage) => message.content.map((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string" ? (part as { text: string }).text : "").join(" ");
 	const current = textOf(messages[userIndex]);
-	if (continuation.test(current.trim())) {
+	if (vagueRequest(current)) {
 		for (let index = userIndex - 1; index >= 0; index--) {
 			if (messages[index].role !== "user") continue;
 			const previous = textOf(messages[index]);
-			if (!continuation.test(previous.trim()) && previous.trim()) return short(previous, 56);
+			if (!vagueRequest(previous) && !greeting.test(previous.trim()) && previous.trim()) return short(previous, 56);
 		}
+		const firstAction = steps.find((step) => step.title && step.title !== "正在分析请求");
+		if (firstAction) return short(firstAction.title, 56);
 	}
 	return short(current, 56) || "当前任务";
 }
@@ -101,7 +106,6 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 	const userIndex = messages.findLastIndex((message) => message.role === "user" && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
 	if (userIndex < 0) return null;
 	const user = messages[userIndex];
-	const title = taskTitle(messages, userIndex);
 	const tail = [...messages.slice(userIndex + 1), ...(streamingMessage?.role === "assistant" ? [streamingMessage] : [])];
 	// A plain conversation is not a task. Create the panel only after pi has
 	// actually invoked a tool in this turn.
@@ -149,6 +153,7 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 	const plannedEnd = status === "done" ? Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0)) : undefined;
 	const plan = planFromTranscript(tail, results, steps, status === "done", plannedEnd);
 	if (!steps.length && !plan) return null;
+	const title = taskTitle(messages, userIndex, steps);
 	const endedAt = status === "running" ? undefined : Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0));
 	return { id: `task:${user.id}`, conversationId, sourceMessageId: user.id, title, status, startedAt: user.timestamp ?? 0, ...(endedAt ? { endedAt } : {}), completed: steps.filter((step) => step.status === "done").length, steps, ...(plan ? { plan } : {}) };
 }

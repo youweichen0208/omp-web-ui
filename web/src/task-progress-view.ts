@@ -23,17 +23,38 @@ function kindOf(step: TaskStep, afterTest: boolean): ProgressPhase["kind"] {
 	const text = plainTitle(`${step.title} ${step.artifacts.map((item) => item.label).join(" ")}`).toLowerCase();
 	if (/\bgit\s+commit\b|提交|commit\b/.test(text)) return "commit";
 	if (/migration|迁移/.test(text)) return "migration";
+	if (step.artifacts.length && step.artifacts.every((item) => ["read", "grep", "find", "ls"].includes(item.kind))) return "read";
+	if (step.artifacts.some((item) => ["write", "edit"].includes(item.kind)) && !step.artifacts.some((item) => ["bash", "terminal"].includes(item.kind))) return afterTest || /修复|修正|fix|debug/.test(text) ? "fix" : "build";
 	if (afterTest && /修复|修正|fix|debug|rerun|重跑|复测/.test(text)) return "fix";
 	if (/pytest|vitest|npm\s+(?:run\s+)?test|测试|test\b/.test(text)) return "test";
-	if (step.artifacts.length && step.artifacts.every((item) => ["read", "grep", "find", "ls"].includes(item.kind)) || /读取|查看|检查|调研|分析/.test(text) && !step.artifacts.some((item) => ["write", "edit"].includes(item.kind))) return "read";
+	if (/读取|查看|检查|调研|分析/.test(text)) return "read";
 	if (afterTest && step.artifacts.some((item) => ["write", "edit"].includes(item.kind))) return "fix";
 	if (step.artifacts.some((item) => ["write", "edit"].includes(item.kind)) || /实现|搭建|编写|创建|修改/.test(text)) return "build";
 	return "other";
 }
 
 const titles: Record<ProgressPhase["kind"], string> = {
-	read: "读取与确认", build: "实现主体", migration: "补 migrations", test: "运行测试", fix: "运行并修复", commit: "提交", other: "处理任务",
+	read: "读取与确认", build: "实现主体", migration: "补 migrations", test: "运行测试", fix: "运行并修复", commit: "提交", other: "执行操作",
 };
+
+function phaseTitle(kind: ProgressPhase["kind"], step: TaskStep): string {
+	const title = plainTitle(step.title);
+	if (title && !/^(?:处理任务|执行操作|当前任务|正在分析请求|运行工具|读取文件|修改文件)$/.test(title) && kind !== "test" && kind !== "commit") return title.slice(0, 32);
+	return titles[kind];
+}
+
+export function phaseSummary(phase: ProgressPhase, tests?: { passed: number; total: number }, locale: "zh" | "en" = "zh"): string {
+	const { read, write, edit, command } = phase.counts;
+	const paths = [...new Set(phase.steps.flatMap((step) => step.artifacts.filter((item) => item.path && ["write", "edit"].includes(item.kind)).map((item) => item.path!)))];
+	if ((phase.kind === "test" || phase.kind === "fix") && command) return locale === "en" ? `Ran ${command} command${command === 1 ? "" : "s"}${tests ? ` · ${tests.passed}/${tests.total} passed` : ""}${paths.length === 1 ? ` · Edited ${paths[0]}` : ""}` : `运行 ${command} 条命令${tests ? ` · ${tests.passed}/${tests.total} 通过` : ""}${paths.length === 1 ? ` · 修改 ${paths[0]}` : ""}`;
+	if (paths.length === 1) return `${locale === "en" ? edit ? "Edited" : "Wrote" : edit ? "修改" : "写入"} ${paths[0]}`;
+	if (paths.length > 1) return locale === "en" ? `${edit ? `Edited ${edit}` : ""}${edit && write ? " · " : ""}${write ? `Wrote ${write}` : ""} · ${paths.length} files` : `${edit ? `修改 ${edit}` : ""}${edit && write ? " · " : ""}${write ? `写入 ${write}` : ""} · ${paths.length} 个文件`;
+	const readPaths = [...new Set(phase.steps.flatMap((step) => step.artifacts.filter((item) => item.path && item.kind === "read").map((item) => item.path!)))];
+	if (readPaths.length) return readPaths.length <= 2 ? readPaths.join(" · ") : locale === "en" ? `Read ${readPaths.length} files` : `读取 ${readPaths.length} 个文件`;
+	if (command) return locale === "en" ? `Ran ${command} command${command === 1 ? "" : "s"}` : `运行 ${command} 条命令`;
+	if (read) return locale === "en" ? `Read ${read} items` : `读取 ${read} 项`;
+	return "";
+}
 
 /** Consecutive transcript steps become readable phases; every raw step remains available underneath. */
 export function progressPhases(task: TaskProgress): ProgressPhase[] {
@@ -43,13 +64,12 @@ export function progressPhases(task: TaskProgress): ProgressPhase[] {
 		let kind = kindOf(step, tested);
 		const previous = phases.at(-1)?.kind;
 		if (kind === "read" && previous && previous !== "read" && previous !== "other") kind = previous;
-		if (kind === "test" && previous === "fix") kind = "fix";
 		if (kind === "other" && phases.length) kind = phases.at(-1)!.kind;
 		if (kind === "test") tested = true;
 		if (kind === "fix" && phases.at(-1)?.kind === "test") phases.at(-1)!.title = "运行测试";
 		let phase = phases.at(-1);
 		if (!phase || phase.kind !== kind) {
-			phase = { id: step.id, kind, title: titles[kind], steps: [], status: "done", startedAt: step.startedAt, counts: { read: 0, write: 0, edit: 0, command: 0 } };
+			phase = { id: step.id, kind, title: phaseTitle(kind, step), steps: [], status: "done", startedAt: step.startedAt, counts: { read: 0, write: 0, edit: 0, command: 0 } };
 			phases.push(phase);
 		}
 		phase.steps.push(step);

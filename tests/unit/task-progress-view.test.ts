@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { TaskProgress, TaskStep, UiMessage } from "../../server/protocol.js";
-import { plainTitle, progressPhases, progressResult } from "../../web/src/task-progress-view.js";
+import { phaseSummary, plainTitle, progressPhases, progressResult } from "../../web/src/task-progress-view.js";
 
 const makeStep = (id: string, title: string, kind: string, timestamp: number): TaskStep => ({ id, messageId: id, title, status: "done", startedAt: timestamp, endedAt: timestamp + 1000, artifacts: [{ toolCallId: id, kind, label: title }] });
 
@@ -18,4 +18,19 @@ test("result card only uses values found in the task transcript", () => {
 	const messages: UiMessage[] = [{ id: "u", role: "user", content: [{ type: "text", text: "继续" }] }, { id: "a", role: "assistant", content: [{ type: "text", text: "提交 f9c3a1e feat: S02b 主体\n测试 48 / 48 通过\n改动 +312 −40 · 11 个文件" }] }];
 	expect(progressResult(task, messages)).toEqual({ commit: { hash: "f9c3a1e", subject: "feat: S02b 主体" }, tests: { passed: 48, total: 48 }, changes: { added: 312, deleted: 40, files: 11 } });
 	expect(progressResult(task, messages.slice(0, 1))).toEqual({});
+});
+
+test("inferred phases use concrete titles and command summaries", () => {
+	const steps: TaskStep[] = [
+		{ ...makeStep("r", "读取进度与测试约定", "read", 100), artifacts: [{ toolCallId: "r", kind: "read", label: "docs/progress.md", path: "docs/progress.md" }] },
+		{ ...makeStep("e", "修复测试配置", "edit", 200), artifacts: [{ toolCallId: "e", kind: "edit", label: "tests/conftest.py", path: "tests/conftest.py" }] },
+		{ ...makeStep("b", "运行测试", "bash", 300), artifacts: [{ toolCallId: "b", kind: "bash", label: "pytest tests/test_jobs.py" }] },
+	];
+	const task: TaskProgress = { id: "task", conversationId: "c", sourceMessageId: "u", title: "S02b 主体实现", status: "running", startedAt: 100, completed: 2, steps };
+	const phases = progressPhases(task);
+	expect(phases[0].title).toBe("读取进度与测试约定");
+	expect(phases[0].title).not.toBe("处理任务");
+	expect(phaseSummary(phases.at(-1)!, { passed: 48, total: 48 })).toContain("运行 1 条命令");
+	expect(phaseSummary(phases.at(-1)!, { passed: 48, total: 48 }, "en")).toContain("Ran 1 command · 48/48 passed");
+	expect(phaseSummary(phases[1])).toContain("tests/conftest.py");
 });

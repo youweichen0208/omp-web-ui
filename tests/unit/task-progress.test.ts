@@ -38,6 +38,21 @@ test("plain chat has no task; a short follow-up keeps the previous task name onc
 	expect(task?.steps[0].artifacts[0]).toMatchObject({ label: "pwd && ls -la", outputLines: 2 });
 });
 
+test("vague next-step request inherits the previous substantive task title", () => {
+	const messages: UiMessage[] = [user("u1", "S02b 主体实现"), { id: "a1", role: "assistant", content: [{ type: "text", text: "上一轮已完成主体模块。" }] }, user("u2", "可以开始下一步吗"), { id: "a2", role: "assistant", content: [call("b1", "bash", { command: "pytest tests/test_jobs.py" })] }];
+	expect(deriveTaskProgress("c1", messages, null, true)?.title).toBe("S02b 主体实现");
+});
+
+test("vague request without previous task falls back to the first concrete action", () => {
+	const messages: UiMessage[] = [user("u1", "可以开始下一步吗"), { id: "a1", role: "assistant", content: [{ type: "text", text: "读取进度与测试约定" }, call("r1", "read", { path: "docs/progress.md" })] }];
+	expect(deriveTaskProgress("c1", messages, null, true)?.title).toBe("读取进度与测试约定");
+});
+
+test("a greeting does not become the inherited task name", () => {
+	const messages: UiMessage[] = [user("u0", "hello"), { id: "a0", role: "assistant", content: [{ type: "text", text: "Hi" }] }, user("u1", "可以开始下一步吗"), { id: "a1", role: "assistant", content: [{ type: "text", text: "读取进度与测试约定" }, call("r1", "read", { path: "docs/progress.md" })] }];
+	expect(deriveTaskProgress("c1", messages, null, true)?.title).toBe("读取进度与测试约定");
+});
+
 test("a running turn keeps a pending step between completed tools and the next model response", () => {
 	const messages: UiMessage[] = [user("u1", "生成文件"), { id: "a1", role: "assistant", content: [call("w1", "write", { path: "a.txt", content: "a" })] }, { id: "r1", role: "toolResult", toolCallId: "w1", content: [{ type: "text", text: "done" }] }];
 	const progress = deriveTaskProgress("c1", messages, null, true);

@@ -658,7 +658,7 @@ export const ChatInput = memo(function ChatInput({
 						/>
 					</div>
 					<div className="input-tools-right">
-						<UsagePopover stats={stats} messages={messages} canCompact={connected && !streaming} onCompact={() => { send({ type: "prompt", text: "/compact", requestId: randomUuid() }); }} />
+						<UsagePopover stats={stats} />
 						<button
 							type="button"
 							className="btn attach-img"

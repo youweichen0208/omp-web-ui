@@ -34,44 +34,6 @@ function notifyToolHover(toolCallId: string | null) {
 	window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId } }));
 }
 
-function writeInfo(block: UiToolCallBlock): { path: string; content: string; bytes: number; lines: string[]; lang: string | null } {
-	try {
-		const args = JSON.parse(block.argumentsText ?? "{}") as { path?: unknown; content?: unknown };
-		const path = typeof args.path === "string" ? args.path : "";
-		const content = typeof args.content === "string" ? args.content : "";
-		const lines = content ? content.replace(/\n$/, "").split("\n") : [];
-		return { path, content, bytes: new TextEncoder().encode(content).length, lines, lang: langFromPath(path) };
-	} catch { return { path: "", content: "", bytes: 0, lines: [], lang: null }; }
-}
-
-/** Adjacent writes share one card. Successful tool boilerplate is represented
- * by the row status; errors stay visible with their original result text. */
-export function WriteGroup({ items }: { items: { block: UiToolCallBlock; view: ToolView }[] }) {
-	const t = useT();
-	const [open, setOpen] = useState(true);
-	const done = items.every(({ view }) => view.result || view.status);
-	const failed = items.some(({ view }) => view.result?.isError || view.status?.isError);
-	const bytes = items.reduce((sum, { block }) => sum + writeInfo(block).bytes, 0);
-	return <div className={`write-group ${failed ? "err" : done ? "ok" : "run"}`}>
-		<button type="button" className="write-group-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><strong>{t("writtenFiles", { n: items.length })}</strong><span className="write-group-summary">{bytes} B</span><span className="write-group-state">{failed ? t("error") : done ? t("done") : t("running")}</span></button>
-		{open && <div className="write-group-items">{items.map(({ block, view }) => <WriteFileRow key={block.id} block={block} view={view} />)}</div>}
-	</div>;
-}
-
-function WriteFileRow({ block, view }: { block: UiToolCallBlock; view: ToolView }) {
-	const t = useT();
-	const info = writeInfo(block);
-	const [open, setOpen] = useState(false);
-	const [expanded, setExpanded] = useState(false);
-	const error = view.result?.isError || view.status?.isError;
-	const resultText = view.result?.content.map((part) => part.type === "text" ? part.text : "").join("") ?? "";
-	const visible = expanded ? info.lines : info.lines.slice(0, 8);
-	return <div className={`write-file-row ${error ? "err" : ""}`} onMouseEnter={() => notifyToolHover(block.id)} onMouseLeave={() => notifyToolHover(null)}>
-		<button type="button" className="write-file-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><code title={info.path}>{info.path || block.name}</code><span>{info.lines.length ? `${info.lines.length} ${t("lines")} · ` : ""}{info.bytes} B</span><i className={error ? "error" : view.result || view.status ? "done" : "pending"} /></button>
-		{open && <div className="write-file-body">{info.lines.length ? <div className="write-file-code" role="region" aria-label={info.path}>{visible.map((line, index) => <div className="write-file-line" key={index}><span className="write-file-number">{index + 1}</span><code className="hljs" dangerouslySetInnerHTML={{ __html: highlightLine(line, info.lang) || "&#8203;" }} /></div>)}</div> : <div className="write-file-empty">{t("emptyFile")} ({info.path.split("/").at(-1)})</div>}{info.lines.length > 8 && <button type="button" className="write-file-more" onClick={() => setExpanded((value) => !value)}>{expanded ? t("collapseCode") : t("expandRemainingLines", { n: info.lines.length - 8 })}</button>}{error && resultText && <pre className="write-file-error">{resultText}</pre>}</div>}
-	</div>;
-}
-
 /** Consecutive reads form one quiet step. Each file remains inspectable. */
 export function ReadGroup({ items, wrap }: { items: { block: UiToolCallBlock; view: ToolView }[]; wrap?: boolean }) {
 	const t = useT();

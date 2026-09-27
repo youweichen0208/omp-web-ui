@@ -174,10 +174,12 @@ await page.screenshot({path:app?'/private/tmp/pi-agent-working-desktop.png':'/pr
 const editCall={id:'edit-call',role:'assistant',model:'glm-5.3',content:[{type:'toolCall',id:'edit-1',name:'edit',argumentsText:JSON.stringify({path:'web/index.html',oldText:'old',newText:'new'})}]};
 const editResult={id:'edit-result',role:'toolResult',toolCallId:'edit-1',toolName:'edit',isError:false,content:[{type:'text',text:'Edit complete'}],details:{diff:'-  3 old\n+  3 new'}};
 emit({messages:[messages[4],editCall,editResult],isStreaming:false,streamingMessage:null});
-await page.locator('.toolcall-diff-header',{hasText:'web/index.html'}).waitFor();
-assert((await page.locator('.toolcall-diff-header').textContent()).includes('+1 −1'));
-assert.equal((await page.locator('.toolcall-diff-gutter').allTextContents()).join(','),'-  3,+  3');
-const diffWidths=await page.locator('.toolcall-diff').evaluate(e=>({line:e.querySelector('.toolcall-diff-line.add').getBoundingClientRect().width,container:e.getBoundingClientRect().width}));
+await page.locator('.change-card-toggle code',{hasText:'web/index.html'}).waitFor();
+assert((await page.locator('.change-card .change-counts').textContent()).includes('+1'));
+assert((await page.locator('.change-card .change-counts').textContent()).includes('−1'));
+assert.equal((await page.locator('.change-card .change-old').allTextContents()).join(','),'3,');
+assert.equal((await page.locator('.change-card .change-new').allTextContents()).join(','),',3');
+const diffWidths=await page.locator('.change-lines').evaluate(e=>({line:e.querySelector('.change-line.add').getBoundingClientRect().width,container:e.getBoundingClientRect().width}));
 assert(diffWidths.line>=diffWidths.container-2,'diff tint spans the block width');
 await page.screenshot({path:app?'/private/tmp/pi-edit-diff-desktop.png':'/private/tmp/pi-edit-diff.png'});
 const multiCommand='cd '+cwd+' && echo "=== PORTS ===" && rg 899 tests && echo "=== GIT ===" && git status';

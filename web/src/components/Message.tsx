@@ -22,7 +22,8 @@ import { LeakedThinkingBlock } from "./LeakedThinkingBlock";
 import { Markdown } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
-import { GrepSummary, isSubagentCall, ReadGroup, SubagentGroup, ToolCallBlock, WriteGroup, type ToolView } from "./ToolCallBlock";
+import { GrepSummary, isSubagentCall, ReadGroup, SubagentGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
+import { EditWriteCard, EditWriteGroup } from "./EditWriteCard";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
@@ -108,6 +109,7 @@ interface MessageProps {
 	message: UiMessage;
 	/** toolResult messages by toolCallId (precomputed in MessageList, memoized). */
 	toolResults: ReadonlyMap<string, UiMessage>;
+	retriedEditIds?: ReadonlySet<string>;
 	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
 	/** tool_status entries (tool_execution_end) by toolCallId. */
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
@@ -147,6 +149,7 @@ export const Message = memo(function Message({
 	continuation,
 	message,
 	toolResults,
+	retriedEditIds,
 	liveOutputs,
 	toolStatuses,
 	streaming,
@@ -325,15 +328,16 @@ export const Message = memo(function Message({
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
 			const first = asToolCall(block);
-			if (first?.name === "write") {
-				const writes: UiToolCallBlock[] = [first];
+			if (first?.name === "write" || first?.name === "edit") {
+				const changes: UiToolCallBlock[] = [first];
 				while (i + 1 < message.content.length) {
 					const next = asToolCall(message.content[i + 1]);
-					if (next?.name !== "write") break;
-					writes.push(next);
+					if (next?.name !== "write" && next?.name !== "edit") break;
+					changes.push(next);
 					i++;
 				}
-				elements.push(<WriteGroup key={`${message.id}-${first.id}`} items={writes.map((item) => ({ block: item, view: viewFor(item) }))} />);
+				if (changes.length >= 3) elements.push(<EditWriteGroup key={`${message.id}-${first.id}`} items={changes.map((item) => ({ block: item, view: viewFor(item) }))} retriedIds={retriedEditIds} />);
+				else elements.push(...changes.map((item) => <EditWriteCard key={`${message.id}-${item.id}`} item={{ block: item, view: viewFor(item) }} retried={retriedEditIds?.has(item.id)} />));
 				continue;
 			}
 			if (first?.name === "read") {

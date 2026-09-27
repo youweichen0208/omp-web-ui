@@ -16,6 +16,7 @@ import type { PendingEcho, ReloadStatus } from "../use-chat";
 import { Message, asText } from "./Message";
 
 import { collectQuestionAttachments } from "../question-attachments";
+import { retriedEditIds as findRetriedEditIds } from "../edit-write-presentation";
 
 import { parseSkillBlock } from "../skill-block";
 import { buildCollapsedGroups } from "../collapsed-groups";
@@ -192,6 +193,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		}
 		return m;
 	}, [state.messages]);
+	const retriedEditIds = useMemo(() => findRetriedEditIds(state.messages, toolResults), [state.messages, toolResults]);
 	/**
 	 * Original attachments per user question (memoized on the stable messages
 	 * array) — restored in the edit composer because the fork drops the
@@ -521,8 +523,23 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 			const id = (event as CustomEvent<{ messageId?: string }>).detail?.messageId;
 			if (id && messages.some((message) => message.id === id)) jumpTo(id);
 		};
+		const onToolJump = (event: Event) => {
+			const { messageId, toolCallId } = (event as CustomEvent<{ messageId?: string; toolCallId?: string }>).detail ?? {};
+			if (!messageId || !toolCallId || !messages.some((message) => message.id === messageId)) return;
+			jumpTo(messageId);
+			requestAnimationFrame(() => requestAnimationFrame(() => {
+				const card = scrollRef.current?.querySelector<HTMLElement>(`[data-tool-call-id="${CSS.escape(toolCallId)}"]`);
+				if (!card) return;
+				card.scrollIntoView({ block: "center" });
+				card.classList.remove("change-card-flash");
+				void card.offsetWidth;
+				card.classList.add("change-card-flash");
+				window.setTimeout(() => card.classList.remove("change-card-flash"), 1800);
+			}));
+		};
 		window.addEventListener("pi:jump-message", onTaskJump);
-		return () => window.removeEventListener("pi:jump-message", onTaskJump);
+		window.addEventListener("pi:jump-tool", onToolJump);
+		return () => { window.removeEventListener("pi:jump-message", onTaskJump); window.removeEventListener("pi:jump-tool", onToolJump); };
 	}, [jumpTo, messages]);
 
 	const onScroll = useCallback(() => {
@@ -737,6 +754,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							qnActive={qIdx !== undefined ? qIdx === activeIdx : undefined}
 							onJump={jumpTo}
 							toolResults={toolResults}
+							retriedEditIds={retriedEditIds}
 							liveOutputs={hasToolCall(m) ? liveOutputs : EMPTY_LIVE}
 							toolStatuses={toolStatuses}
 							streaming={state.isStreaming && connected}
@@ -757,6 +775,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						message={state.streamingMessage}
 						continuation={!!predecessors.get(state.streamingMessage.id)}
 						toolResults={toolResults}
+						retriedEditIds={retriedEditIds}
 						liveOutputs={
 							hasToolCall(state.streamingMessage) ? liveOutputs : EMPTY_LIVE
 						}

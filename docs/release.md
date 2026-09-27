@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.6.8 正式版
+
+`0.6.8` 统一发布编辑／写入逐行 diff 卡片、任务面板状态与阶段摘要修正，以及精简后的上下文窗口和缓存命中用量弹窗。Web、npm 包和 macOS／Windows／Linux 桌面安装包使用同一版本号。发布说明见 `.github/release-notes/v0.6.8.md`。
+
 ## 0.6.7 正式版
 
 `0.6.7` 为任务面板加入按任务规模分级展示：纯聊天不显示任务，单阶段直接列操作，多阶段汇总结果和过程，长任务可由 pi 提前给出并更新计划。修复新对话首条消息被推到消息区底部的问题，调整助手等待提示的位置，并移除输入框下方重复的快捷键提示。Web、npm 包和 macOS／Windows／Linux 桌面安装包使用同一版本号。
