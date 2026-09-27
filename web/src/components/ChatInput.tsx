@@ -412,8 +412,10 @@ export const ChatInput = memo(function ChatInput({
 		<div className="inputbox-actions">
 			{streaming ? (
 				<>
-					<button type="button" className="btn supplement" title={t("supplementTip")} disabled={!connected || !text.trim()} onClick={() => submit(true)}>{t("supplement")}</button>
-					<button type="button" className="btn steer" disabled={!connected || !text.trim()} onClick={() => submit(false)}>{t("steerSend")}</button>
+					{text.trim() && <>
+						<button type="button" className="btn supplement" title={t("supplementTip")} disabled={!connected} onClick={() => submit(true)}>{t("supplement")}</button>
+						<button type="button" className="btn steer" disabled={!connected} onClick={() => submit(false)}>{t("steerSend")}</button>
+					</>}
 					<button
 						type="button"
 						className="btn stop"

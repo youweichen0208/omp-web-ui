@@ -252,6 +252,7 @@ export function App() {
 	 *  its own stopPropagation handlers. */
 	const [appDragOver, setAppDragOver] = useState(false);
 	const [view, setView] = useState<ViewName>("chat");
+	const [commitJump, setCommitJump] = useState<{ hash: string; token: number } | null>(null);
 	const visited = useRef(new Set<ViewName>(["chat"]));
 	visited.current.add(view);
 	// 已安装且未在设置面板禁用的插件（决定 tab 与视图加载）。
@@ -832,6 +833,7 @@ export function App() {
 								<WorkspacePathContext.Provider value={chat.state.cwd}><MessageList
 									active={view === "chat"}
 									connected={chat.ready}
+									silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"}
 									key={chat.state.conversationId ?? "boot"}
 									state={chat.state}
 									liveOutputs={chat.liveOutputs}
@@ -899,8 +901,6 @@ export function App() {
 									active={!filesCollapsed && !previewFile && !switching && view === "chat" && ((!isMobile && !isNarrow) || drawer === "right")}
 									send={send}
 									files={chat.files}
-									conversationFilesChecked={chat.conversationFilesChecked}
-									ready={chat.ready}
 									scmData={chat.scmData}
 									scmDirty={chat.scmDirty}
 									fileChanged={chat.fileChanged}
@@ -916,6 +916,7 @@ export function App() {
 									}}
 									onPreview={openPreview}
 									onNotice={(level, text) => pushNotice(level, text)}
+									onViewChanges={(hash) => { if (hash) setCommitJump({ hash, token: Date.now() }); visited.current.add("git"); setView("git"); setDrawer(null); }}
 								/>
 							</div>
 							{previewFile && (
@@ -955,6 +956,7 @@ export function App() {
 							send={send}
 							terminal={terminal}
 							active={view === "git"}
+							commitToShow={commitJump}
 							onSwitchToTerminal={() => setView("terminal")}
 						/>}
 					</div>

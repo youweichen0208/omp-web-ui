@@ -92,6 +92,8 @@ export interface TaskStep {
 	id: string;
 	messageId: string;
 	title: string;
+	/** Original narrative before the short step title was produced. */
+	detail?: string;
 	status: "running" | "done" | "failed";
 	startedAt: number;
 	endedAt?: number;

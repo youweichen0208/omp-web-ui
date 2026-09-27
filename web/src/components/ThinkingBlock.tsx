@@ -20,7 +20,11 @@ export function ThinkingBlock({ thinking, durationMs, streaming, wrap = true }: 
 	const [open, setOpen] = useState<boolean | null>(null);
 	const expanded = open ?? wrap;
 
-	if (streaming) return expanded && thinking ? <div className="thinking open live"><div className="thinking-body">{thinking}</div></div> : null;
+	if (streaming) {
+		if (!thinking.trim()) return null;
+		return expanded ? <div className="thinking open live"><div className="thinking-body">{thinking}</div></div>
+			: <div className="thinking live"><button type="button" className="thinking-toggle" onClick={() => setOpen(true)}><FiChevronRight /><span className="thinking-label">{t("thinking")}</span><span className="thinking-live-label">{thinking.trim().split("\n").at(-1)}</span></button></div>;
+	}
 	return <div className={`thinking ${expanded ? "open" : ""}`}>
 		<button type="button" className="thinking-toggle" onClick={() => setOpen(!expanded)}>
 			{expanded ? <FiChevronDown /> : <FiChevronRight />}

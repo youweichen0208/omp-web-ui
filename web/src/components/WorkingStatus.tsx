@@ -1,8 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
+import { waitingPhase } from "../waiting-phase";
 
 export function WorkingDots() {
 	return <span className="working-dots" aria-hidden="true"><i /><i /><i /></span>;
+}
+
+export function WaitingHeaderStatus({ startedAt, silenceNotified = false }: { startedAt?: number; silenceNotified?: boolean }) {
+	const t = useT();
+	const start = useRef(startedAt && startedAt > 0 ? startedAt : Date.now());
+	const [elapsed, setElapsed] = useState(() => Math.max(0, Math.floor((Date.now() - start.current) / 1000)));
+	useEffect(() => {
+		const timer = window.setInterval(() => setElapsed(Math.max(0, Math.floor((Date.now() - start.current) / 1000))), 1000);
+		return () => window.clearInterval(timer);
+	}, []);
+	const phase = waitingPhase(elapsed);
+	if (phase === "handoff" && silenceNotified) return null;
+	const slow = phase === "slow" || phase === "handoff";
+	const label = t(slow ? "activitySlowResponse" : phase === "thinking" ? "activityStillThinking" : "activityAnalyze");
+	return <span className={`waiting-header-status${slow ? " slow" : ""}`} role="status"><span className="waiting-header-separator" aria-hidden="true">·</span><WorkingDots /><span className="waiting-header-label">{label}</span><span className="waiting-header-duration">{elapsed}s</span></span>;
 }
 export function WorkingStatus({ label, phase, durationMs }: { label: string; phase: string; durationMs?: number }) {
 	const t = useT();

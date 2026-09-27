@@ -45,9 +45,10 @@ try {
 	await page.locator('.tree-filter').waitFor({state:'detached'});
 	assert.equal(await page.locator('.panel-right .panel-title').textContent(),'文件');
 	assert.equal(await page.locator('.tree-filter').count(),0);
+	await page.locator('.time-gap').waitFor();
 	assert.equal(await page.locator('.time-gap').count(),1);
-	await page.getByText('本次对话涉及').waitFor();
-	assert.equal(await page.locator('.conversation-file').count(),2);
+	assert.equal(await page.getByText('本次对话涉及').count(),0);
+	assert.equal(await page.locator('.conversation-files').count(),0);
 	assert.equal(await page.locator('.status-branch-name').textContent(),'非 Git 仓库');
 	await page.locator('.msg-collapsed').first().waitFor();
 	const widths=await page.evaluate(()=>Object.fromEntries(['.msg-collapsed','.msg','.inputbox'].map(s=>[s,document.querySelector(s).getBoundingClientRect().width])));
@@ -110,7 +111,7 @@ try {
 	assert(bottom.edge<2 && bottom.gap>=0,JSON.stringify(bottom));
 	await page.locator('.msg-collapsed').first().click();
 	assert.equal(await page.locator('.msg-collapse-btn svg polyline').first().getAttribute('points'),'6 9 12 15 18 9');
-	await page.locator('.conversation-file',{hasText:'AGENTS.md'}).click();
+	await page.locator('button[data-tree-node="AGENTS.md"]').click();
 	await page.locator('.fp-markdown h1').waitFor();
-	console.log('PASS non-Git state, involved files, shared widths, folded avatars and file shortcut');
+	console.log('PASS non-Git state, shared widths, folded avatars and file tree preview');
 } finally { await browser?.close();server?.kill('SIGTERM');await sleep(200); }

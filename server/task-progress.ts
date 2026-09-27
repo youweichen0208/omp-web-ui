@@ -44,7 +44,7 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 			const failed = calls.some((call) => results.get(call.id)?.isError);
 			const status: TaskStep["status"] = completed < calls.length ? "running" : failed ? "failed" : "done";
 			const endedAt = Math.max(message.timestamp ?? 0, ...calls.map((call) => results.get(call.id)?.timestamp ?? 0));
-			steps.push({ id: `${message.id}:${group++}`, messageId: message.id, title: short(narrative, 40) || defaultTitle(calls), status, startedAt: message.timestamp ?? user.timestamp ?? 0, ...(status !== "running" ? { endedAt } : {}), hint: status === "running" ? `${completed}/${calls.length} 项完成` : failed ? "有工具执行失败" : `${calls.length} 项完成`, artifacts: calls.map(artifact) });
+			steps.push({ id: `${message.id}:${group++}`, messageId: message.id, title: short(narrative, 40) || defaultTitle(calls), ...(narrative.trim() ? { detail: narrative.trim() } : {}), status, startedAt: message.timestamp ?? user.timestamp ?? 0, ...(status !== "running" ? { endedAt } : {}), hint: status === "running" ? `${completed}/${calls.length} 项完成` : failed ? "有工具执行失败" : `${calls.length} 项完成`, artifacts: calls.map(artifact) });
 			calls = [];
 			narrative = "";
 		};
@@ -53,7 +53,7 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 			else if (part.type === "text" && typeof (part as { text?: unknown }).text === "string") { flush(); narrative = (part as { text: string }).text; }
 		}
 		flush();
-		if (group === 0 && narrative.trim()) steps.push({ id: `${message.id}:text`, messageId: message.id, title: short(narrative, 40), status: message === streamingMessage ? "running" : "done", startedAt: message.timestamp ?? user.timestamp ?? 0, artifacts: [] });
+		if (group === 0 && narrative.trim()) steps.push({ id: `${message.id}:text`, messageId: message.id, title: short(narrative, 40), detail: narrative.trim(), status: message === streamingMessage ? "running" : "done", startedAt: message.timestamp ?? user.timestamp ?? 0, artifacts: [] });
 	}
 	if (isStreaming && !steps.some((step) => step.status === "running")) {
 		const previous = [...tail].reverse().find((message) => message.role === "assistant");

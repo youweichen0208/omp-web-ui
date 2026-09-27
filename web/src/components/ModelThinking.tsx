@@ -81,10 +81,11 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 		supported: supportedThinking ? supportedThinking.has(v) : true,
 	}));
 	const modes = [
-		{ label: t("thinking.minimal"), values: ["minimal", "low", "off"] },
-		{ label: t("thinkingStandard"), values: ["medium"] },
-		{ label: t("thinkingDeep"), values: ["high", "xhigh"] },
+		{ label: t("thinking.minimal"), description: t("thinkingMinimalDescription"), values: ["minimal", "low", "off"] },
+		{ label: t("thinkingStandard"), description: t("thinkingStandardDescription"), values: ["medium"] },
+		{ label: t("thinkingDeep"), description: t("thinkingDeepDescription"), values: ["high", "xhigh", "max"] },
 	];
+	const activeMode = modes.find((mode) => mode.values.includes(state?.thinkingLevel ?? "off")) ?? modes[0];
 	const thinkingLabel = (level: string): string =>
 		thinkingLevels.find((l) => l.value === level)?.label ?? level;
 
@@ -200,12 +201,19 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 					</div>
 				</Dropdown>
 
-			{segmented ? <div className="thinking-control" title={t("thinkingDepthTip")}><span className="thinking-control-label">{t("thinking")}</span><div className="thinking-segments" role="group" aria-label={t("thinkingLevel")}>
+			{segmented ? <div className="thinking-control"><Dropdown
+				trigger={<><span className="thinking-trigger-prefix">{t("thinking")} · </span><span>{activeMode.label}</span></>}
+				open={thinkingOpen}
+				onOpenChange={setThinkingOpen}
+				align="left"
+				menuClassName="dd-menu-thinking"
+			>
+				<div className="dd-header">{t("thinkingLevel")}</div>
 				{modes.map((mode) => {
 					const value = mode.values.find((candidate) => !supportedThinking || supportedThinking.has(candidate));
-					return <button type="button" key={mode.label} disabled={!value} aria-pressed={mode.values.includes(state?.thinkingLevel ?? "off")} title={value ? thinkingLabel(value) : t("thinkingLevel")} onClick={() => value && send({ type: "set_thinking", level: value })}>{mode.label}</button>;
+					return <DropdownItem key={mode.label} active={mode === activeMode} disabled={!value} title={value ? undefined : t("thinkingUnsupported")} onClick={() => { if (value && state?.thinkingLevel !== value) send({ type: "set_thinking", level: value }); setThinkingOpen(false); }}><span className="thinking-mode-option"><strong>{mode.label}</strong><small>{mode.description}</small></span></DropdownItem>;
 				})}
-			</div></div> : <Dropdown
+			</Dropdown></div> : <Dropdown
 				trigger={
 					<>
 						<FiZap />

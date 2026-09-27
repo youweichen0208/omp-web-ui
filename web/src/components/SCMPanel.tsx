@@ -100,6 +100,7 @@ export interface ScmPanelProps {
 	terminal: ScmTerminalBridge;
 	/** True when this view is currently visible (drives auto-refresh). */
 	active: boolean;
+	commitToShow?: { hash: string; token: number } | null;
 	/** Switch the top-level view to the terminal (write ops run there). */
 	onSwitchToTerminal: () => void;
 }
@@ -109,6 +110,7 @@ export function ScmPanel({
 	send,
 	terminal,
 	active,
+	commitToShow,
 	onSwitchToTerminal,
 }: ScmPanelProps) {
 	const t = useT();
@@ -448,6 +450,13 @@ export function ScmPanel({
 	useEffect(() => {
 		if (viewMode === "history" && status) loadHistory();
 	}, [viewMode, status, loadHistory]);
+	const handledCommitJump = useRef<number | null>(null);
+	useEffect(() => {
+		if (!active || !chat.ready || chat.status !== "open" || !commitToShow || handledCommitJump.current === commitToShow.token) return;
+		handledCommitJump.current = commitToShow.token;
+		setViewMode("history");
+		showCommitDetail({ hash: commitToShow.hash, shortHash: commitToShow.hash, subject: "", author: "", date: "", decorations: "", graph: "" });
+	}, [active, chat.ready, chat.status, commitToShow, showCommitDetail]);
 
 	// Server pushed "the watched git dir changed" → re-query (fs.watch makes
 	// this instant for CLI/IDE changes; no polling needed when watch works).
