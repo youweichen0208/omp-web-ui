@@ -206,7 +206,7 @@ const bubble=document.querySelector('[data-msg-id="spacing-hello"] .msg-body').g
 const placeholder=document.querySelector('.agent-working-placeholder');
 const meta=placeholder.querySelector('.msg-meta').getBoundingClientRect();
 const status=placeholder.querySelector('.waiting-header-status').getBoundingClientRect();
-return {betweenMessages:meta.top-bubble.bottom,statusInHeading:status.top>=meta.top&&status.bottom<=meta.bottom,emptyAssistant:document.querySelector('[data-msg-id="spacing-empty"]')!==null,emptyBody:placeholder.querySelector('.msg-body')!==null};
+return {betweenMessages:meta.top-bubble.bottom,statusGap:status.top-meta.bottom,emptyAssistant:document.querySelector('[data-msg-id="spacing-empty"]')!==null,emptyBody:placeholder.querySelector('.msg-body')!==null};
 });
 showSpacing(null);
 await shortPage.locator('.agent-working-placeholder .waiting-header-status',{hasText:'正在分析请求'}).waitFor();
@@ -216,7 +216,7 @@ await shortPage.waitForTimeout(50);
 const emptySpacing=await measureSpacing();
 for(const spacing of [pendingSpacing,emptySpacing]){
 assert(spacing.betweenMessages>=20&&spacing.betweenMessages<=24,JSON.stringify(spacing));
-assert(spacing.statusInHeading,JSON.stringify(spacing));
+assert(spacing.statusGap>=6&&spacing.statusGap<=10,JSON.stringify(spacing));
 assert.equal(spacing.emptyAssistant,false,JSON.stringify(spacing));
 assert.equal(spacing.emptyBody,false,JSON.stringify(spacing));
 }

@@ -18,7 +18,7 @@ export function WaitingHeaderStatus({ startedAt, silenceNotified = false }: { st
 	if (phase === "handoff" && silenceNotified) return null;
 	const slow = phase === "slow" || phase === "handoff";
 	const label = t(slow ? "activitySlowResponse" : phase === "thinking" ? "activityStillThinking" : "activityAnalyze");
-	return <span className={`waiting-header-status${slow ? " slow" : ""}`} role="status"><span className="waiting-header-separator" aria-hidden="true">·</span><WorkingDots /><span className="waiting-header-label">{label}</span><span className="waiting-header-duration">{elapsed}s</span></span>;
+	return <div className={`waiting-header-status${slow ? " slow" : ""}`} role="status"><WorkingDots /><span className="waiting-header-label">{label}</span><span className="waiting-header-duration">{elapsed}s</span></div>;
 }
 export function WorkingStatus({ label, phase, durationMs }: { label: string; phase: string; durationMs?: number }) {
 	const t = useT();

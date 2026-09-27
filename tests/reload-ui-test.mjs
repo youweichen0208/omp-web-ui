@@ -1,4 +1,4 @@
-/** Browser acceptance for the inline /reload result and quiet composer hint. */
+/** Browser acceptance for the inline /reload result and stable composer. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
@@ -34,11 +34,11 @@ try {
 	const input = page.locator(".inputbox textarea");
 	await input.waitFor();
 	await page.waitForFunction(() => !document.querySelector(".inputbox textarea")?.disabled);
-	assert.equal(await page.locator(".composer-hint").isVisible(), false);
+	assert.equal(await page.locator(".composer-hint").count(), 0);
 	await input.focus();
-	assert.equal(await page.locator(".composer-hint").isVisible(), true);
+	assert.equal(await page.locator(".composer-hint").count(), 0);
 	await input.fill("draft");
-	assert.equal(await page.locator(".composer-hint").isVisible(), false);
+	assert.equal(await page.locator(".composer-hint").count(), 0);
 	await input.fill("/reload ");
 	await input.press("Enter");
 	await page.locator(".reload-event-line", { hasText: "已重新加载" }).waitFor({ timeout: 20000 });

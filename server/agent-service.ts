@@ -103,6 +103,7 @@ import {
 	type AgentMessage,
 } from "./serialize.js";
 import { deriveTaskProgress } from "./task-progress.js";
+import { makeTaskPlanTool } from "./task-plan-tool.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -388,6 +389,8 @@ interface Conversation {
 	/** Last SDK event time for this conversation. This detects a quiet run;
 	 *  WebSocket heartbeat separately reports browser/server connectivity. */
 	lastSdkEventAt: number;
+	/** Timestamp of the latest completed run in the current user turn. */
+	lastTaskEndedAt?: number;
 	/** Set once the silence state has been sent for the current quiet period;
 	 *  cleared on every SDK event and on each new prompt. */
 	stallNoticed: boolean;
@@ -1030,11 +1033,12 @@ export class ClientSession {
 							// GBK 老中文文件让模型改用终端按正确编码读（iconv/chcp/Get-Content）。
 							out.push(WINDOWS_PERSONA);
 						}
-						if (this.settingsSvc.current.terminalToolsEnabled !== false) {
+					if (this.settingsSvc.current.terminalToolsEnabled !== false) {
 							// 终端工具使用引导（全平台）：告诉模型什么场景该用持久终端
 							// 而不是一次性 bash——没有这段模型几乎从不主动选终端工具。
 							out.push(TERMINAL_TOOLS_GUIDANCE);
 						}
+						out.push("For tasks that clearly require at least three distinct steps, call task_plan before the first execution tool. Keep step IDs stable and update the plan as work proceeds. Start execution immediately after planning; ordinary short requests need no plan.");
 						return out;
 					},
 					// 技能开关：禁用的技能从系统提示词和 /skill: 目录中剔除。
@@ -1062,6 +1066,7 @@ export class ClientSession {
 				// 覆盖），执行时把自己的 AbortController 注册进客户端集合——
 				// abortBash() 只杀这些命令，agent run 与对话继续。
 				customTools: [
+					makeTaskPlanTool(),
 					// bash 双实现动态分流：「终端接管」开启时命令跑进持久可见终端
 					// （保留 shell 状态、静默自动转后台），关闭时是原生 killable bash。
 					makeAdaptiveBashTool(
@@ -1129,6 +1134,7 @@ export class ClientSession {
 			promptedSinceActive: false,
 			lastActiveAt: Date.now(),
 			lastSdkEventAt: Date.now(),
+			lastTaskEndedAt: undefined,
 			stallNoticed: false,
 			runningToolNames: new Map(),
 			toolsExecutedSincePrompt: false,
@@ -1424,6 +1430,7 @@ export class ClientSession {
 			// A run finished or a new entry was persisted — keep the session list fresh
 			// (new chat + first message, completed turns, compaction, etc.).
 			case "agent_end": {
+				conv.lastTaskEndedAt = Date.now();
 				this.scheduleSessionsRefresh();
 				// Manual interrupt (Stop button / abort): the last assistant message
 				// carries stopReason "aborted". A half-finished run should NOT be
@@ -1662,7 +1669,7 @@ export class ClientSession {
 			// it here is what makes thinking + text stream into the browser at
 			// ~60ms granularity instead of appearing only when the turn finishes.
 			streamingMessage,
-			taskProgress: deriveTaskProgress(conv.id, messages, streamingMessage, conv.session.isStreaming),
+			taskProgress: deriveTaskProgress(conv.id, messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
 			isStreaming: this.session.isStreaming,
 			model: model
 				? {
@@ -2277,7 +2284,7 @@ export class ClientSession {
 				},
 				attachments,
 			);
-			if (!s.isStreaming) conv.toolsExecutedSincePrompt = false;
+			if (!s.isStreaming) { conv.toolsExecutedSincePrompt = false; conv.lastTaskEndedAt = undefined; }
 			await deliverPrompt(s, text, asides, queue, acknowledge);
 		} catch (err) {
 			acknowledge(false);

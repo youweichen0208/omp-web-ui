@@ -17,6 +17,7 @@ interface RightPanelProps {
 	messages: UiMessage[];
 	streamingMessage: UiMessage | null;
 	taskProgress?: TaskProgress | null;
+	conversationTitle: string;
 	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
 	send: (msg: { type: "list_files"; path?: string } | { type: "scm_status"; reqId: number }) => boolean;
@@ -28,7 +29,7 @@ interface RightPanelProps {
 
 // Negative IDs keep tree status requests separate from SCMPanel's positive IDs.
 let treeStatusId = -100;
-export const RightPanel = memo(function RightPanel({ active, files, fileChanged, scmData, scmDirty, widgets, messages, streamingMessage, taskProgress, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ active, files, fileChanged, scmData, scmDirty, widgets, messages, streamingMessage, taskProgress, conversationTitle, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
 	const t = useT();
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
@@ -190,7 +191,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		}}>
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 		</div>
-		{taskProgress && <div className="panel-lower"><TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} onPreview={onPreview} onViewChanges={onViewChanges} /></div>}
+		{taskProgress && <div className="panel-lower"><TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} conversationTitle={conversationTitle} onPreview={onPreview} onViewChanges={onViewChanges} /></div>}
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (
 				<div className="panel-widgets">
 					{widgets

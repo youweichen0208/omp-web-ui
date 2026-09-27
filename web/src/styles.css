@@ -8530,7 +8530,6 @@ img.brand-logo, img.empty-logo { background: transparent; object-fit: contain; }
 .design-workspace .topbar-actions > .panel-toggle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid oklch(0.9 0.005 80); border-radius: 8px; color: oklch(0.4 0.01 80); background: transparent; cursor: pointer; }
 .design-workspace .messages { display: flex; flex-direction: column; padding: 28px 0 24px; }
 .design-workspace .messages > * { flex-shrink: 0; }
-.design-workspace .messages:has(.msg, .goal-event, .reload-event, .msg-collapsed) > :first-child { margin-top: auto; }
 .design-workspace .messages-wrap::before,
 .design-workspace .messages-wrap::after { content: ""; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
 .design-workspace .messages-wrap::before { top: 0; height: 16px; background: linear-gradient(to bottom, var(--bg), transparent); }
@@ -8586,7 +8585,6 @@ img.brand-logo, img.empty-logo { background: transparent; object-fit: contain; }
 .thinking-control-label { color: var(--text-faint); font: 11.5px var(--sans); white-space: nowrap; }
 .thinking-segments button { height: 26px; padding: 0 9px; border: 0; border-radius: 5px; font: 12px var(--sans); cursor: pointer; color: var(--text-dim); background: transparent; white-space: nowrap; }
 .thinking-segments button[aria-pressed="true"] { background: oklch(0.998 0.001 80); color: var(--heading); box-shadow: 0 1px 2px oklch(0.2 0.01 80 / 0.1); }
-.composer-hint { text-align: center; font-size: 11.5px; color: oklch(0.58 0.01 80); margin: 8px auto 0; }
 .design-workspace .drawer-right:not(:has(.fp-embedded)) { background: oklch(0.975 0.004 80); }
 .design-workspace .panel-right { background: transparent; }
 .design-workspace .panel-right .panel-title { min-height: 52px; font-size: 13.5px; font-weight: 500; padding: 0 16px; }
@@ -8623,7 +8621,6 @@ img.brand-logo, img.empty-logo { background: transparent; object-fit: contain; }
 	.design-workspace .input-tools { flex-wrap: wrap; }
 	.design-workspace .input-tools-left { flex: 1; }
 	.design-workspace .thinking-segments { max-width: 130px; }
-	.composer-hint { font-size: 10px; }
 }
 html.pi-desktop .design-workspace .sidebar-brand { -webkit-app-region: drag; app-region: drag; }
 html.pi-desktop-darwin .design-workspace .sidebar-brand { padding-top: 42px; }
@@ -9046,11 +9043,9 @@ body { -webkit-font-smoothing: antialiased; }
 .design-workspace .msg { padding-inline: 0; }
 .design-workspace .msg-collapsed { padding-inline: 0; }
 
-/* Quiet reading state, with focus guidance only while the message field is active. */
+/* Keep the message field's focus state steady without changing composer height. */
 .design-workspace .inputbox:focus-within { border-color: oklch(0.87 0.006 80); }
 .design-workspace .inputbox.has-draft:focus-within { border-color: var(--accent); }
-.design-workspace .composer-hint { display: none; }
-.design-workspace .inputbar:has(.inputbox:not(.has-draft) textarea:focus) .composer-hint { display: block; }
 
 .design-workspace .thinking-toggle { min-height: 22px; align-items: center; gap: 6px; line-height: 18px; }
 .design-workspace .thinking-toggle > svg { flex: none; width: 14px; height: 14px; }
@@ -9157,13 +9152,13 @@ body { -webkit-font-smoothing: antialiased; }
 .design-workspace .msg-assistant > .msg-body > .thinking:first-child { margin-top: 0; }
 .design-workspace .thinking.live:not(.open) .thinking-toggle { display: flex; max-width: 100%; }
 .design-workspace .thinking.live:not(.open) .thinking-live-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.design-workspace .agent-working-placeholder > .msg-meta { margin-bottom: 0; }
-.waiting-header-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--accent); font: 12.5px/1.4 var(--sans); white-space: nowrap; }
+.design-workspace .agent-working-placeholder > .msg-meta { margin-bottom: 8px; }
+.design-workspace .agent-working-placeholder > .waiting-header-status { margin-left: 28px; }
+.waiting-header-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--accent); font: 12.5px/1.4 var(--sans); white-space: nowrap; }
 .waiting-header-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .waiting-header-status .working-dots i { width: 4px; height: 4px; }
 .waiting-header-status.slow, .waiting-header-status.slow .waiting-header-duration { color: var(--amber); }
 .waiting-header-status.slow .working-dots i { background: var(--amber); }
-.waiting-header-separator { margin: 0 3px; color: var(--text-faint); }
 .waiting-header-duration { color: var(--text-faint); font-family: var(--mono); }
 @media (max-width: 600px) { .agent-working-placeholder .msg-model { display: none; } .waiting-header-status { gap: 4px; } }
 .design-workspace .inputbar:has(> .scroll-bottom) { padding-top: 42px; }
@@ -9403,6 +9398,14 @@ body { -webkit-font-smoothing: antialiased; }
 /* Task progress: a compact outcome followed by optional semantic phases. */
 .task-progress-head { gap: 10px; padding: 18px 16px 14px; }
 .task-progress-head > strong { font-size: 15px; white-space: normal; overflow-wrap: anywhere; }
+.task-progress-heading { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.task-progress-heading > strong { min-width: 0; flex: 1; font: 600 15px/1.45 var(--sans); overflow-wrap: anywhere; }
+.task-progress-menu { position: relative; margin-left: auto; flex: none; }
+.task-progress-menu-trigger { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--text-faint); cursor: pointer; }
+.task-progress-menu-trigger:hover { background: var(--bg-elev2); color: var(--text); }
+.task-progress-menu-list { position: absolute; top: 30px; right: 0; z-index: 12; display: grid; min-width: 170px; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); box-shadow: 0 8px 24px oklch(0.2 0.01 80 / 0.12); }
+.task-progress-menu-list button { padding: 7px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--text); text-align: left; font: 12px var(--sans); cursor: pointer; }
+.task-progress-menu-list button:hover { background: var(--bg-elev2); }
 .task-progress-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; font: 11px var(--sans); }
 .task-progress-meta small { margin-left: auto; color: var(--text-faint); }
 .task-progress-status.done { color: var(--green); }
@@ -9430,6 +9433,36 @@ body { -webkit-font-smoothing: antialiased; }
 .task-process-toggle > svg.open { transform: rotate(90deg); }
 .task-process-toggle > span { margin-left: auto; color: var(--text-faint); font-size: 10px; }
 .task-progress-list { padding: 7px 0 12px; }
+.task-single-actions { display: grid; gap: 6px; padding: 10px 14px 14px; overflow-y: auto; }
+.task-artifact-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; color: var(--text-dim); font: 11.5px/1.5 var(--sans); }
+.task-artifact-row > span { flex: none; }
+.task-artifact-row button { min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.task-artifact-row button:hover { color: var(--accent); }
+.task-artifact-row code { font: 11px/1.5 var(--mono); overflow-wrap: anywhere; }
+.task-artifact-row small { flex: none; color: var(--text-faint); white-space: nowrap; }
+.task-raw-summary { color: var(--text-dim); font: 11px/1.5 var(--sans); margin-bottom: 4px; }
+.task-plan-change { margin: 8px 14px 0; color: var(--accent); font: 11px var(--sans); }
+.task-plan-list { min-height: 0; overflow-y: auto; padding: 9px 13px 14px; }
+.task-plan-step { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; color: var(--text-faint); font: 12px/1.45 var(--sans); }
+.task-plan-step > div { min-width: 0; overflow-wrap: anywhere; }
+.task-plan-mark { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 50%; border: 1px solid var(--border); font: 10px var(--mono); }
+.task-plan-step.done { color: var(--text); }
+.task-plan-step.done .task-plan-mark { border-color: var(--green); background: color-mix(in srgb, var(--green) 12%, white); color: var(--green); }
+.task-plan-step.running { color: var(--accent); font-weight: 500; }
+.task-plan-step.running .task-plan-mark { border-color: var(--accent); background: var(--accent-soft); }
+.task-plan-step.removed { color: var(--text-faint); text-decoration: line-through; }
+.task-plan-added { margin-left: 6px; padding: 1px 4px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+.task-plan-current-file { display: block; margin-top: 3px; color: var(--text-faint); font: 10px var(--mono); overflow-wrap: anywhere; }
+.task-plan-actions { display: block; margin-top: 3px; color: var(--text-faint); font: 10px var(--sans); }
+.task-plan-step-duration { margin-left: auto; flex: none; color: var(--text-faint); font: 10px var(--mono); }
+.task-plan-card { margin: 7px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); overflow: hidden; }
+.task-plan-card-head { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 10px; border: 0; background: transparent; color: var(--text); text-align: left; font: 12px var(--sans); cursor: pointer; }
+.task-plan-card-head > svg { width: 12px; flex: none; transition: transform .15s; }
+.task-plan-card-head > svg.open { transform: rotate(90deg); }
+.task-plan-card-state { margin-left: auto; color: var(--text-faint); }
+.task-plan-card.err .task-plan-card-state, .task-plan-card-error { color: var(--red); }
+.task-plan-card-error { padding: 0 10px 9px; font: 11px/1.4 var(--sans); overflow-wrap: anywhere; }
+.task-plan-card ol { display: grid; gap: 4px; padding: 3px 12px 11px 35px; color: var(--text-dim); font: 11.5px/1.5 var(--sans); }
 .task-step { margin-left: 28px; border-left: 2px solid color-mix(in srgb, var(--green) 35%, var(--border-soft)); }
 .task-step-head { padding: 8px 13px 8px 0; gap: 10px; }
 .task-step-mark { width: 19px; height: 19px; margin-left: -10px; border: 0; background: color-mix(in srgb, var(--green) 15%, white); color: var(--green); font-size: 11px; }

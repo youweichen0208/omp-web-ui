@@ -84,21 +84,30 @@ export interface TaskProgress {
 	title: string;
 	status: "running" | "done" | "failed" | "cancelled";
 	startedAt: number;
+	/** Last recorded reply/tool timestamp for a completed turn. */
+	endedAt?: number;
 	completed: number;
 	steps: TaskStep[];
+	/** Explicit revisions supplied by pi's task_plan tool for long tasks. */
+	plan?: {
+		revision: number;
+		added: number;
+		removed: number;
+		items: { id: string; title: string; status: "pending" | "running" | "done" | "removed"; added?: boolean; startedAt?: number; endedAt?: number; actions?: { read: number; write: number; edit: number; command: number } }[];
+	};
 }
 
 export interface TaskStep {
 	id: string;
 	messageId: string;
 	title: string;
-	/** Original narrative before the short step title was produced. */
+	/** Short action summary; never a full assistant reply. */
 	detail?: string;
 	status: "running" | "done" | "failed";
 	startedAt: number;
 	endedAt?: number;
 	hint?: string;
-	artifacts: { toolCallId: string; kind: string; label: string; path?: string }[];
+	artifacts: { toolCallId: string; kind: string; label: string; path?: string; outputLines?: number }[];
 }
 
 export interface UiModelInfo {

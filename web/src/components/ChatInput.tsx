@@ -672,7 +672,6 @@ export const ChatInput = memo(function ChatInput({
 					</div>
 				</div>
 			</div>
-			<div className="composer-hint">{streaming ? t("composerHintWorking", { key: navigator.platform.includes("Mac") ? "⌘" : "Ctrl+" }) : t("composerHint")}</div>
 		</div>
 	);
 });

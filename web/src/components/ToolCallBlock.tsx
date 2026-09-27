@@ -313,12 +313,7 @@ function fenceCodeBlock(text: string, lang: string): string {
 	return `${fence}${lang}\n${text.replace(/\n$/, "")}\n${fence}`;
 }
 
-export const ToolCallBlock = memo(function ToolCallBlock({
-	block,
-	view,
-	onKillBash,
-	wrap = true,
-}: {
+type ToolCallBlockProps = {
 	block: UiToolCallBlock;
 	view: ToolView;
 	/** Kill the running bash command (bash cards only, while running). */
@@ -326,7 +321,24 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 	/** 设置面板「完整显示工具」开关：true（开）→ 工具始终完整展开；
 	 *  false（关）→ 默认折叠，点击展开。 */
 	wrap?: boolean;
-}) {
+};
+
+export const ToolCallBlock = memo(function ToolCallBlock(props: ToolCallBlockProps) {
+	return props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
+});
+
+function TaskPlanCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
+	const t = useT();
+	let steps: { id: string; title: string }[] = [];
+	try { const parsed = JSON.parse(block.argumentsText ?? "{}"); if (Array.isArray(parsed.steps)) steps = parsed.steps.filter((step: unknown) => typeof step === "object" && step !== null && typeof (step as { title?: unknown }).title === "string"); } catch { /* streamed arguments may be incomplete */ }
+	const [open, setOpen] = useState(!view.result);
+	useEffect(() => { if (view.result) setOpen(false); }, [view.result]);
+	const resultText = view.result?.content.filter((part) => part.type === "text").map((part) => (part as { text: string }).text).join(" ") ?? "";
+	const updated = Number(/Plan revision (\d+)/.exec(resultText)?.[1] ?? 0) > 1;
+	return <div className={`task-plan-card${view.result?.isError ? " err" : ""}`}><button type="button" className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><span>{t(updated ? "taskPlanChanged" : "taskPlanCard")} · {steps.length} {t("taskPlanSteps")}</span><span className="task-plan-card-state">{view.result?.isError ? t("error") : view.result ? t("done") : t("running")}</span></button>{open && <ol>{steps.map((step) => <li key={step.id}>{step.title}</li>)}</ol>}{view.result?.isError && <div className="task-plan-card-error">{resultText}</div>}</div>;
+}
+
+function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCallBlockProps) {
 	const t = useT();
 	const [open, setOpen] = useState(wrap);
 	const [copied, setCopied] = useState(false);
@@ -594,7 +606,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 			)}
 		</div>
 	);
-});
+}
 
 /** Pretty-print a bash tool call's arguments as a terminal line. */
 function TerminalCommand({ args, cwd }: { args: string; cwd: string }) {

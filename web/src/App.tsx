@@ -908,6 +908,7 @@ export function App() {
 									messages={chat.state?.messages ?? []}
 									streamingMessage={chat.state?.streamingMessage ?? null}
 									taskProgress={chat.state?.taskProgress}
+									conversationTitle={chat.conversations.find((item) => item.id === chat.activeConversationId)?.title ?? ""}
 									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}
 									onAttach={(path, name, mode, isDir) => {

@@ -37,6 +37,11 @@ try {
 	await page.locator('.inputbox textarea').waitFor();
 	for (let i = 0; i < 50 && !state; i++) await sleep(100);
 	assert(state, 'initial snapshot');
+	state = { ...state, rev: state.rev + 1, conversationId: 'fresh-conversation-layout', messages: [{ id: 'fresh-hello', role: 'user', timestamp: Date.now(), content: [{ type: 'text', text: 'hello' }] }], isStreaming: true, streamingMessage: null, taskProgress: null, piConfigured: true };
+	socket.send(JSON.stringify({ type: 'snapshot', state }));
+	await page.locator('.msg-user', { hasText: 'hello' }).waitFor();
+	const firstMessageTop = await page.locator('.msg-user', { hasText: 'hello' }).evaluate((element) => element.getBoundingClientRect().top - document.querySelector('.messages').getBoundingClientRect().top);
+	assert(firstMessageTop < 100, `a new conversation starts at the top, got ${firstMessageTop}px`);
 	const write = (id, path, content) => ({ type: 'toolCall', id, name: 'write', argumentsText: JSON.stringify({ path, content }) });
 	const messages = [
 		{ id: 'user', role: 'user', content: [{ type: 'text', text: '写入两个文件' }] },
@@ -49,8 +54,8 @@ try {
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
 	await page.locator('.write-group-head', { hasText: '写入 2 个文件' }).waitFor();
 	await page.locator('.task-progress-head', { hasText: '写入两个文件' }).waitFor();
-	await page.locator('.task-step-head').first().click();
-	await page.locator('.task-artifact', { hasText: 'main.py' }).click();
+	assert.equal(await page.locator('.task-step-head').count(), 0, 'a single phase lists actions directly');
+	await page.locator('.task-artifact-row', { hasText: 'main.py' }).locator('button').click();
 	await page.locator('.fp-embedded').waitFor();
 	await page.locator('.fp-back').click();
 	assert.equal(await page.getByText('本次对话涉及').count(), 0, 'conversation files section is removed');
@@ -97,7 +102,7 @@ try {
 	state = { ...state, rev: state.rev + 1, messages: [waitingUser('waiting-10s', 10)], streamingMessage: null, isStreaming: true, model: { id: 'glm-5.3', name: 'GLM 5.3', provider: 'volc' } };
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
 	await page.locator('.waiting-header-status', { hasText: '正在分析请求' }).waitFor();
-	assert.equal(await page.locator('.agent-working-placeholder .agent-working').count(), 0, 'first wait stays in the heading');
+	assert.equal(await page.locator('.agent-working-placeholder .msg-meta .waiting-header-status').count(), 0, 'waiting status is below the heading');
 	assert.equal(await page.locator('.agent-working-placeholder .msg-body').count(), 0, 'empty body has no shell');
 	state = { ...state, rev: state.rev + 1, messages: [waitingUser('waiting-20s', 20)] };
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
@@ -139,10 +144,28 @@ try {
 	assert((await page.locator('.task-result').textContent()).includes('48 / 48 通过'));
 	assert((await page.locator('.task-result').textContent()).includes('+312'));
 	assert.equal(await page.getByText('本次对话涉及').count(), 0);
-	await page.locator('.task-process-toggle').click();
+	await page.locator('.task-progress-menu-trigger').click();
+	await page.getByRole('button', { name: '展开过程' }).click();
 	assert.equal(await page.locator('.task-step-head').count(), 6);
 	await page.locator('.task-step-head').first().click();
-	assert.equal(await page.locator('.task-raw-text strong').count(), 1, 'expanded source narrative renders Markdown');
+	assert.equal(await page.locator('.task-raw-text').count(), 0, 'expanded steps do not repeat assistant prose');
+	assert.equal(await page.locator('.task-raw-summary').first().textContent(), '读取上次进度');
+	const plannedState = { ...state, rev: state.rev + 1, isStreaming: true, messages: [{ id: 'plan-user', role: 'user', content: [{ type: 'text', text: '完成三步实现' }] }, { id: 'plan-call', role: 'assistant', content: [{ type: 'toolCall', id: 'plan-1', name: 'task_plan', argumentsText: JSON.stringify({ steps: [{ id: 'read', title: '读取约定' }, { id: 'build', title: '实现服务' }, { id: 'test', title: '运行测试' }], currentStepId: 'build', completedStepIds: ['read'] }) }] }], taskProgress: { id: 'planned-task', conversationId: state.conversationId, sourceMessageId: 'plan-user', title: '完成三步实现', status: 'running', startedAt: Date.now() - 1000, completed: 1, steps: [], plan: { revision: 2, added: 1, removed: 1, items: [{ id: 'read', title: '读取约定', status: 'done' }, { id: 'build', title: '实现服务', status: 'running' }, { id: 'test', title: '运行测试', status: 'pending', added: true }, { id: 'old', title: '旧步骤', status: 'removed' }] } } };
+	socket.send(JSON.stringify({ type: 'snapshot', state: plannedState }));
+	await page.locator('.task-plan-card', { hasText: '计划 · 3 步' }).waitFor();
+	assert.equal(await page.locator('.task-plan-step').count(), 4);
+	assert((await page.locator('.task-plan-change').textContent()).includes('计划已调整'));
+	const acknowledgedPlan = { ...plannedState, rev: plannedState.rev + 1, messages: [...plannedState.messages, { id: 'plan-result', role: 'toolResult', toolCallId: 'plan-1', content: [{ type: 'text', text: 'Plan revision 2 recorded: 3 steps. Continue execution.' }] }] };
+	socket.send(JSON.stringify({ type: 'snapshot', state: acknowledgedPlan }));
+	await page.locator('.task-plan-card-head', { hasText: '计划已调整' }).waitFor();
+	assert.equal(await page.locator('.task-plan-card-head').getAttribute('aria-expanded'), 'false');
+	const completedPlan = { ...acknowledgedPlan, rev: acknowledgedPlan.rev + 1, isStreaming: false, messages: [...acknowledgedPlan.messages, { id: 'plan-final', role: 'assistant', content: [{ type: 'text', text: '提交 f9c3a1e feat: complete\n测试 48 / 48 通过' }] }], taskProgress: { ...plannedState.taskProgress, status: 'done', endedAt: Date.now(), plan: { ...plannedState.taskProgress.plan, items: plannedState.taskProgress.plan.items.map((item) => item.status === 'removed' ? item : { ...item, status: 'done' }) } } };
+	socket.send(JSON.stringify({ type: 'snapshot', state: completedPlan }));
+	await page.locator('.task-result', { hasText: 'f9c3a1e' }).waitFor();
+	assert.equal(await page.locator('.task-plan-step').count(), 4, 'completed plans keep their steps visible below the result');
+	state = { ...state, rev: completedPlan.rev + 1 };
+	socket.send(JSON.stringify({ type: 'snapshot', state }));
+	await page.locator('.task-result', { hasText: 'f9c3a1e' }).waitFor();
 	await page.getByRole('button', { name: '查看改动' }).click();
 	await page.locator('.view-pane:not(.hidden) .scm-history').waitFor();
 	console.log('write/stall UI passed');

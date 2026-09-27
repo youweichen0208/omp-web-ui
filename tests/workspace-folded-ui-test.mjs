@@ -69,11 +69,11 @@ try {
 	assert(Math.abs(thinking[0].iconCenter-thinking[0].labelCenter)<2);
 	assert(Math.abs(thinking[1].iconCenter-thinking[1].labelCenter)<2);
 	assert(Math.abs(thinking[0].labelX-thinking[1].labelX)<1);
-	assert.equal(await page.locator('.composer-hint').isVisible(),false);
+	assert.equal(await page.locator('.composer-hint').count(),0);
 	await page.locator('.inputbox textarea').focus();
 	await page.waitForTimeout(250);
 	const emptyFocusBorder=await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).borderColor);
-	assert.equal(await page.locator('.composer-hint').isVisible(),true);
+	assert.equal(await page.locator('.composer-hint').count(),0);
 	await page.locator('.inputbox textarea').evaluate(el=>el.blur());
 	await page.waitForTimeout(250);
 	const idleBorder=await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).borderColor);
