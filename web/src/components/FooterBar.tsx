@@ -59,13 +59,14 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 
 	if (!state) return null;
 	const s = state.stats;
+	const current = state.conversationId === chat.activeConversationId;
 	const git = chat.gitBranch?.cwd === state.cwd ? chat.gitBranch : null;
 	const branchLabel = git?.notRepo ? t("notGitRepoShort") : git?.branch ? (git.detached ? `${t("scmDetached")} · ${git.branch}` : git.branch) : "—";
 
 	const connClass = chat.ready ? "ok" : "busy";
 	const connLabel = chat.ready ? t("connected") : t("connecting");
 
-	const context = s.contextUsage;
+	const context = current ? s.contextUsage : { tokens: null, percent: null, contextWindow: 0 };
 	const ctxText =
 		context.tokens !== null && context.percent !== null
 			? `${formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`
@@ -170,7 +171,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 			<span className="status-sep">·</span>
 
 			<span className="status-item status-messages" title={t("sessionMessages")}>
-				<span className="workspace-stat-label">{t("messages")}</span><span>{s.totalMessages}</span>
+				<span className="workspace-stat-label">{t("messages")}</span><span>{current ? s.totalMessages : "—"}</span>
 			</span>
 
 			{chat.statuses.length > 0 && (
@@ -182,7 +183,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 				</>
 			)}
 
-			{state.isStreaming && (
+			{current && state.isStreaming && (
 				<>
 					<span className="status-sep">·</span>
 					<span className="status-item working">

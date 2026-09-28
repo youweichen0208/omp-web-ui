@@ -205,15 +205,18 @@ export function App() {
 	const t = useT();
 	const { locale } = useI18n();
 	const { chat, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
+	// Conversation selection can arrive before its snapshot. Never present the
+	// previous conversation's transcript or usage under the new selection.
+	const conversationState = chat.state?.conversationId === chat.activeConversationId ? chat.state : null;
 	const activeConversation = chat.conversations.find((item) => item.id === chat.activeConversationId);
-	const activeSession = chat.sessions.find((item) => item.path === chat.state?.sessionFile);
+	const activeSession = chat.sessions.find((item) => item.path === conversationState?.sessionFile);
 	const activeConversationTitle = conversationDisplayTitle(
 		activeConversation?.title || skillAwarePreview(activeSession?.firstMessage ?? "") || t("newChat"),
 		activeSession?.firstMessage,
 		activeSession?.name,
-		Math.max(activeSession?.messageCount ?? 0, activeConversation?.messageCount ?? 0, chat.state?.messages.length ?? 0),
+		Math.max(activeSession?.messageCount ?? 0, activeConversation?.messageCount ?? 0, conversationState?.messages.length ?? 0),
 		locale,
-		chat.state?.messages,
+		conversationState?.messages,
 	);
 	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const attachmentDrafts = useRef(new Map<string, PendingAttachment[]>());
@@ -775,10 +778,10 @@ export function App() {
 					onNewChat={() => { setView("chat"); panelSend({ type: "new_chat" }); }}
 					send={panelSend}
 					active={!isMobile || drawer === "left"}
-					ready={chat.ready}
+					ready={chat.ready && !!conversationState}
 					status={chat.status}
 					cwd={chat.state?.cwd ?? ""}
-					sessionFile={chat.state?.sessionFile ?? null}
+					sessionFile={conversationState?.sessionFile ?? null}
 					conversations={chat.conversations}
 					sessions={chat.sessions}
 					projects={chat.projects}
@@ -847,13 +850,13 @@ export function App() {
 					)}
 					<div className={`view-pane ${previewFile ? "preview-open" : ""} ${view === "chat" ? "" : "hidden"}`}>
 						<main className="main">
-							{chat.state ? (
-								<WorkspacePathContext.Provider value={chat.state.cwd}><MessageList
+							{conversationState ? (
+								<WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
 									active={view === "chat"}
 									connected={chat.ready}
-									silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"}
-									key={chat.state.conversationId ?? "boot"}
-									state={chat.state}
+									silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"}
+									key={conversationState.conversationId}
+									state={conversationState}
 									liveOutputs={chat.liveOutputs}
 									toolStatuses={chat.toolStatuses}
 									onEdit={onEditMessage}
@@ -886,13 +889,13 @@ export function App() {
 								currentFile={!switching && currentFile?.cwd === chat.state?.cwd ? currentFile : null}
 								contextReader={contextReader}
 								contextSaver={contextSaver}
-								stats={chat.state?.stats}
+								stats={conversationState?.stats}
 								promptResult={chat.promptResult}
 								send={send}
-								ready={chat.ready}
-								streaming={chat.state?.isStreaming ?? false}
+								ready={chat.ready && !!conversationState}
+								streaming={conversationState?.isStreaming ?? false}
 								silentActivity={chat.agentSilence?.conversationId === chat.activeConversationId ? chat.agentSilence.activity : null}
-										messages={chat.state?.messages ?? EMPTY_MESSAGES}
+										messages={conversationState?.messages ?? EMPTY_MESSAGES}
 								slashCommands={chat.slashCommands}
 								modelState={modelState}
 								models={chat.models}
@@ -923,9 +926,9 @@ export function App() {
 									scmDirty={chat.scmDirty}
 									fileChanged={chat.fileChanged}
 									widgets={chat.widgets}
-									messages={chat.state?.messages ?? []}
-									streamingMessage={chat.state?.streamingMessage ?? null}
-									taskProgress={chat.state?.taskProgress}
+									messages={conversationState?.messages ?? []}
+									streamingMessage={conversationState?.streamingMessage ?? null}
+									taskProgress={conversationState?.taskProgress}
 									conversationTitle={activeConversationTitle}
 									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}

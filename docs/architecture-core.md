@@ -62,6 +62,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 - `snapshot` 带 `conversationId`；`conversations`（ServerMessage）推当前活动对话及当前项目已入列的后台对话。新对话尚未落盘时，活动项仍可在左栏显示；`switch_conversation`（ClientMessage）只在同项目内切换。
 - `switch_session`（恢复持久会话）会为目标会话创建独立 runtime，再按上述生命周期把当前对话移到后台；若目标会话已在运行列表中则直接复用其 conversation，绝不因打开历史记录中断当前生成。回归测试：`tests/switch-session-background-test.mjs`。`edit_message` 在**当前**对话内 fork；`dispose` 遍历销毁全部对话；attachSink 重连时补推 conversations。
 - 前端：左栏「运行的对话」区（≥1 个时显示，活跃高亮、流式绿点），MessageList 以 conversationId 为 key 强制切换重挂载。
+- `/new` 与“新对话”均开启独立上下文，旧历史保留。`conversations.activeId` 先于新快照到达时，消息、用量和任务进度只展示与活动对话 ID 匹配的快照；等待期间禁止发送，并安排 `get_state` 补取快照。回归：`tests/new-chat-context-test.mjs`（mock 模型 + 浏览器延迟快照，零 token）。
 
 ## 其他桥接
 

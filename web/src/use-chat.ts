@@ -1024,6 +1024,7 @@ export function useChat() {
 					dispatch({ type: "sessions", sessions: msg.sessions });
 					break;
 				case "conversations":
+					if (authoritative.current.state?.conversationId !== msg.activeId) scheduleResync();
 					dispatch({
 						type: "conversations",
 						conversations: msg.conversations,

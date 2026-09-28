@@ -21,6 +21,16 @@ try {
 	for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
 	browser = await chromium.launch({ executablePath: CHROME_PATH });
 	const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
+	const prompts = [];
+	await page.routeWebSocket("**/ws", (socket) => {
+		const upstream = socket.connectToServer();
+		socket.onMessage((raw) => {
+			const message = JSON.parse(String(raw));
+			// Hold prompts locally: exercise latency and failures without spending model tokens.
+			if (message.type === "node_request" && message.action === "chat_prompt") prompts.push(message);
+			else upstream.send(raw);
+		});
+	});
 	const errors = []; page.on("pageerror", (e) => errors.push(e.message));
 	page.on("dialog", (dialog) => dialog.accept());
 	await page.goto(`http://127.0.0.1:${port}/`);
@@ -58,6 +68,34 @@ try {
 	await page.locator(".node-main-head em", { hasText: "已连接" }).waitFor({ timeout: 10000 });
 
 	await page.locator(".node-tabs .active").waitFor();
+	const input = page.locator(".node-agent-input textarea");
+	const sendButton = page.locator(".node-agent-input").getByRole("button", { name: "发送", exact: true });
+	await input.fill("Check this node");
+	await sendButton.click();
+	await page.locator(".node-agent-status", { hasText: "等待响应" }).waitFor();
+	assert(await sendButton.isDisabled(), "send stays enabled while waiting for acknowledgment");
+	await input.fill("Do not send twice");
+	await input.press("Enter");
+	await page.waitForTimeout(100);
+	assert(prompts.length === 1, "Enter sent a duplicate prompt");
+	const emit = (event) => page.evaluate((detail) => window.dispatchEvent(new CustomEvent("pi-node-event", { detail })), event);
+	const prompt = prompts[0];
+	const chatEvent = (busy) => ({ type: "node_event", event: "chat", nodeId: prompt.nodeId, conversationId: prompt.conversationId, data: { busy, messages: [] } });
+	await emit(chatEvent(true));
+	await emit({ ...prompt, type: "node_event", event: "result", data: { action: "chat_prompt" } });
+	await page.locator(".node-agent-status").waitFor();
+	await emit({ type: "node_event", event: "run", nodeId: prompt.nodeId, data: { run: { id: "status-test", nodeId: prompt.nodeId, command: "hostname", status: "running" } } });
+	await page.locator(".node-agent-status", { hasText: "正在执行命令" }).waitFor();
+	await emit(chatEvent(false));
+	await page.locator(".node-agent-status").waitFor({ state: "hidden" });
+	assert(await sendButton.isEnabled(), "send did not recover after completion");
+	await sendButton.click();
+	await page.locator(".node-agent-status").waitFor();
+	await page.waitForTimeout(100);
+	await emit({ ...prompts[1], type: "node_event", event: "failure", data: { action: "chat_prompt", message: "Mock rejection" } });
+	await page.locator(".node-agent-status").waitFor({ state: "hidden" });
+	await input.fill("");
+
 	await page.locator(".node-xterm").first().click();
 	await page.keyboard.type("hello"); await page.keyboard.press("Enter");
 	await page.waitForFunction(() => document.querySelector(".node-xterm")?.textContent?.includes("echo:hello"), { timeout: 5000 });
