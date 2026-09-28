@@ -93,7 +93,11 @@ export interface TaskProgress {
 		revision: number;
 		added: number;
 		removed: number;
-		items: { id: string; title: string; status: "pending" | "running" | "done" | "removed"; added?: boolean; startedAt?: number; endedAt?: number; actions?: { read: number; write: number; edit: number; command: number } }[];
+		title?: string;
+		completionCriteria?: string;
+		changeSummary?: string;
+		changes?: { kind: "added" | "removed" | "updated"; title: string; position?: number }[];
+		items: { id: string; title: string; detail?: string; toolCallIds?: string[]; status: "pending" | "running" | "done" | "removed"; added?: boolean; startedAt?: number; endedAt?: number; actions?: { read: number; write: number; edit: number; command: number } }[];
 	};
 }
 

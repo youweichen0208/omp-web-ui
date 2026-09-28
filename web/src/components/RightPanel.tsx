@@ -11,8 +11,8 @@ interface RightPanelProps {
 	active: boolean;
 	files: FileListing | null;
 	fileChanged: { path: string } | null;
-	scmData: ServerMessage | null;
-	scmDirty: number;
+	changed: ScmFileEntry[];
+	notRepo: boolean;
 	widgets: { key: string; lines: string[] }[];
 	messages: UiMessage[];
 	streamingMessage: UiMessage | null;
@@ -20,23 +20,22 @@ interface RightPanelProps {
 	conversationTitle: string;
 	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
-	send: (msg: { type: "list_files"; path?: string } | { type: "scm_status"; reqId: number }) => boolean;
+	send: (msg: { type: "list_files"; path?: string }) => boolean;
 	onAttach: (path: string, name: string, mode: AttachMode, isDir?: boolean) => void;
 	onPreview: (path: string, name: string) => void;
 	onNotice: (level: "info" | "warning" | "error", text: string) => void;
 	onViewChanges: (hash?: string) => void;
 }
 
-// Negative IDs keep tree status requests separate from SCMPanel's positive IDs.
-let treeStatusId = -100;
-export const RightPanel = memo(function RightPanel({ active, files, fileChanged, scmData, scmDirty, widgets, messages, streamingMessage, taskProgress, conversationTitle, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, taskProgress, conversationTitle, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
 	const t = useT();
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
-	const [changed, setChanged] = useState<ScmFileEntry[]>([]);
-	const [notRepo, setNotRepo] = useState(false);
 	const [onlyChanged, setOnlyChanged] = useState(false);
+	const [showOtherDirectories, setShowOtherDirectories] = useState(false);
+	useEffect(() => setShowOtherDirectories(false), [cwd, taskProgress?.id]);
+	const compactTree = taskProgress?.status === "running" && !notRepo && changed.length > 0 && !showOtherDirectories;
 	const [showHidden, setShowHidden] = useState(true);
 	const [controlsOpen, setControlsOpen] = useState(false);
 	const controlsRef = useRef<HTMLDivElement>(null);
@@ -54,7 +53,6 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 	const seenFiles = useRef<FileListing | null>(null);
 	const queue = useRef<string[]>([]);
 	const pending = useRef<string | null>(null);
-	const statusRequest = useRef(0);
 	const expandedRef = useRef(expanded);
 	expandedRef.current = expanded;
 	const pump = useCallback(() => {
@@ -76,8 +74,6 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 			pending.current = null;
 			setDirectories({});
 			setExpanded(new Set());
-			setChanged([]);
-			setNotRepo(false);
 			setOnlyChanged(false);
 		}
 		if (!active || !cwd) return;
@@ -101,23 +97,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 	useEffect(() => {
 		if (active && fileChanged) request(fileChanged.path);
 	}, [active, fileChanged, request]);
-	useEffect(() => {
-		if (!active || !cwd) return;
-		const refresh = () => {
-			statusRequest.current = --treeStatusId;
-			send({ type: "scm_status", reqId: statusRequest.current });
-		};
-		refresh();
-		window.addEventListener("focus", refresh);
-		return () => window.removeEventListener("focus", refresh);
-	}, [active, cwd, scmDirty, send]);
-	useEffect(() => {
-		if (scmData?.type !== "scm_data" || scmData.reqId !== statusRequest.current || scmData.cwd !== cwd) return;
-		const files = scmData.ok ? (scmData.files ?? []).map((entry) => ({ ...entry, path: entry.path.replaceAll("\\", "/") })) : [];
-		setChanged(files);
-		setNotRepo(!!scmData.notRepo);
-		if (scmData.notRepo || files.length === 0) setOnlyChanged(false);
-	}, [scmData, cwd]);
+	useEffect(() => { if (notRepo || !changed.length) setOnlyChanged(false); }, [notRepo, changed]);
 	const toggle = (path: string) => {
 		setExpanded((previous) => {
 			const next = new Set(previous);
@@ -146,6 +126,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		const count = changed.filter((change) => change.path === entry.path || (dir && change.path.startsWith(`${entry.path}/`))).length;
 		const change = !dir ? changed.find((item) => item.path === entry.path) : undefined;
 		const changeKind = change ? change.x === "D" || change.y === "D" ? "D" : change.x === "A" || change.y === "A" || change.x === "?" ? "A" : "M" : null;
+		if (compactTree && depth === 0 && dir && count === 0) return null;
 		const mentioned = dir && entry.name.startsWith(".") && hiddenMentioned.has(entry.name);
 		if ((!showHidden && entry.name.startsWith(".") || onlyChanged && !count) && !mentioned) return null;
 		return <div key={entry.path} role="treeitem" aria-expanded={dir ? open : undefined}>
@@ -167,6 +148,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		{directoryEntries(path).map(({ entry, virtual }) => renderEntry(entry, depth, virtual))}
 		{directories[path]?.truncated && <div className="panel-empty files-truncated">{t("filesTruncated")}</div>}
 	</>;
+	const otherDirectories = directoryEntries("").filter(({ entry }) => entry.type === "dir" && !changed.some((change) => change.path === entry.path || change.path.startsWith(`${entry.path}/`)) && (showHidden || !entry.name.startsWith("."))).length;
 	return <aside className={`panel panel-right${taskProgress ? " has-task-progress" : ""}`}>
 		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
@@ -190,6 +172,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 			}
 		}}>
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
+			{compactTree && !onlyChanged && otherDirectories > 0 && <button type="button" className="tree-other-directories" onClick={() => setShowOtherDirectories(true)}>{t("otherDirectories", { n: otherDirectories })}</button>}
 		</div>
 		{taskProgress && <div className="panel-lower"><TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} conversationTitle={conversationTitle} onPreview={onPreview} onViewChanges={onViewChanges} /></div>}
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (

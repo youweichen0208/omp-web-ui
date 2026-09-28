@@ -1,3 +1,5 @@
+import { splitCommandChain } from "./bash-steps.js";
+
 /** Only trim search-result indentation, never whitespace in ordinary code output. */
 export function compactSearchLine(line: string) {
 	return line.replace(/^(\s*(?:[^:\s]+:)?\d+[:-])[ \t]+(?=\S)/, "$1 ");
@@ -57,4 +59,29 @@ export function differentCommandDirectory(argumentsText: string | undefined, cwd
 		if (normalized === cwd.replace(/\/$/, "")) return null;
 		return home && (normalized === home || normalized.startsWith(home + "/")) ? "~" + normalized.slice(home.length) : normalized;
 	} catch { return null; }
+}
+
+/** Only literal cd prefixes are safe to replace with a directory badge. */
+export function commandPresentation(command: string, cwd: string): { command: string; directory: string | null } {
+	const prefix = /^\s*cd\s+(?:"([^"$`\\]+)"|'([^']+)'|([^\s;&|$`\\*?(){}<>]+))\s*&&\s*/.exec(command);
+	if (!prefix || !cwd.startsWith("/")) return { command: displayBashCommand(command, cwd), directory: null };
+	const literal = prefix.slice(1).find(Boolean)!;
+	if (/[$`*?\\]/.test(literal) || (prefix[1] || prefix[2]) && literal.startsWith("~") || literal === "-" || literal.startsWith("~") && !literal.startsWith("~/")) return { command: displayBashCommand(command, cwd), directory: null };
+	return { command: displayBashCommand(command.slice(prefix[0].length), cwd), directory: differentCommandDirectory(JSON.stringify({ command }), cwd) };
+}
+
+export function gitStatusLine(line: string): { status: string; path: string; kind: "added" | "modified" | "deleted" | "untracked" | "conflict" } | null {
+	const match = /^([ MADRCUT?!]{2}) (.+)$/.exec(line);
+	if (!match || !match[1].trim()) return null;
+	const status = match[1].trim();
+	const kind = status.includes("U") || status === "AA" || status === "DD" ? "conflict" : status === "??" ? "untracked" : status.includes("D") ? "deleted" : status.includes("A") ? "added" : "modified";
+	return { status, path: match[2], kind };
+}
+
+/** Require every line to match short status; never label mixed command output as a file count. */
+export function gitStatusSummary(command: string, lines: string[]) {
+	if (!splitCommandChain(command).some((part) => /^git\s+status\b/.test(part)) || !lines.length) return null;
+	const rows = lines.map(gitStatusLine);
+	if (rows.some((row) => !row)) return null;
+	return { files: rows.length, added: rows.filter((row) => row!.kind === "added" || row!.kind === "untracked").length, modified: rows.filter((row) => row!.kind === "modified").length, deleted: rows.filter((row) => row!.kind === "deleted").length, conflicts: rows.filter((row) => row!.kind === "conflict").length };
 }

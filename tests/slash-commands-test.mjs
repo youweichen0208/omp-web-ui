@@ -197,11 +197,11 @@ async function main() {
 	}
 	console.log("[6] /help intercepted, no SDK leak");
 
-	// --- 6. /new works (snapshot after new_chat, no error) ---
+	// --- 6. /new resets the current conversation and emits its summary ---
 	c.send({ type: "prompt", text: "/new" });
 	const newChat = await c.wait((m) => m.type === "conversations", 6000);
 	if (!newChat.activeId) {
-		throw new Error("FAIL: /new did not create a conversation");
+		throw new Error("FAIL: /new did not emit the current conversation");
 	}
 	console.log(`[7] /new → active conversation ${newChat.activeId.slice(0, 8)}…`);
 

@@ -29,6 +29,8 @@ import { conversationDisplayTitle } from "../conversation-display-title";
 
 interface TopBarProps {
 	leftCollapsed?: boolean;
+	gitChangeCount: number;
+	onOpenTask: () => void;
 	chat: ChatState;
 	send: (msg: ClientMessage) => boolean;
 	/** Minimal terminal-tab bridge (same shape SCMPanel uses) — updates run there. */
@@ -69,6 +71,8 @@ interface TopBarProps {
 
 export function TopBar({
 	leftCollapsed = false,
+	gitChangeCount,
+	onOpenTask,
 	chat,
 	send,
 	terminal,
@@ -96,6 +100,9 @@ export function TopBar({
 	useEffect(() => desktopAPI?.onWindowState(setWindowState), []);
 	const projectName = chat.state?.cwd?.split(/[\\/]/).filter(Boolean).at(-1);
 	const notGitRepo = chat.gitBranch?.cwd === chat.state?.cwd && !!chat.gitBranch?.notRepo;
+	const task = chat.state?.conversationId === chat.activeConversationId ? chat.state?.taskProgress : null;
+	const planItems = task?.status === "running" ? task.plan?.items.filter((item) => item.status !== "removed") ?? [] : [];
+	const currentStep = planItems.findIndex((item) => item.status === "running");
 
 	const session = chat.sessions.find((item) => item.path === chat.state?.sessionFile);
 	const conversation = chat.conversations.find((item) => item.id === chat.activeConversationId);
@@ -202,7 +209,7 @@ export function TopBar({
 			</div>
 
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
-			<div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong></div>
+			<div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
 				<div
 					className="view-switch"
@@ -257,6 +264,7 @@ export function TopBar({
 					>
 						<FiGitBranch />
 						<span>{t("scmTab")}</span>
+						{!notGitRepo && gitChangeCount > 0 && <em className="tab-change-count">{gitChangeCount}</em>}
 					</button>
 					<button type="button" className="workspace-jobs" onClick={onOpenBgTasks} title={t("bgTasksTip")}><FiLayers /><span>{t("bgTasks")}</span>{chat.bgServers.length > 0 && <em className="bg-task-badge">{chat.bgServers.length}</em>}</button>
 					{plugins.map((p) => {

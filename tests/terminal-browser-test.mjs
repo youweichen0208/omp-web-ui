@@ -244,12 +244,12 @@ async function main() {
 
 	// Conversation-level persistence: an idle conversation with a terminal must
 	// remain switchable after creating a new chat, and its PTY/tab must return.
-	await page.click(".newchat");
+	await page.click(".sidebar-new button");
 	await sleep(1800);
 	await page.click('.view-switch button:has-text("对话")');
-	await page.waitForSelector(".panel-convs .session-item", { timeout: 5000 });
-	check("conversation with terminal remains listed", (await page.locator(".panel-convs .session-item").count()) >= 1);
-	await page.locator(".panel-convs .session-item").first().click();
+	await page.waitForSelector(".panel-sessions .session-item:not(.active)", { timeout: 5000 });
+	check("conversation with terminal remains listed", (await page.locator(".panel-sessions .session-item:not(.active)").count()) >= 1);
+	await page.locator(".panel-sessions .session-item:not(.active)").first().click();
 	await sleep(900);
 	await page.click('.view-switch button:has-text("终端")');
 	await sleep(900);

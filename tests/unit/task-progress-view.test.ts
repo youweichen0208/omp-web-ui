@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { TaskProgress, TaskStep, UiMessage } from "../../server/protocol.js";
-import { phaseSummary, plainTitle, progressPhases, progressResult } from "../../web/src/task-progress-view.js";
+import { planStepArtifacts, phaseSummary, plainTitle, progressPhases, progressResult } from "../../web/src/task-progress-view.js";
 
 const makeStep = (id: string, title: string, kind: string, timestamp: number): TaskStep => ({ id, messageId: id, title, status: "done", startedAt: timestamp, endedAt: timestamp + 1000, artifacts: [{ toolCallId: id, kind, label: title }] });
 
@@ -33,4 +33,12 @@ test("inferred phases use concrete titles and command summaries", () => {
 	expect(phaseSummary(phases.at(-1)!, { passed: 48, total: 48 })).toContain("运行 1 条命令");
 	expect(phaseSummary(phases.at(-1)!, { passed: 48, total: 48 }, "en")).toContain("Ran 1 command · 48/48 passed");
 	expect(phaseSummary(phases[1])).toContain("tests/conftest.py");
+});
+
+
+test("step details use explicit ownership even when timestamps are identical", () => {
+	const steps = [makeStep("a", "write a", "write", 100), makeStep("b", "write b", "write", 100)];
+	const task: TaskProgress = { id: "task", conversationId: "c", sourceMessageId: "u", title: "task", status: "running", startedAt: 100, completed: 0, steps };
+	expect(planStepArtifacts(task, { id: "first", title: "first", status: "done", startedAt: 100, toolCallIds: ["a"] }).map((row) => row.artifact.toolCallId)).toEqual(["a"]);
+	expect(planStepArtifacts(task, { id: "second", title: "second", status: "running", startedAt: 100, toolCallIds: [] })).toEqual([]);
 });

@@ -65,6 +65,7 @@ pi-web-ui/
 │   ├── src/
 │   │   ├── App.tsx             # 顶层布局
 │   │   ├── use-chat.ts         # ★ useChat()：WebSocket 连接管理、reducer 状态机、终端 bridge
+│   │   ├── use-workspace-scm.ts # 顶栏与文件栏共用 Git 改动状态，按请求 ID 和 cwd 校验归属
 │   │   ├── types.ts            # ★ wire 协议 re-export shim（`export type * from "../../server/protocol"`）
 │   │   ├── i18n.tsx            # ★ 中英文案（zh 默认），新增 key 必须两处都加
 │   │   ├── styles.css          # ★ 全部样式（按组件分区，带注释分隔线）；唯一/固定的默认主题
@@ -155,7 +156,7 @@ pi-web-ui/
 | **SSH 节点** | `docs/architecture-nodes.md` | 修改 Xshell/SSH config 同步、凭据、执行确认或终端引用时阅读；本机 ssh2 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
-| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、阶段摘要或长任务计划时阅读：工具调用后生成任务；`task_plan` 才提供总步数进度，普通任务只显示已观察到的阶段；结果来自本轮记录，历史任务尚未实现 |
+| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：实施阶段的长任务先给提纲，`task_plan` 只记录进度，不改变用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，结果来自本轮，历史任务尚未实现 |
 | **工具挂死看门狗** | `docs/architecture-core.md` | 20 分钟超时自动 abort 会话；只停止运行不碰后台服务 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |

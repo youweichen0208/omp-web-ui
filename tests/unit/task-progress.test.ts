@@ -69,3 +69,20 @@ test("explicit plan revisions keep added and removed steps visible", () => {
 	expect(task?.plan?.items.map(({ id, status, added }) => [id, status, !!added])).toEqual([["read", "done", false], ["build", "running", false], ["migration", "pending", true], ["test", "removed", false]]);
 	expect(task?.steps.flatMap((step) => step.artifacts.map((item) => item.kind))).toEqual(["bash"]);
 });
+
+test("outline metadata and changes persist while tool ownership follows transcript order", () => {
+	const steps = [{ id: "read", title: "读取约定" }, { id: "build", title: "实现服务", detail: "Add service and tests" }, { id: "test", title: "运行测试" }];
+	const plan = { title: "接入子进程", completionCriteria: "真实子进程可用且测试通过", steps, currentStepId: "read" };
+	const messages: UiMessage[] = [user("u", "实现服务"), { id: "a", role: "assistant", timestamp: 110, content: [call("p1", "task_plan", plan), call("read1", "read", { path: "README.md" }), call("p2", "task_plan", { ...plan, currentStepId: "build", completedStepIds: ["read"] }), call("write1", "write", { path: "service.ts" })] }];
+	let task = deriveTaskProgress("c", messages, null, true)!;
+	expect(task.plan).toMatchObject({ title: plan.title, completionCriteria: plan.completionCriteria });
+	expect(task.plan!.items[0].toolCallIds).toEqual(["read1"]);
+	expect(task.plan!.items[1]).toMatchObject({ toolCallIds: ["write1"], detail: "Add service and tests", actions: { write: 1, read: 0 } });
+	const revised = { ...plan, steps: [...steps.slice(0, 2), { id: "schema", title: "修正校验" }, steps[2]], currentStepId: "schema", completedStepIds: ["read", "build"] };
+	messages.push({ id: "a2", role: "assistant", timestamp: 120, content: [call("p3", "task_plan", { ...revised, changeSummary: "新增校验步骤" })] });
+	messages.push({ id: "a3", role: "assistant", timestamp: 130, content: [call("p4", "task_plan", { ...revised, currentStepId: "test", completedStepIds: ["read", "build", "schema"] })] });
+	task = deriveTaskProgress("c", messages, null, true)!;
+	expect(task.plan).toMatchObject({ changeSummary: "新增校验步骤", changes: [{ kind: "added", position: 3, title: "修正校验" }] });
+	messages.push({ id: "error", role: "toolResult", toolCallId: "p3", isError: true, content: [] }, { id: "error2", role: "toolResult", toolCallId: "p4", isError: true, content: [] });
+	expect(deriveTaskProgress("c", messages, null, true)!.plan!.items).toHaveLength(3);
+});

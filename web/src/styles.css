@@ -9008,15 +9008,23 @@ body { -webkit-font-smoothing: antialiased; }
 .change-error { padding: 9px 12px; background: var(--red-soft); color: var(--red); font: 12px/1.5 var(--sans); overflow-wrap: anywhere; }
 .change-hunk-head { padding: 5px 11px; border-block: 1px solid var(--border-soft); background: var(--bg-elev2); color: var(--text-faint); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .change-hunk:first-child .change-hunk-head, .change-error + .change-hunk .change-hunk-head { border-top: 0; }
-.change-lines { overflow-x: auto; font: 12px/1.65 var(--mono); font-variant-ligatures: none; }
+.change-lines { background: #22252b; overflow-x: auto; font: 12px/1.65 var(--mono); font-variant-ligatures: none; }
 .change-line { display: grid; grid-template-columns: 34px 34px 18px minmax(max-content, 1fr); width: max-content; min-width: 100%; white-space: pre; }
-.change-line.add { background: var(--green-soft); }
-.change-line.del { background: var(--red-soft); }
-.change-old, .change-new { padding-right: 6px; text-align: right; color: var(--text-faint); user-select: none; }
-.change-marker { color: var(--text-faint); user-select: none; }
-.change-line.add .change-marker { color: var(--green); }
-.change-line.del .change-marker { color: var(--red); }
-.change-line code.hljs { display: block; padding: 0 12px 0 0; background: transparent; color: var(--text); font: inherit; }
+.change-line.add { background: #223a2b; }
+.change-line.del { background: #4a221d; }
+.change-old, .change-new { padding-right: 6px; text-align: right; color: #969cb4; user-select: none; }
+.change-marker { color: #969cb4; user-select: none; }
+.change-line.add .change-marker { color: #a6e3a1; }
+.change-line.del .change-marker { color: #f38ba8; }
+.change-line code.hljs { display: block; padding: 0 12px 0 0; background: transparent; color: #cdd6f4; font: inherit; }
+/* Screenshot palette, scoped to edit/write code so the app theme stays independent. */
+.change-lines .hljs [class*="hljs-"] { color: #cdd6f4; }
+.change-lines .hljs .hljs-comment, .change-lines .hljs .hljs-quote { color: #969cb4; }
+.change-lines .hljs .hljs-keyword, .change-lines .hljs .hljs-type, .change-lines .hljs .hljs-literal { color: #cba6f7; }
+.change-lines .hljs .hljs-string, .change-lines .hljs .hljs-regexp { color: #a6e3a1; }
+.change-lines .hljs .hljs-title, .change-lines .hljs .hljs-built_in { color: #f9e2af; }
+.change-lines .hljs .hljs-number, .change-lines .hljs .hljs-symbol { color: #fab387; }
+.change-lines .hljs .hljs-operator, .change-lines .hljs .hljs-punctuation { color: #94e2d5; }
 .change-empty { padding: 10px 12px; color: var(--text-faint); font: 12px var(--sans); }
 .change-more { width: 100%; padding: 7px 12px; border: 0; border-top: 1px solid var(--border-soft); background: transparent; color: var(--accent); text-align: left; font: 11px var(--sans); cursor: pointer; }
 .change-more:hover { background: var(--accent-soft); }
@@ -9579,4 +9587,132 @@ html.pi-desktop .design-workspace .view-switch { min-width: 0; overflow-x: auto;
 @media (min-width: 1201px) {
 	html.pi-desktop-win32 .design-workspace .workspace-column:has(.view-pane:not(.hidden) .drawer-right:not(.files-collapsed)):not(:has(.preview-open:not(.hidden))) > .topbar,
 	html.pi-desktop-linux .design-workspace .workspace-column:has(.view-pane:not(.hidden) .drawer-right:not(.files-collapsed)):not(:has(.preview-open:not(.hidden))) > .topbar { padding-right: 20px; }
+}
+
+/* Running command reference: one command, one clock, a separate task stop. */
+.design-workspace .toolcall-bash.run { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.design-workspace .toolcall-bash > .bash-command-head { flex-wrap: nowrap; gap: 8px; padding: 7px 12px; }
+.design-workspace .toolcall > .bash-command-head > .bash-head-command { display: flex; flex: 1 1 0; min-width: 0; gap: 7px; padding: 0; border: 0; background: transparent; text-align: left; justify-content: flex-start; font: 12px/1.6 var(--mono); opacity: 1; pointer-events: auto; cursor: pointer; }
+.design-workspace .toolcall > .bash-command-head > .bash-head-command:disabled { color: var(--text); cursor: default; }
+.bash-command-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.bash-prompt { flex: none; color: var(--accent); }
+.bash-head-command > svg { flex: none; width: 12px; color: var(--text-faint); }
+.bash-head-command > svg.open { transform: rotate(180deg); }
+.bash-directory { max-width: 22%; overflow: hidden; text-overflow: ellipsis; padding: 2px 5px; border-radius: 4px; background: var(--bg-elev2); color: var(--text-dim); font: 10px var(--mono); }
+.bash-running-dot, .task-progress-status > i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.bash-running-dot { color: var(--accent); animation: working-pulse 1.4s ease-in-out infinite; }
+.design-workspace .toolcall-bash.run .toolcall-status { color: var(--accent); font: 12px var(--mono); padding: 0; }
+.design-workspace .toolcall-bash.run .toolcall-status::before { display: none; }
+.design-workspace .toolcall > .bash-command-head > .toolcall-kill { flex: none; min-width: 42px; padding: 2px 8px; margin: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-dim); font: 12px/1.5 var(--sans); }
+.design-workspace .toolcall > .bash-command-head > .toolcall-kill:hover { background: var(--bg-elev2); color: var(--text); }
+.toolcall-bash:has(.bash-card-more[open]) { position: relative; z-index: 10; overflow: visible; }
+.toolcall-bash .bash-card-more summary { height: 24px; width: 22px; }
+.toolcall-bash .bash-card-more > div { white-space: nowrap; }
+.toolcall-bash .bash-card-more button { opacity: 1; pointer-events: auto; }
+.bash-command-preview { overflow-x: auto; }
+.bash-command-preview .term-command { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bash-git-summary { justify-content: flex-start; flex-wrap: wrap; gap: 5px; }
+.bash-git-summary .git-added, .bash-git-status.git-added, .bash-git-status.git-untracked { color: #a6d6a0; }
+.bash-git-summary .git-modified { color: #e1b85a; }
+.bash-git-summary .git-deleted, .bash-git-status.git-conflict { color: #e68f8f; }
+.bash-output-line.git-row { display: grid; grid-template-columns: 24px 2ch minmax(max-content, 1fr); column-gap: 10px; }
+.bash-output-line.git-row .bash-git-status { text-align: left; }
+.bash-output-lines.wrap .git-row { grid-template-columns: 24px 2ch minmax(0, 1fr); }
+.design-workspace .inputbox .btn.stop { width: auto; min-width: 32px; padding-inline: 10px; gap: 6px; white-space: nowrap; }
+.design-workspace .inputbox .btn.stop svg { width: 10px; height: 10px; fill: currentColor; }
+.tree-other-directories { margin: 4px 6px; padding: 3px 4px; border: 0; background: transparent; color: var(--text-faint); font: 12px var(--sans); cursor: pointer; text-align: left; }
+.tree-other-directories:hover { color: var(--accent); }
+.task-progress-status { display: inline-flex; align-items: center; gap: 6px; }
+.task-progress-status.running > i { animation: working-pulse 1.4s ease-in-out infinite; }
+.task-plan-list { padding: 4px 8px 12px; }
+.task-plan-step { gap: 6px; padding: 6px; border: 1px solid transparent; border-radius: 8px; font-size: 12.5px; }
+.task-plan-copy { flex: 1; }
+.task-plan-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.task-plan-tag { flex: none; max-width: 35%; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; padding: 0 4px; background: var(--bg-elev2); color: var(--text-dim); font: 10px/1.7 var(--mono); }
+.task-plan-step-title { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-plan-mark { border: 0; background: transparent; line-height: 18px; }
+.task-plan-step.running { background: var(--bg-elev); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.task-plan-step.running .task-plan-step-title { color: var(--text); font-weight: 600; }
+.task-plan-step.running .task-plan-mark { background: transparent; }
+.task-plan-detail, .task-plan-current-file { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 2px; color: var(--text-dim); font: 11px/1.5 var(--sans); }
+.task-plan-step-duration { font: 11px/18px var(--mono); }
+.task-plan-step.running .task-plan-step-duration { color: var(--accent); }
+@keyframes working-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .bash-running-dot, .task-progress-status.running > i { animation: none; } }
+@media (max-width: 600px) {
+	.design-workspace .toolcall-bash > .bash-command-head { gap: 5px; padding-inline: 8px; }
+	.bash-directory { max-width: 15%; }
+}
+.bash-command-verb { flex: none; }
+.bash-commit-subject { color: var(--text-dim); }
+
+/* Task outline 6b/6c: concise rows, execution records behind disclosure. */
+.task-outline-title { display: block; margin-top: 6px; padding-right: 4px; color: var(--text); font: 600 13px/1.45 var(--sans); overflow-wrap: anywhere; }
+.task-outline-criteria { margin: 5px 0 0; color: var(--text-dim); font: 12px/1.5 var(--sans); overflow-wrap: anywhere; }
+.task-result.task-result-inline { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; overflow-x: auto; margin: 0; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--border-soft); border-radius: 0; background: transparent; font: 11px/1.5 var(--sans); white-space: nowrap; }
+.task-result-inline > * { flex: none; }
+.task-result-inline code { color: var(--accent); font: 11px var(--mono); }
+.task-result-inline .success { color: var(--green); }
+.task-result-inline .removed { color: var(--red); }
+.task-result-inline .task-result-counts { font: 10.5px var(--mono); }
+.task-result-inline > button { margin-left: auto; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.task-plan-step { display: block; padding: 0; border-radius: 7px; }
+.task-plan-step-head { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 6px; border: 0; border-radius: inherit; background: transparent; color: inherit; font: 12.5px/1.5 var(--sans); text-align: left; cursor: pointer; }
+.task-plan-step-head:hover, .task-plan-step.expanded { background: var(--bg-elev); }
+.task-plan-step-title { flex: 1; }
+.task-plan-step .task-plan-mark { width: 16px; height: 18px; border: 0; border-radius: 0; background: transparent; }
+.task-plan-step.done .task-plan-mark { background: transparent; }
+.task-plan-step > .task-plan-current-file { margin: 0 6px 6px 30px; font: 11px/1.5 var(--mono); }
+.task-plan-step-detail { margin: 0 6px 6px 30px; color: var(--text-dim); font: 11px/1.5 var(--mono); }
+.task-plan-step-detail > p { margin: 0 0 5px; font: 11px/1.5 var(--sans); overflow-wrap: anywhere; }
+.task-plan-step-detail .task-artifact-row { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 5px; padding: 2px 0; border: 0; font-size: 11px; }
+.task-plan-step-detail .task-artifact-row > span { flex: none; font-size: 10px; }
+.task-plan-step-detail .task-artifact-row > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-plan-step-detail .task-artifact-row code { font: 11px/1.5 var(--mono); white-space: nowrap; }
+.task-plan-step-detail .task-artifact-row > .task-artifact-change { flex: none; }
+.task-plan-change { flex: none; margin: auto 12px 12px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); font: 12px/1.5 var(--sans); overflow-wrap: anywhere; }
+
+/* Compact workspace toolbar: underline navigation and quiet sidebar controls. */
+.design-workspace .topbar,
+html.pi-desktop .design-workspace .topbar { height: 44px; min-height: 44px; gap: 10px; }
+.design-workspace .project-panel-toggle,
+.design-workspace .topbar .brand > .panel-toggle { width: 28px; height: 28px; border: 0; border-radius: 5px; background: transparent; }
+.design-workspace .view-switch { height: 44px; align-items: stretch; padding: 0; gap: 4px; border-radius: 0; background: transparent; }
+.design-workspace .view-switch button { position: relative; height: 44px; min-height: 44px; padding: 0 9px; border: 0; border-radius: 0; background: transparent; font-size: 12px; }
+.design-workspace .view-switch button.active { background: transparent; color: var(--text); font-weight: 600; box-shadow: none; }
+.design-workspace .view-switch button.active::after { content: ""; position: absolute; right: 9px; bottom: 0; left: 9px; height: 2px; background: var(--accent); }
+.design-workspace .view-switch button:hover { background: var(--row-hover); }
+.design-workspace .view-switch .tab-change-count { font: 11px var(--mono); color: var(--text-dim); }
+.design-workspace .view-switch .bg-task-badge { min-width: 0; padding: 0; border-radius: 0; background: transparent; color: var(--accent); font: 11px var(--mono); }
+.design-workspace .topbar-actions > .panel-toggle,
+html.pi-desktop .design-workspace .topbar-actions > .panel-toggle { position: relative; width: 28px; height: 28px; margin-left: 8px; border: 0; border-radius: 5px; background: var(--row-hover); }
+.design-workspace .topbar-actions > .panel-toggle::before { content: ""; position: absolute; left: -11px; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
+.header-task-progress { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 3px 0; border: 0; background: transparent; color: var(--accent); font: 11px var(--sans); white-space: nowrap; cursor: pointer; -webkit-app-region: no-drag; app-region: no-drag; }
+.header-task-progress > span { font-size: 8px; }
+.header-task-progress:hover { text-decoration: underline; text-underline-offset: 3px; }
+.task-progress:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.design-workspace .panel-right > .panel-title { height: 40px; min-height: 40px; max-height: 40px; }
+.design-workspace .panel-right .tree-filter { padding: 2px 4px; border-color: transparent; background: transparent; font-size: 11px; }
+.design-workspace .panel-right .tree-filter[aria-pressed="true"] { background: var(--accent-soft); }
+.design-workspace .qn-rail { right: 8px; width: 16px; opacity: 0; }
+.design-workspace .qn-rail:hover,
+.design-workspace .qn-rail:focus-within { opacity: 1; }
+html.pi-desktop-win32 .design-workspace .desktop-window-controls,
+html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px; }
+@media (min-width: 1201px) {
+	.design-workspace .view-pane:not(.preview-open) > .drawer-right { margin-top: -44px; }
+}
+@media (min-width: 769px) {
+	html.pi-desktop-darwin .design-workspace .project-panel-toggle { position: fixed; left: 92px; top: 8px; z-index: 75; }
+	html.pi-desktop-darwin .design-workspace.left-collapsed .topbar { padding-left: 132px; }
+	html.pi-desktop-darwin .design-workspace:not(.left-collapsed) .topbar { padding-left: 20px; }
+	html.pi-desktop-darwin .design-workspace .topbar:not(:has(.project-panel-toggle)) { padding-left: 92px; }
+}
+@media (max-width: 768px) {
+	html.pi-desktop-darwin .design-workspace .topbar { padding-left: 92px; }
+	.design-workspace .view-switch button { padding-inline: 7px; }
+}
+@media (min-width: 769px) and (max-width: 1100px) {
+	.design-workspace .view-pane:not(.preview-open) > .drawer-right,
+	html.pi-desktop .design-workspace .view-pane:not(.preview-open) > .drawer-right { top: 44px; }
 }

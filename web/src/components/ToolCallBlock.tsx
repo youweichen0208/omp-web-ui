@@ -1,4 +1,4 @@
-import { numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
+import { commandPresentation, gitStatusLine, gitStatusSummary, numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
 import { WorkspacePathContext } from "../workspace-context";
 import { Fragment, memo, useContext, useEffect, useRef, useState } from "react";
 import {
@@ -300,6 +300,29 @@ function TaskPlanCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view"
 	return <div className={`task-plan-card${view.result?.isError ? " err" : ""}`}><button type="button" className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><span>{t(updated ? "taskPlanChanged" : "taskPlanCard")} · {steps.length} {t("taskPlanSteps")}</span><span className="task-plan-card-state">{view.result?.isError ? t("error") : view.result ? t("done") : t("running")}</span></button>{open && <ol>{steps.map((step) => <li key={step.id}>{step.title}</li>)}</ol>}{view.result?.isError && <div className="task-plan-card-error">{resultText}</div>}</div>;
 }
 
+function BashCommandHeader({ command, original, directory, running, elapsed, status, full, onFull, onKill, children }: { command: string; original: string; directory: string | null; running: boolean; elapsed: number; status: string; full: boolean; onFull: () => void; onKill?: () => void; children: React.ReactNode }) {
+	const t = useT();
+	const commit = /^git\s+commit\s+(?:-q\s+)?-m\s+(?:"([^"$`]+)"|'([^']+)')\s*$/.exec(command);
+	const label = useRef<HTMLSpanElement>(null);
+	const [clipped, setClipped] = useState(false);
+	useEffect(() => {
+		const node = label.current;
+		if (!node) return;
+		const update = () => setClipped(node.scrollWidth > node.clientWidth + 1 || command.includes("\n"));
+		const observer = new ResizeObserver(update);
+		observer.observe(node); update();
+		return () => observer.disconnect();
+	}, [command]);
+	return <div className="toolcall-head bash-command-head">
+		{running && <span className="bash-running-dot" aria-label={t("running")} />}
+		<button type="button" className="bash-head-command" title={original} disabled={!clipped && !full} aria-expanded={full} aria-label={full ? t("collapseCode") : clipped ? t("bashExpandFullCommand") : command} onClick={onFull}><span className="bash-prompt">$</span>{commit && <span className="bash-command-verb">git commit</span>}<span ref={label} className={`bash-command-text${commit ? " bash-commit-subject" : ""}`}>{commit ? commit[1] ?? commit[2] : command}</span>{(clipped || full) && <FiChevronDown className={full ? "open" : ""} />}</button>
+		{directory && <span className="bash-directory" title={directory}>{directory}</span>}
+		<span className="toolcall-status">{running ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}` : status}</span>
+		{running && onKill && <button type="button" className="toolcall-kill" title={t("stopBashTip")} onClick={onKill}>{t("stopBash")}</button>}
+		<details className="bash-card-more"><summary aria-label={t("more")}>⋯</summary><div>{children}</div></details>
+	</div>;
+}
+
 function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCallBlockProps) {
 	const t = useT();
 	const [open, setOpen] = useState(wrap);
@@ -367,7 +390,8 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	const outputLines = output.replace(/\r\n/g, "\n").split("\n");
 	if (outputLines.at(-1) === "") outputLines.pop();
 	const command = block.name === "bash" ? bashCommand(block.argumentsText) : null;
-	const compactBash = !!command && !bashRun && !bashDiagnostics.length && !command.includes("\n") && command.length <= 90;
+	const compactBash = !!command;
+	const commandDisplay = command ? commandPresentation(command, cwd) : null;
 	const limitedOutput = block.name !== "bash" && outputLines.length > 10 && !expanded && !zoomed;
 	const visibleOutput = limitedOutput ? outputLines.slice(0, 10).join("\n") : output;
 	const markdownRead = isMarkdown && markdownPreview && !isError ? splitFrontmatter(visibleOutput) : null;
@@ -412,12 +436,12 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	// the two views can never drift apart.
 	const bodyContent = (
 		<>
-			{block.argumentsText && !compactBash && (
+			{block.argumentsText && (!compactBash || fullCommand || zoomed) && (
 				<div className="toolcall-args">
 					{targetPath ? (
 						<button type="button" className="toolcall-read-path" title={targetPath} onClick={() => setZoomed(true)}>{displayReadPath(targetPath)}</button>
 					) : block.name === "bash" && block.argumentsText.startsWith("{") ? (
-						<div className="bash-command-preview"><div className={fullCommand ? "full" : "clipped"}><TerminalCommand args={block.argumentsText} cwd={cwd} /></div><button type="button" onClick={() => setFullCommand((value) => !value)}>{fullCommand ? t("collapseCode") : t("bashExpandFullCommand")}</button></div>
+						<div className="bash-command-preview"><TerminalCommand args={block.argumentsText} cwd={cwd} /></div>
 					) : writePreview ? (
 						writePreview.lang ? (
 							<div className="toolcall-code">
@@ -431,7 +455,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					)}
 				</div>
 			)}
-			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} compact={compactBash} gitStatus={!!command && /^\s*git\s+status(?:\s|$)/.test(command)} /> : (
+			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">
 						{isError ? t("errorOutput") : block.name === "read" ? t("modelReadOnly") : t("output")}
@@ -477,6 +501,14 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 
 	return (
 		<div className={`toolcall ${statusClass} ${block.name === "bash" ? "toolcall-bash" : ""} ${bashRun ? "toolcall-steps" : ""} ${bashDiagnostics.length ? "toolcall-diagnostics" : ""}`} onMouseEnter={() => notifyToolHover(block.id)} onMouseLeave={() => notifyToolHover(null)}>
+			{commandDisplay ? <BashCommandHeader command={commandDisplay.command} original={command!} directory={commandDisplay.directory ?? differentCommandDirectory(block.argumentsText, cwd)} running={isBashRunning} elapsed={elapsed} status={statusLabel} full={fullCommand} onFull={() => { setFullCommand((value) => !value); setOpen(true); }} onKill={onKillBash}>
+				{bashRun && <span className="bash-view-switch"><button type="button" className={bashView === "steps" ? "active" : ""} onClick={() => setBashView("steps")}>{t("bashSteps")}</button><button type="button" className={bashView === "raw" ? "active" : ""} onClick={() => setBashView("raw")}>{t("bashRaw")}</button></span>}
+				<button type="button" className="toolcall-wrap" aria-pressed={lineWrap} onClick={() => setLineWrap((value) => !value)}>{t("toolWrap")}</button>
+				<button type="button" className="toolcall-expand" onClick={() => setExpanded((value) => !value)}>{t(expanded ? "collapseCode" : "expandCode")}</button>
+				<button type="button" className="toolcall-expand" onClick={() => setZoomed(true)}>{t("zoomCode")}</button>
+				<button type="button" className="toolcall-copy" onClick={copyArgs}>{t(copied ? "copied" : "copy")}</button>
+				<button type="button" className="toolcall-toggle" onClick={() => setOpen((value) => !value)}>{t(open ? "collapseCode" : "expandCode")}</button>
+			</BashCommandHeader> : (
 			<div className="toolcall-head">
 				<span className="toolcall-icon">{toolIcon(block.name)}</span>
 				{compactBash ? <code className="bash-head-command" title={command ?? ""}>$ {displayBashCommand(command!, cwd)}</code> : <span className="toolcall-name">{block.name}</span>}
@@ -537,6 +569,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					{open ? <FiChevronDown /> : <FiChevronRight />}
 				</button>}
 			</div>
+			)}
 			{open && (
 				<div className={`toolcall-body ${expanded ? "expanded" : ""}`}>
 					{bodyContent}
@@ -632,7 +665,7 @@ function BashFailure({ diagnostics, output, wrap }: { diagnostics: ReturnType<ty
 	</div>;
 }
 
-function BashOutput({ output, wrap, cwd, searchOutput, compact = false, gitStatus = false }: { output: string; wrap: boolean; cwd: string; searchOutput: "standalone" | "mixed" | "none"; compact?: boolean; gitStatus?: boolean }) {
+function BashOutput({ output, wrap, cwd, searchOutput, compact = false, command = "" }: { output: string; wrap: boolean; cwd: string; searchOutput: "standalone" | "mixed" | "none"; compact?: boolean; command?: string }) {
 	const t = useT();
 	const [all, setAll] = useState(false);
 	const scroller = useRef<HTMLDivElement>(null);
@@ -647,20 +680,20 @@ function BashOutput({ output, wrap, cwd, searchOutput, compact = false, gitStatu
 	}, [output, all, wrap]);
 	const lines = output.replace(/\r\n/g, "\n").split("\n");
 	if (lines.at(-1) === "") lines.pop();
-	const visible = selectVisibleOutputLines(lines, all);
+	const gitSummary = gitStatusSummary(command, lines);
+	const visible = gitSummary && !all && lines.length > 6 ? [0, 1, 2, lines.length - 3, lines.length - 2, lines.length - 1] : selectVisibleOutputLines(lines, all);
 	const errorCount = lines.filter(isLikelyErrorLine).length;
 	const hasGap = visible.some((index, position) => position > 0 && index > visible[position - 1] + 1);
 	return <div className="bash-output">
-		{!compact && <div className="bash-output-label"><span>{t("output")} · {t("toolLineCount", { n: lines.length })}{errorCount > 0 ? ` · ${t("bashLikelyErrorLines", { n: errorCount })}` : ""}</span>{cwd && <span title={cwd}>{t("toolRelativeTo", { path: cwd })}</span>}</div>}
+		{gitSummary ? <div className="bash-output-label bash-git-summary"><span>git status · {t("bashStatusFiles", { n: gitSummary.files })}</span>{gitSummary.added > 0 && <span className="git-added">· {t("bashStatusAdded", { n: gitSummary.added })}</span>}{gitSummary.modified > 0 && <span className="git-modified">· {t("bashStatusModified", { n: gitSummary.modified })}</span>}{gitSummary.deleted > 0 && <span className="git-deleted">· {t("bashStatusDeleted", { n: gitSummary.deleted })}</span>}{gitSummary.conflicts > 0 && <span className="git-deleted">· {t("bashStatusConflicts", { n: gitSummary.conflicts })}</span>}</div> : !compact && <div className="bash-output-label"><span>{t("output")} · {t("toolLineCount", { n: lines.length })}{errorCount > 0 ? ` · ${t("bashLikelyErrorLines", { n: errorCount })}` : ""}</span>{cwd && <span title={cwd}>{t("toolRelativeTo", { path: cwd })}</span>}</div>}
 		<div ref={scroller} className={`bash-output-lines ${wrap ? "wrap" : ""} ${overflow ? "has-overflow" : ""}`}>{visible.map((index, position) => {
 			const rawLine = lines[index];
 			const { number: lineNumber, text: line } = numberedOutputLine(rawLine, index, searchOutput === "mixed" ? "mixed" : searchOutput === "standalone");
 			const path = /^(?:[.~/\w-]+\/)*[.\w-]+(?:\.[\w-]+)$/.test(line);
 			const split = path ? line.lastIndexOf("/") + 1 : 0;
-			const status = gitStatus ? /^(?:[ MADRCU?!]{2})\s/.exec(line)?.[0].trim() : "";
-			const gitClass = status === "??" ? " git-untracked" : status?.includes("D") ? " git-deleted" : status ? " git-modified" : "";
-			return <Fragment key={index}>{position > 0 && index > visible[position - 1] + 1 && <button type="button" className="bash-output-gap bash-output-gap-button" onClick={() => setAll(true)}>{t("toolMoreLines", { n: index - visible[position - 1] - 1 })}</button>}<div className={`bash-output-line${isLikelyErrorLine(rawLine) ? " error" : ""}`}><span className="bash-line-number">{lineNumber}</span><span className="bash-line-text">{gitClass ? <><span className={`bash-git-status${gitClass}`}>{line.slice(0, 2)}</span>{line.slice(2)}</> : path ? <><span className="bash-path-dir">{line.slice(0, split)}</span><span className={split ? "bash-path-file" : "bash-root-file"}>{line.slice(split)}</span></> : line || " "}</span></div></Fragment>;
+			const git = gitSummary ? gitStatusLine(line) : null;
+			return <Fragment key={index}>{position > 0 && index > visible[position - 1] + 1 && <button type="button" className="bash-output-gap bash-output-gap-button" onClick={() => setAll(true)}>⋯ {t("toolMoreLines", { n: index - visible[position - 1] - 1 })}</button>}<div className={`bash-output-line${git ? " git-row" : ""}${isLikelyErrorLine(rawLine) ? " error" : ""}`}><span className="bash-line-number">{lineNumber}</span>{git ? <><span className={`bash-git-status git-${git.kind}`}>{git.status}</span><span className="bash-line-text">{git.path}</span></> : <span className="bash-line-text">{path ? <><span className="bash-path-dir">{line.slice(0, split)}</span><span className={split ? "bash-path-file" : "bash-root-file"}>{line.slice(split)}</span></> : line || " "}</span>}</div></Fragment>;
 		})}</div>
-		{lines.length > 8 && (all || !hasGap) && <button type="button" className="bash-output-more" onClick={() => setAll((value) => !value)}>{all ? t("collapseCode") : t("toolMoreLines", { n: lines.length - visible.length })}</button>}
+		{lines.length > (gitSummary ? 6 : 8) && (all || !hasGap) && <button type="button" className="bash-output-more" onClick={() => setAll((value) => !value)}>{all ? t("collapseCode") : t("toolMoreLines", { n: lines.length - visible.length })}</button>}
 	</div>;
 }

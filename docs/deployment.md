@@ -76,7 +76,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   处理。沙箱兼容的 `preload.cjs` 仅暴露固定窗口操作和窗口状态通知，关闭按钮继续隐藏到托盘。
 - Electron 渲染页加 `pi-desktop` 类，次要操作位于设置菜单；窗口宽度
   ≤1100px 时右侧文件树变为抽屉。Web 和桌面共用工作区布局，模型设置位于输入框底部；
-  项目栏全高显示，macOS 品牌区为原生窗口按钮留空。Windows/Linux 顶栏为右上角 132px 窗口按钮预留空间；宽屏文件栏可见时由文件栏承担这段空间。设置和文件按钮不压缩，视图标签在空间不足时横向滚动。`tests/desktop-toolbar-test.mjs` 在 Chromium 中模拟两平台外壳，验证顶栏边界与点击区域（不替代真机窗口验证）。详见 [界面布局](ui-design.md)。
+  顶栏高 44px，项目栏全高显示；macOS 品牌区为原生窗口按钮留空，项目栏开关固定在红绿灯右侧，收起项目栏时标题仍避让这些控件。Windows/Linux 顶栏为右上角 132px 窗口按钮预留空间；宽屏文件栏可见时由文件栏承担这段空间。设置和文件按钮不压缩，视图标签在空间不足时横向滚动。`tests/desktop-toolbar-test.mjs` 在 Chromium 中模拟两平台外壳，验证顶栏边界、状态数字与任务定位（不替代真机窗口验证）。详见 [界面布局](ui-design.md)。
 - 原生模块（`node-pty`）：`electron-builder.yml` 里 `npmRebuild: true`，打包时自动
   rebuild 成 Electron 的 Node ABI，不需要手动 `electron-rebuild`；本机需要装好
   Xcode Command Line Tools（mac）/ Visual Studio Build Tools（win）。

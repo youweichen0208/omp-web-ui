@@ -5,6 +5,7 @@
 ## 终端管理
 
 - 每个 `Conversation` 一个 `TerminalManager`；agent 可调用 `terminal_create`、`terminal_list`、`terminal_close`、`terminal_input`、`terminal_key`、`terminal_read`，支持命名多终端、增量 cursor、Enter/Tab/方向键及 Ctrl/Alt 组合。PTY 工作目录限制在该对话工作区，最多 16 个终端，输入/读取有大小与等待上限。
+- 顶栏首次打开终端时，默认 shell 使用与当前活动会话匹配的快照 ID；创建回调必须依赖会话 ID，不能只依赖 cwd。同项目切换历史会话不会改变 cwd，沿用旧 ID 会把终端创建到后台会话，当前界面只剩空白光标。回归：`tests/terminal-startup-ui-test.mjs`（macOS 隔离 zsh，覆盖会话切换后首次打开及断线恢复；`--fresh` 检查直接打开）。
 - **所有 spawn 路径统一准入**：`terminal_create`（浏览器/agent）与 `run_command`（命令列表）共用 `validateId`（字母/数字/.-_:/≤80 字符）+ `ensureSpawnAllowed`（新 live PTY 需低于 `MAX_TERMINALS`；已在运行的同名终端原地重启不占新名额；**history 里的已退出终端不保留名额**——满员时重跑已退出终端同样拒绝，堵住"唯一 ID 无限生成 PTY"的洞）；失败统一走 `fail()`（notice + 终端内红色报错 + terminal_exit）。
 
 ## terminal_key 按键编码

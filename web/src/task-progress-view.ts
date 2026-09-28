@@ -103,3 +103,20 @@ export function progressResult(task: TaskProgress, messages: UiMessage[]): Progr
 	else if (gitStat) result.changes = { files: Number(gitStat[1]), added: Number(gitStat[2]), deleted: Number(gitStat[3]) };
 	return result;
 }
+
+/** Split authored labels without inventing a phase or rewriting its meaning. */
+export function planStepPresentation(value: string): { tag: string; title: string; detail: string } {
+	let title = plainTitle(value);
+	const prefix = /^([A-Za-z][\w-]{0,24}):\s*(.+)$/.exec(title);
+	const tag = prefix ? prefix[1].toLowerCase().replace(/^agent-runtime$/, "runtime") : "";
+	if (prefix) title = prefix[2];
+	const details = /\s*[（(]([^()（）]+)[）)]\s*$/.exec(title);
+	return { tag, title: details ? title.slice(0, details.index).trim() : title, detail: details?.[1] ?? "" };
+}
+
+/** New snapshots carry transcript-order ownership; old snapshots use their recorded time range. */
+export function planStepArtifacts(task: TaskProgress, item: NonNullable<TaskProgress["plan"]>["items"][number]) {
+	const ids = item.toolCallIds ? new Set(item.toolCallIds) : null;
+	const nextStart = task.plan?.items.filter((other) => other.startedAt && other.startedAt > (item.startedAt ?? Infinity)).map((other) => other.startedAt!).sort((a, b) => a - b)[0];
+	return task.steps.flatMap((step) => step.artifacts.filter((artifact) => ids ? ids.has(artifact.toolCallId) : !!item.startedAt && step.startedAt >= item.startedAt && step.startedAt < (item.endedAt ?? nextStart ?? Infinity)).map((artifact) => ({ messageId: step.messageId, artifact })));
+}

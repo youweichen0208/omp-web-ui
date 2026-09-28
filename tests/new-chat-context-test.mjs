@@ -1,4 +1,4 @@
-// Regression: /new must start with empty history and no previous model context.
+// Regression: /new resets the current conversation; new_chat opens another one.
 import { createServer } from "node:http";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -53,6 +53,7 @@ const mock = createServer(async (req, res) => {
 			created: Date.now(),
 			model: payload.model,
 			choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+			usage: { prompt_tokens: 120, completion_tokens: 12, total_tokens: 132 },
 		})}\n\n`,
 	);
 	res.write("data: [DONE]\n\n");
@@ -193,6 +194,7 @@ try {
 	client.send({ type: "prompt", text: "OLD_CONTEXT_SENTINEL" });
 	await client.waitForMessage((message) => message.role === "assistant");
 	await client.waitForState((state) => !state.isStreaming);
+	if (!(client.state.stats.tokens.total > 0)) throw new Error("Fixture must start with nonzero usage");
 	const oldId = client.state.conversationId;
 	const historyPath = client.state.sessionFile;
 	browser = await chromium.launch({ executablePath: CHROME_PATH || chromium.executablePath() });
@@ -223,16 +225,14 @@ try {
 	await input.fill("/new");
 	await input.press("Escape");
 	await input.press("Enter");
-	await client.waitForState((state) => state.conversationId !== oldId);
-	await page.waitForTimeout(200);
-	if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("UI retained old messages after active conversation changed while snapshot was delayed");
-	if (await page.locator(".usage-percent").innerText() !== "—") throw new Error("UI retained old context usage while awaiting new snapshot");
-	for (let i = 0; i < 20 && !resyncs; i++) await sleep(50);
-	if (!resyncs) throw new Error("Missing snapshot recovery request");
-	if (!(await page.locator(".status-messages").innerText()).includes("—")) throw new Error("Footer retained old message count");
+	await client.waitForState((state) => state.sessionFile !== historyPath);
+	if (client.state.conversationId !== oldId) throw new Error("/new opened another conversation instead of resetting the current one");
 	hold = false;
 	for (const wire of held) downstream.send(wire);
 	await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");
+	if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("/new retained old messages in UI");
+	if (client.state.model?.id !== "new-context-mock") throw new Error("/new lost the selected model");
+	if (client.state.stats.tokens.total !== 0) throw new Error("/new retained accumulated token usage");
 	if (client.messages.length) throw new Error("/new retained old messages");
 	if (client.state.stats.contextUsage.tokens > 0) throw new Error("/new retained context usage");
 	client.send({ type: "prompt", text: "NEW_CONTEXT_SENTINEL" });
@@ -245,6 +245,22 @@ try {
 	await client.waitForState((state) => state.sessionFile === historyPath);
 	await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).waitFor();
 	console.log("✓ old history remains recoverable");
+	const resumedId = client.state.conversationId;
+	hold = true;
+	held.length = 0;
+	resyncs = 0;
+	client.send({ type: "new_chat" });
+	await client.waitForState((state) => state.conversationId !== resumedId);
+	if (client.messages.length || client.state.stats.tokens.total !== 0) throw new Error("new_chat did not open an empty conversation");
+	await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "—");
+	if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("UI retained old messages while new_chat snapshot was delayed");
+	for (let i = 0; i < 20 && !resyncs; i++) await sleep(50);
+	if (!resyncs) throw new Error("Missing snapshot recovery request");
+	if (!(await page.locator(".status-messages").innerText()).includes("—")) throw new Error("Footer retained old message count");
+	hold = false;
+	for (const wire of held) downstream.send(wire);
+	await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");
+	console.log("✓ new_chat opens a separate conversation without stale UI during delayed snapshots");
 	console.log("✓ /new clears messages and usage; next model request contains no old context");
 
 } catch (error) {

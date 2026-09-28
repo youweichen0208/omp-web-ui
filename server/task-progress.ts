@@ -43,20 +43,27 @@ function defaultTitle(calls: UiToolCallBlock[]): string {
 }
 
 function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, actualSteps: TaskStep[], finished: boolean, finishedAt?: number): TaskProgress["plan"] {
-	const revisions: { steps: { id: string; title: string }[]; currentStepId?: string; completedStepIds: string[]; timestamp: number }[] = [];
+	const revisions: { steps: { id: string; title: string; detail?: string }[]; title?: string; completionCriteria?: string; changeSummary?: string; currentStepId?: string; completedStepIds: string[]; timestamp: number }[] = [];
+	const toolCallIds = new Map<string, string[]>();
+	let activeStepId: string | undefined;
 	for (const message of tail) {
 		if (message.role !== "assistant") continue;
 		for (const part of message.content) {
-			if (part.type !== "toolCall" || (part as UiToolCallBlock).name !== "task_plan") continue;
+			if (part.type !== "toolCall") continue;
+			if ((part as UiToolCallBlock).name !== "task_plan") {
+				if (activeStepId) toolCallIds.set(activeStepId, [...(toolCallIds.get(activeStepId) ?? []), (part as UiToolCallBlock).id]);
+				continue;
+			}
 			if (results.get((part as UiToolCallBlock).id)?.isError) continue;
 			try {
 				const data = JSON.parse((part as UiToolCallBlock).argumentsText ?? "{}");
 				if (!Array.isArray(data.steps) || !data.steps.length || data.steps.length > 16 || !data.steps.every((step: unknown) => typeof step === "object" && step !== null && typeof (step as { id?: unknown }).id === "string" && typeof (step as { title?: unknown }).title === "string")) continue;
-				const steps = (data.steps as { id: string; title: string }[]).map((step) => ({ id: step.id.trim(), title: short(step.title, 80) }));
+				const steps = (data.steps as { id: string; title: string; detail?: unknown }[]).map((step) => ({ id: step.id.trim(), title: short(step.title, 80), ...(typeof step.detail === "string" ? { detail: step.detail.slice(0, 500) } : {}) }));
 				if (steps.some((step) => !step.id || !step.title) || new Set(steps.map((step) => step.id)).size !== steps.length) continue;
 				const ids = new Set(steps.map((step) => step.id));
 				if (data.currentStepId && !ids.has(data.currentStepId) || Array.isArray(data.completedStepIds) && data.completedStepIds.some((id: unknown) => typeof id !== "string" || !ids.has(id))) continue;
-				revisions.push({ steps, currentStepId: typeof data.currentStepId === "string" ? data.currentStepId : undefined, completedStepIds: Array.isArray(data.completedStepIds) ? data.completedStepIds.filter((id: unknown): id is string => typeof id === "string") : [], timestamp: message.timestamp ?? 0 });
+				revisions.push({ steps, title: typeof data.title === "string" ? short(data.title, 80) : undefined, completionCriteria: typeof data.completionCriteria === "string" ? data.completionCriteria.trim().slice(0, 240) : undefined, changeSummary: typeof data.changeSummary === "string" ? data.changeSummary.trim().slice(0, 240) : undefined, currentStepId: typeof data.currentStepId === "string" ? data.currentStepId : undefined, completedStepIds: Array.isArray(data.completedStepIds) ? data.completedStepIds.filter((id: unknown): id is string => typeof id === "string") : [], timestamp: message.timestamp ?? 0 });
+				activeStepId = data.currentStepId || steps.find((step) => !revisions.at(-1)!.completedStepIds.includes(step.id))?.id;
 			} catch { /* incomplete streamed tool arguments */ }
 		}
 	}
@@ -81,13 +88,12 @@ function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, 
 		}
 	}
 	const completed = new Set(latest.completedStepIds);
-	const items: NonNullable<TaskProgress["plan"]>["items"] = latest.steps.map((step) => ({ id: step.id, title: step.title, status: finished || completed.has(step.id) ? "done" : step.id === latest.currentStepId || !latest.currentStepId && step.id === latest.steps.find((item) => !completed.has(item.id))?.id ? "running" : "pending", ...(history.get(step.id)!.revision > 0 ? { added: true } : {}), ...timings.get(step.id), ...(finishedAt && timings.get(step.id)?.startedAt && !timings.get(step.id)?.endedAt ? { endedAt: finishedAt } : {}) }));
+	const items: NonNullable<TaskProgress["plan"]>["items"] = latest.steps.map((step) => ({ id: step.id, title: step.title, detail: step.detail, toolCallIds: toolCallIds.get(step.id) ?? [], status: finished || completed.has(step.id) ? "done" : step.id === latest.currentStepId || !latest.currentStepId && step.id === latest.steps.find((item) => !completed.has(item.id))?.id ? "running" : "pending", ...(history.get(step.id)!.revision > 0 ? { added: true } : {}), ...timings.get(step.id), ...(finishedAt && timings.get(step.id)?.startedAt && !timings.get(step.id)?.endedAt ? { endedAt: finishedAt } : {}) }));
 	for (const item of items) {
-		if (!item.startedAt) continue;
 		const actions = { read: 0, write: 0, edit: 0, command: 0 };
 		for (const step of actualSteps) {
-			if (!step.startedAt || step.startedAt < item.startedAt || step.startedAt >= (item.endedAt ?? Infinity)) continue;
 			for (const artifact of step.artifacts) {
+				if (!item.toolCallIds?.includes(artifact.toolCallId)) continue;
 				if (artifact.kind === "read") actions.read++;
 				else if (artifact.kind === "write") actions.write++;
 				else if (artifact.kind === "edit") actions.edit++;
@@ -96,8 +102,22 @@ function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, 
 		}
 		if (Object.values(actions).some(Boolean)) item.actions = actions;
 	}
-	for (const [id, entry] of history) if (!current.has(id)) items.push({ id, title: entry.title, status: "removed" });
-	return { revision: revisions.length, added: previous ? latest.steps.filter((step) => !before.has(step.id)).length : 0, removed: previous ? previous.steps.filter((step) => !current.has(step.id)).length : 0, items };
+	for (const [id, entry] of history) if (!current.has(id)) items.push({ id, title: entry.title, status: "removed", toolCallIds: toolCallIds.get(id) ?? [], ...timings.get(id) });
+	let changes: NonNullable<TaskProgress["plan"]>["changes"] = [];
+	let changeSummary: string | undefined;
+	for (let index = 1; index < revisions.length; index++) {
+		const oldSteps = revisions[index - 1].steps;
+		const newSteps = revisions[index].steps;
+		const delta: NonNullable<typeof changes> = [];
+		for (const [position, step] of newSteps.entries()) {
+			const oldIndex = oldSteps.findIndex((old) => old.id === step.id);
+			if (oldIndex < 0) delta.push({ kind: "added", title: step.title, position: position + 1 });
+			else if (oldSteps[oldIndex].title !== step.title || oldIndex !== position && oldSteps.length === newSteps.length) delta.push({ kind: "updated", title: step.title, position: position + 1 });
+		}
+		for (const step of oldSteps) if (!newSteps.some((next) => next.id === step.id)) delta.push({ kind: "removed", title: step.title });
+		if (delta.length) { changes = delta; changeSummary = revisions[index].changeSummary; }
+	}
+	return { revision: revisions.length, title: [...revisions].reverse().find((entry) => entry.title)?.title, completionCriteria: [...revisions].reverse().find((entry) => entry.completionCriteria)?.completionCriteria, changeSummary, changes, added: previous ? latest.steps.filter((step) => !before.has(step.id)).length : 0, removed: previous ? previous.steps.filter((step) => !current.has(step.id)).length : 0, items };
 }
 
 /** P0: infer the current task from the server's serialized transcript. The

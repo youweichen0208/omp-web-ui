@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { FiFile, FiFolder } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
 import { useT } from "../i18n";
-import { WorkingDots } from "./WorkingStatus";
 
 interface FooterBarProps {
 	chat: ChatState;
@@ -183,20 +182,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 				</>
 			)}
 
-			{current && state.isStreaming && (
-				<>
-					<span className="status-sep">·</span>
-					<span className="status-item working">
-						<WorkingDots />
-						{chat.agentSilence?.conversationId === chat.activeConversationId ? t(chat.agentSilence.activity === "tool" ? "toolSilentShort" : "modelSilentShort") : t("working")}
-						{queueTotal > 0 && (
-							<span className="status-queue">
-								⏳ {queueTotal} {t("queued")}
-							</span>
-						)}
-					</span>
-				</>
-			)}
+			{current && queueTotal > 0 && <span className="status-queue">{queueTotal} {t("queued")}</span>}
 
 			{editing ? (
 				<div className="status-cwd-wrap">

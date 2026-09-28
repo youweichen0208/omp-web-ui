@@ -11,6 +11,7 @@ import {
 	type CSSProperties,
 	type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useWorkspaceScm } from "./use-workspace-scm";
 import { TopBar } from "./components/TopBar";
 import { desktopAPI } from "./desktop";
 import { LeftPanel } from "./components/LeftPanel";
@@ -208,6 +209,7 @@ export function App() {
 	// Conversation selection can arrive before its snapshot. Never present the
 	// previous conversation's transcript or usage under the new selection.
 	const conversationState = chat.state?.conversationId === chat.activeConversationId ? chat.state : null;
+	const workspaceScm = useWorkspaceScm(chat.state?.cwd ?? "", chat.ready && !switching, chat.scmDirty, chat.scmData, rawSend);
 	const activeConversation = chat.conversations.find((item) => item.id === chat.activeConversationId);
 	const activeSession = chat.sessions.find((item) => item.path === conversationState?.sessionFile);
 	const activeConversationTitle = conversationDisplayTitle(
@@ -534,6 +536,23 @@ export function App() {
 	}, [chat.notices, sound]);
 
 	const closePreview = useCallback(() => setPreviewFile(null), []);
+	const [taskFocusRequest, setTaskFocusRequest] = useState(0);
+	const openTask = () => {
+		const open = () => {
+			setPreviewFile(null);
+			setView("chat");
+			setFilesCollapsed(false);
+			setDrawer(isMobile || isNarrow ? "right" : null);
+			setTaskFocusRequest((value) => value + 1);
+		};
+		if (fileGuard.current) fileGuard.current(open); else open();
+	};
+	useEffect(() => {
+		if (!taskFocusRequest) return;
+		const panel = document.querySelector<HTMLElement>(".view-pane:not(.hidden) .task-progress");
+		panel?.focus({ preventScroll: true });
+		panel?.querySelector(".task-plan-step.running")?.scrollIntoView({ block: "nearest" });
+	}, [taskFocusRequest]);
 	const attachPreviewLines = useCallback((path: string, name: string, start: number, end: number) => {
 		attach(path, name, "lines", false, { start, end });
 	}, [attach]);
@@ -705,20 +724,24 @@ export function App() {
 		[model, thinkingLevel, availableThinkingLevels],
 	);
 
+	// A same-project history switch changes the owner without changing cwd.
+	// Wait for its matching snapshot before creating a default terminal.
+	const terminalConversationId = conversationState?.conversationId;
+	const terminalCwd = conversationState?.cwd;
 	const createShell = useCallback(() => {
-		if (!chat.ready || chat.terminals.length !== 0) return false;
+		if (!chat.ready || !terminalConversationId || chat.terminals.length !== 0) return false;
 		terminal.create({
 			id: randomUuid(),
-			conversationId: chat.activeConversationId || chat.state?.conversationId || "",
+			conversationId: terminalConversationId,
 			title: t("terminalTitle", { n: 1 }),
-			cwd: chat.state?.cwd ?? "",
+			cwd: terminalCwd ?? "",
 			cols: 80,
 			rows: 24,
 			running: true,
 			exitCode: null,
 		});
 		return true;
-	}, [chat.ready, chat.state?.cwd, chat.terminals.length, t, terminal]);
+	}, [chat.ready, terminalConversationId, terminalCwd, chat.terminals.length, t, terminal]);
 
 	// If the user clicked Terminal while the initial connection was still
 	// loading, complete that request as soon as the session becomes ready.
@@ -796,6 +819,8 @@ export function App() {
 			<div className="workspace-column">
 				<TopBar
 					leftCollapsed={leftCollapsed}
+					gitChangeCount={workspaceScm.files.length}
+					onOpenTask={openTask}
 					chat={chat}
 					send={send}
 					terminal={terminal}
@@ -922,8 +947,8 @@ export function App() {
 									active={!filesCollapsed && !previewFile && !switching && view === "chat" && ((!isMobile && !isNarrow) || drawer === "right")}
 									send={send}
 									files={chat.files}
-									scmData={chat.scmData}
-									scmDirty={chat.scmDirty}
+									changed={workspaceScm.files}
+									notRepo={workspaceScm.notRepo}
 									fileChanged={chat.fileChanged}
 									widgets={chat.widgets}
 									messages={conversationState?.messages ?? []}

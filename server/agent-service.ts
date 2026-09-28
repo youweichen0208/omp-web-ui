@@ -105,7 +105,7 @@ import {
 	type AgentMessage,
 } from "./serialize.js";
 import { deriveTaskProgress } from "./task-progress.js";
-import { makeTaskPlanTool } from "./task-plan-tool.js";
+import { makeTaskPlanTool, TASK_PLAN_GUIDANCE } from "./task-plan-tool.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -1027,7 +1027,7 @@ export class ClientSession {
 							// 而不是一次性 bash——没有这段模型几乎从不主动选终端工具。
 							out.push(TERMINAL_TOOLS_GUIDANCE);
 						}
-						out.push("For tasks that clearly require at least three distinct steps, call task_plan before the first execution tool. Keep step IDs stable and update the plan as work proceeds. Start execution immediately after planning; ordinary short requests need no plan.");
+						out.push(TASK_PLAN_GUIDANCE);
 						return out;
 					},
 					// 技能开关：禁用的技能从系统提示词和 /skill: 目录中剔除。
@@ -1991,7 +1991,7 @@ export class ClientSession {
 		emit: (msg) => this.emit(msg),
 		cwd: () => this.cwd,
 		getSession: () => this.session,
-		newChat: () => this.newChat(),
+		resetChat: () => this.resetChat(),
 		setModel: (id) => this.setModel(id),
 		setCwd: (path) => this.setCwd(path),
 		setThinking: (level) => this.setThinking(level),
@@ -2485,6 +2485,37 @@ export class ClientSession {
 				text: `强制中断失败：${(err as Error).message}`,
 			});
 		}
+	}
+
+	/** /new replaces the SDK session inside the current conversation slot. */
+	async resetChat(): Promise<void> {
+		if (this.quiesceBlocked()) return;
+		const previous = this.conv;
+		const model = previous.session.model;
+		const thinking = previous.session.thinkingLevel;
+		const result = await previous.runtime.newSession();
+		if (result.cancelled) return;
+		if (this.conv === previous) await this.goalSvc.clearGoal();
+		previous.titleJob.lock();
+		previous.goalGeneration++;
+		previous.goal.goal = null;
+		previous.unsubscribe?.();
+		this.clearAllToolWatchdogs(previous);
+		const conv = this.makeConversation(previous.runtime, previous.id, previous.terminals);
+		// IDs and delta sequence remain monotonic within this conversation.
+		conv.deltaSeq = previous.deltaSeq;
+		conv.nextMsgId = previous.nextMsgId;
+		conv.createdAt = previous.createdAt;
+		this.convs.set(conv.id, conv);
+		await this.bindSession(conv);
+		if (model) await conv.session.setModel(model);
+		conv.session.setThinkingLevel(thinking);
+		this.invalidateLists();
+		this.emitConversations();
+		this.goalSvc.emitGoalStatus();
+		if (previous.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: "model" });
+		this.flushSnapshot(true);
+		void this.pushSlashCommands();
 	}
 
 	async newChat(): Promise<void> {
