@@ -1001,6 +1001,8 @@ export type ServerMessage =
 			toolCallId: string;
 			toolName: string;
 			delta: string;
+			/** SDK partial results replace output; user_bash chunks append. */
+			replace?: boolean;
 	  }
 	/** Live assistant-message increment (thinking/text deltas + usage) that
 	 *  deliberately BYPASSES the snapshot channel: send() drops snapshots under
@@ -1229,3 +1231,23 @@ export type ServerMessage =
 	 *  empties when the tasks are stopped (individually or all at once) or the
 	 *  process exits on its own. Pushed on change, on attach and on request. */
 	| { type: "bg_servers"; servers: BgServer[] }
+
+/** Node workbench profiles contain metadata only; credentials never enter state snapshots. */
+export type NodePolicy = "readonly" | "confirm" | "auto" | "off";
+export interface NodeProfile {
+	id: string; name: string; group: string; host: string; port: number; username: string;
+	auth: "password" | "key" | "agent"; keyPath?: string; defaultDir: string; fingerprint?: string;
+	hasSecret?: boolean; sourceId?: string; sourceKey?: string; sourceMissing?: boolean;
+	unsupported?: string[]; policy?: NodePolicy; lastConnected?: number;
+}
+export interface NodeSource {
+	id: string; kind: "xshell" | "ssh"; path: string; enabled: boolean;
+	lastSync?: number; error?: string; count: number; groups: number; changes?: string[];
+}
+export interface NodeRun {
+	id: string; nodeId: string; terminalId?: string; command: string;
+	status: "running" | "done" | "error"; output?: string;
+}
+export interface NodeApproval {
+	id: string; nodeId: string; terminalId?: string; command: string; kind: "command" | "write" | "read";
+}

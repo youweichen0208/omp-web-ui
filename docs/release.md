@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.52.0 正式版
+
+`0.52.0` 发布 Xshell/OpenSSH 来源同步与节点工作台，修复工具输出快照重复追加，并补充 SSH 后台执行指导。版本高于历史 `0.51.2`，恢复 SemVer 正常排序。npm 与三平台桌面安装包统一版本；说明及同步限制见 `.github/release-notes/v0.52.0.md`。
+
 ## 0.6.10 正式版
 
 `0.6.10` 修复长命令卡片标题换行、任务进度重复标题、思考模式按钮样式、编辑结果缺少可见变化，以及折叠消息摘要排版。Web、npm 包及 macOS／Windows／Linux 桌面安装包统一使用 `0.6.10`。发布说明见 `.github/release-notes/v0.6.10.md`。

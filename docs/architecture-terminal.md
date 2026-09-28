@@ -74,3 +74,7 @@ macOS 下若服务由 launchd 拉起（`process.ppid === 1`，LaunchAgent/孤儿
 `terminals.ts` 的 `resolveShell()` 每次创建终端时解析，优先 bash——`PI_WEB_SHELL` 显式 → `$SHELL` → Git Bash（ProgramFiles）→ busybox 兜底（`~/.pi-web/bin/bash.exe`，`ensure-bash.ts` 无 Git Bash 时自动下载 busybox-w32）→ `$COMSPEC` → powershell。与 SDK bash 工具（Git Bash / PATH 上的 bash）保持一致，避免 PowerShell/bash 混用挂死。
 
 底栏通过 `get_git_branch` / `git_branch` 显示当前工作区分支，替代费用显示。查询仅执行 `symbolic-ref`（分离 HEAD 时回退短提交号），不扫描文件状态；复用 Git 目录 watcher，在切换工作区、Git 变化或窗口重新聚焦时刷新。结果携带 cwd 防止串项目，非仓库显示 `—`。回归：`tests/footer-branch-test.mjs`。
+
+### SSH 后台命令与输出管道
+
+一次性 bash 在所有平台注入显式超时和后台执行指导。POSIX/SSH 启动服务时使用 `cd /path || exit; nohup command </dev/null > /tmp/service.log 2>&1 &`，再执行有超时的健康检查。不要将 `cd … && nohup …` 整个 AND 列表放到后台：外层 shell 可能持续持有 SSH 输出管道，导致服务已启动、探测已完成，但 SSH 和工具一直不结束。`nohup` 本身不能解决继承的管道；使用命令组时需重定向整个后台组。该约束是模型执行指导，不会自动改写用户命令。

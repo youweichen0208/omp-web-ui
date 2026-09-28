@@ -22,6 +22,8 @@
 
 ### `tool_delta` 同协议
 
+SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发送 `replace: true`，前端替换当前工具输出（包括空快照），避免重复拼接。`bash_execution_update` 才是真正的增量，保持追加。两条路径均保留浏览器输出长度上限。协议版本 22 要求旧前端刷新。
+
 也带 `conversationId` + `seq`，与 message_delta 共享同一每对话单调序列（`conv.deltaSeq`）；前端按对话 Map 追踪 seq，仅活动对话缺口触发重同步（后台对话切回时 snapshot 收敛）。
 
 ### 协议版本协商

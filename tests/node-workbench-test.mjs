@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startMockSsh } from "./lib/mock-ssh.mjs";
@@ -60,6 +60,43 @@ try {
 	assert.match(toolResult.content[0].text, /echo:whoami/);
 	assert(events.slice(before).some((e) => e.event === "terminal_output" && e.terminalId === "term-b" && e.data.text.includes("echo:whoami")));
 	assert(!events.slice(before).some((e) => e.event === "terminal_output" && e.terminalId === "term-a" && e.data.text.includes("echo:whoami")));
+
+	// A pending write cannot execute before a matching client/node/terminal approval.
+	const pendingCommand = remoteCommand.execute("write-test", { command: "touch /tmp/approved" });
+	await new Promise((r) => setTimeout(r, 20));
+	const approval = events.findLast((e) => e.event === "approval_required").data.approval;
+	assert(!events.some((e) => e.event === "terminal_output" && e.data.text.includes("echo:touch /tmp/approved")));
+	assert.equal((await call("approval", nodeId, { id: approval.id, allow: true }, "term-a")).event, "failure");
+	assert.equal((await call("approval", nodeId, { id: approval.id, allow: true, command: "echo approved" }, "term-b")).event, "result");
+	assert.match((await pendingCommand).content[0].text, /echo:echo approved/);
+	const denied = remoteCommand.execute("deny-test", { command: "rm /tmp/no" });
+	const deniedCheck = assert.rejects(denied, /用户拒绝/);
+	await new Promise((r) => setTimeout(r, 20));
+	const denyApproval = events.findLast((e) => e.event === "approval_required").data.approval;
+	await call("approval", nodeId, { id: denyApproval.id, allow: false }, "term-b");
+	await deniedCheck;
+	const canceled = remoteCommand.execute("cancel-test", { command: "restart something" });
+	const cancelCheck = assert.rejects(canceled, /确认已取消/);
+	await new Promise((r) => setTimeout(r, 20));
+	await call("policy", nodeId, { policy: "off" });
+	await cancelCheck;
+	await assert.rejects(remoteCommand.execute("off-test", { command: "whoami" }), /停用 Agent/);
+	await call("policy", nodeId, { policy: "readonly" });
+
+	const remoteWrite = service.chats.get(JSON.stringify(["client-a", nodeId])).session.getToolDefinition("remote_write");
+	const pendingWrite = remoteWrite.execute("write-file", { path: "/home/test/approved.txt", text: "approved content" });
+	await new Promise((r) => setTimeout(r, 20));
+	const writeApproval = events.findLast((e) => e.event === "approval_required").data.approval;
+	assert.equal(writeApproval.kind, "write");
+	assert.match(writeApproval.command, /approved content/);
+	await call("approval", nodeId, { id: writeApproval.id, allow: true });
+	await pendingWrite;
+	assert.equal((await call("read", nodeId, { path: "/home/test/approved.txt" })).data.text, "approved content");
+	const aborter = new AbortController();
+	const waiting = remoteCommand.execute("abort-confirm", { command: "sudo restart app" }, aborter.signal);
+	const waitingCheck = assert.rejects(waiting, /操作已中断/);
+	aborter.abort(); await waitingCheck;
+	assert.equal(service.approvals.size, 0);
 	await call("terminal_open", nodeId, {}, "term-trap", conversationId);
 	await call("terminal_input", nodeId, { data: "trap_foreground\r" }, "term-trap", conversationId);
 	await assert.rejects(service.execute("client-a", nodeId, "term-trap", "must_not_run"), /无法确认 shell 提示符/);
@@ -76,6 +113,13 @@ try {
 	assert.equal((await call("connect", nodeId)).event, "failure");
 	service.nodes.find((n) => n.id === nodeId).fingerprint = trust.data.fingerprint;
 	assert.equal((await call("connect", nodeId)).event, "result");
+
+	// Failed verification never overwrites the previous saved credential.
+	assert.equal((await call("credential_test", nodeId, { secret: "wrong", persist: true })).event, "failure");
+	assert.equal(service.secrets.get(`node:${nodeId}:secret`), "secret123");
+	assert.equal((await call("credential_test", nodeId, { secret: "secret123", persist: false })).event, "result");
+	assert.equal(service.transientSecrets.get(JSON.stringify(["client-a", nodeId])), "secret123");
+	assert(!service.transientSecrets.has(JSON.stringify(["client-b", nodeId])));
 	const wrong = await call("save", undefined, { name: "bad", group: "test", host: "127.0.0.1", port, username: "tester", auth: "password", secret: "wrong", defaultDir: "/" });
 	const wrongId = wrong.data.id;
 	assert.equal((await call("trust", wrongId, { fingerprint: trust.data.fingerprint })).event, "failure");
@@ -87,8 +131,38 @@ try {
 	assert.equal((await call("delete", nodeId)).event, "result");
 	assert(![...service.connections.values()].some((connection) => connection.nodeId === nodeId));
 	detachB();
+
+	const sourceDir = join(dataDir, "sessions"); mkdirSync(sourceDir);
+	const xsh = (port = 22, name = "tester") => `[CONNECTION]\nHost=127.0.0.1\nPort=${port}\nProtocol=SSH\n[CONNECTION:AUTHENTICATION]\nUserName=${name}\nMethod=0\nPassword=encrypted-secret`;
+	writeFileSync(join(sourceDir, "source.xsh"), xsh());
+	const sourceResult = await call("source_add", undefined, { kind: "xshell", path: sourceDir, enabled: true });
+	const sourceId = sourceResult.data.sourceId;
+	let state = events.findLast((e) => e.event === "state").data;
+	const imported = state.nodes.find((n) => n.sourceId === sourceId);
+	assert(imported && !imported.hasSecret);
+	service.secrets.set(`node:${imported.id}:secret`, "retained");
+	writeFileSync(join(sourceDir, "new.xsh"), xsh(2222));
+	await call("source_sync", undefined, { id: sourceId });
+	assert.equal(service.secrets.get(`node:${imported.id}:secret`), "retained");
+	assert.equal(service.nodes.filter((n) => n.sourceId === sourceId).length, 2);
+	writeFileSync(join(sourceDir, "source.xsh"), xsh(22, "another-user"));
+	await call("source_sync", undefined, { id: sourceId });
+	assert(!service.secrets.has(`node:${imported.id}:secret`));
+	rmSync(join(sourceDir, "source.xsh"));
+	await call("source_sync", undefined, { id: sourceId });
+	assert(service.nodes.find((n) => n.id === imported.id).sourceMissing);
+	assert.equal((await call("connect", imported.id)).event, "failure");
+	writeFileSync(join(sourceDir, "new.xsh"), "invalid");
+	await call("source_sync", undefined, { id: sourceId });
+	assert(service.sources.find((s) => s.id === sourceId).error);
+	assert.equal(service.nodes.filter((n) => n.sourceId === sourceId).length, 2);
+	assert(!readFileSync(join(dataDir, "nodes.json"), "utf8").includes("encrypted-secret"));
+	assert.equal((await call("source_toggle", undefined, { id: sourceId, enabled: false })).event, "result");
+	const restored = new NodeWorkbench(dataDir);
+	assert.equal(restored.sources.find((s) => s.id === sourceId).enabled, false);
+	restored.dispose();
 	console.log("✓ SSH trust, key change, authentication, terminal command/interrupt/truncation, SFTP and node isolation");
 } finally {
 	for (const c of [...service.connections.values()]) await call("disconnect", c.nodeId);
-	detach(); mock.close(); rmSync(dataDir, { recursive: true, force: true });
+	service.dispose(); detach(); mock.close(); rmSync(dataDir, { recursive: true, force: true });
 }

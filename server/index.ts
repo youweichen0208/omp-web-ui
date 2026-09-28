@@ -979,6 +979,7 @@ async function shutdown(): Promise<void> {
 	console.log("\nshutting down…");
 	clearInterval(heartbeatTimer);
 	stopControl();
+	nodeWorkbench.dispose();
 	pluginMgr.dispose();
 	mcpBridge.dispose();
 	await service.disposeAll();

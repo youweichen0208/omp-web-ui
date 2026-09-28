@@ -1,3 +1,4 @@
+import { toolOutputUpdate } from "./tool-output.js";
 import { ThinkingTimings, ThinkingDurationStore } from "./thinking-timing.js";
 import { deliverPrompt } from "./prompt-delivery.js";
 import type { PromptAttachment } from "./protocol.js";
@@ -161,6 +162,10 @@ export class QuiesceRejectedError extends Error {
 // ---------------------------------------------------------------------------
 
 
+const BASH_BACKGROUND_GUIDANCE = `Always set an explicit bash timeout in seconds, allowing enough time for the task. For persistent services, detach all standard streams and use bounded readiness checks (curl --connect-timeout 5 --max-time 15).
+For POSIX shells, including remote SSH commands, use: cd /path || exit; nohup command </dev/null > /tmp/service.log 2>&1 & pid=$!; printf 'PID: %s\\n' "$pid"
+Never use cd /path && nohup command >log 2>&1 & to detach a service: & backgrounds the entire && list, whose wrapper shell can retain SSH stdout/stderr pipes until the service exits. Redirect the entire background group if grouping is needed. nohup alone does not close inherited pipes. Do not run persistent servers in the foreground of the bash tool.`;
+
 /** Windows persona appendix — appended to the SDK system prompt on win32 only.
  *  Two failure modes it guards against: (1) the SDK bash tool has NO default
  *  timeout, so a long-running command hangs the whole conversation forever;
@@ -213,7 +218,7 @@ function makeKillableBashTool(
 	return {
 		name: tool.name,
 		label: tool.label,
-		description: tool.description,
+		description: `${tool.description}\n\n${BASH_BACKGROUND_GUIDANCE}`,
 		parameters: tool.parameters,
 		prepareArguments: tool.prepareArguments,
 		executionMode: tool.executionMode,
@@ -337,21 +342,6 @@ function contentFingerprint(m: AgentMessage): string {
 
 
 
-function extractPartialText(partial: unknown): string | null {
-	const content = (partial as { content?: unknown } | null | undefined)
-		?.content;
-	if (Array.isArray(content)) {
-		const text = content
-			.map((c) =>
-				(c as { type?: string; text?: string })?.type === "text"
-					? (c as { text: string }).text
-					: "",
-			)
-			.join("");
-		return text.length > 0 ? text : null;
-	}
-	return null;
-}
 
 export { workspacePath };
 // ---------------------------------------------------------------------------
@@ -1022,7 +1012,7 @@ export class ClientSession {
 							: base;
 					},
 					appendSystemPromptOverride: (base: string[]) => {
-						const out = [...base];
+						const out = [...base, BASH_BACKGROUND_GUIDANCE];
 						const custom = this.settingsSvc.current.customSystemPrompt.trim();
 						if (this.settingsSvc.current.promptMode === "append" && custom) {
 							out.push(custom);
@@ -1410,15 +1400,15 @@ export class ClientSession {
 				break;
 			}
 			case "tool_execution_update": {
-				const text = extractPartialText(event.partialResult);
-				if (text) {
+				const update = toolOutputUpdate(event.partialResult);
+				if (update) {
 					this.emit({
 						type: "tool_delta",
 						conversationId: conv.id,
 						seq: ++conv.deltaSeq,
 						toolCallId: event.toolCallId,
 						toolName: event.toolName,
-						delta: text,
+						...update,
 					});
 				}
 				break;

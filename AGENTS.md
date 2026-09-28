@@ -58,7 +58,8 @@ pi-web-ui/
 │   ├── ensure-bash.ts          # Windows 轻量 bash 兜底（busybox-w32）
 │   ├── control-socket.ts       # 本地控制 socket（status / quiesce / unquiesce）
 │   ├── terminals.ts            # TerminalManager（PTY 管理 + 增量输出/按键工具）
-│   └── node-workbench.ts       # 内置 SSH 节点：资料/主机信任/PTY/SFTP/独立 Agent
+│   ├── node-sources.ts         # Xshell / SSH config 元数据解析与只读命令判定
+│   └── node-workbench.ts       # 内置 SSH 节点：来源同步/凭据/确认/PTY/SFTP/独立 Agent
 ├── web/                        # 前端（React + Vite，编译到 web/dist/）
 │   ├── vite.config.ts          # dev 端口 5173，/ws 代理到后端
 │   ├── src/
@@ -129,7 +130,7 @@ pi-web-ui/
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
 | `PluginView.tsx` | 插件视图宿主：薄 React 壳 + 动态 import client bundle |
-| `NodeWorkbench.tsx` | 内置 SSH 节点工作台：分组、终端标签、SFTP 文件和节点 Agent |
+| `NodeWorkbench.tsx` / `node-terminal.tsx` | SSH 节点工作台：来源同步、详情/凭据、终端引用与命令确认；修改时阅读 `docs/architecture-nodes.md` |
 | `CollapsedMessage.tsx` / `LazyMount.tsx` | 消息折叠摘要行 / 消息级惰性挂载包装 |
 | `SearchBar.tsx` | 会话内搜索栏（Ctrl+F，CSS Custom Highlight API 高亮） |
 | `Markdown.tsx` / `Dropdown.tsx` / `copy-button.tsx` / `SoundSettings.tsx` | 通用件 |
@@ -151,7 +152,7 @@ pi-web-ui/
 | **SCM** | `docs/architecture-terminal.md` | 只读 git 查询走 execFile；未跟踪文件显示限量内容；git-dir watcher；写操作走可见终端 tab |
 | **终端接管 bash** | `docs/architecture-terminal.md` | 设置开关（默认关）；哨兵行技术；静默解阻；shell 状态跨调用保留 |
 | **插件** | `docs/architecture-plugins.md` | <dataDir>/plugins/<id>/ 目录（manifest.json + index.mjs + client/entry.mjs）；attach 时热重扫；MCP 工具桥 |
-| **SSH 节点** | `docs/architecture-nodes.md` | 本机 ssh2 连接、主机密钥信任、加密凭据、PTY/SFTP 与远端专用 Agent |
+| **SSH 节点** | `docs/architecture-nodes.md` | 修改 Xshell/SSH config 同步、凭据、执行确认或终端引用时阅读；本机 ssh2 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
 | **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、阶段摘要或长任务计划时阅读：工具调用后生成任务；`task_plan` 才提供总步数进度，普通任务只显示已观察到的阶段；结果来自本轮记录，历史任务尚未实现 |

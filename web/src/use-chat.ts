@@ -1,3 +1,4 @@
+import { mergeLiveToolOutput } from "./live-tool-output";
 import { useCallback, useEffect, useReducer, useRef, useState, useMemo } from "react";
 import { ProjectCache } from "./project-cache";
 import { randomUuid } from "./uuid";
@@ -215,7 +216,7 @@ type Action =
 	| { type: "snapshot"; state: UiState }
 	| { type: "snapshot_delta"; msg: Extract<ServerMessage, { type: "snapshot_delta" }> }
 	| { type: "protocol_mismatch" }
-	| { type: "tool_delta"; toolCallId: string; toolName: string; delta: string }
+	| { type: "tool_delta"; toolCallId: string; toolName: string; delta: string; replace?: boolean }
 	| { type: "message_delta"; msg: MessageDeltaMsg }
 	| { type: "tool_status"; status: ToolStatus }
 	| { type: "notice"; notice: Notice }
@@ -296,7 +297,6 @@ type Action =
 	| { type: "set_pending_echo"; echo: PendingEcho }
 	| { type: "clear_pending_echo" };
 
-const MAX_LIVE_OUTPUT = 200_000;
 const MAX_TERM_BUFFER = 200_000;
 
 /** Initial (inactive) goal status before the server pushes the first one. */
@@ -508,17 +508,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 		}
 		case "tool_delta": {
 			const prev = state.liveOutputs.get(action.toolCallId);
-			// Keep the TAIL when over the cap (not the head): for a long-running
-			// tool what matters is the LATEST output — keeping the head would show
-			// only the earliest 200K chars and freeze visually while the tool is
-			// still streaming. The terminal-bridge buffer below already keeps the
-			// newest data; this unifies the semantics.
-			const text = (prev?.text ?? "") + action.delta;
-			const capped =
-				text.length > MAX_LIVE_OUTPUT
-					? `…[前 ${text.length - MAX_LIVE_OUTPUT} 字符已省略]…\n` +
-					  text.slice(text.length - MAX_LIVE_OUTPUT)
-					: text;
+			const capped = mergeLiveToolOutput(prev?.text ?? "", action);
 			const liveOutputs = new Map(state.liveOutputs);
 			liveOutputs.set(action.toolCallId, {
 				toolName: action.toolName,
@@ -1004,6 +994,7 @@ export function useChat() {
 						toolCallId: msg.toolCallId,
 						toolName: msg.toolName,
 						delta: msg.delta,
+						replace: msg.replace,
 					});
 					break;
 				case "tool_status":
