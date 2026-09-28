@@ -288,6 +288,7 @@ export function App() {
 		void syncPluginViews(enabledPlugins, chat.pluginsEpoch);
 	}, [enabledPlugins, chat.pluginsEpoch]);
 	// 左右面板可拖拽宽度（桌面端）：localStorage 持久化，双击手柄复位。
+	const [leftCollapsed, setLeftCollapsed] = useState(() => localStorage.getItem("pi-left-collapsed") === "true");
 	const [leftWidth, setLeftWidth] = useState(() => readPanelWidth("left"));
 	const [rightWidth, setRightWidth] = useState(() => readPanelWidth("right"));
 	const resizeLeft = useCallback((w: number) => setLeftWidth(w), []);
@@ -733,7 +734,7 @@ export function App() {
 		// navigating away; children with their own handlers (input bar / edit
 		// composer) call stopPropagation and keep priority.
 		<div
-			className={`app design-workspace ${previewFile && view === "chat" ? "document-open" : ""}`}
+			className={`app design-workspace ${leftCollapsed ? "left-collapsed" : ""} ${previewFile && view === "chat" ? "document-open" : ""}`}
 			style={{ "--left-w": `${leftWidth}px`, "--right-w": `${rightWidth}px` } as CSSProperties}
 			onDragOver={(e) => {
 				if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
@@ -785,12 +786,13 @@ export function App() {
 					activeConversationId={chat.activeConversationId}
 				/>
 			</div>}
-			{view !== "nodes" && !isMobile && (
+			{view !== "nodes" && !isMobile && !leftCollapsed && (
 				<ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />
 			)}
 
 			<div className="workspace-column">
 				<TopBar
+					leftCollapsed={leftCollapsed}
 					chat={chat}
 					send={send}
 					terminal={terminal}
@@ -808,7 +810,10 @@ export function App() {
 						setDrawer(null);
 					}}
 					onOpenPanel={(side) => {
-						if (side === "right" && !isMobile && !isNarrow && !previewFile) setFilesCollapsed((value) => !value);
+						if (side === "left" && !isMobile) {
+							setDrawer(null);
+							setLeftCollapsed((value) => { localStorage.setItem("pi-left-collapsed", String(!value)); return !value; });
+						} else if (side === "right" && !isMobile && !isNarrow && !previewFile) setFilesCollapsed((value) => !value);
 						else {
 							if (side === "right") setFilesCollapsed(false);
 							setDrawer((value) => value === side ? null : side);

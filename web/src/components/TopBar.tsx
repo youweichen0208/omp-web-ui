@@ -6,7 +6,6 @@ import {
 	FiGlobe,
 	FiMenu,
 	FiMessageSquare,
-	FiMoreHorizontal,
 	FiSearch,
 	FiPlus,
 	FiSettings,
@@ -29,6 +28,7 @@ import { skillAwarePreview } from "../skill-block";
 import { conversationDisplayTitle } from "../conversation-display-title";
 
 interface TopBarProps {
+	leftCollapsed?: boolean;
 	chat: ChatState;
 	send: (msg: ClientMessage) => boolean;
 	/** Minimal terminal-tab bridge (same shape SCMPanel uses) — updates run there. */
@@ -68,6 +68,7 @@ interface TopBarProps {
 }
 
 export function TopBar({
+	leftCollapsed = false,
 	chat,
 	send,
 	terminal,
@@ -89,12 +90,8 @@ export function TopBar({
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
 	useEffect(() => {
-		const query = window.matchMedia("(min-width: 1201px)");
-		const sync = () => setMenuHost(query.matches ? document.getElementById("sidebar-settings-slot") : null);
-		sync();
-		query.addEventListener("change", sync);
-		return () => query.removeEventListener("change", sync);
-	}, []);
+		setMenuHost(!leftCollapsed ? document.getElementById("sidebar-settings-slot") : null);
+	}, [view, leftCollapsed]);
 	const [windowState, setWindowState] = useState<DesktopWindowState>({ maximized: false, fullscreen: false });
 	useEffect(() => desktopAPI?.onWindowState(setWindowState), []);
 	const projectName = chat.state?.cwd?.split(/[\\/]/).filter(Boolean).at(-1);
@@ -128,8 +125,8 @@ export function TopBar({
 					<Dropdown
 						trigger={
 							<>
-								{menuHost ? <FiSettings aria-hidden="true" /> : <FiMoreHorizontal />}
-								<span className="chip-sub">{t(menuHost ? "settings" : "more")}</span>
+								<FiSettings aria-hidden="true" />
+								<span className="chip-sub">{t("settings")}</span>
 							</>
 						}
 						open={moreOpen}
@@ -204,6 +201,7 @@ export function TopBar({
 				<span className="conn-label">{connLabel}</span>
 			</div>
 
+			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
 			<div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong></div>
 			<div className="topbar-actions">
 				<div

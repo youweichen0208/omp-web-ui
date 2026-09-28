@@ -1,3 +1,6 @@
+import { generateKeyPairSync } from "node:crypto";
+import ssh2 from "ssh2";
+const { utils } = ssh2;
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,7 +11,8 @@ import { PluginSecrets } from "../dist/server/plugin-facilities.js";
 
 const dataDir = mkdtempSync(join(tmpdir(), "pi-node-test-"));
 const port = 8938;
-const mock = await startMockSsh(process.cwd(), port);
+const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs1", format: "pem" });
+const mock = await startMockSsh(process.cwd(), port, [utils.parseKey(privateKey)]);
 const service = new NodeWorkbench(dataDir);
 const events = [];
 const detach = service.attach("client-a", (event) => events.push(event));
@@ -161,6 +165,32 @@ try {
 	const restored = new NodeWorkbench(dataDir);
 	assert.equal(restored.sources.find((s) => s.id === sourceId).enabled, false);
 	restored.dispose();
+	// Xshell key-manager names need a local private-key binding, not a password.
+	const keyDir = join(dataDir, "key-sessions"); mkdirSync(keyDir);
+	writeFileSync(join(keyDir, "key.xsh"), xsh(port).replace("Method=0", "Method=1\nUserKey=xshell-key-name"));
+	const keySource = await call("source_add", undefined, { kind: "xshell", path: keyDir, enabled: false });
+	const keyNode = service.nodes.find((n) => n.sourceId === keySource.data.sourceId);
+	assert.equal(keyNode.auth, "key");
+	const keyPath = join(dataDir, "id_rsa"); writeFileSync(keyPath, privateKey, { mode: 0o600 });
+	assert.equal((await call("credential_test", keyNode.id, { secret: "", keyPath })).event, "failure");
+	const keyTrust = events.findLast((e) => e.event === "trust_required" && e.nodeId === keyNode.id);
+	assert(keyTrust);
+	assert.equal((await call("credential_test", keyNode.id, { secret: "", keyPath, fingerprint: keyTrust.data.fingerprint })).event, "result");
+	assert.equal(keyNode.localKeyPath, keyPath);
+	assert.equal((await call("credential_test", keyNode.id, { secret: "", keyPath: join(dataDir, "missing") })).event, "failure");
+	assert.equal(keyNode.localKeyPath, keyPath);
+	await call("source_sync", undefined, { id: keySource.data.sourceId });
+	assert.equal(keyNode.localKeyPath, keyPath);
+	assert.equal((await call("connect", keyNode.id)).event, "result");
+	const keyRestored = new NodeWorkbench(dataDir);
+	assert.equal(keyRestored.nodes.find((n) => n.id === keyNode.id).localKeyPath, keyPath);
+	keyRestored.dispose();
+	keyNode.unsupported.push("proxy");
+	assert.equal((await call("connect", keyNode.id)).event, "failure");
+	keyNode.unsupported.pop();
+	writeFileSync(join(keyDir, "key.xsh"), xsh(port, "changed").replace("Method=0", "Method=1\nUserKey=xshell-key-name"));
+	await call("source_sync", undefined, { id: keySource.data.sourceId });
+	assert.equal(keyNode.localKeyPath, undefined);
 	console.log("✓ SSH trust, key change, authentication, terminal command/interrupt/truncation, SFTP and node isolation");
 } finally {
 	for (const c of [...service.connections.values()]) await call("disconnect", c.nodeId);

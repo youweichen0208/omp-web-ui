@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.7.1 正式版
+
+`0.7.1` 加入一次性 bash 默认超时兜底，改进项目栏折叠／调宽、设置入口、Xshell 本机私钥绑定与任务记录排版，并移除来源更新提示。npm 与三平台桌面安装包统一版本；说明见 `.github/release-notes/v0.7.1.md`。
+
 ## 0.7.0 正式版
 
 `0.7.0` 发布 Xshell/OpenSSH 来源同步与节点工作台，修复工具输出快照重复追加，并补充 SSH 后台执行指导。沿当前 `0.6.x` 发布线升级；历史 `0.51.x` 不作为当前版本线的升级基准。npm 与三平台桌面安装包统一版本；说明及同步限制见 `.github/release-notes/v0.7.0.md`。

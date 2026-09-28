@@ -99,7 +99,7 @@ function tarFileEntry(name, content) {
  * @param {number} port 监听端口
  * @returns {Promise<{close(): void}>}
  */
-export async function startMockSsh(pluginDir, port) {
+export async function startMockSsh(pluginDir, port, publicKeys = []) {
 	const { createRequire } = await import("node:module");
 	const { generateKeyPairSync } = await import("node:crypto");
 	const req = createRequire(join(pluginDir, "package.json"));
@@ -234,6 +234,7 @@ export async function startMockSsh(pluginDir, port) {
 			srv = new Server({ hostKeys: [HOST_KEY] }, (client) => {
 				client.on("error", () => {}); // 客户端断开等 socket 错误不炸测试进程
 				client.on("authentication", (ctx) => {
+					if (ctx.username === "tester" && ctx.method === "publickey" && publicKeys.some((key) => key.getPublicSSH().equals(ctx.key.data) && (!ctx.signature || key.verify(ctx.blob, ctx.signature, ctx.hashAlgo) === true))) return ctx.accept();
 					if (ctx.username === "tester" && ctx.password === "secret123") return ctx.accept();
 					ctx.reject();
 				});

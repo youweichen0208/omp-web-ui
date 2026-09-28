@@ -1,3 +1,4 @@
+import { boundedBashOperations } from "./bounded-bash.js";
 import { toolOutputUpdate } from "./tool-output.js";
 import { ThinkingTimings, ThinkingDurationStore } from "./thinking-timing.js";
 import { deliverPrompt } from "./prompt-delivery.js";
@@ -162,13 +163,12 @@ export class QuiesceRejectedError extends Error {
 // ---------------------------------------------------------------------------
 
 
-const BASH_BACKGROUND_GUIDANCE = `Always set an explicit bash timeout in seconds, allowing enough time for the task. For persistent services, detach all standard streams and use bounded readiness checks (curl --connect-timeout 5 --max-time 15).
+const BASH_BACKGROUND_GUIDANCE = `One-shot bash commands default to a 120 second timeout when omitted. Set an explicit timeout in seconds for tasks that need longer. For persistent services, detach all standard streams and use bounded readiness checks (curl --connect-timeout 5 --max-time 15).
 For POSIX shells, including remote SSH commands, use: cd /path || exit; nohup command </dev/null > /tmp/service.log 2>&1 & pid=$!; printf 'PID: %s\\n' "$pid"
 Never use cd /path && nohup command >log 2>&1 & to detach a service: & backgrounds the entire && list, whose wrapper shell can retain SSH stdout/stderr pipes until the service exits. Redirect the entire background group if grouping is needed. nohup alone does not close inherited pipes. Do not run persistent servers in the foreground of the bash tool.`;
 
 /** Windows persona appendix — appended to the SDK system prompt on win32 only.
- *  Two failure modes it guards against: (1) the SDK bash tool has NO default
- *  timeout, so a long-running command hangs the whole conversation forever;
+ *  Two failure modes it guards against: (1) persistent commands must be detached or given an explicit timeout;
  *  (2) the in-app terminal is an interactive TTY where heredocs / interactive
  *  programs wait for input that never comes. Legacy Chinese files are often
  *  GBK/GB2312 — read them with the right encoding, never paste mojibake into
@@ -177,7 +177,7 @@ const WINDOWS_PERSONA = `You are a coding agent running on Windows. The bash too
 
 
 
-- ALWAYS pass a timeout parameter to the bash tool (in seconds). There is NO default timeout — a command that never finishes (servers, watchers, infinite loops, slow downloads/installs) will hang the entire conversation indefinitely. Pick a generous timeout for long-running work, but never omit it.
+- ALWAYS pass a timeout parameter to the bash tool (in seconds). One-shot bash defaults to 120 seconds. Pick a generous explicit timeout for long-running work.
 - NEVER run interactive or foreground long-running commands through the bash tool (vi, less, top, python -, node -, npm run dev, sleep 10000). For servers/daemons use background execution with output redirected to a log file, then poll the log; stop them when done.
 - In the interactive terminal (TTY) — which is Git Bash too, not PowerShell — NEVER use heredocs (<<'EOF' ... EOF) or here-strings, and NEVER start interactive programs (vi, less, python -, node -, npm init): they wait for keyboard input that never arrives and hang the terminal forever. Prefer writing a temp script file (e.g. .pi-tmp.sh) and running it non-interactively. ALWAYS pass a timeout to long-running commands (e.g. \`timeout 120 npm run dev\`).
 
@@ -193,7 +193,7 @@ function makeKillableBashTool(
 	cwd: string,
 	kills: Set<AbortController>,
 ): ToolDefinition {
-	const base = createLocalBashOperations();
+	const base = boundedBashOperations(createLocalBashOperations());
 	const tool = createBashTool(cwd, {
 		operations: {
 			exec: async (command, c, opts) => {
@@ -420,14 +420,13 @@ interface Conversation {
 	toolStartTimes: Map<string, number>;
 	/** tool_call watchdog timers keyed by toolCallId — a tool that runs past
 	 *  TOOL_WATCHDOG_TIMEOUT_MS gets the session aborted instead of hanging
-	 *  the conversation forever (the SDK bash tool has no default timeout). */
+	 *  the conversation forever. */
 	toolWatchdogs: Map<string, ReturnType<typeof setTimeout>>;
 }
 
 /** Hard cap on how long ONE tool call may run before the watchdog aborts the
- *  session. The SDK bash tool has NO default timeout, so a command that never
- *  finishes (servers, watchers, infinite loops) would otherwise hang the whole
- *  conversation indefinitely. Override with the PI_WEB_TOOL_TIMEOUT_MS env var
+ *  session. This covers all tools, including explicit long bash timeouts and
+ *  extension tools without their own deadlines. Override with the PI_WEB_TOOL_TIMEOUT_MS env var
  *  (milliseconds). */
 const TOOL_WATCHDOG_TIMEOUT_MS = (() => {
 	const v = Number(process.env.PI_WEB_TOOL_TIMEOUT_MS);
@@ -1018,7 +1017,7 @@ export class ClientSession {
 							out.push(custom);
 						}
 						if (process.platform === "win32") {
-							// Windows 专属 persona：bash 工具跑 Git Bash 且无默认超时、终端
+							// Windows 专属 persona：bash 工具跑 Git Bash、终端
 							// 是交互式 TTY——注入约束避免 heredoc/交互/长驻命令挂死整个会话；
 							// GBK 老中文文件让模型改用终端按正确编码读（iconv/chcp/Get-Content）。
 							out.push(WINDOWS_PERSONA);
@@ -1271,7 +1270,7 @@ export class ClientSession {
 
 	/** Arm the hang-guard for a tool call: if it is still running after
 	 *  TOOL_WATCHDOG_TIMEOUT_MS, abort the session instead of letting the
-	 *  conversation hang forever (the SDK bash tool has no default timeout). */
+	 *  conversation hang forever. */
 	private armToolWatchdog(conv: Conversation, toolCallId: string): void {
 		const t = setTimeout(() => {
 			conv.toolWatchdogs.delete(toolCallId);
