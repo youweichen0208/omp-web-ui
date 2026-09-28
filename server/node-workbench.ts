@@ -14,6 +14,9 @@ import type { NodeSource, NodeProfile, NodeApproval, NodeRun, ClientMessage, Ser
 type Request = Extract<ClientMessage, { type: "node_request" }>;
 type Sink = (msg: ServerMessage) => void;
 type Node = NodeProfile;
+function unsupportedOptions(node: Node): string[] {
+	return (node.unsupported ?? []).filter((reason) => reason !== "key" || ((node.localAuth ?? node.auth) === "key" && !node.localKeyPath));
+}
 type Terminal = { id: string; conversationId: string; stream: ClientChannel; busy: boolean; buffer: string; pending?: { marker: string; output: string; resolve: (value: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } };
 type Connection = { client: Client; nodeId: string; clientId: string; terminals: Map<string, Terminal>; sftp?: SFTPWrapper; ready: boolean; startedAt: number; connectedAt?: number };
 type Chat = { session: AgentSession; conversationId: string; nodeId: string; clientId: string; busy: boolean; updateTimer?: ReturnType<typeof setTimeout> };
@@ -68,7 +71,7 @@ export class NodeWorkbench {
 		for (const sink of this.sinks.get(clientId) ?? []) sink(msg);
 	}
 	private state(clientId: string): Record<string, unknown> {
-		return { sources: this.sources, approvals: [...this.approvals.values()].filter((a) => a.clientId === clientId).map((a) => a.view), runs: this.nodes.flatMap((n) => this.runs.get(identity(clientId, n.id)) ?? []), nodes: this.nodes.map((node) => ({ ...node, unsupported: node.unsupported?.filter((reason) => reason !== "key" || !node.localKeyPath), hasSecret: this.secrets.has(`node:${node.id}:secret`) || this.transientSecrets.has(identity(clientId, node.id)), fingerprint: node.fingerprint })), connections: [...this.connections.values()].filter((c) => c.clientId === clientId).map((c) => ({ nodeId: c.nodeId, connectedAt: c.connectedAt, latencyMs: c.connectedAt ? c.connectedAt - c.startedAt : undefined, status: c.ready ? "connected" : "connecting", terminals: [...c.terminals.values()].map((t) => ({ id: t.id, conversationId: t.conversationId, busy: t.busy, output: t.buffer })) })) };
+		return { sources: this.sources, approvals: [...this.approvals.values()].filter((a) => a.clientId === clientId).map((a) => a.view), runs: this.nodes.flatMap((n) => this.runs.get(identity(clientId, n.id)) ?? []), nodes: this.nodes.map((node) => ({ ...node, auth: node.localAuth ?? node.auth, unsupported: unsupportedOptions(node), hasSecret: this.secrets.has(`node:${node.id}:secret`) || this.transientSecrets.has(identity(clientId, node.id)), fingerprint: node.fingerprint })), connections: [...this.connections.values()].filter((c) => c.clientId === clientId).map((c) => ({ nodeId: c.nodeId, connectedAt: c.connectedAt, latencyMs: c.connectedAt ? c.connectedAt - c.startedAt : undefined, status: c.ready ? "connected" : "connecting", terminals: [...c.terminals.values()].map((t) => ({ id: t.id, conversationId: t.conversationId, busy: t.busy, output: t.buffer })) })) };
 	}
 	attach(clientId: string, sink: Sink): () => void {
 		let set = this.sinks.get(clientId);
@@ -130,20 +133,31 @@ export class NodeWorkbench {
 				}
 				case "credential_test": {
 					const node = this.node(req.nodeId);
-					if (typeof p.secret !== "string" || (node.auth === "password" && !p.secret) || p.secret.length > 10000) throw new Error("凭据无效");
+					if (p.auth !== undefined && p.auth !== "password" && p.auth !== "key") throw new Error("认证方式无效");
+					const auth = (p.auth ?? node.localAuth ?? node.auth) as Node["auth"];
+					if (typeof p.secret !== "string" || (auth === "password" && !p.secret) || p.secret.length > 10000) throw new Error("凭据无效");
 					const secret = p.secret;
-					const candidate = { ...node };
-					if (node.auth === "key" && typeof p.keyPath === "string") candidate.localKeyPath = field(p.keyPath, "私钥路径", 4096);
+					const originalAuth = node.localAuth;
+					const candidate = { ...node, localAuth: auth };
+					if (auth === "key" && typeof p.keyPath === "string") candidate.localKeyPath = field(p.keyPath, "私钥路径", 4096);
 					if (p.fingerprint) {
 						if (p.fingerprint !== this.observedKeys.get(identity(clientId, node.id))) throw new Error("主机指纹已过期");
 						node.fingerprint = String(p.fingerprint);
 					}
 					candidate.fingerprint = node.fingerprint;
 					await this.connect(clientId, candidate, secret, req);
-					if (this.node(node.id) !== node || node.host !== candidate.host || node.port !== candidate.port || node.username !== candidate.username || node.keyPath !== candidate.keyPath || node.auth !== candidate.auth || node.sourceMissing) { this.disconnect(clientId, node.id); throw new Error("节点配置已变化，请重试"); }
-					if (candidate.localKeyPath) node.localKeyPath = candidate.localKeyPath;
+					if (this.node(node.id) !== node || node.host !== candidate.host || node.port !== candidate.port || node.username !== candidate.username || node.keyPath !== candidate.keyPath || node.auth !== candidate.auth || node.localAuth !== originalAuth || node.sourceMissing) { this.disconnect(clientId, node.id); throw new Error("节点配置已变化，请重试"); }
+					if (auth !== (node.localAuth ?? node.auth)) {
+						this.cancelApprovals(node.id);
+						for (const c of [...this.connections.values()]) if (c.nodeId === node.id && c.clientId !== clientId) this.drop(c);
+						this.secrets.delete(`node:${node.id}:secret`);
+						for (const key of this.transientSecrets.keys()) if (JSON.parse(key)[1] === node.id) this.transientSecrets.delete(key);
+					}
+					node.localAuth = auth;
+					if (auth === "key" && candidate.localKeyPath) node.localKeyPath = candidate.localKeyPath;
+					else if (auth !== "key") delete node.localKeyPath;
 					node.lastConnected = candidate.lastConnected;
-					const targets = p.sameGroup && node.auth === "password" ? this.nodes.filter((n) => n.group === node.group && n.auth === node.auth && !n.sourceMissing && !n.unsupported?.length) : [node];
+					const targets = p.sameGroup && auth === "password" ? this.nodes.filter((n) => n.group === node.group && (n.localAuth ?? n.auth) === auth && !n.sourceMissing && !unsupportedOptions(n).length) : [node];
 					for (const target of targets) {
 						if (p.persist !== false) { this.secrets.set(`node:${target.id}:secret`, secret); this.transientSecrets.delete(identity(clientId, target.id)); }
 						else this.transientSecrets.set(identity(clientId, target.id), secret);
@@ -289,6 +303,7 @@ export class NodeWorkbench {
 				if (endpoint) delete old.fingerprint;
 				if (old.host !== incoming.host || credentials) {
 					delete old.localKeyPath;
+					delete old.localAuth;
 					this.secrets.delete(`node:${old.id}:secret`);
 					for (const key of this.transientSecrets.keys()) if (JSON.parse(key)[1] === old.id) this.transientSecrets.delete(key);
 				}
@@ -364,7 +379,8 @@ export class NodeWorkbench {
 		return { count };
 	}
 	private async connect(clientId: string, node: Node, overrideSecret?: string, req?: Request): Promise<void> {
-		if (node.sourceMissing || node.unsupported?.some((reason) => reason !== "key" || !node.localKeyPath)) throw new Error("来源已移除或配置包含暂不支持的选项，请检查节点详情");
+		const auth = node.localAuth ?? node.auth;
+		if (node.sourceMissing || unsupportedOptions(node).length) throw new Error("来源已移除或配置包含暂不支持的选项，请检查节点详情");
 		const secret = overrideSecret ?? this.transientSecrets.get(identity(clientId, node.id)) ?? this.secrets.get(`node:${node.id}:secret`);
 		let keyChanged = false;
 		const opts: Parameters<Client["connect"]>[0] = { host: node.host, port: node.port, username: node.username, readyTimeout: 15000, keepaliveInterval: 10000,
@@ -375,8 +391,8 @@ export class NodeWorkbench {
 				if (node.fingerprint !== fp) keyChanged = true;
 				return node.fingerprint === fp;
 			} };
-		if (node.auth === "password") opts.password = secret ?? "";
-		else if (node.auth === "agent") {
+		if (auth === "password") opts.password = secret ?? "";
+		else if (auth === "agent") {
 			if (!process.env.SSH_AUTH_SOCK) throw new Error("本机 SSH Agent 未就绪");
 			opts.agent = process.env.SSH_AUTH_SOCK;
 		}

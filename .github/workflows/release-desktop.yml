@@ -117,6 +117,12 @@ jobs:
       - name: Terminal smoke test (plain Node)
         run: node tests/terminal-smoke-test.mjs
 
+      - name: Install browser for toolbar regression
+        run: npx playwright-core install chromium
+
+      - name: Verify desktop toolbar layout on Windows
+        run: node tests/desktop-toolbar-test.mjs
+
       - name: Build Electron (Windows)
         run: npx electron-builder build --win --x64 --publish never
 

@@ -191,6 +191,28 @@ try {
 	writeFileSync(join(keyDir, "key.xsh"), xsh(port, "changed").replace("Method=0", "Method=1\nUserKey=xshell-key-name"));
 	await call("source_sync", undefined, { id: keySource.data.sourceId });
 	assert.equal(keyNode.localKeyPath, undefined);
+	// A password source can use a locally selected public-key method.
+	writeFileSync(join(keyDir, "password.xsh"), xsh(port));
+	await call("source_sync", undefined, { id: keySource.data.sourceId });
+	const passwordNode = service.nodes.find((n) => n.sourceKey === "password.xsh");
+	const override = { auth: "key", secret: "", keyPath };
+	assert.equal((await call("credential_test", passwordNode.id, override)).event, "failure");
+	const overrideTrust = events.findLast((e) => e.event === "trust_required" && e.nodeId === passwordNode.id);
+	assert(overrideTrust, "switching to key must reach host verification without a password");
+	assert.equal((await call("credential_test", passwordNode.id, { ...override, fingerprint: overrideTrust.data.fingerprint })).event, "result");
+	assert.equal(passwordNode.auth, "password");
+	assert.equal(passwordNode.localAuth, "key");
+	assert.equal(events.findLast((e) => e.event === "state").data.nodes.find((n) => n.id === passwordNode.id).auth, "key");
+	const authRestored = new NodeWorkbench(dataDir);
+	assert.equal(authRestored.nodes.find((n) => n.id === passwordNode.id).localAuth, "key");
+	authRestored.dispose();
+	await call("source_sync", undefined, { id: keySource.data.sourceId });
+	assert.equal(passwordNode.localAuth, "key");
+	assert.equal((await call("connect", passwordNode.id)).event, "result");
+	assert.equal((await call("credential_test", passwordNode.id, { auth: "password", secret: "wrong" })).event, "failure");
+	assert.equal(passwordNode.localAuth, "key");
+	assert.equal((await call("credential_test", passwordNode.id, { auth: "password", secret: "secret123" })).event, "result");
+	assert.equal(passwordNode.localAuth, "password");
 	console.log("✓ SSH trust, key change, authentication, terminal command/interrupt/truncation, SFTP and node isolation");
 } finally {
 	for (const c of [...service.connections.values()]) await call("disconnect", c.nodeId);

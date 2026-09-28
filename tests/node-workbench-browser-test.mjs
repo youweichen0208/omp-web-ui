@@ -111,7 +111,9 @@ try {
 	await page.locator(".node-item", { hasText: "imported" }).getByRole("button").first().click();
 	await page.screenshot({ path: join(root, "tests/scratch/node-details.png") });
 	await page.getByRole("button", { name: "打开终端", exact: true }).click();
-	await page.locator(".node-modal input[type=password]").fill("secret123");
+	await page.locator(".node-modal").getByRole("combobox").selectOption("key");
+	const importedKeyPath = join(dataDir, "imported_id_rsa"); writeFileSync(importedKeyPath, privateKey, { mode: 0o600 });
+	await page.locator(".node-modal").getByLabel("本机私钥路径").fill(importedKeyPath);
 	await page.locator(".node-modal").getByRole("button", { name: "测试并保存" }).click();
 	await page.locator(".node-main-head em", { hasText: "已连接" }).waitFor({ timeout: 10000 });
 	assert(await page.locator(".node-modal").count() === 0, "credential modal stayed open");

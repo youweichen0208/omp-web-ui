@@ -9562,3 +9562,17 @@ body { -webkit-font-smoothing: antialiased; }
 .task-artifact-row > small { grid-row: 1; grid-column: 3; font-size: 11.5px; color: var(--text-dim); }
 .task-progress-meta { font-size: 12px; line-height: 1.6; }
 .task-step-detail .task-artifact-row { padding-inline: 0; }
+
+/* Reserve the fixed Windows/Linux caption controls in the toolbar layout. */
+html.pi-desktop-win32 .design-workspace .topbar,
+html.pi-desktop-linux .design-workspace .topbar { padding-right: 144px; }
+html.pi-desktop .design-workspace .topbar-actions { min-width: 0; flex-shrink: 1; }
+html.pi-desktop .design-workspace .topbar-actions > .topbar-more { flex: none; }
+html.pi-desktop .design-workspace .topbar-actions > .topbar-more .chip { white-space: nowrap; flex: none; }
+html.pi-desktop .design-workspace .topbar-actions > .topbar-more .chip > svg { flex: none; }
+html.pi-desktop .design-workspace .view-switch { min-width: 0; overflow-x: auto; flex-shrink: 1; }
+/* A visible file column already reserves the entire right edge of the window. */
+@media (min-width: 1201px) {
+	html.pi-desktop-win32 .design-workspace .workspace-column:has(.view-pane:not(.hidden) .drawer-right:not(.files-collapsed)):not(:has(.preview-open:not(.hidden))) > .topbar,
+	html.pi-desktop-linux .design-workspace .workspace-column:has(.view-pane:not(.hidden) .drawer-right:not(.files-collapsed)):not(:has(.preview-open:not(.hidden))) > .topbar { padding-right: 20px; }
+}

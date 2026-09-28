@@ -1236,7 +1236,7 @@ export type ServerMessage =
 export type NodePolicy = "readonly" | "confirm" | "auto" | "off";
 export interface NodeProfile {
 	id: string; name: string; group: string; host: string; port: number; username: string;
-	auth: "password" | "key" | "agent"; keyPath?: string; localKeyPath?: string; defaultDir: string; fingerprint?: string;
+	auth: "password" | "key" | "agent"; keyPath?: string; localKeyPath?: string; localAuth?: "password" | "key" | "agent"; defaultDir: string; fingerprint?: string;
 	hasSecret?: boolean; sourceId?: string; sourceKey?: string; sourceMissing?: boolean;
 	unsupported?: string[]; policy?: NodePolicy; lastConnected?: number;
 }
