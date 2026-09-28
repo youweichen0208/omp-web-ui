@@ -2,9 +2,9 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
-## 0.52.0 正式版
+## 0.7.0 正式版
 
-`0.52.0` 发布 Xshell/OpenSSH 来源同步与节点工作台，修复工具输出快照重复追加，并补充 SSH 后台执行指导。版本高于历史 `0.51.2`，恢复 SemVer 正常排序。npm 与三平台桌面安装包统一版本；说明及同步限制见 `.github/release-notes/v0.52.0.md`。
+`0.7.0` 发布 Xshell/OpenSSH 来源同步与节点工作台，修复工具输出快照重复追加，并补充 SSH 后台执行指导。沿当前 `0.6.x` 发布线升级；历史 `0.51.x` 不作为当前版本线的升级基准。npm 与三平台桌面安装包统一版本；说明及同步限制见 `.github/release-notes/v0.7.0.md`。
 
 ## 0.6.10 正式版
 
@@ -72,7 +72,7 @@ curl -s https://registry.npmjs.org/@youweichen/pi-web-ui/latest | jq .version
 
 ## 注意事项
 
-- 版本号**必须**高于 npm registry 上已有的；发布前用 `npm view @youweichen/pi-web-ui version` 核对。
+- 版本号必须在当前发布线递增且尚未占用；发布前用 `npm view @youweichen/pi-web-ui dist-tags --json` 核对。当前从 `0.6.x` 升至 `0.7.x`，不要为超过历史 `0.51.x` 擅自跳号。
 - 提交信息不要带 `Co-authored-by`（P1 规则，仓库 hook 会拦）。
 - `.pi/commands.json` 是**每个项目各自**的个人命令（当前 cwd 的 `.pi/ 下），已被 gitignore，永远不会进公开仓库；切换 cwd 时命令列表自动刷新为该项目的命令。
 - 大改动发布前先问用户是否要 `npm publish`（会真实消耗账号权限、触发构建）。
