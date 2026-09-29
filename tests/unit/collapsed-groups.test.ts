@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildCollapsedGroups } from "../../web/src/collapsed-groups.js";
+import { buildCollapsedGroups, collapsedPreview } from "../../web/src/collapsed-groups.js";
+
+it("collapsed previews remove Markdown delimiters and omit folded model content", () => {
+	expect(collapsedPreview("你选了 **1：平台研究工具**，开始写 `tools.py`。")).toBe("你选了 1：平台研究工具，开始写 tools.py。");
+	expect(collapsedPreview("附加内容</think>\n**现在开始实现**")).toBe("现在开始实现");
+	expect(collapsedPreview("附加内容</think>")).toBe("");
+	expect(collapsedPreview("读取 agent_runtime.py 和 [说明](https://example.com)")).toBe("读取 agent_runtime.py 和 说明");
+});
 import type { UiMessage } from "../../server/protocol.js";
 
 function msg(id: string, role: string): UiMessage {

@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.8.2 正式版
+
+`0.8.2` 修复正文伪工具调用导致任务中断时的恢复与状态判断，保留停止、排队和当前任务边界；修复扩展消息缓存碰撞，优化历史摘要和模型附加内容提示。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.2.md`。
+
 ## 0.8.1 正式版
 
 `0.8.1` 加强 todo 实施引导，区分任务清单与执行记录，移除任务总标题并整理设置菜单；修复节点页右侧设置入口意外出现。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.1.md`。

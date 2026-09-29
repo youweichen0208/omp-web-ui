@@ -8,6 +8,12 @@
 // Serialized messages (server -> client snapshot)
 // ---------------------------------------------------------------------------
 
+/** Details for the visible tool-call-recovery custom message. */
+export interface ToolCallRecoveryDetails {
+	status: "retrying" | "resumed" | "failed" | "unverified" | "deferred" | "cancelled";
+	toolName: string;
+}
+
 export interface UiTextBlock {
 	type: "text";
 	text: string;

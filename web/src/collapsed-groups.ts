@@ -1,4 +1,17 @@
 import { goalEventText, goalCompletedText } from "./goal-events.js";
+import { skillAwarePreview } from "./skill-block.js";
+import { splitLeakedThinking } from "./leaked-thinking.js";
+
+/** Lightweight plain-text summary; full Markdown is rendered only on expansion. */
+export function collapsedPreview(text: string, assistant = true): string {
+	const visible = assistant ? splitLeakedThinking(text)?.visible ?? text : text;
+	return skillAwarePreview(visible)
+		.replace(/`+([^`]+)`+/g, "$1")
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+		.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (_match, bold, underline) => bold ?? underline)
+		.replace(/\*([^*]+)\*/g, "$1")
+		.replace(/^#{1,6}\s+/, "");
+}
 // 直接引协议源（而不是 ./types）：这个模块也被 tsconfig.tests.json 编译，
 // 那边是 NodeNext 解析，要求显式扩展名，而 web/src/types.ts 的再导出写法
 // 不带扩展名。纯类型导入，构建时整体擦除，运行时不解析这条路径。

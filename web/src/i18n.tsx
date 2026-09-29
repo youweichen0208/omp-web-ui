@@ -761,7 +761,15 @@ const zh = {
 	/* thinking block */
 	thinkingNow: "思考中",
 	thinkingPreview: "思考：{preview}",
-	leakedThinking: "异常内容（疑似泄露的思考文本）",
+	toolRecovery: "工具调用恢复",
+	toolRecoveryRetrying: "模型把工具调用写进了正文，尚未执行。正在请求模型纠正一次。",
+	toolRecoveryResumed: "纠正后已收到目标工具的成功返回。这不代表整个任务已完成，请以任务清单和执行结果为准。",
+	toolRecoveryFailed: "纠正未成功，或工具执行报错。本轮不会再次自动纠正，请检查未完成步骤后手动继续。",
+	toolRecoveryUnverified: "纠正后没有确认目标工具执行成功，任务可能尚未完成。请检查结果后手动继续。",
+	toolRecoveryDeferred: "正文中的工具调用未执行。已有排队消息，或本轮未明确启动任务步骤，因此未自动继续。",
+	toolRecoveryCancelled: "已停止工具调用恢复，不会自动继续。",
+	leakedThinking: "模型附加内容",
+	leakedThinkingHint: "正文中检测到思考标记，相关内容已折叠；不代表应用报错或数据泄露。点击查看原文。",
 
 	/* terminal panel */
 	commands: "命令",
@@ -1764,7 +1772,15 @@ const en: Record<keyof typeof zh, string> = {
 	/* thinking block */
 	thinkingNow: "Thinking",
 	thinkingPreview: "Thinking: {preview}",
-	leakedThinking: "Unexpected content (likely leaked reasoning text)",
+	toolRecovery: "Tool-call recovery",
+	toolRecoveryRetrying: "The model printed a tool call as text; it has not executed. Requesting one correction.",
+	toolRecoveryResumed: "The target tool returned successfully after correction. This does not mean the entire task is complete; check the checklist and results.",
+	toolRecoveryFailed: "Correction failed or the tool returned an error. No further automatic correction will be attempted in this run. Check unfinished steps before continuing manually.",
+	toolRecoveryUnverified: "The target tool has not been confirmed successful after correction. The task may be unfinished; check the results before continuing manually.",
+	toolRecoveryDeferred: "The tool call printed as text did not execute. A message is queued, or this turn has not explicitly started a task step, so no automatic continuation was requested.",
+	toolRecoveryCancelled: "Tool-call recovery was stopped. It will not continue automatically.",
+	leakedThinking: "Additional model content",
+	leakedThinkingHint: "Reasoning markers were detected in the reply, so this content was collapsed. This does not indicate an application error or data disclosure. Click to view the original.",
 
 	/* terminal panel */
 	commands: "Commands",

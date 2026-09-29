@@ -47,6 +47,7 @@ pi-web-ui/
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
 │   ├── todo-extension.ts       # 原生 rpiv-todo 加载适配、Web 展示及工作流引导
 │   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
+│   ├── tool-call-recovery.ts   # 正文伪工具调用的单次纠正；本轮 todo/真实队列准入与结果确认
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData + 视觉桥）

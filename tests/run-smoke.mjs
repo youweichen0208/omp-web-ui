@@ -60,6 +60,7 @@ const ALL = [
 	"switch-session-background-test",
 	"terminal-smoke-test",
 	"todo-extension-test",
+	"tool-call-recovery-test",
 	"vision-bridge-test",
 	"version-handshake-test",
 	"vscode-editor-plugin-test",

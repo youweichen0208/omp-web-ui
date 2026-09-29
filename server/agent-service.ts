@@ -102,12 +102,14 @@ import type {
 } from "./protocol.js";
 import {
 	serializeMessage,
+	contentFingerprint,
 	serializeStreamingMessage,
 	type AgentMessage,
 } from "./serialize.js";
 import { deriveTaskProgress } from "./task-progress.js";
 import { adaptTodoExtensions, TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { taskHistoryFromSession } from "./todo-progress.js";
+import { handleToolCallRecovery } from "./tool-call-recovery.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -308,32 +310,6 @@ function pluginToolToDefinition(tool: PluginAgentTool): ToolDefinition {
 	} as unknown as ToolDefinition;
 }
 
-
-/**
- * Cheap per-message discriminator for the serialization cache key. Persisted
- * message content never changes, so this is stable across snapshots, while
- * several same-role messages created within one millisecond (attachment
- * asides) get distinct keys. Text blocks are fingerprinted by a short hash of
- * their head (paths embedded in <file> tags can share long prefixes — e.g.
- * uploads created in the same millisecond differ only at the tail); image
- * payloads by data length (identical lengths within the same ms are far too
- * unlikely to matter).
- */
-function contentFingerprint(m: AgentMessage): string {
-	const content = (m as unknown as { content?: unknown }).content;
-	if (!Array.isArray(content) || content.length === 0) return "empty";
-	const first = content[0] as { type?: string; text?: string; data?: string };
-	if (first?.type === "image") {
-		return `img:${(first.data ?? "").length}`;
-	}
-	const text = typeof first?.text === "string" ? first.text : "";
-	// djb2 — fast enough to run per snapshot, distinct enough for asides.
-	let h = 5381;
-	for (let i = 0; i < text.length && i < 512; i++) {
-		h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
-	}
-	return `txt:${h.toString(36)}:${text.length}`;
-}
 
 // ---------------------------------------------------------------------------
 // Web UI context adapter — bridges extension UI calls (setWidget/notify) to the
@@ -1309,6 +1285,7 @@ export class ClientSession {
 	}
 
 	private onEvent(conv: Conversation, event: AgentSessionEvent): void {
+		handleToolCallRecovery(conv.session, event);
 		// Any SDK event proves the run is alive — feeds the stall watchdog below.
 		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: conv.runningToolNames.size ? "tool" : "model" });
 		conv.lastSdkEventAt = Date.now();

@@ -15,7 +15,7 @@ export function LeakedThinkingBlock({ text }: { text: string }) {
 
 	return (
 		<div className={`thinking leaked ${open ? "open" : ""}`}>
-			<button type="button" className="thinking-toggle" onClick={() => setOpen(!open)}>
+			<button type="button" className="thinking-toggle" aria-expanded={open} title={t("leakedThinkingHint")} onClick={() => setOpen(!open)}>
 				{open ? <FiChevronDown /> : <FiChevronRight />}
 				<FiAlertTriangle className="thinking-icon" />
 				<span className="thinking-label">{t("leakedThinking")}</span>

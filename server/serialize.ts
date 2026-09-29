@@ -213,3 +213,17 @@ export function serializeStreamingMessage(m: AgentMessage): UiMessage | null {
 	if (!msg) return null;
 	return { ...msg, id: `stream-${m.timestamp ?? 0}` };
 }
+
+/** Stable discriminator for messages sharing a role and millisecond timestamp. */
+export function contentFingerprint(message: AgentMessage): string {
+	const content = "content" in message ? message.content : undefined;
+	const first = Array.isArray(content) ? content[0] : undefined;
+	if (first?.type === "image") return `img:${first.data.length}`;
+	const text = typeof content === "string" ? content : first?.type === "text" ? first.text : "";
+	let hash = 5381;
+	for (let i = 0; i < text.length && i < 512; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
+	// Custom messages often carry string content. Their type and structured
+	// details also affect rendering (including localized recovery statuses).
+	const custom = message.role === "custom" ? JSON.stringify([message.customType, message.display, message.details]) : "";
+	return `txt:${hash.toString(36)}:${text.length}:${custom}`;
+}

@@ -82,6 +82,12 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 `server/todo-progress.ts` 从 SessionManager 当前分支读取 `todo` 工具结果的 `details.tasks`，按分支末端缓存，跨轮次及压缩后仍可恢复。任务状态以成功快照为准，`details.error` 的拒绝更新不改变状态；一轮结束不会自动完成未完成项，界面显示“等待继续”。`/new` 更换 SDK 会话，任务随之清空。`clear` 开始新的清单并隔离重复使用的数字 ID。步骤的执行记录按工具调用顺序关联，保留文件和命令入口。上游负责修改与校验，本地只读投影，不维护第二份可修改清单。
 
+`server/tool-call-recovery.ts` 处理模型把完整 `<invoke name="工具">` 写进正文却返回 `stop` 的情况。它由宿主的 SDK 事件订阅器调用，位于所有扩展事件处理之后，检查 core 的真实消息队列（包括扩展自定义 follow-up）。仅当**当前指令内成功执行过 `todo update status=in_progress`**、对应步骤仍进行中、工具可用、没有排队消息且没有取消时，最多追加一次纠正请求。历史清单、`todo list/get` 和新用户／扩展消息前的执行状态均不能作为自动继续依据；每个 SDK run 独立计数，用户插队不会重置该计数。状态按 AgentSession 隔离，不写入第二份任务清单。
+
+恢复不解释或执行 XML 参数，而是要求模型使用正式工具接口并继续遵循用户及 skill 的停止／等待／确认要求。检测保留 Markdown 边界，排除围栏、缩进、行内代码、引用和列表中的示例；真正工具调用、错误、取消、普通等待回复均不触发。支持范围有意限定为已观察到的完整尾部 XML 形式，含糊内容交给用户判断，不能承诺识别所有模型格式错误。
+
+纠正状态作为带结构化 `details` 的 custom message 持久化，前端按语言渲染。目标工具成功返回才标记“工具已恢复”（不代表参数语义正确或整个任务完成）；再次输出伪调用、工具报错、仅口头说继续、停止分别记录失败／未确认／已停止，不再追加纠正。无当前步骤或已有排队消息时记录未自动继续。相同毫秒的 custom 消息缓存同时区分字符串正文、customType、display 与 details，避免覆盖扩展消息。回归 `tests/tool-call-recovery-test.mjs` 用本地模拟模型驱动真实 SDK 和原生 todo，覆盖恢复、重复失败、历史清单、扩展排队、用户插队及取消；端口占用直接失败，连接前验证测试子进程 PID。
+
 每项使用 subject/description/status/blockedBy；首项 metadata.title 和 metadata.completionCriteria 对应整体标题与完成标准，修改项 metadata.changeSummary 用于变更说明。建议 3–7 个实际步骤，按任务调整；问答、小修改和澄清不强制建实施清单。正在执行任务保持一项 in_progress，等待用户回答不自动 completed。已完成项按上游状态机不能重开，追加后续项；开始不同任务时 clear。依赖关系用于显示等待项，执行许可仍由用户与 skill 决定。
 
 没有 todo 的旧会话继续使用当前轮次工具阶段推断；旧 task_plan 完整提纲仍可展示。todo 的完整原始 details 不经消息序列化发送浏览器，只下发结构化 taskProgress。协议版本 24 增加 waiting 状态与 todo 来源、清单标识和依赖字段。
