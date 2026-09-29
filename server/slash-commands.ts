@@ -23,7 +23,7 @@ export interface SlashHost {
 	cwd: () => string;
 	/** 活动对话的 session。 */
 	getSession: () => AgentSession;
-	resetChat: () => Promise<void>;
+	startNewSession: () => Promise<void>;
 	setModel: (modelId: string) => Promise<void>;
 	setCwd: (path: string) => Promise<void>;
 	setThinking: (level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") => void;
@@ -50,7 +50,7 @@ export const NATIVE_COMMANDS: {
 	argumentHint?: string;
 	argumentHintEn?: string;
 }[] = [
-	{ name: "new", description: "重置当前对话上下文与用量", descriptionEn: "Reset current chat context and usage" },
+	{ name: "new", description: "新建会话，保留当前会话历史", descriptionEn: "Start a new session, keeping previous history" },
 	{ name: "model", description: "切换模型", descriptionEn: "Switch model", argumentHint: "[名称]", argumentHintEn: "[name]" },
 	{ name: "compact", description: "压缩上下文", descriptionEn: "Compact context", argumentHint: "[说明]", argumentHintEn: "[instructions]" },
 	{ name: "cwd", description: "切换工作目录", descriptionEn: "Switch workspace", argumentHint: "<路径>", argumentHintEn: "<path>" },
@@ -152,7 +152,7 @@ export class SlashCommandsService {
 	async exec(name: string, args: string, context: { conversationId: string; requestId: string }): Promise<boolean> {
 		switch (name) {
 			case "new":
-				await this.host.resetChat();
+				await this.host.startNewSession();
 				return true;
 			case "model": {
 				if (!args) {

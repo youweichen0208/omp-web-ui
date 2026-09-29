@@ -62,7 +62,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 - `snapshot` 带 `conversationId`；`conversations`（ServerMessage）推当前活动对话及当前项目已入列的后台对话。新对话尚未落盘时，活动项仍可在左栏显示；`switch_conversation`（ClientMessage）只在同项目内切换。
 - `switch_session`（恢复持久会话）会为目标会话创建独立 runtime，再按上述生命周期把当前对话移到后台；若目标会话已在运行列表中则直接复用其 conversation，绝不因打开历史记录中断当前生成。回归测试：`tests/switch-session-background-test.mjs`。`edit_message` 在**当前**对话内 fork；`dispose` 遍历销毁全部对话；attachSink 重连时补推 conversations。
 - 前端：左栏「运行的对话」区（≥1 个时显示，活跃高亮、流式绿点），MessageList 以 conversationId 为 key 强制切换重挂载。
-- `/new` 在当前对话槽位内重置 SDK 会话，保留 conversationId、终端、模型与思考档位，清空消息、上下文、累计用量及任务状态；“新对话”按钮仍创建独立对话。旧历史保留，可手动恢复。`conversations.activeId` 先于新快照到达时，消息、用量和任务进度只展示与活动对话 ID 匹配的快照；等待期间禁止发送，并安排 `get_state` 补取快照。回归：`tests/new-chat-context-test.mjs`（mock 模型 + 浏览器延迟快照，零 token）。
+- `/new` 直接调用 SDK `runtime.newSession()`：生成新的 SDK 会话 ID 和文件路径，旧会话历史与标题保留，可手动恢复；新会话的消息、上下文、用量和任务从空状态开始。Web 只复用 conversationId、终端并同步模型与思考档位，不复用旧会话文件、不自建重置分支、不扣减 SDK 统计基数。“新对话”按钮创建独立 runtime，允许原对话在后台继续。`/compact` 直接调用 SDK `session.compact(args || undefined)`，压缩规则与摘要由 SDK 负责。`conversations.activeId` 先于新快照到达时，消息、用量和任务进度只展示与活动对话 ID 匹配的快照；等待期间禁止发送，并安排 `get_state` 补取快照。回归：`tests/new-chat-context-test.mjs`（mock 模型 + 浏览器延迟快照，零 token）；`tests/native-session-commands-test.mjs` 复用无浏览器模式进入 CI，校验新会话身份、旧历史保留、取消、重复新建及重新打开。
 
 ## 其他桥接
 

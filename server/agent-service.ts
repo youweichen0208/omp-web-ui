@@ -1999,7 +1999,7 @@ export class ClientSession {
 		emit: (msg) => this.emit(msg),
 		cwd: () => this.cwd,
 		getSession: () => this.session,
-		resetChat: () => this.resetChat(),
+		startNewSession: () => this.startNewSession(),
 		setModel: (id) => this.setModel(id),
 		setCwd: (path) => this.setCwd(path),
 		setThinking: (level) => this.setThinking(level),
@@ -2495,8 +2495,8 @@ export class ClientSession {
 		}
 	}
 
-	/** /new replaces the SDK session inside the current conversation slot. */
-	async resetChat(): Promise<void> {
+	/** /new delegates session creation and history persistence to the SDK; the Web slot is reused. */
+	async startNewSession(): Promise<void> {
 		if (this.quiesceBlocked()) return;
 		const previous = this.conv;
 		const model = previous.session.model;
