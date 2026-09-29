@@ -53,7 +53,7 @@ export function unresolvedRecoveryTool(messages: readonly Reply[], tools: readon
 	for (const message of messages.slice(-16).toReversed()) {
 		if (message.role === "custom" && message.customType === "tool-call-recovery") {
 			const status = (message.details as ToolCallRecoveryDetails | undefined)?.status;
-			if (!["retrying", "failed", "unverified", "deferred"].includes(status ?? "")) return;
+			if (!["retrying", "failed", "unverified", "deferred", "exhausted"].includes(status ?? "")) return;
 			continue;
 		}
 		const tool = malformedToolCall(message, tools);
@@ -65,16 +65,21 @@ export function unresolvedRecoveryTool(messages: readonly Reply[], tools: readon
 
 type Status = ToolCallRecoveryDetails["status"];
 type Session = Pick<AgentSession, "agent" | "messages" | "getActiveToolNames" | "sendCustomMessage">;
+const MAX_CORRECTIONS_PER_RUN = 3;
 interface Recovery {
-	attempted: boolean;
+	attempts: number;
+	progressSinceCorrection: boolean;
+	candidate?: string;
 	resumeTool?: string;
 	pending?: { toolName: string; started: boolean; result?: boolean };
 }
 const states = new WeakMap<Session, Recovery>();
 const content: Record<Status, string> = {
-	retrying: "A prior reply printed an XML tool invocation as text. That invocation was NOT executed. A promise to continue is not tool execution. Use the native tool-call interface if continuing the current authorized task is appropriate. Respect all user and skill stop, confirmation, and waiting requirements. Do not repeat successful operations or print another <invoke> block. If you cannot continue, explain why. This is the only automatic correction for this run.",
+	retrying: "A prior reply printed an XML tool invocation as text. That invocation was NOT executed. A promise to continue is not tool execution. Use the native tool-call interface if continuing the current authorized task is appropriate. Respect all user and skill stop, confirmation, and waiting requirements. Do not repeat successful operations or print another <invoke> block. If you cannot continue, explain why. This is one bounded formatting correction. A failed or timed-out command may already have taken effect: inspect its actual state before repeating an operation. If tools keep failing, report the blocker rather than retrying blindly.",
 	resumed: "A native call to the indicated tool returned successfully after correction. This confirms tool execution, not completion of the task or correctness of the arguments.",
-	failed: "Tool-call correction failed or the native tool returned an error. No further automatic correction will be requested in this run. Check the unfinished task before continuing manually.",
+	failed: "The model printed another unexecuted invocation without intervening successful tool execution. This correction will not be repeated without progress. Check the unfinished task before continuing manually.",
+	"tool-error": "The tool-call format was corrected, but the native tool returned an error or timeout. A timeout does not prove the operation had no effect. Inspect actual state before repeating an operation; do not treat this as task completion.",
+	exhausted: "The automatic formatting correction budget for this run is exhausted. The latest invocation printed as text was not executed. Check the unfinished task before continuing manually.",
 	unverified: "Correction ended without a successful native call to the indicated tool. Task completion has not been verified. Check the unfinished task before continuing manually.",
 	deferred: "No automatic tool-call correction because a new user or extension message takes priority. Follow that message; no invocation printed as text was executed.",
 	cancelled: "Tool-call correction stopped because the run was cancelled. No automatic continuation will be requested.",
@@ -89,10 +94,45 @@ function publish(session: Session, status: Status, toolName: string, triggerTurn
 	});
 }
 
+/** Install before a run starts: the SDK captures this hook in its loop config. */
+export function installToolCallRecovery(session: Session): () => void {
+	const previous = session.agent.shouldStopAfterTurn;
+	let active = true;
+	const check: NonNullable<typeof previous> = async (context, signal) => {
+		const stop = await previous?.(context, signal) ?? false;
+		if (!active) return stop;
+		const state = states.get(session);
+		const name = state?.candidate;
+		if (!state || !name) return stop;
+		state.candidate = undefined;
+		// prepareNextTurn and the previous stop hook may await I/O. Only commit
+		// after both have settled, immediately before the SDK drains its queues.
+		// An already queued follow-up cannot be selectively removed by the SDK.
+		if (stop || signal?.aborted) publish(session, "cancelled", name);
+		else if (session.agent.hasQueuedMessages()) publish(session, "deferred", name, false, "queued-message");
+		else if (!session.getActiveToolNames().includes(name)) publish(session, "unverified", name);
+		else if (state.attempts >= MAX_CORRECTIONS_PER_RUN) publish(session, "exhausted", name);
+		else if (!state.progressSinceCorrection) publish(session, "failed", name);
+		else {
+			state.attempts++;
+			state.progressSinceCorrection = false;
+			state.resumeTool = undefined;
+			state.pending = { toolName: name, started: false };
+			publish(session, "retrying", name, true);
+		}
+		return stop;
+	};
+	session.agent.shouldStopAfterTurn = check;
+	return () => {
+		active = false;
+		if (session.agent.shouldStopAfterTurn === check) session.agent.shouldStopAfterTurn = previous;
+	};
+}
+
 /** Called by the host subscriber AFTER SDK extension handlers, once per event. */
 export function handleToolCallRecovery(session: Session, event: AgentSessionEvent): void {
 	if (event.type === "agent_start") {
-		states.set(session, { attempted: false });
+		states.set(session, { attempts: 0, progressSinceCorrection: true });
 		return;
 	}
 	const state = states.get(session);
@@ -107,6 +147,9 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 		if (message.role === "custom" && message.customType === "tool-call-recovery") {
 			if ((message.details as ToolCallRecoveryDetails | undefined)?.status === "retrying" && state.pending) state.pending.started = true;
 		} else if (message.role === "user" || message.role === "custom") {
+			const candidate = state.candidate;
+			state.candidate = undefined;
+			if (candidate) publish(session, "deferred", candidate, false, "new-instruction");
 			state.resumeTool = undefined;
 			if (recoveryContinuation(message)) {
 				const messages = session.messages;
@@ -114,7 +157,8 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 				const history = last?.role === "user" && last.timestamp === message.timestamp ? messages.slice(0, -1) : messages;
 				state.resumeTool = unresolvedRecoveryTool(history, session.getActiveToolNames());
 			}
-			// New instructions always take priority; preserve the per-run cap.
+			// New instructions take priority and cannot replenish the per-run budget.
+			state.progressSinceCorrection = state.attempts === 0;
 			finish("deferred");
 		}
 		return;
@@ -125,15 +169,17 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 		return;
 	}
 	if (event.type === "tool_execution_end") {
+		// rpiv-todo can report a domain failure without setting isError.
+		const failed = event.isError || (event.toolName === "todo" && !!todoSnapshot(event.result?.details)?.error);
+		if (!failed) state.progressSinceCorrection = true;
 		if (state.pending?.started && event.toolName === state.pending.toolName) {
-			// rpiv-todo reports domain failures in details.error without isError.
 			// A later success in the same batch must not hide an earlier failure.
-			const failed = event.isError || (event.toolName === "todo" && !!todoSnapshot(event.result?.details)?.error);
 			state.pending.result = (state.pending.result ?? true) && !failed;
 		}
 		return;
 	}
 	if (event.type === "agent_end") {
+		state.candidate = undefined;
 		finish(session.agent.signal?.aborted ? "cancelled" : "unverified");
 		return;
 	}
@@ -146,22 +192,11 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 	const tools = session.getActiveToolNames();
 	const name = malformedToolCall(message, tools) ?? (state.resumeTool && tools.includes(state.resumeTool) && continuationPromise(message) ? state.resumeTool : undefined);
 	if (state.pending?.started) {
-		if (state.pending.result !== undefined) finish(state.pending.result ? "resumed" : "failed");
+		if (state.pending.result !== undefined) finish(state.pending.result ? "resumed" : "tool-error");
 		else if (name || (message.role === "assistant" && ["stop", "error", "length"].includes(message.stopReason))) {
-			finish(name ? "failed" : "unverified");
-			return;
+			finish(name && !state.progressSinceCorrection ? "failed" : "unverified");
+			if (!name || !state.progressSinceCorrection) return;
 		}
 	}
-	if (!name) return;
-	if (state.attempted) { publish(session, "failed", name); return; }
-	// hasPendingMessages() omits custom extension follow-ups. Inspect the core
-	// queues only after every turn_end extension has had a chance to enqueue.
-	if (session.agent.hasQueuedMessages()) {
-		publish(session, "deferred", name, false, "queued-message");
-		return;
-	}
-	state.attempted = true;
-	state.resumeTool = undefined;
-	state.pending = { toolName: name, started: false };
-	publish(session, "retrying", name, true);
+	state.candidate = name;
 }

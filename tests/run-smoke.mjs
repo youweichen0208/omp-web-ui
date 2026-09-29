@@ -62,6 +62,7 @@ const ALL = [
 	"terminal-smoke-test",
 	"todo-extension-test",
 	"tool-call-recovery-test",
+	"tool-call-recovery-boundary-test",
 	"vision-bridge-test",
 	"version-handshake-test",
 	"vscode-editor-plugin-test",

@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.8.5 正式版
+
+`0.8.5` 修复长任务中的重复伪调用恢复、工具超时状态混淆，以及 SDK 异步准备期间用户插队后过期纠正提示仍执行的竞态。纠正按原生工具成功结果重新允许，每轮最多 3 次；保留停止及排队边界。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.5.md`。
+
 ## 0.8.4 桌面正式版
 
 `0.8.4` 修复伪工具调用恢复被 todo 状态阻断的问题，并补充历史会话中明确继续后仅口头承诺的单次纠正；保留停止、排队与等待边界。本次发布 GitHub Release 及三平台桌面安装包。说明见 `.github/release-notes/v0.8.4.md`。

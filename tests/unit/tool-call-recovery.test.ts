@@ -25,7 +25,7 @@ test("preserves fences, quotes and code delimiters around examples", () => {
 	expect(malformedToolCall(reply(`\`\`\`text\nold code\n\`\`\`\n\n${xml}`), ["read"])).toBe("read");
 });
 test("localizes persisted recovery notices without showing model instructions", () => {
-	for (const status of ["retrying", "resumed", "failed", "unverified", "deferred", "cancelled"]) {
+	for (const status of ["retrying", "resumed", "failed", "tool-error", "exhausted", "unverified", "deferred", "cancelled"]) {
 		expect(toolRecoveryKey({ role: "custom", customType: "tool-call-recovery", details: { status, toolName: "read" } })).toMatch(/^toolRecovery/);
 	}
 	for (const details of [null, {}, { status: "toString" }, { status: "unknown" }, { status: 1 }]) {
@@ -71,7 +71,7 @@ test("finds unresolved calls in legacy history without crossing an unrelated ins
 		reply("请确认是否继续？"),
 		reply("读取完成。"),
 		reply("让我继续核实。", "aborted"),
-		notice("resumed"), notice("cancelled"),
+		notice("resumed"), notice("cancelled"), notice("tool-error"),
 	]) expect(unresolvedRecoveryTool([...history, boundary], ["read"])).toBeUndefined();
 	expect(unresolvedRecoveryTool([reply(`\`\`\`xml\n${xml}\n\`\`\``), notice("deferred")], ["read"])).toBeUndefined();
 });

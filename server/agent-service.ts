@@ -109,7 +109,7 @@ import {
 import { deriveTaskProgress } from "./task-progress.js";
 import { adaptTodoExtensions, TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { taskHistoryFromSession } from "./todo-progress.js";
-import { handleToolCallRecovery } from "./tool-call-recovery.js";
+import { handleToolCallRecovery, installToolCallRecovery } from "./tool-call-recovery.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -1208,9 +1208,11 @@ export class ClientSession {
 				this.emit({ type: "notice", level: "error", text: err.error });
 			},
 		});
-		conv.unsubscribe = conv.session.subscribe((event) =>
+		const uninstallRecovery = installToolCallRecovery(conv.session);
+		const unsubscribe = conv.session.subscribe((event) =>
 			this.onEvent(conv, event),
 		);
+		conv.unsubscribe = () => { unsubscribe(); uninstallRecovery(); };
 		this.scheduleSnapshot();
 		this.webUi.refresh();
 		this.startWidgetsTimer();

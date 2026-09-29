@@ -4,6 +4,8 @@ const keys = {
 	retrying: "toolRecoveryRetrying",
 	resumed: "toolRecoveryResumed",
 	failed: "toolRecoveryFailed",
+	"tool-error": "toolRecoveryToolError",
+	exhausted: "toolRecoveryExhausted",
 	unverified: "toolRecoveryUnverified",
 	deferred: "toolRecoveryDeferred",
 	cancelled: "toolRecoveryCancelled",
