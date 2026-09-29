@@ -13,5 +13,10 @@ const keys = {
 export function toolRecoveryKey(message: Pick<UiMessage, "role" | "customType" | "details">) {
 	if (message.role !== "custom" || message.customType !== "tool-call-recovery" || !message.details || typeof message.details !== "object") return;
 	const status = (message.details as { status?: unknown }).status;
+	if (status === "deferred") {
+		const reason = (message.details as { reason?: unknown }).reason;
+		if (reason === "queued-message") return "toolRecoveryQueued";
+		if (reason === "new-instruction") return "toolRecoveryInterrupted";
+	}
 	if (typeof status === "string" && Object.hasOwn(keys, status)) return keys[status as keyof typeof keys];
 }

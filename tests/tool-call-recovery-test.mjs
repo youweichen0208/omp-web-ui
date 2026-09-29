@@ -30,9 +30,22 @@ const mock = createServer(async (req, res) => {
 				await holdModel(); if (res.destroyed) return;
 			}
 			const tool = (name, args) => { finish = 'tool_calls'; delta = { tool_calls: [{ index: 0, id: `call-${scenario}-${phase}-${n}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }] }; };
-			if (phase === 'probe' || scenario === 'no-todo') {
-				if (n === 1) tool('read', { path: 'runtime.py' });
-				else delta = { content: xml };
+			if (phase === 'continuation') {
+				if (n === 1) delta = { content: scenario === 'resume-waiting' ? '请确认是否可以继续。' : '继续 A 切片。我刚才在查 usage 暴露方式。让我继续核实。' };
+				else if (n === 2 && scenario === 'resume-repeat-promise') delta = { content: '让我继续核实。' };
+				else if (n === 2) tool('read', { path: 'runtime.py' });
+				else delta = { content: '核实完成。' };
+			} else if (scenario === 'no-todo' || scenario === 'first-call') {
+				if (n === 1 && scenario === 'first-call') delta = { content: xml };
+				else if (n === 1) tool('read', { path: 'runtime.py' });
+				else if (n === 2 && scenario === 'first-call') tool('read', { path: 'runtime.py' });
+				else if (scenario === 'first-call') delta = { content: '核实完成。' };
+				else if (n === 2) delta = { content: xml };
+				else if (n === 3) tool('read', { path: 'runtime.py' });
+				else delta = { content: '核实完成。' };
+			} else if (phase === 'probe') {
+				if (n === 1) delta = { content: xml };
+				else delta = { content: '这是 XML 格式示例，按你的要求只解释，不执行。' };
 			} else if (n === 1) tool('todo', { action: 'create', subject: '读取并验证文件' });
 			else if (n === 2) tool('todo', { action: 'update', id: 1, status: 'in_progress' });
 			else if (n === 3) {
@@ -44,7 +57,7 @@ const mock = createServer(async (req, res) => {
 				delta = { content: '已处理排队消息。' };
 			} else if (n === 4) {
 				assert(JSON.stringify(payload.messages).includes('That invocation was NOT executed'), 'correction reaches actual model context');
-				if (scenario === 'plain-stop') delta = { content: '我会继续处理。' };
+				if (scenario === 'plain-stop' || scenario.startsWith('resume-')) delta = { content: '我会继续处理。' };
 				else if (scenario === 'todo-error') tool('todo', { action: 'update', id: 99, status: 'completed' });
 				else if (scenario === 'mixed-results') {
 					tool('read', { path: 'missing-file.py' });
@@ -122,8 +135,13 @@ try {
 		'mixed-results': [5, ['retrying', 'failed']],
 		waiting: [3, []],
 		indented: [3, []],
-		completed: [4, ['deferred']],
-		'no-todo': [2, ['deferred']],
+		completed: [5, ['retrying', 'failed']],
+		'no-todo': [4, ['retrying', 'resumed']],
+		'first-call': [3, ['retrying', 'resumed']],
+		'resume-promise': [4, ['retrying', 'unverified']],
+		'resume-waiting': [4, ['retrying', 'unverified']],
+		'resume-repeat-promise': [4, ['retrying', 'unverified']],
+		'resume-new-topic': [4, ['retrying', 'unverified']],
 		'extension-queue': [4, ['deferred']],
 		'user-queue': [4, ['deferred']],
 		'user-steer': [4, ['deferred']],
@@ -131,7 +149,7 @@ try {
 		'abort-after': [4, ['retrying', 'cancelled']],
 		stale: [3, []],
 	};
-	for (scenario of Object.keys(cases)) {
+	for (scenario of Object.keys(cases).filter(name => process.argv.length <= 3 || process.argv.slice(3).includes(name))) {
 		if (scenario !== 'success') { send({ type: 'prompt', text: '/new' }); await snapshot(state => !state.messages.length); }
 		count = 0; sawRead = false; phase = 'initial'; releaseModel = undefined;
 		send({ type: 'prompt', text: '读取文件并验证，完成后更新任务。' });
@@ -147,21 +165,39 @@ try {
 			releaseModel();
 		}
 		const [expectedCalls, expectedStatuses] = cases[scenario];
-		const state = await snapshot(state => count >= expectedCalls && !state.isStreaming);
+		const state = await snapshot(state => count > 0 && !state.isStreaming);
+		let finalState = state;
 		assert.equal(count, expectedCalls, scenario);
 		assert.deepEqual(repairStatuses(state), expectedStatuses, `${scenario}: ${JSON.stringify(state.messages.filter(m => m.role === "custom"))}`);
 		if (scenario === 'success') { assert(sawRead); assert.equal(state.taskProgress.status, 'done'); }
 		if (['repeat', 'plain-stop'].includes(scenario)) assert.equal(state.taskProgress.status, 'waiting');
 		if (scenario === 'tool-error') assert.equal(state.taskProgress.status, 'failed');
 		if (scenario.startsWith('abort-')) assert.equal(state.taskProgress.status, 'cancelled');
+		if (['extension-queue', 'user-queue', 'user-steer'].includes(scenario)) {
+			assert.equal(state.messages.find(m => m.customType === 'tool-call-recovery').details.reason, 'queued-message');
+		}
 		if (scenario === 'stale') {
 			phase = 'probe'; count = 0;
 			send({ type: 'prompt', text: '暂停实施，只解释 XML 格式。' });
 			const after = await snapshot(state => count >= 2 && !state.isStreaming);
-			assert.equal(count, 2, 'historical in-progress todo must not authorize recovery');
-			assert.deepEqual(repairStatuses(after), ['deferred']);
+			finalState = after;
+			assert.equal(count, 2, 'format correction must not force implementation from historical todo');
+			assert.deepEqual(repairStatuses(after), ['retrying', 'unverified']);
+			assert(!after.messages.slice(state.messages.length).some(m => m.role === 'toolResult'), 'explanation-only request must not execute tools');
 		}
-		console.log(`PASS ${scenario}: model calls=${count}, recovery=${repairStatuses(state).join(',') || 'none'}`);
+		if (scenario.startsWith('resume-')) {
+			// Reopen from disk: continuation recovery cannot depend on a live WeakMap.
+			const path = state.sessionFile;
+			send({ type: 'prompt', text: '/new' }); await snapshot(state => !state.messages.length);
+			send({ type: 'switch_session', path }); await snapshot(state => state.sessionFile === path);
+			phase = 'continuation'; count = 0;
+			send({ type: 'prompt', text: scenario === 'resume-new-topic' ? '暂停实施，只解释原因。' : '怎么卡住了 可以帮我继续吗' });
+			const after = await snapshot(state => count > 0 && !state.isStreaming);
+			finalState = after;
+			assert.equal(count, scenario === 'resume-promise' ? 3 : scenario === 'resume-repeat-promise' ? 2 : 1, scenario);
+			assert.deepEqual(repairStatuses(after), scenario === 'resume-promise' ? ['retrying', 'unverified', 'retrying', 'resumed'] : scenario === 'resume-repeat-promise' ? ['retrying', 'unverified', 'retrying', 'unverified'] : ['retrying', 'unverified']);
+		}
+		console.log(`PASS ${scenario}: model calls=${count}, recovery=${repairStatuses(finalState).join(',') || 'none'}`);
 	}
 } finally {
 	releaseModel?.();

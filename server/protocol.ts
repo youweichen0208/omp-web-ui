@@ -12,6 +12,8 @@
 export interface ToolCallRecoveryDetails {
 	status: "retrying" | "resumed" | "failed" | "unverified" | "deferred" | "cancelled";
 	toolName: string;
+	/** Why correction yielded; absent on older persisted notices. */
+	reason?: "queued-message" | "new-instruction";
 }
 
 export interface UiTextBlock {
