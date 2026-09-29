@@ -1,4 +1,4 @@
-import { FiVolume2 } from "react-icons/fi";
+import { FiChevronDown, FiVolume2 } from "react-icons/fi";
 import type { SoundKind, SoundSettings } from "../sounds";
 import { useT } from "../i18n";
 
@@ -38,8 +38,9 @@ export function SoundSettingsPanel({
 		onChange({ ...settings, ...patch });
 
 	return (
-		<div className="sound-menu">
-			<div className="dd-header">{t("soundHeader")}</div>
+		<details className="sound-menu">
+			<summary className="sound-menu-summary"><FiVolume2 aria-hidden="true" /><span>{t("soundHeader")}</span><FiChevronDown className="sound-menu-caret" aria-hidden="true" /></summary>
+			<div className="sound-menu-options">
 
 			<label className="sound-row sound-master">
 				<span className="sound-label">
@@ -98,6 +99,7 @@ export function SoundSettingsPanel({
 				/>
 				<span className="sound-vol-num">{settings.volume}%</span>
 			</div>
-		</div>
+			</div>
+		</details>
 	);
 }

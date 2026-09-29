@@ -57,6 +57,10 @@ try {
 				const taskButton = await page.locator('.header-task-progress').boundingBox();
 				assert(taskButton.x + taskButton.width <= actions.x + 1, `${platform}/${width}/${view}: task overlaps tabs`);
 				const menu = page.locator('.topbar-actions .topbar-more .chip');
+				if (view === 'nodes') {
+					assert.equal(await page.locator('.topbar-more').count(), 0, 'nodes does not move settings into the top-right toolbar');
+					continue;
+				}
 				const box = await menu.boundingBox();
 				const hit = await menu.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); });
 				assert(hit && box.width >= 60, `${platform}/${width}/${view}: settings is clipped or covered`);
@@ -84,7 +88,11 @@ try {
 			}
 		}
 		await page.locator('.topbar-more .chip').click();
-		await page.locator('.dd-menu').getByRole('button', { name: '设置', exact: true }).click();
+		await page.locator('.workspace-settings-menu').screenshot({ path: `tests/scratch/settings-menu-${platform}.png` });
+		await page.locator('.sound-menu-summary').click();
+		await page.locator('.sound-master input').waitFor({ state: 'visible' });
+		await page.locator('.sound-menu-summary').click();
+		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="插件"]').click();
 		const builtin = page.locator('.set-row', { hasText: 'rpiv-todo · 内置任务清单' });
 		await builtin.waitFor();

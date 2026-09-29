@@ -55,6 +55,7 @@ try {
 	await page.locator('.change-card').first().waitFor();
 	assert.equal(await page.locator('.change-card').count(), 2, 'two writes keep separate diff cards');
 	await page.locator('.task-progress-head').waitFor();
+	assert.equal(await page.locator('.task-progress-source').textContent(), '执行记录 · 未创建计划', 'inferred activity is not presented as an explicit checklist');
 	assert.equal(await page.locator('.task-progress-heading > strong').count(), 0, 'task panel does not repeat the top-bar title');
 	assert.equal(await page.locator('.task-step-head').count(), 0, 'a single phase lists actions directly');
 	assert.equal(await page.locator('.change-card').first().locator('.change-line.add').count(), 1);
@@ -250,7 +251,7 @@ try {
 	await page.locator('.task-plan-card', { hasText: '计划 · 3 步' }).waitFor();
 	assert.equal(await page.locator('.task-plan-step').count(), 4);
 	assert((await page.locator('.task-plan-change').textContent()).includes('计划有变'));
-	assert.equal(await page.locator('.task-outline-title').textContent(), '接入 agent-runtime 子进程');
+	assert.equal(await page.locator('.task-outline-title').count(), 0, 'task panel starts with status rather than repeating the prompt as a title');
 	assert((await page.locator('.task-outline-criteria').textContent()).includes('llm_adjusted'));
 	assert.equal(await page.locator('.task-plan-step-detail').count(), 0);
 	await page.locator('.task-progress').screenshot({ path: '/private/tmp/pi-task-outline-running.png' });
@@ -284,6 +285,7 @@ try {
 	assert.equal(await page.locator('.task-plan-card-head', { hasText: '任务清单更新' }).getAttribute('aria-expanded'), 'false');
 	assert.equal(await page.locator('.task-todo-details').count(), 0);
 	await page.locator('.task-progress').screenshot({ path: '/private/tmp/pi-todo-waiting.png' });
+	assert.equal(await page.locator('.task-progress-source').textContent(), '任务清单', 'native todo state is explicitly labeled as a checklist');
 	state = { ...state, rev: todoState.rev + 1 };
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
 	await page.locator('.task-result', { hasText: 'f9c3a1e' }).waitFor();

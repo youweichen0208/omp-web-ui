@@ -9,6 +9,7 @@ import {
 	FiSearch,
 	FiPlus,
 	FiSettings,
+	FiTarget,
 	FiLayers,
 	FiTerminal,
 	FiMinus,
@@ -95,6 +96,7 @@ export function TopBar({
 	const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
 	useEffect(() => {
 		setMenuHost(!leftCollapsed ? document.getElementById("sidebar-settings-slot") : null);
+		if (view === "nodes") setMoreOpen(false);
 	}, [view, leftCollapsed]);
 	const [windowState, setWindowState] = useState<DesktopWindowState>({ maximized: false, fullscreen: false });
 	useEffect(() => desktopAPI?.onWindowState(setWindowState), []);
@@ -138,24 +140,25 @@ export function TopBar({
 						}
 						open={moreOpen}
 						onOpenChange={setMoreOpen}
+						menuClassName="workspace-settings-menu"
 					>
-						<div className="dd-header">{t("settings")}</div>
-						<DropdownItem onClick={() => { setMoreOpen(false); onOpenGoal(); }}>{t("goalBarTitle")}</DropdownItem>
 						<DropdownItem
 							onClick={() => {
 								setMoreOpen(false);
 								onOpenSettings();
 							}}
 						>
-							<FiSettings /> {t("settingsTitle")}
+							<FiSettings aria-hidden="true" /><span className="workspace-menu-label">{t("allSettings")}</span>
 						</DropdownItem>
+						<div className="dd-header workspace-menu-section">{t("quickActions")}</div>
+						<DropdownItem onClick={() => { setMoreOpen(false); onOpenGoal(); }}><FiTarget aria-hidden="true" /><span className="workspace-menu-label">{t("goalBarTitle")}</span></DropdownItem>
 						<DropdownItem
 							onClick={() => {
 								setMoreOpen(false);
 								onOpenGlobalSearch();
 							}}
 						>
-							<FiSearch /> {t("searchGlobal")}
+							<FiSearch aria-hidden="true" /><span className="workspace-menu-label">{t("searchGlobal")}</span>
 						</DropdownItem>
 						<DropdownItem
 							onClick={() => {
@@ -163,7 +166,7 @@ export function TopBar({
 								onOpenBgTasks();
 							}}
 						>
-							<FiLayers /> {t("bgTasks")}
+							<FiLayers aria-hidden="true" /><span className="workspace-menu-label">{t("bgTasks")}</span>
 							{chat.bgServers.length > 0 && (
 								<em className="bg-task-badge">{chat.bgServers.length}</em>
 							)}
@@ -367,7 +370,7 @@ export function TopBar({
 				</button>
 
 				{/* Mobile "⋯" panel — folds sound / language. */}
-				{menuHost ? createPortal(settingsMenu, menuHost) : settingsMenu}
+				{view !== "nodes" && (menuHost ? createPortal(settingsMenu, menuHost) : settingsMenu)}
 
 				<button
 					type="button"

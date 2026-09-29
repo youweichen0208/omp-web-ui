@@ -5,6 +5,13 @@ import { deriveTaskProgress } from "../../server/task-progress.js";
 const user = (id: string, text: string): UiMessage => ({ id, role: "user", timestamp: 100, content: [{ type: "text", text }] });
 const call = (id: string, name: string, args: object) => ({ type: "toolCall", id, name, argumentsText: JSON.stringify(args) });
 
+test("a numeric option reply keeps the task intent and never invents a todo plan", () => {
+	const messages: UiMessage[] = [user("u1", "实现预算校验并验证"), user("u2", "1"), { id: "a", role: "assistant", content: [{ type: "text", text: "工作区干净。" }, call("r", "read", { path: "README.md" })] }];
+	const task = deriveTaskProgress("c", messages, null, true);
+	expect(task?.title).toBe("实现预算校验并验证");
+	expect(task?.plan).toBeUndefined();
+});
+
 test("server groups narrative and adjacent tools into a stable current step", () => {
 	const messages: UiMessage[] = [user("u1", "搭建 API、worker 和 budget 模块"),
 		{ id: "a1", role: "assistant", timestamp: 110, content: [{ type: "text", text: "开始搭建三个模块的入口。" }, call("w1", "write", { path: "api/main.py", content: "a" }), call("w2", "write", { path: "worker/main.py", content: "b" })] },

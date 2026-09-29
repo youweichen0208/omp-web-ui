@@ -335,6 +335,10 @@ const zh = {
 
 	taskTodoUpdate: "任务清单更新",
 	taskWaitingContinue: "等待继续",
+	taskPlanSource: "任务清单",
+	taskPlanSourceHint: "按 agent 创建的清单跟踪步骤",
+	taskObservedSource: "执行记录 · 未创建计划",
+	taskObservedSourceHint: "由实际工具调用归纳，不代表 agent 已创建任务清单",
 	taskBlockedBy: "等待步骤 {steps} 完成",
 	taskCancelled: "已停止",
 	taskLongTool: "命令运行中",
@@ -905,6 +909,8 @@ const zh = {
 	/* settings modal */
 	settings: "设置",
 	settingsTitle: "设置",
+	allSettings: "所有设置",
+	quickActions: "快捷操作",
 	settingsAppearance: "外观",
 	settingsCodeTheme: "代码文件配色",
 	codeThemeLight: "浅色",
@@ -1324,6 +1330,10 @@ const en: Record<keyof typeof zh, string> = {
 
 	taskTodoUpdate: "Task list update",
 	taskWaitingContinue: "Waiting to continue",
+	taskPlanSource: "Task checklist",
+	taskPlanSourceHint: "Steps tracked from the checklist created by the agent",
+	taskObservedSource: "Activity · No plan created",
+	taskObservedSourceHint: "Summarized from tool calls; the agent has not created a task checklist",
 	taskBlockedBy: "Waiting for steps {steps}",
 	taskCancelled: "Stopped",
 	taskLongTool: "Command running",
@@ -1904,6 +1914,8 @@ const en: Record<keyof typeof zh, string> = {
 	/* settings modal */
 	settings: "Settings",
 	settingsTitle: "Settings",
+	allSettings: "All settings",
+	quickActions: "Quick actions",
 	settingsAppearance: "Appearance",
 	settingsCodeTheme: "Code file colors",
 	codeThemeLight: "Light",

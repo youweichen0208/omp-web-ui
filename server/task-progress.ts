@@ -8,7 +8,8 @@ const short = (text: string, limit: number) => {
 
 const continuation = /^(?:继续(?:吧|吗)?|可以(?:的|吧|了)?|好的?|开始|接着|可以(?:帮我)?继续(?:吗|吧)?|帮我继续(?:吗|吧)?|please continue|continue)[\s，。！!？?]*$/i;
 const nextStep = /^(?:(?:可以|能)?(?:帮我)?(?:开始|继续|接着|进行)(?:下一步|下个阶段|后续工作)?(?:吗|吧|了)?|下一步(?:呢|是什么)?)[\s，。！!？?]*$/i;
-const vagueRequest = (text: string) => continuation.test(text.trim()) || nextStep.test(text.trim());
+const optionReply = /^(?:[1-9]\d?|[A-D])(?:[.、)）])?[\s。！!]*$/i;
+const vagueRequest = (text: string) => continuation.test(text.trim()) || nextStep.test(text.trim()) || optionReply.test(text.trim());
 const greeting = /^(?:hi|hello|hey|你好|嗨|在吗|谢谢)[\s，。！!？?]*$/i;
 
 function taskTitle(messages: UiMessage[], userIndex: number, steps: TaskStep[]): string {

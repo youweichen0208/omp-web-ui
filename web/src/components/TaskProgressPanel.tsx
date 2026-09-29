@@ -99,7 +99,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 				</div>
 			</div>
 			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span></div>
-			<strong className="task-outline-title">{title}</strong>
+			<div className="task-progress-source" title={t(task.plan ? "taskPlanSourceHint" : "taskObservedSourceHint")}>{t(task.plan ? "taskPlanSource" : "taskObservedSource")}</div>
 			{(task.status === "running" || task.status === "waiting") && task.plan?.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
 		</div>
 		{hasResult && <div className="task-result task-result-inline">{result.commit && <code title={result.commit.subject}>{result.commit.hash}</code>}{result.tests && <span className="success">{result.tests.passed}/{result.tests.total} {t("taskPassed")}</span>}{result.changes && <span className="task-result-counts"><span className="success">+{result.changes.added}</span> <span className="removed">−{result.changes.deleted}</span></span>}<button type="button" title={t("taskViewChanges")} onClick={() => onViewChanges(result.commit?.hash)}>{t("taskChanges")} ›</button></div>}

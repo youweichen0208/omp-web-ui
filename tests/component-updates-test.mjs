@@ -67,7 +67,7 @@ try {
 		await page.locator('.topbar-more .chip').waitFor();
 		await page.keyboard.press('Escape');
 		await page.locator('.topbar-more .chip').click();
-		await page.locator('.dd-menu').getByRole('button', { name: '设置', exact: true }).click();
+		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="组件更新"]').click();
 		await page.locator('.component-update-row', { hasText: 'pi Agent' }).waitFor();
 		const builtin = page.locator('.component-update-row', { hasText: 'rpiv-todo' });
