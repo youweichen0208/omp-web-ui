@@ -1,3 +1,4 @@
+import { packageManagerFor, updateTargets, checkComponents, componentRestartRequired, updateComponentPackage } from "./component-updates.js";
 import { boundedBashOperations } from "./bounded-bash.js";
 import { toolOutputUpdate } from "./tool-output.js";
 import { ThinkingTimings, ThinkingDurationStore } from "./thinking-timing.js";
@@ -105,7 +106,8 @@ import {
 	type AgentMessage,
 } from "./serialize.js";
 import { deriveTaskProgress } from "./task-progress.js";
-import { makeTaskPlanTool, TASK_PLAN_GUIDANCE } from "./task-plan-tool.js";
+import { adaptTodoExtensions, TODO_EXTENSION_PATH } from "./todo-extension.js";
+import { taskHistoryFromSession } from "./todo-progress.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -998,6 +1000,7 @@ export class ClientSession {
 				// 值——因此 session.reload() 即可让系统提示词 / 技能 / 插件开关生效，
 				// 新对话（新 runtime）也会自动带上当前设置。
 				resourceLoaderOptions: {
+					additionalExtensionPaths: [TODO_EXTENSION_PATH],
 					// 系统提示词：replace 模式整体替换；append 模式追加到提示词末尾。
 					systemPromptOverride: (base?: string) => {
 						// Remember the built-in default so the settings panel can show
@@ -1027,7 +1030,6 @@ export class ClientSession {
 							// 而不是一次性 bash——没有这段模型几乎从不主动选终端工具。
 							out.push(TERMINAL_TOOLS_GUIDANCE);
 						}
-						out.push(TASK_PLAN_GUIDANCE);
 						return out;
 					},
 					// 技能开关：禁用的技能从系统提示词和 /skill: 目录中剔除。
@@ -1042,7 +1044,7 @@ export class ClientSession {
 					// 匹配 —— isExtensionDisabled 同时比对 npm:<pkg> 候选键。
 					extensionsOverride: (res) => ({
 						...res,
-						extensions: res.extensions.filter(
+						extensions: adaptTodoExtensions(res.extensions).filter(
 							(e) => !isExtensionDisabled(e, this.settingsSvc.current.disabledExtensions),
 						),
 					}),
@@ -1055,7 +1057,6 @@ export class ClientSession {
 				// 覆盖），执行时把自己的 AbortController 注册进客户端集合——
 				// abortBash() 只杀这些命令，agent run 与对话继续。
 				customTools: [
-					makeTaskPlanTool(),
 					// bash 双实现动态分流：「终端接管」开启时命令跑进持久可见终端
 					// （保留 shell 状态、静默自动转后台），关闭时是原生 killable bash。
 					makeAdaptiveBashTool(
@@ -1658,7 +1659,7 @@ export class ClientSession {
 			// it here is what makes thinking + text stream into the browser at
 			// ~60ms granularity instead of appearing only when the turn finishes.
 			streamingMessage,
-			taskProgress: deriveTaskProgress(conv.id, messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
+			taskProgress: deriveTaskProgress(conv.id, taskHistoryFromSession(conv.session.sessionManager, (message) => this.serializeCached(message)) ?? messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
 			isStreaming: this.session.isStreaming,
 			model: model
 				? {
@@ -1881,7 +1882,7 @@ export class ClientSession {
 			// Fetch the full package doc (not /latest): it carries the per-version
 			// publish timestamps so the UI can hint when a version was JUST
 			// published and the registry/CDN caches may not have caught up yet.
-			const res = await fetch("https://registry.npmjs.org/pi-web-ui", {
+			const res = await fetch("https://registry.npmjs.org/@youweichen%2fpi-web-ui", {
 				signal: AbortSignal.timeout(8_000),
 			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1910,6 +1911,36 @@ export class ClientSession {
 				upToDate: false,
 				error: `检查更新失败：${(err as Error).message}`,
 			});
+		}
+	}
+
+	async checkComponentUpdates(requestId: string): Promise<void> {
+		const session = this.session;
+		const cwd = this.cwd;
+		this.emit({ type: "component_updates", requestId, cwd, phase: "checking", items: [] });
+		try {
+			const manager = packageManagerFor(session, cwd, this.agentDir);
+			const items = await checkComponents(updateTargets(session, manager));
+			this.emit({ type: "component_updates", requestId, cwd, phase: "ready", items, restartRequired: componentRestartRequired() });
+		} catch (error) {
+			this.emit({ type: "component_updates", requestId, cwd, phase: "error", items: [], error: String(error) });
+		}
+	}
+
+	async updateComponent(requestId: string, id: string): Promise<void> {
+		const cwd = this.cwd;
+		const session = this.session;
+		this.emit({ type: "component_updates", requestId, cwd, phase: "updating", items: [] });
+		try {
+			const manager = packageManagerFor(session, cwd, this.agentDir);
+			const targets = updateTargets(session, manager);
+			await updateComponentPackage(targets, id, (source) => manager.update(source));
+			// SDK modules may be shared by other conversations. Restart, rather than
+			// hot-swapping one session and claiming every session now runs new code.
+			const items = await checkComponents(updateTargets(session, manager));
+			this.emit({ type: "component_updates", requestId, cwd, phase: "updated", items, restartRequired: true });
+		} catch (error) {
+			this.emit({ type: "component_updates", requestId, cwd, phase: "error", items: [], error: error instanceof Error ? error.message : String(error) });
 		}
 	}
 

@@ -275,7 +275,16 @@ try {
 	await page.locator('.task-progress-menu-trigger').click();
 	await page.getByRole('button', { name: '定位到最终回复' }).waitFor();
 	await page.locator('.task-progress-menu-trigger').click();
-	state = { ...state, rev: completedPlan.rev + 1 };
+	const todoState = { ...plannedState, rev: completedPlan.rev + 1, isStreaming: false, messages: [{ id: 'todo-user', role: 'user', content: [{ type: 'text', text: '实施任务' }] }, { id: 'todo-call', role: 'assistant', content: [{ type: 'toolCall', id: 'todo-update', name: 'todo', argumentsText: '{"action":"update","id":1,"status":"in_progress"}' }] }, { id: 'todo-result', role: 'toolResult', toolCallId: 'todo-update', content: [{ type: 'text', text: 'Updated #1 (pending → in_progress)' }] }], taskProgress: { ...plannedState.taskProgress, id: 'todo-native', status: 'waiting', endedAt: Date.now(), plan: { ...plannedState.taskProgress.plan, source: 'todo', items: [{ id: '1', title: '确认需求', status: 'running' }, { id: '2', title: '实施方案', status: 'pending', blockedBy: ['1'] }] } } };
+	socket.send(JSON.stringify({ type: 'snapshot', state: todoState }));
+	await page.locator('.task-progress-status', { hasText: '等待继续' }).waitFor();
+	assert.equal(await page.locator('.task-plan-step.done').count(), 0);
+	await page.locator('.task-plan-step-head', { hasText: '实施方案' }).click();
+	await page.getByText('等待步骤 #1 完成', { exact: true }).waitFor();
+	assert.equal(await page.locator('.task-plan-card-head', { hasText: '任务清单更新' }).getAttribute('aria-expanded'), 'false');
+	assert.equal(await page.locator('.task-todo-details').count(), 0);
+	await page.locator('.task-progress').screenshot({ path: '/private/tmp/pi-todo-waiting.png' });
+	state = { ...state, rev: todoState.rev + 1 };
 	socket.send(JSON.stringify({ type: 'snapshot', state }));
 	await page.locator('.task-result', { hasText: 'f9c3a1e' }).waitFor();
 	await page.locator('.task-result button[title="查看改动"]').click();

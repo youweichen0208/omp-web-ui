@@ -11,7 +11,7 @@
 // skill/extension toggle round-trip (see settings-live flow in git history).
 // Usage: npm run build && node settings-test.mjs [port]
 import WebSocket from "ws";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -19,6 +19,11 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.argv[2] || 8931);
 const DATA_DIR = mkdtempSync(join(tmpdir(), "pi-web-set-test-"));
 console.log("data-dir:", DATA_DIR);
+const extensionRoot = join(DATA_DIR, "agent", "extensions");
+mkdirSync(join(extensionRoot, "sample-directory"), { recursive: true });
+writeFileSync(join(extensionRoot, "sample-directory", "index.ts"), "export default function () {}\n");
+writeFileSync(join(extensionRoot, "custom-footer.ts"), "export default function () {}\n");
+
 
 const server = spawn(process.execPath, ["dist/server/index.js"], {
 	env: {
@@ -105,6 +110,11 @@ try {
 	check("settings_state pushed on attach", !!st0.settings);
 	check("has skills array", Array.isArray(st0.settings.skills));
 	check("has extensions array", Array.isArray(st0.settings.extensions));
+	const builtinTodo = st0.settings.extensions.find((e) => e.builtin === "todo");
+	check("bundled todo has a recognizable built-in label", builtinTodo?.name === "rpiv-todo");
+	check("directory entry uses its extension name", st0.settings.extensions.some((e) => e.name === "sample-directory"));
+	check("standalone extension uses its own name", st0.settings.extensions.some((e) => e.name === "custom-footer"));
+
 	check("has presets array", Array.isArray(st0.settings.presets));
 	check("default promptMode=append", st0.settings.promptMode === "append");
 	check(
@@ -179,13 +189,14 @@ try {
 	}
 
 	// extension toggle
-	const extId = st0.settings.extensions[0]?.id;
+	const extId = builtinTodo?.id;
 	if (extId) {
 		c.send({ type: "set_settings", disabledExtensions: [extId] });
 		const st5 = await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.includes(extId));
 		check("extension disabled", st5.settings.disabledExtensions.includes(extId));
 		const e = st5.settings.extensions.find((x) => x.id === extId);
 		check("disabled extension still listed", e && !e.enabled);
+		check("disabled builtin retains its label", e?.name === "rpiv-todo" && e?.builtin === "todo");
 		c.send({ type: "set_settings", disabledExtensions: [] });
 		await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.length === 0);
 		check("extension re-enabled", true);

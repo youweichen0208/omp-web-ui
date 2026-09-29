@@ -134,7 +134,7 @@ async function main() {
 		"agent exposes persistent terminal tools",
 		["terminal_create", "terminal_list", "terminal_close", "terminal_input", "terminal_key", "terminal_read"].every((name) => snapshotReply?.tools?.includes(name)),
 	);
-	check("agent exposes task_plan for long tasks", snapshotReply?.tools?.includes("task_plan"));
+	check("agent exposes native todo instead of task_plan", snapshotReply?.tools?.includes("todo") && !snapshotReply?.tools?.includes("task_plan"));
 
 	// -- commands: list (fresh dir -> empty), save, list again -----------------
 	send({ type: "list_commands" });

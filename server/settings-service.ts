@@ -6,8 +6,10 @@
  * 预设存取 + 何时需要 reload」，真正动 runtime 的 session.reload() 走宿主回调
  * （reloadSession 里还会刷新斜杠命令目录）。
  */
+import { extensionDisplay } from "./extension-display.js";
+import { TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { existsSync, readdirSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ServerMessage, UiExtensionInfo, UiSettingsState, UiSkillInfo, UiVisionBridgeModel } from "./protocol.js";
 import { extensionKey, type ClientStateStore, type ClientSettings, type PromptMode } from "./client-state.js";
@@ -147,10 +149,7 @@ export class SettingsService {
 				const p = e.sourceInfo?.path ?? e.path;
 				this.knownExtensions.set(id, {
 					id,
-					name:
-						e.sourceInfo?.origin === "package" && e.sourceInfo.source
-							? e.sourceInfo.source
-							: basename(p),
+					...extensionDisplay(p, e.sourceInfo?.origin === "package" ? e.sourceInfo.source : undefined, TODO_EXTENSION_PATH),
 					path: p,
 					enabled: true,
 				});
@@ -189,8 +188,8 @@ export class SettingsService {
 			if (!this.knownExtensions.has(id)) {
 				this.knownExtensions.set(id, {
 					id,
-					name: id.startsWith("npm:") ? id : basename(id),
-					path: "",
+					...extensionDisplay(id.startsWith("npm:") ? "" : id, id.startsWith("npm:") ? id : undefined, TODO_EXTENSION_PATH),
+					path: id.startsWith("npm:") ? "" : id,
 					enabled: false,
 				});
 			}

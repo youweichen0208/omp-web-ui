@@ -15,10 +15,12 @@ import {
 	FiX,
 	FiZap,
 } from "react-icons/fi";
+import { ComponentUpdates } from "./ComponentUpdates";
 import { CopyButton } from "./copy-button";
 import { PluginSettingsForm } from "./PluginSettingsForm";
 import type {
 	ClientMessage,
+	ServerMessage,
 	CommandDef,
 	UiExtensionInfo,
 	UiPluginInfo,
@@ -47,6 +49,8 @@ interface SettingsTerminalBridge {
 
 interface SettingsModalProps {
 	chat: {
+		ready: boolean;
+		componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 		settings: UiSettingsState | null;
 		plugins: UiPluginInfo[];
 		terminals: {
@@ -148,6 +152,7 @@ type SettingsTab =
 	| "appearance"
 	| "skills"
 	| "extensions"
+	| "updates"
 	| "plugins"
 	| "review"
 	| "vision"
@@ -235,6 +240,7 @@ export function SettingsModal({
 		{ id: "appearance", icon: <FiEye />, label: t("settingsAppearance") },
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
 		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length },
+		{ id: "updates", icon: <FiRefreshCw />, label: t("componentUpdates"), count: chat.componentUpdates?.cwd === chat.state?.cwd ? chat.componentUpdates?.items.filter((item) => item.status === "available").length : undefined },
 		{ id: "plugins", icon: <FiBox />, label: t("settingsUiPlugins"), count: chat.plugins.length },
 		{ id: "review", icon: <FiZap />, label: t("settingsReview"), count: settings.reviewSkills.length },
 		{ id: "vision", icon: <FiEye />, label: t("settingsVisionBridge") },
@@ -603,6 +609,7 @@ export function SettingsModal({
 				</div>
 				)}
 
+				{tab === "updates" && <ComponentUpdates report={chat.componentUpdates} cwd={chat.state?.cwd ?? ""} ready={chat.ready} send={send} />}
 				{/* ---- extensions ------------------------------------------------ */}
 				{tab === "extensions" && (
 				<div className="set-section">
@@ -616,11 +623,11 @@ export function SettingsModal({
 					) : (
 						<div className="set-list">
 							{settings.extensions.map((e) => {
-								const pkgName = e.id.startsWith("npm:") ? e.id.slice(4) : null;
+								const pkgName = !e.builtin && e.id.startsWith("npm:") ? e.id.slice(4) : null;
 								return (
 									<ToggleRow
 										key={e.id}
-										title={e.name}
+										title={e.builtin === "todo" ? `${e.name} · ${t("builtinTaskList")}` : e.name}
 										subtitle={e.path}
 										enabled={e.enabled}
 										onToggle={() => toggleExtension(e)}

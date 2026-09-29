@@ -27,6 +27,7 @@ const WIN32_KNOWN_ENV_FAIL = new Set(["terminal-smoke-test", "restart-handoff-te
 
 const ALL = [
 	"clear-provider-key-test",
+	"component-updates-test",
 	"conv-cwd-test",
 	"db-client-test",
 	"fetch-models-test",
@@ -58,6 +59,7 @@ const ALL = [
 	"steer-queue-smoke",
 	"switch-session-background-test",
 	"terminal-smoke-test",
+	"todo-extension-test",
 	"vision-bridge-test",
 	"version-handshake-test",
 	"vscode-editor-plugin-test",

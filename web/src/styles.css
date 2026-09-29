@@ -9716,3 +9716,16 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 	.design-workspace .view-pane:not(.preview-open) > .drawer-right,
 	html.pi-desktop .design-workspace .view-pane:not(.preview-open) > .drawer-right { top: 44px; }
 }
+
+/* Todo updates stay compact; waiting is a paused task, not an active run. */
+.task-todo-details { padding: 8px 12px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.task-progress.waiting .task-plan-mark { animation: none; color: var(--text-dim); }
+
+/* Component version checks in settings. */
+.component-updates .set-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.component-update-row { align-items: center; }
+.component-update-tag { font-size: 11px; color: var(--text-dim); margin-left: 8px; font-weight: 400; }
+.component-update-state { font-size: 12px; margin-top: 5px; color: var(--text-dim); }
+.component-update-state.available { color: var(--accent); }
+.component-update-error { color: var(--red); font-size: 12px; overflow-wrap: anywhere; }
+.component-update-notice { padding: 10px 12px; background: var(--bg-elev); border-radius: 6px; }

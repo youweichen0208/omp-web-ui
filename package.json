@@ -1,6 +1,6 @@
 {
   "name": "@youweichen/pi-web-ui",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "description": "Web chat interface for the pi coding agent, powered by the pi SDK (@earendil-works/pi-coding-agent) — one-command run, Docker/systemd/launchd deployable",
   "license": "MIT",
   "author": {
@@ -70,6 +70,7 @@
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.2",
     "@earendil-works/pi-coding-agent": "^0.84.2",
+    "@juicesharp/rpiv-todo": "2.11.0",
     "compression": "^1.8.1",
     "electron-updater": "^6.0.0",
     "express": "^4.21.2",

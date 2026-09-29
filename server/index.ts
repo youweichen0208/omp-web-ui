@@ -697,6 +697,17 @@ wss.on("connection", (ws) => {
 			case "complete_path":
 				void cs.completePath(msg.path);
 				break;
+			case "check_component_updates":
+				void cs.checkComponentUpdates(msg.requestId);
+				break;
+			case "update_component":
+				if (service.quiesceInfo().quiesced || service.activeConversations() || service.pendingMessages()) {
+					send({ type: "component_updates", requestId: msg.requestId, cwd: cs.cwd, phase: "error", items: [], error: "请等待所有任务结束后再更新扩展" });
+				} else {
+					service.quiesce();
+					void cs.updateComponent(msg.requestId, msg.id).finally(() => service.unquiesce());
+				}
+				break;
 			case "check_update":
 				void cs.checkUpdate();
 				break;

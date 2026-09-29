@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.8.0 正式版
+
+`0.8.0` 内置原生 rpiv-todo 任务清单，改进扩展名称展示，并新增组件更新检查和用户扩展手动更新。pi Agent 与内置任务清单随应用升级；npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.0.md`。
+
 ## 0.7.4 正式版
 
 `0.7.4` 修复会话切换后的空白终端与 `/new` 重置行为，更新工作区顶栏、运行命令和任务提纲，并明确 `task_plan` 与 skill 的流程边界。npm 与三平台桌面版统一版本；说明见 `.github/release-notes/v0.7.4.md`。

@@ -82,14 +82,16 @@ export interface TaskProgress {
 	conversationId: string;
 	sourceMessageId: string;
 	title: string;
-	status: "running" | "done" | "failed" | "cancelled";
+	status: "running" | "waiting" | "done" | "failed" | "cancelled";
 	startedAt: number;
 	/** Last recorded reply/tool timestamp for a completed turn. */
 	endedAt?: number;
 	completed: number;
 	steps: TaskStep[];
-	/** Explicit revisions supplied by pi's task_plan tool for long tasks. */
+	/** Explicit todo state, or a legacy task_plan transcript. */
 	plan?: {
+		source?: "todo";
+		origin?: string;
 		revision: number;
 		added: number;
 		removed: number;
@@ -97,7 +99,7 @@ export interface TaskProgress {
 		completionCriteria?: string;
 		changeSummary?: string;
 		changes?: { kind: "added" | "removed" | "updated"; title: string; position?: number }[];
-		items: { id: string; title: string; detail?: string; toolCallIds?: string[]; status: "pending" | "running" | "done" | "removed"; added?: boolean; startedAt?: number; endedAt?: number; actions?: { read: number; write: number; edit: number; command: number } }[];
+		items: { id: string; title: string; detail?: string; toolCallIds?: string[]; blockedBy?: string[]; status: "pending" | "running" | "done" | "removed"; added?: boolean; startedAt?: number; endedAt?: number; actions?: { read: number; write: number; edit: number; command: number } }[];
 	};
 }
 
@@ -393,6 +395,8 @@ export type ClientMessage =
 	// -- self-update ----------------------------------------------------------
 	/** Check the npm registry for a newer pi-web-ui version. */
 	| { type: "check_update" }
+	| { type: "check_component_updates"; requestId: string }
+	| { type: "update_component"; requestId: string; id: string }
 	// -- pi agent setup ------------------------------------------------------
 	/** Auto-install the pi agent (mkdir config dir + npm i -g the CLI). */
 	| { type: "install_pi_agent" }
@@ -872,12 +876,26 @@ export interface UiSkillInfo {
 
 /** One loaded extension, with whether it is currently enabled. Disabled
  *  extensions are unloaded from the runtime (tools/commands disappear). */
+export interface ComponentUpdate {
+	id: string;
+	name: string;
+	current: string | null;
+	latest: string | null;
+	kind: "bundled" | "npm" | "git" | "local";
+	scope?: "user" | "project";
+	status: "available" | "current" | "pinned" | "manual" | "unknown" | "error";
+	canUpdate: boolean;
+	error?: string;
+}
+
 export interface UiExtensionInfo {
 	/** Stable identity for the toggle: the npm spec for packages, the resolved
 	 *  entry path otherwise. */
 	id: string;
-	/** Display label: npm package spec (npm:pi-foo) or the path basename. */
+	/** Human-readable package, directory or standalone extension name. */
 	name: string;
+	/** Bundled functionality, labeled by the browser in the active language. */
+	builtin?: "todo";
 	/** Resolved entry path. */
 	path: string;
 	enabled: boolean;
@@ -1217,6 +1235,7 @@ export type ServerMessage =
 	 *  extensions, saved presets). Pushed on attach and after every settings
 	 *  change. */
 	| { type: "settings_state"; settings: UiSettingsState }
+	| { type: "component_updates"; requestId: string; cwd: string; phase: "checking" | "ready" | "updating" | "updated" | "error"; items: ComponentUpdate[]; restartRequired?: boolean; error?: string }
 	// -- plugins (<dataDir>/plugins) -----------------------------------------
 	/** Installed-plugin catalog. Pushed on attach (the dir is re-scanned each
 	 *  time so freshly dropped plugins appear without a server restart) and

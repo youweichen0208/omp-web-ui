@@ -111,6 +111,7 @@ export interface ChatState {
 	installResult: { ok: boolean; detail: string } | null;
 	/** Path completions for the cwd input. */
 	pathCompletions: { name: string; path: string; type: "dir" | "file" }[];
+	componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 	/** Self-update status (result of check_update). */
 	update: {
 		current: string;
@@ -272,6 +273,8 @@ type Action =
 				error?: string;
 			};
 	  }
+	| { type: "component_updates"; result: Extract<ServerMessage, { type: "component_updates" }> }
+	| { type: "component_updates_start"; requestId: string; cwd: string; updating: boolean }
 	| { type: "widgets"; widgets: { key: string; lines: string[] }[] }
 	| { type: "statuses"; statuses: { key: string; text: string | undefined }[] }
 	| {
@@ -604,6 +607,11 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, scmDirty: state.scmDirty + 1 };
 		case "path_completions":
 			return { ...state, pathCompletions: action.completions };
+		case "component_updates_start":
+			return { ...state, componentUpdates: { type: "component_updates", requestId: action.requestId, cwd: action.cwd, phase: action.updating ? "updating" : "checking", items: action.updating && state.componentUpdates?.cwd === action.cwd ? state.componentUpdates.items : [] } };
+		case "component_updates":
+			if (state.componentUpdates?.requestId !== action.result.requestId) return state;
+			return { ...state, componentUpdates: { ...action.result, items: action.result.items.length ? action.result.items : state.componentUpdates.items } };
 		case "update_status":
 			return { ...state, update: action.status };
 		case "widgets":
@@ -743,6 +751,7 @@ export function useChat() {
 		installResult: null,
 		pathCompletions: [],
 		update: null,
+		componentUpdates: null,
 		widgets: [],
 		statuses: [],
 		dialog: null,
@@ -859,6 +868,7 @@ export function useChat() {
 		}
 		if (ws && ws.readyState === WebSocket.OPEN) {
 			if (!snapshotReady.current && msg.type !== "get_state") return false;
+			if (msg.type === "check_component_updates" || msg.type === "update_component") dispatch({ type: "component_updates_start", requestId: msg.requestId, cwd: authoritative.current.state?.cwd ?? "", updating: msg.type === "update_component" });
 			if (msg.type === "set_cwd") {
 				const current = authoritative.current;
 				const display = cache.current.get(msg.path);
@@ -1137,6 +1147,9 @@ export function useChat() {
 					break;
 				case "path_completions":
 					dispatch({ type: "path_completions", completions: msg.completions });
+					break;
+				case "component_updates":
+					dispatch({ type: "component_updates", result: msg });
 					break;
 				case "update_status":
 					dispatch({ type: "update_status", status: msg });

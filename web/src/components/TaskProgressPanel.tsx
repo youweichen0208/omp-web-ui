@@ -67,8 +67,8 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	const finalMessage = messages.slice(messages.findIndex((message) => message.id === task.sourceMessageId) + 1).findLast((message) => message.role === "assistant" && message.content.some((part) => part.type === "text"));
 	const jump = (messageId: string) => window.dispatchEvent(new CustomEvent("pi:jump-message", { detail: { messageId } }));
 	const jumpTool = (messageId: string, toolCallId: string) => window.dispatchEvent(new CustomEvent("pi:jump-tool", { detail: { messageId, toolCallId } }));
-	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("working") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
-	const hasResult = task.status !== "running" && !single && !!(result.commit || result.tests || result.changes);
+	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("working") : task.status === "waiting" ? t("taskWaitingContinue") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
+	const hasResult = task.status === "done" && !single && !!(result.commit || result.tests || result.changes);
 	const finalTestPhase = phases.findLast((phase) => phase.kind === "test" || phase.kind === "fix")?.id;
 	const title = plainTitle(task.plan?.title || task.title || conversationTitle);
 	const preview = (path: string) => { const relative = path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path; onPreview(relative, relative.split("/").at(-1) ?? relative); };
@@ -85,7 +85,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 		setMenuOpen(false);
 	};
 	useEffect(() => { if (task.status !== "running" && (!hasResult || !!task.plan)) setShowProcess(true); }, [task.status, hasResult, !!task.plan]);
-	return <div className="task-progress" tabIndex={-1} aria-label={t("taskProgress")}>
+	return <div className={`task-progress ${task.status}`} tabIndex={-1} aria-label={t("taskProgress")}>
 		<div className="task-progress-head">
 			<div className="task-progress-heading">
 				<div className="task-progress-menu" ref={menuRef}>
@@ -100,7 +100,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 			</div>
 			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span></div>
 			<strong className="task-outline-title">{title}</strong>
-			{task.status === "running" && task.plan?.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
+			{(task.status === "running" || task.status === "waiting") && task.plan?.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
 		</div>
 		{hasResult && <div className="task-result task-result-inline">{result.commit && <code title={result.commit.subject}>{result.commit.hash}</code>}{result.tests && <span className="success">{result.tests.passed}/{result.tests.total} {t("taskPassed")}</span>}{result.changes && <span className="task-result-counts"><span className="success">+{result.changes.added}</span> <span className="removed">−{result.changes.deleted}</span></span>}<button type="button" title={t("taskViewChanges")} onClick={() => onViewChanges(result.commit?.hash)}>{t("taskChanges")} ›</button></div>}
 
@@ -122,6 +122,7 @@ function PlanStepRow({ item, index, now, taskEndedAt, activeArtifact, changes, o
 		{item.status === "running" && activeArtifact && <small className="task-plan-current-file" title={activeArtifact}>{activeArtifact}</small>}
 		{open && <div className="task-plan-step-detail">
 			{detail && <p>{detail}</p>}
+			{!!item.blockedBy?.length && <p>{t("taskBlockedBy", { steps: item.blockedBy.map((id) => `#${id}`).join(", ") })}</p>}
 			{artifacts.map(({ artifact, messageId }) => <ArtifactRow key={artifact.toolCallId} item={artifact} change={changes.find((change) => change.toolCallId === artifact.toolCallId)?.count} onPreview={onPreview} onJump={() => onJump(messageId)} onJumpTool={() => onJumpTool(messageId, artifact.toolCallId)} />)}
 			{!detail && !artifacts.length && <small>{t("taskNoStepDetails")}</small>}
 		</div>}

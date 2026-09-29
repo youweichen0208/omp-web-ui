@@ -1,3 +1,4 @@
+import { todoPlanFromTranscript } from "./todo-progress.js";
 import type { TaskProgress, TaskStep, UiMessage, UiToolCallBlock } from "./protocol.js";
 
 const short = (text: string, limit: number) => {
@@ -123,13 +124,16 @@ function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, 
 /** P0: infer the current task from the server's serialized transcript. The
  * transcript remains authoritative; no browser heuristic decides completion. */
 export function deriveTaskProgress(conversationId: string, messages: UiMessage[], streamingMessage: UiMessage | null, isStreaming: boolean, turnEndedAt?: number): TaskProgress | null {
-	const userIndex = messages.findLastIndex((message) => message.role === "user" && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
-	if (userIndex < 0) return null;
+	const recordedTodo = todoPlanFromTranscript(messages);
+	const latestUserIndex = messages.findLastIndex((message) => message.role === "user" && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
+	if (latestUserIndex < 0) return null;
+	const todo = recordedTodo && (recordedTodo.lastMutationIndex >= latestUserIndex || recordedTodo.plan.items.some((item) => item.status === "running" || item.status === "pending")) ? recordedTodo : undefined;
+	const userIndex = todo && !todo.cleared ? todo.startIndex : latestUserIndex;
 	const user = messages[userIndex];
 	const tail = [...messages.slice(userIndex + 1), ...(streamingMessage?.role === "assistant" ? [streamingMessage] : [])];
 	// A plain conversation is not a task. Create the panel only after pi has
 	// actually invoked a tool in this turn.
-	if (!tail.some((message) => message.role === "assistant" && message.content.some((part) => part.type === "toolCall"))) return null;
+	if ((!todo || todo.cleared) && !tail.some((message) => message.role === "assistant" && message.content.some((part) => part.type === "toolCall"))) return null;
 	const results = new Map(tail.filter((message) => message.role === "toolResult" && message.toolCallId).map((message) => [message.toolCallId!, message]));
 	const steps: TaskStep[] = [];
 	for (const message of tail) {
@@ -154,7 +158,7 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 		};
 		for (const part of message.content) {
 			if (part.type === "toolCall" && typeof (part as UiToolCallBlock).id === "string") {
-				if ((part as UiToolCallBlock).name === "task_plan") { flush(); continue; }
+				if (["task_plan", "todo"].includes((part as UiToolCallBlock).name)) { flush(); continue; }
 				calls.push(part as UiToolCallBlock);
 			}
 			else if (part.type === "text" && typeof (part as { text?: unknown }).text === "string") { flush(); narrative = (part as { text: string }).text; }
@@ -165,15 +169,18 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 		const previous = [...tail].reverse().find((message) => message.role === "assistant");
 		steps.push({ id: `${user.id}:pending`, messageId: previous?.id ?? user.id, title: "正在分析请求", status: "running", startedAt: previous?.timestamp ?? user.timestamp ?? 0, artifacts: [] });
 	}
-	const cancelled = tail.some((message) => message.role === "assistant" && message.stopReason === "aborted");
+	const currentTail = messages.slice(latestUserIndex + 1).concat(streamingMessage ? [streamingMessage] : []);
+	const cancelled = currentTail.some((message) => message.role === "assistant" && message.stopReason === "aborted");
 	// Earlier failed commands can be followed by a successful fix or rerun.
 	// The latest completed tool group is the best observed outcome for this turn.
 	const lastCompleted = steps.findLast((step) => step.status !== "running");
 	const status: TaskProgress["status"] = cancelled ? "cancelled" : isStreaming ? "running" : lastCompleted?.status === "failed" ? "failed" : "done";
 	const plannedEnd = status === "done" ? Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0)) : undefined;
-	const plan = planFromTranscript(tail, results, steps, status === "done", plannedEnd);
+	const plan = todo && !todo.cleared ? todo.plan : todo ? undefined : planFromTranscript(tail, results, steps, status === "done", plannedEnd);
+	const planIncomplete = plan?.source === "todo" && plan.items.some((item) => item.status !== "done" && item.status !== "removed");
+	const taskStatus = planIncomplete && !isStreaming && !cancelled && status !== "failed" ? "waiting" : status;
 	if (!steps.length && !plan) return null;
-	const title = taskTitle(messages, userIndex, steps);
+	const title = plan?.title || taskTitle(messages, userIndex, steps);
 	const endedAt = status === "running" ? undefined : Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0));
-	return { id: `task:${user.id}`, conversationId, sourceMessageId: user.id, title, status, startedAt: user.timestamp ?? 0, ...(endedAt ? { endedAt } : {}), completed: steps.filter((step) => step.status === "done").length, steps, ...(plan ? { plan } : {}) };
+	return { id: `task:${plan?.origin ?? user.id}`, conversationId, sourceMessageId: user.id, title, status: taskStatus, startedAt: user.timestamp ?? 0, ...(endedAt ? { endedAt } : {}), completed: steps.filter((step) => step.status === "done").length, steps, ...(plan ? { plan } : {}) };
 }

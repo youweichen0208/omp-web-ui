@@ -101,7 +101,7 @@ export function TopBar({
 	const projectName = chat.state?.cwd?.split(/[\\/]/).filter(Boolean).at(-1);
 	const notGitRepo = chat.gitBranch?.cwd === chat.state?.cwd && !!chat.gitBranch?.notRepo;
 	const task = chat.state?.conversationId === chat.activeConversationId ? chat.state?.taskProgress : null;
-	const planItems = task?.status === "running" ? task.plan?.items.filter((item) => item.status !== "removed") ?? [] : [];
+	const planItems = (task?.status === "running" || task?.status === "waiting") ? task.plan?.items.filter((item) => item.status !== "removed") ?? [] : [];
 	const currentStep = planItems.findIndex((item) => item.status === "running");
 
 	const session = chat.sessions.find((item) => item.path === chat.state?.sessionFile);

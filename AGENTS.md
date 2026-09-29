@@ -41,10 +41,12 @@ pi-web-ui/
 │   ├── client-state.ts         # ClientStateStore：<dataDir>/client-state.json 持久化
 │   ├── uploads.ts              # 文件对话上传 + 保留期清理
 │   ├── bg-servers.ts           # 后台任务跟踪（bash 前后端口快照 diff + 存活刷新）
-│   ├── settings-service.ts     # 设置面板状态机
+│   ├── component-updates.ts    # pi Agent / 扩展版本检查、来源校验与包更新
+│   ├── settings-service.ts     # 设置面板状态机（扩展命名见 extension-display.ts）
 │   ├── goal-service.ts         # 目标/审查循环/调研向导
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
-│   ├── task-plan-tool.ts       # pi 的长任务计划工具（计划修订写入 transcript）
+│   ├── todo-extension.ts       # 原生 rpiv-todo 加载适配、Web 展示及工作流引导
+│   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData + 视觉桥）
@@ -156,7 +158,7 @@ pi-web-ui/
 | **SSH 节点** | `docs/architecture-nodes.md` | 修改 Xshell/SSH config 同步、凭据、执行确认或终端引用时阅读；本机 ssh2 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
-| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：实施阶段的长任务先给提纲，`task_plan` 只记录进度，不改变用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，结果来自本轮，历史任务尚未实现 |
+| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：原生 `rpiv-todo` 管理跨轮次清单，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
 | **工具挂死看门狗** | `docs/architecture-core.md` | 20 分钟超时自动 abort 会话；只停止运行不碰后台服务 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |

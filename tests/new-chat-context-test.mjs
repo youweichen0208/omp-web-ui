@@ -239,6 +239,8 @@ try {
 	await client.waitForMessage((message) => message.role === "assistant");
 	const chatRequests = requests.filter((request) => request.messages.some((message) => Array.isArray(message.content) && message.content.some((part) => part.text === "OLD_CONTEXT_SENTINEL" || part.text === "NEW_CONTEXT_SENTINEL")));
 	if (chatRequests.length !== 2) throw new Error("Expected two chat requests");
+	const tools = chatRequests[0].tools.map((tool) => tool.function.name);
+	if (!tools.includes("todo") || tools.includes("task_plan")) throw new Error("Expected native todo instead of task_plan");
 	if (requests.some((request) => request.messages.some((message) => message.content === "/new" || (Array.isArray(message.content) && message.content.some((part) => part.text === "/new"))))) throw new Error("/new was sent to the model");
 	if (JSON.stringify(chatRequests[1]).includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new leaked previous context into model request");
 	client.send({ type: "switch_session", path: historyPath });
