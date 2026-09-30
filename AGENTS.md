@@ -122,6 +122,7 @@ pi-web-ui/
 | `RightPanel.tsx` / `TaskProgressPanel.tsx` | 可展开目录树、Git 改动标记、文件预览；当前任务进度由服务端 transcript 推断，右栏展示合并后的任务阶段和结果；布局见 `docs/ui-design.md` |
 | `ChatInput.tsx` | 输入框 + 附件 chips（inline/reference/lines 三色）+ 当前文件 chip（镜像预览面板，发送取编辑器快照）；全窗口拖放目标；followUp 排队/steer 插队；斜杠命令选择器 |
 | `Message.tsx` / `MessageList.tsx` / `WorkingStatus.tsx` | 消息渲染、流式等待标题与静默状态、tool 结果关联；编辑重问、惰性窗口化、问题导航；等待态切换与间距见 `docs/ui-design.md` |
+| `TodoChecklist.tsx` | Web/桌面共用清单卡和变化行；修改连续更新合并、clear 身份隔离或任务项跳转时，读取 `web/src/todo-presentation.ts`、`docs/architecture-core.md` 和 `docs/ui-design.md` |
 | `ToolCallBlock.tsx` / `EditWriteCard.tsx` / `ThinkingBlock.tsx` / `BashBlock` | 通用工具卡片、编辑与写入的逐行 diff 卡片、思考块、bash 输出；编辑卡片的数据整理在 `web/src/edit-write-presentation.ts`，交互规则见 `docs/ui-design.md` |
 | `TerminalPanel.tsx` / `TermXterm.tsx` | 终端视图 + xterm 实例桥接 |
 | `SCMPanel.tsx` | 源代码管理（Git）视图：status/branch/diff；提交/推送/拉取/切换分支 |

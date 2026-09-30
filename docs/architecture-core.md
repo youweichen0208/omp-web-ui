@@ -92,7 +92,9 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 每项使用 subject/description/status/blockedBy；首项 metadata.title 和 metadata.completionCriteria 对应整体标题与完成标准，修改项 metadata.changeSummary 用于变更说明。建议 3–7 个实际步骤，按任务调整；问答、小修改和澄清不强制建实施清单。正在执行任务保持一项 in_progress，等待用户回答不自动 completed。已完成项按上游状态机不能重开，追加后续项；开始不同任务时 clear。依赖关系用于显示等待项，执行许可仍由用户与 skill 决定。
 
-没有 todo 的旧会话继续使用当前轮次工具阶段推断；旧 task_plan 完整提纲仍可展示。todo 的完整原始 details 不经消息序列化发送浏览器，只下发结构化 taskProgress。协议版本 24 增加 waiting 状态与 todo 来源、清单标识和依赖字段。
+没有 todo 的旧会话继续使用当前轮次工具阶段推断；旧 task_plan 完整提纲仍可展示。todo 的完整原始 details 不经消息序列化发送浏览器；右栏使用结构化 taskProgress，聊天使用 `UiMessage.todoSnapshot` 的精简投影（action/error、任务 id/subject/status，不含 metadata、params 或 description）。该字段为可选增量能力，旧结果缺失时保持普通工具行。协议版本 24 增加 waiting 状态与 todo 来源、清单标识和依赖字段。
+
+`web/src/todo-presentation.ts` 按工具调用顺序投影聊天清单：跨 assistant/toolResult 消息边界合并连续成功更新，正文、其他工具、用户消息及失败/未结束调用切开更新段；思考块保留，但不切开清单更新段。首个非空快照建立展开卡片，卡片反映该清单最新的成功状态，之后每段只记录相对段首的变化，未变化的 list/get 隐藏。clear 冻结旧卡片并重置身份，新清单即使复用数字 ID 也使用新卡片。失败调用保留原始错误展示。右栏依旧使用服务端权威清单；前端仅做展示，不修改 transcript 或执行状态。`TodoChecklist` 的“查看”沿用 `pi:jump-tool`，携带变化项 ID；MessageList 先展开并固定历史消息，再定位、聚焦并短暂高亮具体任务项。回归：`todo-presentation.test.ts`、`todo-chat-browser-test.mjs`。
 
 ### 工具挂死看门狗
 

@@ -5,6 +5,7 @@
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { UiContentBlock, UiMessage } from "./protocol.js";
+import { todoSnapshot } from "./todo-progress.js";
 
 /** AgentMessage is not re-exported from the package root; derive it from AgentSession. */
 export type AgentMessage = AgentSession["messages"][number];
@@ -122,6 +123,7 @@ export function serializeMessage(
 				.map((c) => (c.type === "text" ? c.text : "[image result]"))
 				.join("\n");
 			const { text, truncated } = truncate(raw, TOOL_OUTPUT_CAP);
+			const todo = m.toolName === "todo" ? todoSnapshot(m.details) : undefined;
 			return {
 				id: `t-${m.toolCallId}`,
 				role: "toolResult",
@@ -129,6 +131,11 @@ export function serializeMessage(
 				toolCallId: m.toolCallId,
 				toolName: m.toolName,
 				isError: m.isError,
+				...(todo ? { todoSnapshot: {
+					action: typeof todo.action === "string" ? todo.action : undefined,
+					error: typeof todo.error === "string" ? todo.error : undefined,
+					tasks: todo.tasks.map(({ id, subject, status }) => ({ id, subject, status })),
+				} } : {}),
 				timestamp: m.timestamp,
 			};
 		}

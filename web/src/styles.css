@@ -9732,6 +9732,30 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 
 /* Todo updates stay compact; waiting is a paused task, not an active run. */
 .task-todo-details { padding: 8px 12px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+
+/* ---- Chat todo checklist (shared by Web and Electron) ---- */
+.todo-checklist { margin: 8px 0; min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); overflow: hidden; }
+.todo-checklist-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font: 12px/1.5 var(--sans); color: var(--text-faint); }
+.todo-checklist-head strong { font-size: 13px; font-weight: 600; color: var(--text); }
+.todo-checklist-state { margin-left: auto; }
+.todo-checklist-items { list-style: none; margin: 0; padding: 6px 0; }
+.todo-checklist-item { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 5px 14px; color: var(--text-dim); font: 13px/1.65 var(--sans); overflow-wrap: anywhere; }
+.todo-checklist-mark { align-self: start; display: grid; place-items: center; width: 13px; height: 13px; margin-top: 4px; border: 1.5px solid var(--text-faint); border-radius: 50%; font: 10px/1 var(--sans); }
+.todo-checklist-item.in_progress { color: var(--text); }
+.todo-checklist-item.in_progress .todo-checklist-mark { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 3px var(--bg-elev); }
+.todo-checklist-item.completed, .todo-checklist-item.deleted { color: var(--text-faint); }
+.todo-checklist-item.completed .todo-checklist-mark, .todo-checklist-item.deleted .todo-checklist-mark { border-color: transparent; }
+.todo-checklist-item.deleted > span:last-child { text-decoration: line-through; }
+.todo-checklist-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.todo-update { display: flex; align-items: baseline; gap: 8px; margin: 8px 2px; color: var(--text-faint); font: 12px/1.6 var(--sans); }
+.todo-update > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.todo-update-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.todo-update button { flex: none; padding: 1px 3px; border: 0; border-radius: 3px; background: transparent; color: var(--text-faint); font: inherit; cursor: pointer; }
+.todo-update button:hover { color: var(--accent); }
+.todo-update button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.todo-item-flash { animation: todo-item-flash 1.8s ease-out; }
+@keyframes todo-item-flash { from, 35% { background: var(--accent-soft); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .todo-item-flash { animation: none; background: var(--accent-soft); } }
 .task-progress.waiting .task-plan-mark { animation: none; color: var(--text-dim); }
 
 /* Component version checks in settings. */

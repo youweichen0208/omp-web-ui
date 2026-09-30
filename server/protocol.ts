@@ -61,6 +61,13 @@ export type UiContentBlock =
 	| UiBashBlock
 	| { type: string; [k: string]: unknown };
 
+/** Allowlisted todo result for chat presentation; never includes extension metadata. */
+export interface UiTodoSnapshot {
+	action?: string;
+	error?: string;
+	tasks: { id: number; subject: string; status: "pending" | "in_progress" | "completed" | "deleted" }[];
+}
+
 export interface UiMessage {
 	/** Stable-ish id for React keys: u-<ts>-<seq> / a-<ts>-<seq> / t-<toolCallId>. */
 	id: string;
@@ -77,6 +84,7 @@ export interface UiMessage {
 	toolCallId?: string;
 	toolName?: string;
 	isError?: boolean;
+	todoSnapshot?: UiTodoSnapshot;
 	/** Extension-injected custom messages. */
 	customType?: string;
 	/** Extension-provided metadata (e.g. attachment file name/path). */

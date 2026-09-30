@@ -17,6 +17,7 @@ import { Message, asText } from "./Message";
 
 import { collectQuestionAttachments } from "../question-attachments";
 import { retriedEditIds as findRetriedEditIds } from "../edit-write-presentation";
+import { isAbsorbedTodoMessage, todoPresentation } from "../todo-presentation";
 
 import { parseSkillBlock } from "../skill-block";
 import { buildCollapsedGroups } from "../collapsed-groups";
@@ -194,6 +195,13 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		return m;
 	}, [state.messages]);
 	const retriedEditIds = useMemo(() => findRetriedEditIds(state.messages, toolResults), [state.messages, toolResults]);
+	// Most streaming frames only add text or arguments; keep the shared map stable
+	// so those frames do not force every historical Message to render again.
+	const todoStreamingMessage = state.streamingMessage?.content.some((block) => block.type === "toolCall" && typeof block.id === "string" && toolResults.get(block.id)?.todoSnapshot) ? state.streamingMessage : null;
+	const todoViews = useMemo(() => todoPresentation(
+		todoStreamingMessage ? [...state.messages, todoStreamingMessage] : state.messages, toolResults,
+	), [state.messages, todoStreamingMessage, toolResults]);
+	const absorbedTodos = useMemo(() => new Set(state.messages.filter((message) => isAbsorbedTodoMessage(message, todoViews)).map((message) => message.id)), [state.messages, todoViews]);
 	/**
 	 * Original attachments per user question (memoized on the stable messages
 	 * array) — restored in the edit composer because the fork drops the
@@ -228,8 +236,8 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	// transcript 里是 8 条 assistant 消息，一条一行会把历史区堆成 8 条长得一模
 	// 一样的条带。纯逻辑在 collapsed-groups.ts（有单测）。
 	const collapsed = useMemo(
-		() => buildCollapsedGroups(state.messages, recentStart, expanded, new Set(timeGaps.keys())),
-		[state.messages, recentStart, expanded, timeGaps],
+		() => buildCollapsedGroups(state.messages, recentStart, expanded, new Set(timeGaps.keys()), absorbedTodos),
+		[state.messages, recentStart, expanded, timeGaps, absorbedTodos],
 	);
 
 	// ---- 惰性窗口化（lazy windowing，纯函数见 lazy-window.ts）----------------
@@ -524,12 +532,25 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 			if (id && messages.some((message) => message.id === id)) jumpTo(id);
 		};
 		const onToolJump = (event: Event) => {
-			const { messageId, toolCallId } = (event as CustomEvent<{ messageId?: string; toolCallId?: string }>).detail ?? {};
+			let { messageId, toolCallId, todoItemIds } = (event as CustomEvent<{ messageId?: string; toolCallId?: string; todoItemIds?: number[] }>).detail ?? {};
+			const todo = toolCallId ? todoViews.get(toolCallId) : undefined;
+			if (todo?.target) ({ messageId, toolCallId } = todo.target);
 			if (!messageId || !toolCallId || !messages.some((message) => message.id === messageId)) return;
 			jumpTo(messageId);
 			requestAnimationFrame(() => requestAnimationFrame(() => {
 				const card = scrollRef.current?.querySelector<HTMLElement>(`[data-tool-call-id="${CSS.escape(toolCallId)}"]`);
 				if (!card) return;
+				if (todoItemIds?.length) {
+					scrollRef.current?.querySelectorAll(".todo-item-flash").forEach((node) => node.classList.remove("todo-item-flash"));
+					const rows = Array.from(card.querySelectorAll<HTMLElement>("[data-todo-item-id]")).filter((row) => todoItemIds.includes(Number(row.dataset.todoItemId)));
+					if (rows.length) {
+						rows[0].focus({ preventScroll: true });
+						rows[0].scrollIntoView({ block: "center" });
+						for (const row of rows) { void row.offsetWidth; row.classList.add("todo-item-flash"); }
+						window.setTimeout(() => rows.forEach((row) => row.classList.remove("todo-item-flash")), 1800);
+						return;
+					}
+				}
 				card.scrollIntoView({ block: "center" });
 				card.classList.remove("change-card-flash");
 				void card.offsetWidth;
@@ -540,7 +561,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		window.addEventListener("pi:jump-message", onTaskJump);
 		window.addEventListener("pi:jump-tool", onToolJump);
 		return () => { window.removeEventListener("pi:jump-message", onTaskJump); window.removeEventListener("pi:jump-tool", onToolJump); };
-	}, [jumpTo, messages]);
+	}, [jumpTo, messages, todoViews]);
 
 	const onScroll = useCallback(() => {
 		const el = scrollRef.current;
@@ -700,6 +721,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 					if (item.kind === "cwd") return <div key={`cwd-${item.event.timestamp}`} className="goal-event cwd-event" role="status"><span aria-hidden="true">↪</span><span>{t("cwdSwitchEvent", { path: item.event.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~") })}</span></div>;
 					const { message: m, index: i } = item;
 					if (goalEvents.absorbed.has(m.id)) return null;
+					if (absorbedTodos.has(m.id)) return null;
 					const withGap = (content: ReactNode) => {
 						const label = timeGaps.get(i);
 						return label ? <Fragment key={m.id}><div className="time-gap" aria-label={t("timeGapAt", { time: label })} title={m.timestamp ? new Date(m.timestamp).toLocaleString() : undefined}><span>{label}</span></div>{content}</Fragment> : content;
@@ -754,6 +776,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							qnActive={qIdx !== undefined ? qIdx === activeIdx : undefined}
 							onJump={jumpTo}
 							toolResults={toolResults}
+							todoViews={todoViews}
 							retriedEditIds={retriedEditIds}
 							liveOutputs={hasToolCall(m) ? liveOutputs : EMPTY_LIVE}
 							toolStatuses={toolStatuses}
@@ -769,12 +792,13 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						</LazyMount>
 					);
 				})}
-				{state.streamingMessage && streamingHasContent && (
+				{state.streamingMessage && streamingHasContent && !isAbsorbedTodoMessage(state.streamingMessage, todoViews) && (
 					<Message
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}
 						continuation={!!predecessors.get(state.streamingMessage.id)}
 						toolResults={toolResults}
+						todoViews={todoViews}
 						retriedEditIds={retriedEditIds}
 						liveOutputs={
 							hasToolCall(state.streamingMessage) ? liveOutputs : EMPTY_LIVE

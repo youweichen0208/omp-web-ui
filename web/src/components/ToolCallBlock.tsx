@@ -293,10 +293,10 @@ function TodoCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
 	const t = useT();
 	const [open, setOpen] = useState(false);
 	const text = view.result?.content.filter((part) => part.type === "text").map((part) => (part as { text: string }).text).join("\n") ?? "";
-	const failed = view.result?.isError || text.startsWith("Error:");
+	const failed = view.result?.isError || !!view.result?.todoSnapshot?.error || text.startsWith("Error:");
 	return <div className={`task-plan-card${failed ? " err" : ""}`} data-tool-call-id={block.id}>
 		<button type="button" className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen(!open)}><FiChevronRight className={open ? "open" : ""} /><span>{t("taskTodoUpdate")}</span><span className="task-plan-card-state">{failed ? t("error") : view.result ? t("done") : t("running")}</span></button>
-		{(open || failed) && <pre className="task-todo-details">{text || block.argumentsText}</pre>}
+		{(open || failed) && <pre className="task-todo-details">{view.result?.todoSnapshot?.error || text || block.argumentsText}</pre>}
 	</div>;
 }
 

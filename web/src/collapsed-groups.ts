@@ -50,6 +50,7 @@ export function buildCollapsedGroups(
 	recentStart: number,
 	expanded: ReadonlySet<string>,
 	breakBefore: ReadonlySet<number> = new Set(),
+	hiddenMessages: ReadonlySet<string> = new Set(),
 ): CollapsedGrouping {
 	const groupAt = new Map<number, UiMessage[]>();
 	const absorbed = new Set<number>();
@@ -65,7 +66,7 @@ export function buildCollapsedGroups(
 	const end = Math.min(recentStart, messages.length);
 	for (let i = 0; i < end; i++) {
 		const m = messages[i];
-		if (m.role === "toolResult") {
+		if (m.role === "toolResult" || hiddenMessages.has(m.id)) {
 			absorbed.add(i);
 			continue;
 		}

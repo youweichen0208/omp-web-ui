@@ -32,6 +32,8 @@ import { isRasterImage, fileToProcessedImage } from "../image-paste";
 import { splitFrontmatter } from "../read-presentation";
 import { questionPreviewText } from "../question-markers";
 import { preserveUserTree } from "../user-message-presentation";
+import type { TodoPresentation } from "../todo-presentation";
+import { TodoChecklist } from "./TodoChecklist";
 
 /** 编辑重问编辑器里直接拖入/粘贴文件的上限（与服务端 MAX_UPLOAD_BYTES 一致）。 */
 const MAX_EDIT_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -106,6 +108,7 @@ function editAttLabel(att: PromptAttachment, t: Translate): string {
 }
 
 interface MessageProps {
+	todoViews?: ReadonlyMap<string, TodoPresentation>;
 	continuation?: boolean;
 	message: UiMessage;
 	/** toolResult messages by toolCallId (precomputed in MessageList, memoized). */
@@ -147,6 +150,7 @@ interface MessageProps {
 }
 
 export const Message = memo(function Message({
+	todoViews,
 	continuation,
 	message,
 	toolResults,
@@ -331,6 +335,11 @@ export const Message = memo(function Message({
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
 			const first = asToolCall(block);
+			const todoView = first && todoViews?.get(first.id);
+			if (first && todoView) {
+				elements.push(<TodoChecklist key={first.id} toolCallId={first.id} view={todoView} />);
+				continue;
+			}
 			if (first?.name === "write" || first?.name === "edit") {
 				const changes: UiToolCallBlock[] = [first];
 				while (i + 1 < message.content.length) {

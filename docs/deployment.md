@@ -80,6 +80,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - 原生模块（`node-pty`）：`electron-builder.yml` 里 `npmRebuild: true`，打包时自动
   rebuild 成 Electron 的 Node ABI，不需要手动 `electron-rebuild`；本机需要装好
   Xcode Command Line Tools（mac）/ Visual Studio Build Tools（win）。
+- 聊天任务清单与 Web 共用 `TodoChecklist`：连续更新合并、后续变化行及历史任务定位一起随 `web/dist` 构建进入桌面包。`tests/todo-chat-browser-test.mjs` 覆盖 Web 和 macOS/Windows 桌面外壳的 900px 布局、键盘跳转、历史折叠与清空后编号复用；它不替代原生安装包验证。
 - 图标：`build/icon.png`（1024×1024，从 `web/public/favicon.svg` 派生）+
   `build/icon.ico`；electron-builder 打包时自动生成各平台格式，不需要手动出
   `.icns`。
