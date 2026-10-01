@@ -1,4 +1,4 @@
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, AgentSessionEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ToolCallRecoveryDetails } from "./protocol.js";
 import { todoSnapshot } from "./todo-progress.js";
 
@@ -74,6 +74,7 @@ interface Recovery {
 	pending?: { toolName: string; started: boolean; result?: boolean };
 }
 const states = new WeakMap<Session, Recovery>();
+const activeSessions = new WeakSet<Session>();
 const content: Record<Status, string> = {
 	retrying: "A prior reply printed an XML tool invocation as text. That invocation was NOT executed. A promise to continue is not tool execution. Use the native tool-call interface if continuing the current authorized task is appropriate. Respect all user and skill stop, confirmation, and waiting requirements. Do not repeat successful operations or print another <invoke> block. If you cannot continue, explain why. This is one bounded formatting correction. A failed or timed-out command may already have taken effect: inspect its actual state before repeating an operation. If tools keep failing, report the blocker rather than retrying blindly.",
 	resumed: "A native call to the indicated tool returned successfully after correction. This confirms tool execution, not completion of the task or correctness of the arguments.",
@@ -94,22 +95,25 @@ function publish(session: Session, status: Status, toolName: string, triggerTurn
 	});
 }
 
-/** Install before a run starts: the SDK captures this hook in its loop config. */
+/** Enable recovery for this binding; the public extension boundary owns timing. */
 export function installToolCallRecovery(session: Session): () => void {
-	const previous = session.agent.shouldStopAfterTurn;
-	let active = true;
-	const check: NonNullable<typeof previous> = async (context, signal) => {
-		const stop = await previous?.(context, signal) ?? false;
-		if (!active) return stop;
+	activeSessions.add(session);
+	return () => { activeSessions.delete(session); states.delete(session); };
+}
+
+/** Registered through resourceLoaderOptions.extensionFactories, also after reload. */
+export function toolCallRecoveryExtension(getSession: () => Session | undefined): (pi: ExtensionAPI) => void {
+	return pi => { pi.on("agent_before_settle", event => {
+		const session = getSession();
+		if (!session || !activeSessions.has(session)) return;
 		const state = states.get(session);
 		const name = state?.candidate;
-		if (!state || !name) return stop;
+		if (!state || !name) return;
 		state.candidate = undefined;
-		// prepareNextTurn and the previous stop hook may await I/O. Only commit
-		// after both have settled, immediately before the SDK drains its queues.
-		// An already queued follow-up cannot be selectively removed by the SDK.
-		if (stop || signal?.aborted) publish(session, "cancelled", name);
-		else if (session.agent.hasQueuedMessages()) publish(session, "deferred", name, false, "queued-message");
+		// This official boundary runs after native retries, compaction and all
+		// agent_end handlers. User/extension queues and aborts retain priority.
+		if (event.outcome !== "completed" || session.agent.signal?.aborted) publish(session, "cancelled", name);
+		else if (event.entries.length || event.continue || event.context.pendingMessages.length || session.agent.hasQueuedMessages()) publish(session, "deferred", name, false, "queued-message");
 		else if (!session.getActiveToolNames().includes(name)) publish(session, "unverified", name);
 		else if (state.attempts >= MAX_CORRECTIONS_PER_RUN) publish(session, "exhausted", name);
 		else if (!state.progressSinceCorrection) publish(session, "failed", name);
@@ -120,19 +124,13 @@ export function installToolCallRecovery(session: Session): () => void {
 			state.pending = { toolName: name, started: false };
 			publish(session, "retrying", name, true);
 		}
-		return stop;
-	};
-	session.agent.shouldStopAfterTurn = check;
-	return () => {
-		active = false;
-		if (session.agent.shouldStopAfterTurn === check) session.agent.shouldStopAfterTurn = previous;
-	};
+	}); };
 }
 
 /** Called by the host subscriber AFTER SDK extension handlers, once per event. */
 export function handleToolCallRecovery(session: Session, event: AgentSessionEvent): void {
 	if (event.type === "agent_start") {
-		states.set(session, { attempts: 0, progressSinceCorrection: true });
+		if (!states.has(session)) states.set(session, { attempts: 0, progressSinceCorrection: true });
 		return;
 	}
 	const state = states.get(session);
@@ -149,7 +147,7 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 		} else if (message.role === "user" || message.role === "custom") {
 			const candidate = state.candidate;
 			state.candidate = undefined;
-			if (candidate) publish(session, "deferred", candidate, false, "new-instruction");
+			if (candidate) publish(session, "deferred", candidate, false, "queued-message");
 			state.resumeTool = undefined;
 			if (recoveryContinuation(message)) {
 				const messages = session.messages;
@@ -178,9 +176,10 @@ export function handleToolCallRecovery(session: Session, event: AgentSessionEven
 		}
 		return;
 	}
-	if (event.type === "agent_end") {
+	if (event.type === "agent_settled") {
 		state.candidate = undefined;
 		finish(session.agent.signal?.aborted ? "cancelled" : "unverified");
+		states.delete(session);
 		return;
 	}
 	if (event.type !== "turn_end") return;

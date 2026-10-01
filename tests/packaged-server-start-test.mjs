@@ -12,6 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const [executable, appRoot] = process.argv.slice(2).map((p) => resolve(p));
 assert(executable && appRoot, "Usage: node tests/packaged-server-start-test.mjs <executable> <resources/app>");
+const { agentRuntimeEnvironment } = await import(pathToFileURL(join(appRoot, "electron/agent-runtime-env.mjs")).href);
 if (process.platform === "win32") {
 	const helper = readFileSync(join(appRoot, "node_modules/node-pty/lib/conpty_console_list_agent.js"), "utf8");
 	assert.match(helper, /pi-web-ui: the console may already be gone during ConPTY teardown/);
@@ -76,7 +77,7 @@ const child = fork(join(appRoot, "dist/server/index.js"), [], {
 	execPath: executable,
 	cwd: workspace,
 	env: {
-		...process.env,
+		...agentRuntimeEnvironment(appRoot, join(temp, "data"), executable),
 		NODE_PATH: "",
 		NODE_OPTIONS: "",
 		ELECTRON_RUN_AS_NODE: "1",

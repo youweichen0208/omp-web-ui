@@ -59,6 +59,9 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
+- 桌面 Pi SDK 由包依赖锁定，终端 `pi update` 不会替换它。原生用户扩展来自共享的 `~/.pi/agent`；安装 `pi install npm:pi-subagents` 后重启桌面即可加载。
+- `electron/agent-runtime-env.mjs` 为 pi-subagents 指定桌面包内的 SDK 根目录。macOS/Linux 在桌面数据目录创建 `runtime-bin/node`，指向当前 Electron 可执行文件，并保留 `ELECTRON_RUN_AS_NODE=1`；后台 runner 因而可在 Finder 的最小 PATH 下启动。Windows 不创建此符号链接，后台 runner 仍需 PATH 中的 Node。
+- 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`，避免携带本机配置。打包后运行 `tests/packaged-server-start-test.mjs` 和 `tests/subagents-desktop-test.mjs`，传入应用可执行文件与 `Resources/app`；子代理测试只调用隔离的本地模型，分别验证前台和后台子会话。
 - 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
   判断 server 就绪，再让 `BrowserWindow` 加载 `http://127.0.0.1:{随机空闲端口}`。
 - 子进程意外退出后，主进程在同一端口最多重启 3 次（间隔 1/2/4 秒），窗口保留原 URL，

@@ -26,6 +26,8 @@ Windows 计划任务部署。
 | 终端 | node-pty（服务端 PTY）+ `@xterm/xterm`（浏览器渲染，经 terminal bridge 转发） |
 | 样式 | 单文件 `web/src/styles.css`（固定浅色主题，CSS 变量） |
 
+SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` 只表示一次循环结束。修改队列、纠正或延迟设置前读 `docs/architecture-core.md`；修改桌面扩展子进程或打包前读 `docs/deployment.md`。
+
 ## 3. 目录结构
 
 ```
@@ -47,7 +49,7 @@ pi-web-ui/
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
 │   ├── todo-extension.ts       # 原生 rpiv-todo 加载适配、Web 展示及工作流引导
 │   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
-│   ├── tool-call-recovery.ts   # 伪调用的有界纠正；SDK 停止检查后才入队，修改时读 docs/architecture-core.md
+│   ├── tool-call-recovery.ts   # 伪调用的有界纠正；官方 agent_before_settle 边界才入队，修改时读 docs/architecture-core.md
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData + 视觉桥）

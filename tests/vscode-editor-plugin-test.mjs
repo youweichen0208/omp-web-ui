@@ -10,6 +10,8 @@
  *
  * 运行：先 npm run build:server，再 node tests/vscode-editor-plugin-test.mjs
  */
+import { once } from "node:events";
+import { portUp } from "./lib/port-utils.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,6 +26,10 @@ const repoRoot = join(import.meta.dirname, "..");
 let proc = null;
 const dataDir = mkdtempSync(join(tmpdir(), "pi-web-vsc-plugin-"));
 const workspace = join(dataDir, "workspace");
+const agentDir = join(dataDir, "agent");
+mkdirSync(agentDir);
+writeFileSync(join(agentDir, "settings.json"), "{}");
+if (await portUp(PORT)) throw new Error(`Port ${PORT} occupied; refusing to touch its owner`);
 
 function fail(msg) {
 	console.error(`✗ ${msg}`);
@@ -89,6 +95,9 @@ try {
 			...process.env,
 			PORT: String(PORT),
 			PI_WEB_DATA_DIR: dataDir,
+			PI_CODING_AGENT_DIR: agentDir,
+			PI_WEB_TOKEN: "",
+			PI_WEB_HOST: "127.0.0.1",
 			PI_WEB_CWD: workspace,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
@@ -240,10 +249,11 @@ try {
 	fail(err.message);
 	console.error(err);
 } finally {
-	try {
-		if (proc?.pid) process.kill(proc.pid, "SIGTERM");
-	} catch {}
-	await new Promise((r) => setTimeout(r, 500));
+	if (proc?.pid && proc.exitCode === null && proc.signalCode === null) {
+		const exit = once(proc, 'exit'); proc.kill('SIGTERM');
+		const force = setTimeout(() => proc.kill('SIGKILL'), 5000);
+		await exit; clearTimeout(force);
+	}
 	rmSync(dataDir, { recursive: true, force: true });
 }
 process.exit(process.exitCode ?? 0);

@@ -31,6 +31,7 @@ import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { agentRuntimeEnvironment } from "./agent-runtime-env.mjs";
 // electron-updater 是 CJS 包，Node ESM 下不能直接 named import，
 // 得走默认导出再解构（Node 的 CJS→ESM 互操作不会自动分析 named exports）。
 import electronUpdaterPkg from "electron-updater";
@@ -105,7 +106,7 @@ async function startServer(reusePort) {
 
 	serverProcess = fork(serverPath, [], {
 		env: {
-			...process.env,
+			...agentRuntimeEnvironment(getPkgRoot(), dataDir),
 			PORT: String(serverPort),
 			PI_WEB_HOST: "127.0.0.1",
 			PI_WEB_DATA_DIR: dataDir,

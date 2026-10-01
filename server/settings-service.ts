@@ -118,7 +118,7 @@ export class SettingsService {
 		let loadedSkillNames: Set<string> | null = null;
 		try {
 			const loadedSkills = this.host.getSession().resourceLoader.getSkills().skills;
-			const loadedExts = this.host.getSession().resourceLoader.getExtensions().extensions;
+			const loadedExts = this.host.getSession().resourceLoader.getExtensions().extensions.filter(e => !e.hidden);
 			loadedSkillNames = new Set(loadedSkills.map((s) => s.name));
 			// Prune entries that no longer exist on disk AND aren't disabled
 			// (e.g. a skill/extension file was deleted). Disabled entries are

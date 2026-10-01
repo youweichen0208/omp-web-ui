@@ -18,7 +18,7 @@ export async function deliverPrompt(
 			session.agent.steeringMode = "all";
 			session.agent.followUpMode = "all";
 			const unsubscribe = session.subscribe((event) => {
-				if (event.type !== "agent_end") return;
+				if (event.type !== "agent_settled") return;
 				session.agent.steeringMode = steeringMode;
 				session.agent.followUpMode = followUpMode;
 				groupedSessions.delete(session);
@@ -34,7 +34,8 @@ export async function deliverPrompt(
 	try {
 		await session.prompt(text, {
 			streamingBehavior: queue ? "followUp" : "steer",
-			preflightResult: (ok) => {
+			preflightResult: (disposition) => {
+				const ok = disposition !== "handled";
 				if (ok && asides.length) {
 					if (session.isStreaming) enqueue(queue);
 					else {

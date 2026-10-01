@@ -109,7 +109,7 @@ import {
 import { deriveTaskProgress } from "./task-progress.js";
 import { adaptTodoExtensions, TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { taskHistoryFromSession } from "./todo-progress.js";
-import { handleToolCallRecovery, installToolCallRecovery } from "./tool-call-recovery.js";
+import { handleToolCallRecovery, installToolCallRecovery, toolCallRecoveryExtension } from "./tool-call-recovery.js";
 import {
 	loadCommands,
 	saveCommandsFile,
@@ -125,7 +125,7 @@ const SNAPSHOT_INTERVAL_MS = 60;
 /** While assistant deltas are flowing, live rendering is carried by
  *  message_delta — full snapshots become pure reconciliation checkpoints, so
  *  send them on a slow event-driven cadence (see flushSnapshot call-sites:
- *  agent_end / tool_execution_end always checkpoint immediately). */
+ *  agent_settled / tool_execution_end always checkpoint immediately). */
 const STREAMING_SNAPSHOT_INTERVAL_MS = 2000;
 /** Deltas newer than this keep the streaming (low-frequency) snapshot cadence. */
 const DELTA_ACTIVE_WINDOW_MS = 1500;
@@ -332,6 +332,7 @@ export { workspacePath };
  * never interrupts another conversation's in-flight run.
  */
 interface Conversation {
+	lastRunMessages?: Extract<AgentSessionEvent, { type: "agent_end" }>["messages"];
 	thinkingTimings: ThinkingTimings;
 	id: string;
 	/** Display title: first user prompt (truncated) or the default. */
@@ -596,7 +597,7 @@ export class ClientSession {
 	 *  abort signal would otherwise leave the chat stuck forever). */
 	private static readonly HARD_ABORT_TIMEOUT_MS = 15_000;
 	/** Extra settle window after session.abort() returns: the run is only
-	 *  considered stopped once its agent_end event arrives. If it doesn't
+	 *  considered stopped once its agent_settled event arrives. If it doesn't
 	 *  (model stream stuck before the run even started), force-reset. */
 	private static readonly HARD_ABORT_SETTLE_MS = 8_000;
 	/** Live AbortControllers of THIS client's running bash tool calls — aborting
@@ -778,14 +779,14 @@ export class ClientSession {
 
 	/** The system prompt the replace-mode editor should show as its seed:
 	 *  the user's system-prompt file content if one exists, otherwise the
-	 *  SDK's built-in default actually in effect (agent.state.systemPrompt,
+	 *  SDK's built-in default actually in effect (session.systemPrompt,
 	 *  which the loader rebuilds at session init). If the user HAS a custom
 	 *  prompt the seed is only cosmetic — an unmodified seed is saved as
 	 *  empty and the server falls back to the true base. */
 	private effectiveDefaultSystemPrompt(): string {
 		if (this.lastBaseSystemPrompt) return this.lastBaseSystemPrompt;
 		try {
-			const sp = this.session.agent.state.systemPrompt;
+			const sp = this.session.systemPrompt;
 			if (typeof sp === "string" && sp) return sp;
 		} catch {
 			// Session not ready yet.
@@ -968,6 +969,7 @@ export class ClientSession {
 	 */
 	private makeRuntimeFactory(terminals: TerminalManager): CreateAgentSessionRuntimeFactory {
 		return async ({ cwd: effectiveCwd, sessionManager }) => {
+			let recoverySession: AgentSession | undefined;
 			const services = await createAgentSessionServices({
 				cwd: effectiveCwd,
 				modelRuntime: this.sharedModelRuntime,
@@ -977,6 +979,7 @@ export class ClientSession {
 				// 新对话（新 runtime）也会自动带上当前设置。
 				resourceLoaderOptions: {
 					additionalExtensionPaths: [TODO_EXTENSION_PATH],
+					extensionFactories: [{ name: "web-tool-call-recovery", hidden: true, factory: toolCallRecoveryExtension(() => recoverySession) }],
 					// 系统提示词：replace 模式整体替换；append 模式追加到提示词末尾。
 					systemPromptOverride: (base?: string) => {
 						// Remember the built-in default so the settings panel can show
@@ -1059,6 +1062,7 @@ export class ClientSession {
 					...(this.pluginToolsProvider?.() ?? []).map(pluginToolToDefinition),
 				],
 			});
+			recoverySession = created.session;
 			// 终端工具开关从创建起就生效（工具始终注册进注册表，只调活跃集）。
 			this.applyTerminalToolGating(created.session);
 			return {
@@ -1398,7 +1402,12 @@ export class ClientSession {
 				break;
 			// A run finished or a new entry was persisted — keep the session list fresh
 			// (new chat + first message, completed turns, compaction, etc.).
-			case "agent_end": {
+			case "agent_end":
+				conv.lastRunMessages = event.messages;
+				break;
+			case "agent_settled": {
+				const messages = conv.lastRunMessages ?? [];
+				conv.lastRunMessages = undefined;
 				conv.lastTaskEndedAt = Date.now();
 				this.scheduleSessionsRefresh();
 				// Manual interrupt (Stop button / abort): the last assistant message
@@ -1406,7 +1415,7 @@ export class ClientSession {
 				// reviewed (it would fail and inject a revision, only to be stopped
 				// again → an endless review loop). Clear the goal so the review loop
 				// stops too, then let the user give a fresh instruction.
-				const aborted = (event.messages as unknown[]).some((m) => {
+				const aborted = (messages as unknown[]).some((m) => {
 					const a = m as { role?: string; stopReason?: string };
 					return a.role === "assistant" && a.stopReason === "aborted";
 				});
@@ -1417,7 +1426,7 @@ export class ClientSession {
 					}
 					break;
 				}
-				const turn = completedTitleTurn(event.messages);
+				const turn = completedTitleTurn(messages);
 				if (turn) {
 					const session = conv.session;
 					void conv.titleJob.complete(skillAwareTitleText(turn.question), turn.answer,
@@ -1496,7 +1505,7 @@ export class ClientSession {
 		// Snapshot checkpoint policy: deltas carry live rendering during streaming;
 		// full snapshots are reconciliation checkpoints taken immediately at
 		// run/tool boundaries and on a slow timer otherwise.
-		if (event.type === "agent_end" || event.type === "tool_execution_end") {
+		if (event.type === "agent_settled" || event.type === "tool_execution_end") {
 			this.flushSnapshot();
 		} else {
 			this.scheduleSnapshot();
@@ -2088,7 +2097,7 @@ export class ClientSession {
 
 	/** Extensions/skills changed externally (e.g. `pi remove` finished in the
 	 *  terminal): re-run session.reload() and re-push state. Streaming-safe —
-	 *  deferred to agent_end, same as settings reloads. */
+	 *  deferred to agent_settled, same as settings reloads. */
 	async reloadExtensions(): Promise<void> {
 		return this.settingsSvc.applyRuntime();
 	}
@@ -2130,7 +2139,7 @@ export class ClientSession {
 		return this.settingsSvc.deletePreset(name);
 	}
 
-		/** Make settings effective in the running runtime（流式中则延迟到 agent_end）。 */
+		/** Make settings effective in the running runtime（流式中则延迟到 agent_settled）。 */
 	private async applyRuntimeSettings(): Promise<void> {
 		return this.settingsSvc.applyRuntime();
 	}
@@ -2416,15 +2425,15 @@ export class ClientSession {
 
 	/** Interrupt a run: abort, with a force-reset fallback on timeout. */
 	private async interruptRun(conv: Conversation, reason: string): Promise<void> {
-		// The run is only truly stopped when its agent_end event arrives:
+		// The run is only truly stopped when its agent_settled event arrives:
 		// session.abort() can return without stopping anything when the run is
 		// stuck before the agent even started (e.g. a model stream that never
-		// begins), so we watch for agent_end and force-reset when it never
+		// begins), so we watch for agent_settled and force-reset when it never
 		// comes — abort 卡住（超时）或空转（结算窗口）两条路都覆盖。
 		let ended = false;
 		let forced = false;
 		const off = conv.session.subscribe((e) => {
-			if (e.type === "agent_end") {
+			if (e.type === "agent_settled") {
 				ended = true;
 			}
 		});
@@ -2452,7 +2461,7 @@ export class ClientSession {
 				text: `中止失败：${(err as Error).message}`,
 			});
 		}
-		// 3) abort returned but no agent_end within the settle window → the
+		// 3) abort returned but no agent_settled within the settle window → the
 		//    run was stuck before it started; force-reset to recover.
 		if (!ended) {
 			await new Promise((r) => setTimeout(r, ClientSession.HARD_ABORT_SETTLE_MS));
