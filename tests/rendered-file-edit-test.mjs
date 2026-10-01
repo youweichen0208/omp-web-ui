@@ -16,11 +16,11 @@ writeFileSync(join(workspace, "note.md"), original);
 writeFileSync(join(workspace, "expand.md"), "| One | Two |\n| :--- | ---: |\n| A | B |\n");
 const placeholderTable = "| 主题 | 要点 |\n| --- | --- |\n| 插件 | <dataDir>/plugins/<id>/ |\n| 说明 | 第一行<br>第二行 |\n";
 writeFileSync(join(workspace, "placeholders.md"), placeholderTable);
-const tree = "pi-web-ui/\n├── server/                  # 后端（Node ESM，编译到 dist/server/）\n│   ├── index.ts             # 入口：express 静态 + /ws 端点、消息分发、心跳、优雅停机\n│   └── protocol.ts          # wire 协议\n└── web/\n";
+const tree = "omp-web-ui/\n├── server/                  # 后端（Node ESM，编译到 dist/server/）\n│   ├── index.ts             # 入口：express 静态 + /ws 端点、消息分发、心跳、优雅停机\n│   └── protocol.ts          # wire 协议\n└── web/\n";
 writeFileSync(join(workspace, "tree.md"), "# Directory\n\n```\n" + tree + "```\n");
 writeFileSync(join(workspace, "empty.md"), "```python\n\n```\n");
 writeFileSync(join(workspace, "code.yaml"), "# comment\nname: original\n" + Array.from({ length: 100 }, (_, i) => `key${i}: value${i}`).join("\n"));
-const env = { ...process.env, PI_WEB_CWD: workspace, PI_WEB_DATA_DIR: join(base, "data"), PI_CODING_AGENT_DIR: join(base, "agent") };
+const env = { ...process.env, OMP_WEB_CWD: workspace, OMP_WEB_DATA_DIR: join(base, "data"), OMP_WEB_AGENT_DIR: join(base, "agent") };
 let browser, app, server;
 try {
 	let page;

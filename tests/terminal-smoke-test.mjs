@@ -7,13 +7,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { seedOmpSession } from "./lib/omp-fixtures.mjs";
 
 const PORT = 20000 + Math.floor(Math.random() * 10000);
 const workdir = mkdtempSync(join(tmpdir(), "piweb-term-"));
 const dataDir = mkdtempSync(join(tmpdir(), "piweb-term-data-"));
 process.env.PORT = String(PORT);
-process.env.PI_WEB_CWD = workdir;
-process.env.PI_WEB_DATA_DIR = dataDir;
+process.env.OMP_WEB_CWD = workdir;
+process.env.OMP_WEB_DATA_DIR = dataDir;
+process.env.OMP_WEB_AGENT_DIR = join(dataDir, "agent");
 
 // realpathSync: fnm multishell shim 路径可能失效；fileURLToPath: URL.pathname 在 Windows 下非法
 const NODE = realpathSync(process.execPath);
@@ -144,8 +146,8 @@ async function main() {
 		commandsReply?.commands?.length === 0,
 	);
 	check(
-		"commands path is <cwd>/.pi/commands.json",
-		commandsReply?.path === join(workdir, ".pi", "commands.json"),
+		"commands path is <cwd>/.omp/commands.json",
+		commandsReply?.path === join(workdir, ".omp", "commands.json"),
 	);
 
 	send({
@@ -160,12 +162,12 @@ async function main() {
 	const { readFileSync, existsSync } = await import("node:fs");
 	check(
 		"commands.json written on disk",
-		existsSync(join(workdir, ".pi", "commands.json")),
+		existsSync(join(workdir, ".omp", "commands.json")),
 	);
 	let onDisk = null;
 	try {
 		onDisk = JSON.parse(
-			readFileSync(join(workdir, ".pi", "commands.json"), "utf8"),
+			readFileSync(join(workdir, ".omp", "commands.json"), "utf8"),
 		);
 	} catch {
 		onDisk = null;
@@ -208,49 +210,9 @@ async function main() {
 	// The CLI stores sessions in <agentDir>/sessions/--<cwd-sanitized>--; fabricate
 	// one there and check list_sessions discovers the same persisted file.
 	{
-		const { homedir } = await import("node:os");
-		const { writeFileSync, mkdirSync } = await import("node:fs");
-		const safePath = `--${workdir.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-		const tuiDir = join(homedir(), ".pi", "agent", "sessions", safePath);
-		const tuiFile = join(
-			tuiDir,
-			"2026-08-04T00-00-00-000Z_tui-smoke-test.jsonl",
-		);
-		mkdirSync(tuiDir, { recursive: true });
-		writeFileSync(
-			tuiFile,
-			[
-				JSON.stringify({
-					type: "session",
-					version: 3,
-					id: "tui-smoke-test",
-					timestamp: "2026-08-04T00:00:00.000Z",
-					cwd: workdir,
-				}),
-				JSON.stringify({
-					type: "message",
-					id: "m1",
-					parentId: null,
-					timestamp: "2026-08-04T00:00:01.000Z",
-					message: {
-						role: "user",
-						content: [{ type: "text", text: "TUI 会话标题" }],
-						timestamp: 1722700801000,
-					},
-				}),
-			].join("\n") + "\n",
-		);
-		// Clean up the fabricated session on exit (best effort).
-		process.on("exit", () => {
-			try {
-				rmSync(tuiFile, { force: true });
-				rmSync(tuiDir, { recursive: true, force: true });
-			} catch {
-				/* ignore */
-			}
-		});
+		const tuiFile = seedOmpSession(workdir, process.env.OMP_WEB_AGENT_DIR, "TUI 会话标题");
 		send({ type: "list_sessions" });
-		await sleep(1000);
+		await waitFor(() => sessionsReply?.some(s => s.path === tuiFile), 15000);
 		check(
 			"persisted session appears in the conversation list",
 			sessionsReply?.some(

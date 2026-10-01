@@ -71,6 +71,7 @@ interface Draft {
 	baseUrl: string;
 	apiKey: string;
 	authHeader: boolean;
+	auth: "apiKey" | "none" | "oauth";
 	models: DraftModel[];
 }
 
@@ -90,6 +91,7 @@ const emptyDraft = (): Draft => ({
 	baseUrl: "",
 	apiKey: "",
 	authHeader: true,
+	auth: "apiKey",
 	models: [emptyModel()],
 });
 
@@ -101,6 +103,7 @@ function toDraft(p: UiProviderConfig): Draft {
 		baseUrl: p.baseUrl ?? "",
 		apiKey: p.apiKey ?? "",
 		authHeader: p.authHeader ?? false,
+		auth: p.auth ?? "apiKey",
 		models: (p.models.length ? p.models : [emptyModel()]).map((m) => ({
 			id: m.id,
 			name: m.name ?? "",
@@ -263,6 +266,7 @@ export function ModelConfigModal({
 			baseUrl: editing.baseUrl.trim() || undefined,
 			apiKey: editing.apiKey.trim() || undefined,
 			authHeader: editing.authHeader || undefined,
+			auth: editing.auth,
 			models,
 		};
 		send({ type: "save_model_config", providerId, config });
@@ -558,6 +562,10 @@ export function ModelConfigModal({
 									}
 									placeholder={t("apiKeyHint")}
 								/>
+							</label>
+							<label className="field check">
+								<input type="checkbox" checked={editing.auth === "none"} onChange={e => setEditing({ ...editing, auth: e.target.checked ? "none" : "apiKey" })} />
+								<span>{t("providerNoAuth")}</span>
 							</label>
 							<label className="field check">
 								<input

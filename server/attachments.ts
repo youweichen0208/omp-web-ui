@@ -8,7 +8,7 @@
 import type {
 	AgentSession,
 	ModelRuntime,
-} from "@earendil-works/pi-coding-agent";
+} from "./omp/index.js";
 import { validateEditorSnapshots } from "./editor-snapshot.js";
 import type { PromptAttachment, ServerMessage } from "./protocol.js";
 import {
@@ -67,7 +67,7 @@ export async function buildAttachmentMessages(
 	// Files at or below this size are inlined; larger files are referenced by
 	// path only (the model reads them on demand — saves tokens for small edits).
 	const MAX_INLINE_BYTES = Number(
-		process.env.PI_WEB_INLINE_FILE_MAX ?? 12 * 1024,
+		process.env.OMP_WEB_INLINE_FILE_MAX ?? 12 * 1024,
 	);
 	const IMAGE_EXT = new Set([
 		".png",

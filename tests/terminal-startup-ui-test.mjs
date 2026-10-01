@@ -22,7 +22,7 @@ try {
 		{ type: 'session', version: 3, id, timestamp: '2026-09-28T00:00:00.000Z', cwd: root },
 		{ type: 'message', id: `user-${id}`, parentId: null, timestamp: '2026-09-28T00:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: `TERMINAL_HISTORY_${id}` }], timestamp: Date.now() } },
 	].map(row => JSON.stringify(row)).join('\n') + '\n');
-	server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: root, PI_WEB_DATA_DIR: join(root, 'data'), PI_CODING_AGENT_DIR: join(root, 'agent'), SHELL: '/bin/zsh', ZDOTDIR: root }, stdio: 'ignore' });
+	server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), OMP_WEB_CWD: root, OMP_WEB_DATA_DIR: join(root, 'data'), OMP_WEB_AGENT_DIR: join(root, 'agent'), SHELL: '/bin/zsh', ZDOTDIR: root }, stdio: 'ignore' });
 	for (let i = 0; i < 100 && !await portUp(port); i++) await sleep(100);
 	assert(await portUp(port));
 	browser = await chromium.launch({ executablePath: CHROME_PATH });

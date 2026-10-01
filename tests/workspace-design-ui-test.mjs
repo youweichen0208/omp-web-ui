@@ -33,7 +33,7 @@ const messages=[
 let server,browser;
 try{
 assert.equal(await portUp(PORT),false);
-server=spawn(process.execPath,['dist/server/index.js'],{env:{...process.env,PORT:String(PORT),PI_WEB_CWD:cwd,PI_WEB_DATA_DIR:join(root,'data'),PI_CODING_AGENT_DIR:join(root,'agent')},stdio:['ignore','pipe','pipe']});
+server=spawn(process.execPath,['dist/server/index.js'],{env:{...process.env,PORT:String(PORT),OMP_WEB_CWD:cwd,OMP_WEB_DATA_DIR:join(root,'data'),OMP_WEB_AGENT_DIR:join(root,'agent')},stdio:['ignore','pipe','pipe']});
 let log='';server.stderr.on('data',data=>log+=data);
 for(let n=0;n<80&&!await portUp(PORT);n++)await sleep(250);
 assert(await portUp(PORT),log);

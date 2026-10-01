@@ -12,8 +12,8 @@ const PORT = 30000 + Math.floor(Math.random() * 10000);
 const workdir = mkdtempSync(join(tmpdir(), "piweb-ui-"));
 const dataDir = mkdtempSync(join(tmpdir(), "piweb-ui-data-"));
 process.env.PORT = String(PORT);
-process.env.PI_WEB_CWD = workdir;
-process.env.PI_WEB_DATA_DIR = dataDir;
+process.env.OMP_WEB_CWD = workdir;
+process.env.OMP_WEB_DATA_DIR = dataDir;
 
 const server = spawn(
 	process.execPath,
@@ -134,12 +134,12 @@ async function main() {
 	const { existsSync, readFileSync } = await import("node:fs");
 	check(
 		"commands.json on disk",
-		existsSync(join(workdir, ".pi", "commands.json")),
+		existsSync(join(workdir, ".omp", "commands.json")),
 	);
 	let onDisk = null;
 	try {
 		onDisk = JSON.parse(
-			readFileSync(join(workdir, ".pi", "commands.json"), "utf8"),
+			readFileSync(join(workdir, ".omp", "commands.json"), "utf8"),
 		);
 	} catch {
 		onDisk = null;

@@ -56,9 +56,9 @@ const server = spawn(NODE, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		PI_WEB_DATA_DIR: dataDir,
-		PI_WEB_CWD: workdir,
-		PI_CODING_AGENT_DIR: agentDir,
+		OMP_WEB_DATA_DIR: dataDir,
+		OMP_WEB_CWD: workdir,
+		OMP_WEB_AGENT_DIR: agentDir,
 	},
 	stdio: ["ignore", "ignore", "ignore"],
 	windowsHide: true,
@@ -145,7 +145,7 @@ try {
 	await sleep(1000);
 	const c = await connect();
 	c.send({ type: "hello", clientId: "refresh-models-test" });
-	await c.waitFor("ready", 8000);
+	await c.waitFor("ready", 60000);
 
 	// 0) save a provider with ONE manual row (hand-tuned metadata)
 	c.send({

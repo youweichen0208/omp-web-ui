@@ -1,11 +1,11 @@
 /**
- * Local control socket for the pi-web-ui server.
+ * Local control socket for the omp-web-ui server.
  *
  * Lets the CLI (and humans) query status and quiesce/unquiesce the server
  * WITHOUT opening a network port or exposing an unauthenticated HTTP
  * endpoint. Only the local OS user can reach it:
- *   - POSIX: a mode-0600 Unix domain socket at <dataDir>/pi-web-ui.sock
- *   - Windows: a named pipe  \\.\pipe\pi-web-ui-<port>
+ *   - POSIX: a mode-0600 Unix domain socket at <dataDir>/omp-web-ui.sock
+ *   - Windows: a named pipe  \\.\pipe\omp-web-ui-<port>
  *
  * Protocol: one JSON object per line.
  *   → {"cmd":"status"}        ← {"ok":true, ...serviceStatus}
@@ -30,8 +30,8 @@ const CONTROL_CLIENT_TIMEOUT_MS = 3_000;
 /** Socket path (POSIX) or pipe name (Windows). */
 export function controlPath(dataDir: string, port: number): string {
 	return process.platform === "win32"
-		? `\\\\.\\pipe\\pi-web-ui-${port}`
-		: join(dataDir, "pi-web-ui.sock");
+		? `\\\\.\\pipe\\omp-web-ui-${port}`
+		: join(dataDir, "omp-web-ui.sock");
 }
 
 export interface ControlCommand {

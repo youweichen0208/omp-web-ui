@@ -1,7 +1,7 @@
 export type CodeTheme = "light" | "dark" | "system";
 
-const KEY = "pi-web-ui:code-theme";
-export const CODE_THEME_EVENT = "pi-web-ui:code-theme";
+const KEY = "omp-web-ui:code-theme";
+export const CODE_THEME_EVENT = "omp-web-ui:code-theme";
 
 export function getCodeTheme(): CodeTheme {
 	try {

@@ -1,12 +1,12 @@
-// PI_WEB_TOKEN optional auth — protocol smoke test (zero token).
+// OMP_WEB_TOKEN optional auth — protocol smoke test (zero token).
 //
-// When PI_WEB_TOKEN is set on the server:
+// When OMP_WEB_TOKEN is set on the server:
 //   1. /api/health stays open (monitoring probes)
 //   2. HTTP requests without a valid token → 401
 //   3. ?token= query param accepted + Set-Cookie pi_web_token issued
 //   4. Authorization: Bearer / X-PI-Token headers accepted
 //   5. WS upgrade without token → rejected; with ?token= → connects
-// Without PI_WEB_TOKEN everything behaves as before (no auth middleware).
+// Without OMP_WEB_TOKEN everything behaves as before (no auth middleware).
 //
 // Usage: npm run build && node tests/token-auth-test.mjs [port]
 import WebSocket from "ws";
@@ -31,10 +31,10 @@ const server = spawn(NODE, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		PI_WEB_DATA_DIR: dataDir,
-		PI_WEB_CWD: workdir,
-		PI_CODING_AGENT_DIR: agentDir,
-		PI_WEB_TOKEN: TOKEN,
+		OMP_WEB_DATA_DIR: dataDir,
+		OMP_WEB_CWD: workdir,
+		OMP_WEB_AGENT_DIR: agentDir,
+		OMP_WEB_TOKEN: TOKEN,
 	},
 	stdio: ["ignore", "pipe", "pipe"],
 	windowsHide: true,

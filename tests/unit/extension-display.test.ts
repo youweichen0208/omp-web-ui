@@ -8,15 +8,9 @@ test.each([
 	["/agent/extensions/my-extension/index.ts", undefined, "my-extension"],
 	["/agent/extensions/my-extension/dist/main.js", undefined, "my-extension"],
 	["/agent/extensions/custom-footer.ts", undefined, "custom-footer"],
-	["/project/.pi/extensions/index.ts", undefined, "project"],
+	["/project/.omp/extensions/index.ts", undefined, "project"],
 	["/cache/index.ts", "npm:@scope/package", "@scope/package"],
 	["", "npm:disabled-package", "disabled-package"],
 ])("extension entry %s has a recognizable label", (path, source, name) => {
 	expect(extensionDisplay(path, source)).toEqual({ name });
-});
-
-test("only the bundled todo entry gets a built-in label, including after disabled restart", () => {
-	const bundled = "/desktop/node_modules/@juicesharp/rpiv-todo/index.ts";
-	expect(extensionDisplay(bundled, undefined, bundled)).toEqual({ name: "rpiv-todo", builtin: "todo" });
-	expect(extensionDisplay("/user/node_modules/@juicesharp/rpiv-todo/index.ts", undefined, bundled)).toEqual({ name: "@juicesharp/rpiv-todo" });
 });

@@ -6,10 +6,7 @@
  *
  * 从 agent-service.ts 抽出，行为保持不变。
  */
-import type {
-	ExtensionUIContext,
-	Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { RpcExtensionUIRequest } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
 import type { ServerMessage } from "./protocol.js";
 
 const WIDGET_WIDTH = 80;
@@ -40,7 +37,7 @@ const mockTheme = new Proxy(
 				text !== undefined ? text : "";
 		},
 	},
-) as unknown as Theme;
+);
 
 /** Mock TUI: any method call is a safe no-op. */
 const mockTui = new Proxy(
@@ -82,7 +79,7 @@ export class WebUIContext {
 	// -- widgets -------------------------------------------------------------
 
 	/** Matches ExtensionUIContext's overloaded setWidget exactly. */
-	setWidget: ExtensionUIContext["setWidget"] = (key, content, options) => {
+	setWidget = (key: string, content: string[] | ((tui: unknown, theme: unknown) => unknown) | undefined, options?: unknown) => {
 		void options;
 		if (content === undefined) {
 			this.widgets.delete(key);
@@ -196,25 +193,46 @@ export class WebUIContext {
 		(value: string | boolean | null) => void
 	>();
 
-	select = (title: string, options: string[]): Promise<string | undefined> =>
-		this.openDialog("select", title, [options]) as Promise<string | undefined>;
+	select = (title: string, options: string[], signal?: AbortSignal): Promise<string | undefined> =>
+		this.openDialog("select", title, [options], signal) as Promise<string | undefined>;
 	confirm = (title: string, message: string): Promise<boolean> =>
 		this.openDialog("confirm", title, [message]) as Promise<boolean>;
-	input = (title: string, placeholder?: string): Promise<string | undefined> =>
-		this.openDialog("input", title, [placeholder ?? ""]) as Promise<
+	input = (title: string, placeholder?: string, signal?: AbortSignal): Promise<string | undefined> =>
+		this.openDialog("input", title, [placeholder ?? ""], signal) as Promise<
 			string | undefined
 		>;
 
 	private openDialog(
-		kind: "select" | "confirm" | "input",
+		kind: "select" | "confirm" | "input" | "editor",
 		title: string,
 		args: unknown[],
+		signal?: AbortSignal,
 	): Promise<string | boolean | null> {
 		return new Promise((resolve) => {
+			if (signal?.aborted) { resolve(null); return; }
 			const id = ++this.dialogSeq;
-			this.pendingDialogs.set(id, resolve);
+			const abort = () => this.resolveDialog(id, null);
+			this.pendingDialogs.set(id, value => { signal?.removeEventListener("abort", abort); resolve(value); });
+			signal?.addEventListener("abort", abort, { once: true });
 			this.emit({ type: "dialog", id, kind, title, args });
 		});
+	}
+
+	/** A worker can cancel only its own request, including on process exit. */
+	async handleRpc(request: RpcExtensionUIRequest, signal: AbortSignal): Promise<string | boolean | null | undefined> {
+		switch (request.method) {
+			case "select": return this.openDialog("select", request.title, [request.options], signal);
+			case "confirm": return this.openDialog("confirm", request.title, [request.message], signal);
+			case "input": return this.openDialog("input", request.title, [request.placeholder ?? ""], signal);
+			case "editor": return this.openDialog("editor", request.title, [request.prefill ?? ""], signal);
+			case "notify": this.notify(request.message, request.notifyType); return;
+			case "setStatus": this.setStatus(request.statusKey, request.statusText); return;
+			case "setWidget": this.setWidget(request.widgetKey, request.widgetLines); return;
+			case "open_url": this.notify([request.instructions, request.launchUrl ?? request.url].filter(Boolean).join("\n")); return;
+			case "setTitle": return;
+			case "set_editor_text": this.emit({ type: "notice", level: "info", text: request.text }); return;
+			case "cancel": return;
+		}
 	}
 
 	/** Resolve a pending dialog with the user's choice (called from the client). */

@@ -28,7 +28,7 @@ function check(name, ok, extra = "") {
 	if (!ok) failures++;
 }
 
-// 两个工作区：workDir 是 PI_WEB_CWD；otherDir 只作为最近项目条目存在
+// 两个工作区：workDir 是 OMP_WEB_CWD；otherDir 只作为最近项目条目存在
 const baseTmp = mkdtempSync(join(tmpdir(), "pi-web-lp-del-"));
 const workDir = join(baseTmp, "proj");
 const otherDir = join(baseTmp, "other");
@@ -39,37 +39,8 @@ writeFileSync(join(workDir, "a.txt"), "keep me");
 const dataDir = mkdtempSync(join(tmpdir(), "pi-web-lp-del-data-"));
 const agentDir = join(baseTmp, "agent");
 
-// 种两个会话文件（workDir 一条 + otherDir 一条），格式与 pi CLI/TUI 相同
-function seedSession(dirName, id, cwd, text) {
-	const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-	const dir = join(agentDir, "sessions", dirName ?? safePath);
-	mkdirSync(dir, { recursive: true });
-	const file = join(dir, `2026-08-04T00-00-00-000Z_${id}.jsonl`);
-	writeFileSync(
-		file,
-		[
-			JSON.stringify({
-				type: "session",
-				version: 3,
-				id,
-				timestamp: "2026-08-04T00:00:00.000Z",
-				cwd,
-			}),
-			JSON.stringify({
-				type: "message",
-				id: "m1",
-				parentId: null,
-				timestamp: "2026-08-04T00:00:01.000Z",
-				message: {
-					role: "user",
-					content: [{ type: "text", text }],
-					timestamp: 1722700801000,
-				},
-			}),
-		].join("\n") + "\n",
-	);
-	return file;
-}
+import { seedOmpSession } from "./lib/omp-fixtures.mjs";
+function seedSession(_dir, _id, cwd, text) { return seedOmpSession(cwd, agentDir, text); }
 const sess1 = seedSession(null, "del-target", workDir, "要删除的对话");
 const sess2 = seedSession(null, "del-keep", workDir, "要保留的对话");
 const sessOther = seedSession(null, "del-other", otherDir, "另一个项目的对话");
@@ -82,9 +53,9 @@ async function startServer() {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			PI_WEB_DATA_DIR: dataDir,
-			PI_CODING_AGENT_DIR: agentDir,
-			PI_WEB_CWD: workDir,
+			OMP_WEB_DATA_DIR: dataDir,
+			OMP_WEB_AGENT_DIR: agentDir,
+			OMP_WEB_CWD: workDir,
 		},
 		stdio: "ignore",
 	});
@@ -155,6 +126,7 @@ async function run() {
 	await startServer();
 	await sleep(300);
 	const c = await connect();
+	await c.next(m => m.type === "ready", "OMP ready", 60000);
 
 	// 1) list_sessions 发现种下的两条（当前项目 workDir）
 	c.send({ type: "list_sessions" });

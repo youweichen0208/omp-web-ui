@@ -46,17 +46,16 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Terminal smoke round $_ failed" }
           }
 
-      # electron-builder 默认 npmRebuild: true，会用 @electron/rebuild + node-gyp
-      # 把 node-pty 针对 Electron 的 Node ABI 重新编译一遍（这一步在 mac/Linux 上
-      # 交叉构建时会直接报错，只有真机 Windows 才能跑；windows-latest runner 自带
-      # 编译工具链，这里应该会成功）。产出 nsis 安装包 + portable 绿色版 + zip。
-      - name: Build Electron desktop app (real npmRebuild)
+      - name: Rebuild Electron host terminal module
+        run: npm run rebuild:electron
+
+      - name: Build Electron desktop app
         run: npm run build:electron:win -- --publish never
 
       - name: Verify packaged server and portable relaunch
         shell: pwsh
         run: |
-          node tests/packaged-server-start-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
+          node tests/packaged-server-start-test.mjs release/win-unpacked/OMP.exe release/win-unpacked/resources/app
           if ($LASTEXITCODE -ne 0) { throw "Packaged server cannot start" }
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
@@ -64,7 +63,7 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: pi-web-ui-windows
+          name: omp-web-ui-windows
           path: |
             release/*.exe
             release/*.zip
@@ -96,7 +95,7 @@ jobs:
           $zip = Get-ChildItem "$env:RUNNER_TEMP/packages/*win-x64.zip" | Select-Object -First 1
           $dest = "$env:RUNNER_TEMP/桌面测试/portable pi"
           Expand-Archive $zip.FullName $dest
-          node tests/packaged-server-start-test.mjs "$dest/pi.exe" "$dest/resources/app"
+          node tests/packaged-server-start-test.mjs "$dest/OMP.exe" "$dest/resources/app"
           if ($LASTEXITCODE -ne 0) { throw "Published ZIP cannot start" }
       - name: Install NSIS and start installed server
         shell: pwsh
@@ -106,13 +105,13 @@ jobs:
           $proc = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', '/currentuser', "/D=$dest") -PassThru
           if (-not $proc.WaitForExit(180000)) { throw "Installer did not exit within 180 seconds" }
           if ($proc.ExitCode -ne 0) { throw "Installer failed: $($proc.ExitCode)" }
-          if (-not (Test-Path "$dest/pi.exe")) {
-            $installed = Get-ChildItem "$env:LOCALAPPDATA/Programs" -Filter pi.exe -Recurse | Select-Object -First 1
-            if (-not $installed) { throw "Installer exited without an installed pi.exe" }
+          if (-not (Test-Path "$dest/OMP.exe")) {
+            $installed = Get-ChildItem "$env:LOCALAPPDATA/Programs" -Filter OMP.exe -Recurse | Select-Object -First 1
+            if (-not $installed) { throw "Installer exited without an installed OMP.exe" }
             $dest = $installed.DirectoryName
           }
           Write-Host "Installed app: $dest"
-          node tests/packaged-server-start-test.mjs "$dest/pi.exe" "$dest/resources/app"
+          node tests/packaged-server-start-test.mjs "$dest/OMP.exe" "$dest/resources/app"
           if ($LASTEXITCODE -ne 0) { throw "Installed server cannot start" }
 
   diagnose-portable:

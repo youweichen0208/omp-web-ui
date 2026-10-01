@@ -15,13 +15,12 @@
 import { join } from "node:path";
 import { Type } from "typebox";
 import {
-	createAgentSessionFromServices,
-	createAgentSessionServices,
+	createSession,
 	defineTool,
 	ModelRuntime,
 	SessionManager,
 	type AgentSession,
-} from "@earendil-works/pi-coding-agent";
+} from "./omp/index.js";
 import type { GoalStatus, ServerMessage } from "./protocol.js";
 import type { ClientStateStore } from "./client-state.js";
 import { parseModelSpec } from "./attachments.js";
@@ -365,24 +364,17 @@ export class GoalService {
 			const wmSpec = opts?.wizardModel
 				? this.resolveReviewModel(opts.wizardModel)
 				: null; // reuse the honest "provider/id" parser
-			const services = await createAgentSessionServices({
-				cwd: wizardConversation.cwd,
-				agentDir: this.host.agentDir,
-				modelRuntime: await ModelRuntime.create({
-					authPath: join(this.host.agentDir, "auth.json"),
-					modelsPath: join(this.host.agentDir, "models.json"),
-				}),
-			});
+			const modelRuntime = await ModelRuntime.create({ agentDir: this.host.agentDir });
 
 			let model;
-			if (wmSpec) model = services.modelRuntime.getModel(wmSpec.provider, wmSpec.id);
+			if (wmSpec) model = modelRuntime.getModel(wmSpec.provider, wmSpec.id);
 			if (!model) {
 				const mainModel = mainSession.model as {
 					provider?: string;
 					id?: string;
 				} | undefined;
 				if (mainModel?.provider && mainModel.id)
-					model = services.modelRuntime.getModel(mainModel.provider, mainModel.id);
+					model = modelRuntime.getModel(mainModel.provider, mainModel.id);
 			}
 
 			// The wizard asks the user questions via this tool; each call bridges one
@@ -390,6 +382,7 @@ export class GoalService {
 			let qStep = 0;
 			const goalAsk = defineTool({
 				name: "goal_ask",
+				concurrency: "exclusive",
 				label: "Ask the user",
 				description:
 					"Ask the user ONE question at a time to scope down the goal. Provide a clear question and 2-4 concise options; or ask an open question. Returns the user's chosen answer.",
@@ -401,7 +394,6 @@ export class GoalService {
 				// firing parallel goal_ask calls whose dialogs would overwrite each other
 				// in the single browser modal (leaving earlier ones deadlocked — the
 				// reported "调研卡住").
-				executionMode: "sequential",
 				execute: async (_id, params, _sig, _onUpdate, ctx) => {
 					qStep += 1;
 					if (qStep > maxSteps) {
@@ -437,8 +429,8 @@ export class GoalService {
 						};
 						ac.signal.addEventListener("abort", onAbort, { once: true });
 						const choose = isChoice
-							? ctx.ui.select(`🔍 第 ${qStep} 题：${params.question}`, params.options!)
-							: ctx.ui.input(`🔍 第 ${qStep} 题：${params.question}`);
+							? this.host.webUi.select(`🔍 第 ${qStep} 题：${params.question}`, params.options!, ac.signal)
+							: this.host.webUi.input(`🔍 第 ${qStep} 题：${params.question}`, undefined, ac.signal);
 						const ans = (await choose) as string | boolean | undefined;
 						ac.signal.removeEventListener("abort", onAbort);
 						if (aborted || ac.signal.aborted) {
@@ -489,15 +481,15 @@ export class GoalService {
 				},
 			});
 
-			const srv = await createAgentSessionFromServices({
-				services,
-				sessionManager: SessionManager.inMemory(this.host.cwd()),
+			const srv = await createSession({
+				cwd: wizardConversation.cwd, agentDir: this.host.agentDir, modelRuntime,
+				sessionManager: SessionManager.inMemory(wizardConversation.cwd),
 				customTools: [goalAsk],
 				...(model ? { model } : {}),
 			});
 			const wizard = srv.session;
 			this.wizardSession = wizard;
-			await wizard.bindExtensions({ mode: "rpc", uiContext: this.host.webUi });
+			wizard.bindUI((request, signal) => this.host.webUi.handleRpc(request, signal));
 			// Cancel watcher: when the user ✗s / idle-timeout fires, truly stop the
 			// wizard's agent run (not just mark it).
 			if (!ac.signal.aborted) {
@@ -505,13 +497,11 @@ export class GoalService {
 					"abort",
 					() => {
 						void wizard.abort().catch(() => {});
-						// Close the unanswered browser dialog(s) the wizard may have up.
-						this.host.webUi.cancelPendingDialogs();
 					},
 					{ once: true },
 				);
 			}
-			await wizard.prompt(wizardPrompt(draft));
+			await wizard.promptAndWait(wizardPrompt(draft));
 			refinedGoal = wizard.getLastAssistantText()?.trim() ?? "";
 			// The wizard is prompted to emit "GOAL: <text>". Parse past the marker;
 			// if it didn't follow, strip a leading preamble line and keep the rest.
@@ -653,13 +643,12 @@ export class GoalService {
 		// Abort a running wizard for real (✗ in the goal bar while scoping).
 		if (this.wizardOwnerId === this.host.activeConvId()) {
 			this.wizardCancelled = true;
-			this.host.webUi.cancelPendingDialogs();
 			this.wizardAbort?.abort();
 			const ws2 = this.wizardSession;
 			this.wizardSession = null;
 			if (ws2) {
 				await ws2.abort().catch(() => {});
-				ws2.dispose();
+				await ws2.dispose();
 			}
 			this.wizardAbort = null;
 		}
@@ -865,46 +854,29 @@ export class GoalService {
 
 		try {
 			const rmSpec = this.resolveReviewModel(g.reviewModel);
-			const services = await createAgentSessionServices({
-				cwd: mainConv.cwd,
-				agentDir: this.host.agentDir,
-				// The reviewer has its own skill allow/deny list. It deliberately does
-				// not reuse the main session's disabledSkills setting.
-				resourceLoaderOptions: {
-					skillsOverride: (res) => ({
-						...res,
-						skills: res.skills.filter((s) => !reviewDisabledSkills.has(s.name)),
-					}),
-				},
-				// A FRESH ModelRuntime for the reviewer — isolated from the shared
-				// one used by the main conversations, so its model choice is its own.
-				modelRuntime: await ModelRuntime.create({
-					authPath: join(this.host.agentDir, "auth.json"),
-					modelsPath: join(this.host.agentDir, "models.json"),
-				}),
-			});
+			const modelRuntime = await ModelRuntime.create({ agentDir: this.host.agentDir });
 
 			// Model resolution: explicit reviewer model, else the main session's
 			// current model (so a goal works even when no reviewer model is given).
 			let model;
 			if (rmSpec) {
-				model = services.modelRuntime.getModel(rmSpec.provider, rmSpec.id);
+				model = modelRuntime.getModel(rmSpec.provider, rmSpec.id);
 			}
 			if (!model) {
 				const mainModel = mainSession.model as { provider?: string; id?: string } | undefined;
 				if (mainModel?.provider && mainModel.id) {
-					model = services.modelRuntime.getModel(mainModel.provider, mainModel.id);
+					model = modelRuntime.getModel(mainModel.provider, mainModel.id);
 				}
 			}
 
-			const srv = await createAgentSessionFromServices({
-				services,
+			const srv = await createSession({
+				cwd: mainConv.cwd, agentDir: this.host.agentDir, modelRuntime, disabledSkills: [...reviewDisabledSkills],
 				sessionManager: SessionManager.inMemory(mainConv.cwd),
 				...(model ? { model } : {}),
 			});
 			const reviewCap = g.locked && g.maxRounds > 0 ? g.maxRounds : 0; // 0 = no cap
 			const reviewer = srv.session;
-			await reviewer.prompt(
+			await reviewer.promptAndWait(
 				this.reviewerPrompt(
 					goalText,
 					g.round,

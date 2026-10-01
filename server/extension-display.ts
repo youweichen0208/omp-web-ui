@@ -1,9 +1,6 @@
 /** Display-only metadata. Toggle/uninstall identities remain owned by the loader. */
-export function extensionDisplay(path: string, source?: string, bundledTodoPath?: string): { name: string; builtin?: "todo" } {
+export function extensionDisplay(path: string, source?: string): { name: string; builtin?: "todo" } {
 	const normalized = path.replaceAll("\\", "/").replace(/\/$/, "");
-	if (bundledTodoPath && normalized === bundledTodoPath.replaceAll("\\", "/")) {
-		return { name: "rpiv-todo", builtin: "todo" };
-	}
 	if (source?.startsWith("npm:")) return { name: source.slice(4) };
 	const marker = "/node_modules/";
 	const packagePath = normalized.slice(normalized.lastIndexOf(marker) + marker.length);
@@ -17,6 +14,6 @@ export function extensionDisplay(path: string, source?: string, bundledTodoPath?
 	const stem = filename.replace(/\.(?:[cm]?[jt]s|tsx|jsx)$/i, "");
 	if (!/^(?:index|main|extension|plugin)$/i.test(stem)) return { name: stem || source || path };
 	// Entry points commonly sit in build/source folders beneath the extension.
-	while (parts.length && /^(?:src|dist|lib|build|extensions?|\.pi)$/i.test(parts.at(-1)!)) parts.pop();
+	while (parts.length && /^(?:src|dist|lib|build|extensions?|\.omp)$/i.test(parts.at(-1)!)) parts.pop();
 	return { name: parts.at(-1) || source || filename };
 }

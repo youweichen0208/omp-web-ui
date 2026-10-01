@@ -39,8 +39,8 @@ async function startServer(dataDir) {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			PI_WEB_DATA_DIR: dataDir,
-			PI_WEB_CWD: REPO_ROOT,
+			OMP_WEB_DATA_DIR: dataDir,
+			OMP_WEB_CWD: REPO_ROOT,
 		},
 		stdio: ["ignore", "ignore", "pipe"],
 	});
@@ -188,7 +188,7 @@ async function main() {
 		attachments: [
 			{
 				path: "",
-				uploadPath: "C:/tmp/.pi-web/uploads/edit-attach-client/1-data.txt",
+				uploadPath: "C:/tmp/.omp-web/uploads/edit-attach-client/1-data.txt",
 				name: "data.txt",
 				size: 9,
 			},

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, feat/omp-migration]
   pull_request:
     branches: [main, develop]
 
@@ -55,3 +55,5 @@ jobs:
       - run: npm ci
       - run: npm run build:server
       - run: node tests/node-workbench-test.mjs
+      - run: node tests/omp-runtime-test.mjs
+      - run: node tests/omp-session-test.mjs

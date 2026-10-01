@@ -2,7 +2,7 @@
  * Regression test: crypto.randomUUID must never crash the app.
  *
  * crypto.randomUUID is ONLY available in secure contexts (HTTPS or localhost).
- * When pi-web-ui is served over plain HTTP on a LAN IP / remote host, or in
+ * When omp-web-ui is served over plain HTTP on a LAN IP / remote host, or in
  * browsers without the API (Safari < 15.4), it is `undefined` — the WebSocket
  * `onopen` handler used to throw before sending `hello`, so the session never
  * attached (UI stuck, every feature dead), and opening a terminal crashed too.
@@ -32,7 +32,7 @@ const PORT = 8901;
 const URL = `http://localhost:${PORT}`;
 const PROJ = REPO_ROOT;
 // Hermetic workdir: the test server runs in a fresh temp dir so the user's
-// real .pi/commands.json (in the project) is never loaded or modified.
+// real .omp/commands.json (in the project) is never loaded or modified.
 const workdir = mkdtempSync(join(tmpdir(), "piweb-uuid-"));
 
 let failures = 0;
@@ -45,7 +45,7 @@ let server = null;
 async function startServer() {
 	server = spawn("node", ["dist/server/index.js"], {
 		cwd: PROJ,
-		env: { ...process.env, PORT: String(PORT), PI_WEB_CWD: workdir },
+		env: { ...process.env, PORT: String(PORT), OMP_WEB_CWD: workdir },
 		stdio: "ignore",
 	});
 	for (let i = 0; i < 40; i++) {

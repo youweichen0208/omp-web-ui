@@ -13,7 +13,7 @@ writeFileSync(join(base,'note.md'),'# Highlight test\n\nOriginal paragraph.\n');
 let server,browser;
 try {
 	assert.equal(await portUp(port),false);
-	server=spawn(process.execPath,['dist/server/index.js'],{env:{...process.env,PORT:String(port),PI_WEB_CWD:base,PI_WEB_DATA_DIR:join(base,'data'),PI_CODING_AGENT_DIR:join(base,'agent')},stdio:'ignore'});
+	server=spawn(process.execPath,['dist/server/index.js'],{env:{...process.env,PORT:String(port),OMP_WEB_CWD:base,OMP_WEB_DATA_DIR:join(base,'data'),OMP_WEB_AGENT_DIR:join(base,'agent')},stdio:'ignore'});
 	for(let i=0;i<100&&!await portUp(port);i++) await sleep(100);
 	browser=await chromium.launch({executablePath:CHROME_PATH});
 	const page=await browser.newPage({viewport:{width:1440,height:950}});

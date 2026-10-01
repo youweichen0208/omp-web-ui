@@ -18,8 +18,8 @@ const PORT = 31000 + Math.floor(Math.random() * 10000);
 const workdir = mkdtempSync(join(tmpdir(), "piweb-scm-"));
 const repo = join(workdir, "repo");
 const dataDir = join(workdir, "data");
-process.env.PI_WEB_CWD = repo; // the workspace the panel inspects
-process.env.PI_WEB_DATA_DIR = dataDir;
+process.env.OMP_WEB_CWD = repo; // the workspace the panel inspects
+process.env.OMP_WEB_DATA_DIR = dataDir;
 const CHROME = CHROME_PATH;
 
 // ---- set up a throwaway git repo with a modification + an untracked file ----

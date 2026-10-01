@@ -36,8 +36,8 @@ const server = spawn(
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			PI_WEB_DATA_DIR: DATA,
-			PI_WEB_CWD: REPO,
+			OMP_WEB_DATA_DIR: DATA,
+			OMP_WEB_CWD: REPO,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 		windowsHide: true,
@@ -63,8 +63,8 @@ async function waitFor(pred, timeoutMs = 15000, desc = "") {
 function control(cmd) {
 	const path =
 		process.platform === "win32"
-			? `\\\\.\\pipe\\pi-web-ui-${PORT}`
-			: join(DATA, "pi-web-ui.sock");
+			? `\\\\.\\pipe\\omp-web-ui-${PORT}`
+			: join(DATA, "omp-web-ui.sock");
 	return new Promise((resolvePromise) => {
 		const sock = createConnection(path);
 		let done = false;
@@ -104,6 +104,7 @@ function openWs(origin, path = "/ws") {
 		const messages = [];
 		let opened = false;
 		let closed = false;
+		let readyTimer;
 		const timer = setTimeout(() => {
 			ws.terminate();
 			resolvePromise({ opened, closed, code: undefined, messages });
@@ -113,18 +114,23 @@ function openWs(origin, path = "/ws") {
 			clearTimeout(timer);
 			// handshake + attach
 			ws.send(JSON.stringify({ type: "hello", clientId: "tester" }));
-			// 首次创建 ClientSession 含 runtime 初始化，负载高时可能超 1s ——
-			// 给足握手+首帧 snapshot 时间（总上限仍由外层 4s timer 兒底）。
-			setTimeout(() => resolvePromise({ opened, closed, code: undefined, messages }), 2500);
+			// Resolve on readiness, allowing a cold native worker to initialize.
+			readyTimer = setTimeout(() => { ws.terminate(); resolvePromise({ opened, closed, code: undefined, messages }); }, 60000);
 		});
 		ws.on("message", (d) => {
 			try {
 				messages.push(JSON.parse(d.toString()));
+				if (messages.some(m => m.type === "ready") && messages.some(m => m.type === "snapshot")) {
+					clearTimeout(readyTimer);
+					resolvePromise({ opened, closed, code: undefined, messages });
+					ws.close();
+				}
 			} catch {
 				/* ignore */
 			}
 		});
 		ws.on("close", (code) => {
+			clearTimeout(readyTimer);
 			closed = true;
 			clearTimeout(timer);
 			resolvePromise({ opened, closed, code, messages });

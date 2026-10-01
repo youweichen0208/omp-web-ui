@@ -18,7 +18,7 @@ mkdirSync(cwd);
 writeFileSync(join(cwd, "code.ts"), "const disk = 1;\n");
 writeFileSync(join(cwd, "note.md"), "# Note\n\nSelected paragraph.\n");
 writeFileSync(join(cwd, "large.txt"), "a".repeat(512 * 1024 + 1));
-const env = { ...process.env, PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(base, "data"), PI_CODING_AGENT_DIR: join(base, "agent") };
+const env = { ...process.env, OMP_WEB_CWD: cwd, OMP_WEB_DATA_DIR: join(base, "data"), OMP_WEB_AGENT_DIR: join(base, "agent") };
 let server, browser, app;
 try {
 	let page;

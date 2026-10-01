@@ -27,3 +27,9 @@ extensions/
 AGENTS.md
 CONTEXT.md
 README.md
+
+# OMP runtime and application state
+.omp/
+.omp-web/
+.omp-web-desktop/
+.omp-subagents/

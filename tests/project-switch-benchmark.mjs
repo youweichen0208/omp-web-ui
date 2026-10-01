@@ -10,17 +10,18 @@ import { CHROME_PATH } from "./lib/chrome.mjs";
 
 const base = mkdtempSync(join(tmpdir(), "pi-switch-"));
 const agent = join(base, "agent");
-process.env.PI_CODING_AGENT_DIR = agent;
-const { SessionManager } = await import("@earendil-works/pi-coding-agent");
+process.env.OMP_WEB_AGENT_DIR = agent;
+const { seedOmpMessages } = await import("./lib/omp-fixtures.mjs");
 const projects = ["short-a", "short-b", "long-c"].map((name) => join(base, name));
 for (const [i, project] of projects.entries()) {
 	mkdirSync(project, { recursive: true });
 	writeFileSync(join(project, `project-${i}.txt`), `project ${i}`);
-	const session = SessionManager.create(project);
+	const messages = [];
 	for (let n = 0; n < (i === 2 ? 250 : 2); n++) {
-		session.appendMessage({ role: "user", content: [{ type: "text", text: `fixture-${i}-${n}` }], timestamp: Date.now() });
-		session.appendMessage({ role: "assistant", content: [{ type: "text", text: `reply-${i}-${n} ` + "example text ".repeat(40) }], api: "openai-completions", provider: "test", model: "fixture", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() });
+		messages.push({ role: "user", content: [{ type: "text", text: `fixture-${i}-${n}` }], timestamp: Date.now() });
+		messages.push({ role: "assistant", content: [{ type: "text", text: `reply-${i}-${n} ` + "example text ".repeat(40) }], api: "openai-completions", provider: "test", model: "fixture", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() });
 	}
+	seedOmpMessages(project, agent, messages);
 }
 
 const baseline = process.argv[2];
@@ -39,7 +40,7 @@ async function run(version, delay, round) {
 	const root = roots[version];
 	const server = spawn(process.execPath, [join(root, "dist/server/index.js")], {
 		cwd: root,
-		env: { ...process.env, PORT: String(port), PI_WEB_CWD: projects[0], PI_WEB_DATA_DIR: join(base, `${version}-${delay}-${round}`), PI_WEB_PKG_ROOT: root, PI_CODING_AGENT_DIR: agent },
+		env: { ...process.env, PORT: String(port), OMP_WEB_CWD: projects[0], OMP_WEB_DATA_DIR: join(base, `${version}-${delay}-${round}`), OMP_WEB_PKG_ROOT: root, OMP_WEB_AGENT_DIR: agent },
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	let logs = "";

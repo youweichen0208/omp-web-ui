@@ -201,10 +201,10 @@ export function TopBar({
 					<FiMenu />
 				</button>
 				<img className="brand-logo" src="/favicon.svg" alt="" />
-				<span className="brand-name">pi-web-ui</span>
+				<span className="brand-name">OMP</span>
 				{desktopAPI && (
 					<span className="desktop-window-title" title={chat.state?.cwd ?? ""}>
-						pi <span className="desktop-title-separator">/</span> {projectName || t("desktopWorkspace")}
+						OMP <span className="desktop-title-separator">/</span> {projectName || t("desktopWorkspace")}
 					</span>
 				)}
 				<span className={`conn-dot ${connClass}`} title={connLabel} />

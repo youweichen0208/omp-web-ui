@@ -41,7 +41,7 @@ const EMPTY_DRAFT: Draft = { name: "", command: "", cwd: "${pwd}" };
 
 /**
  * Built-in terminal — two panes:
- *   left : user command list (.pi/commands.json) on top + terminal tabs below
+ *   left : user command list (.omp/commands.json) on top + terminal tabs below
  *          (on mobile this whole column slides in as a drawer)
  *   right: the active terminal (one xterm per tab, kept mounted)
  */

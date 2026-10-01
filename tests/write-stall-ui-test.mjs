@@ -19,7 +19,7 @@ writeFileSync(join(cwd, 'youwei_core/worker/__init__.py'), '');
 let server, browser;
 try {
 	assert.equal(await portUp(port), false);
-	server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(root, 'data'), PI_CODING_AGENT_DIR: join(root, 'agent') }, stdio: ['ignore', 'pipe', 'pipe'] });
+	server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), OMP_WEB_CWD: cwd, OMP_WEB_DATA_DIR: join(root, 'data'), OMP_WEB_AGENT_DIR: join(root, 'agent') }, stdio: ['ignore', 'pipe', 'pipe'] });
 	let stderr = ''; server.stderr.on('data', (chunk) => { stderr += chunk; });
 	for (let i = 0; i < 80 && !await portUp(port); i++) await sleep(200);
 	assert(await portUp(port), stderr);

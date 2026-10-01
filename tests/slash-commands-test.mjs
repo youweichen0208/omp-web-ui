@@ -107,11 +107,11 @@ async function main() {
 			...process.env,
 			PORT: String(PORT),
 			// 仓库根本身当工作区（跨平台）；隔离 client-state
-			PI_WEB_CWD: REPO_ROOT,
-			PI_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "piweb-slash-")),
+			OMP_WEB_CWD: REPO_ROOT,
+			OMP_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "piweb-slash-")),
 			// 隔离 agent 目录（无会话历史）——复现 CI 的空环境，防止本机
-			// 真实 ~/.pi/agent 里的历史会话掩盖 snapshot/delta 时序差异。
-			PI_CODING_AGENT_DIR: mkdtempSync(join(tmpdir(), "piweb-slash-agent-")),
+			// 真实 ~/.omp/agent 里的历史会话掩盖 snapshot/delta 时序差异。
+			OMP_WEB_AGENT_DIR: mkdtempSync(join(tmpdir(), "piweb-slash-agent-")),
 		},
 		stdio: "ignore",
 	});

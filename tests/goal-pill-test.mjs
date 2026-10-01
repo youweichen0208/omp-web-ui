@@ -37,9 +37,9 @@ async function startServer() {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			PI_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-web-goalpill-")),
-			PI_WEB_CWD: PROJ,
-			PI_CODING_AGENT_DIR: mkdtempSync(join(tmpdir(), "pi-web-goal-agent-")),
+			OMP_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-web-goalpill-")),
+			OMP_WEB_CWD: PROJ,
+			OMP_WEB_AGENT_DIR: mkdtempSync(join(tmpdir(), "pi-web-goal-agent-")),
 		},
 		stdio: "ignore",
 	});

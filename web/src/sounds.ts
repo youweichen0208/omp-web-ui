@@ -1,5 +1,5 @@
 /**
- * Sound notifications for pi-web-ui.
+ * Sound notifications for omp-web-ui.
  *
  * All cues are synthesized with the Web Audio API (no asset files), so the
  * whole feature is ~1KB and works offline. Settings are persisted to

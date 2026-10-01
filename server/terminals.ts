@@ -1,7 +1,7 @@
 /**
  * TerminalManager — conversation-owned PTY sessions (node-pty) bridged over
  * the WebSocket protocol, plus the user command list persisted in
- * `<workspaceRoot>/.pi/commands.json`.
+ * `<workspaceRoot>/.omp/commands.json`.
  *
  * Each conversation gets its own manager; terminals are shared across browser
  * tabs through the session emit. A socket drop does not kill them: the
@@ -25,21 +25,21 @@ import { spawn, type IPty } from "node-pty";
 import {
 	defineTool,
 	type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+} from "./omp/index.js";
 import { Type } from "typebox";
 import type { CommandDef, ServerMessage, TerminalInfo } from "./protocol.js";
 
 // ---------------------------------------------------------------------------
-// .pi/commands.json
+// .omp/commands.json
 // ---------------------------------------------------------------------------
 
 export interface CommandsFile {
 	commands: CommandDef[];
 }
 
-/** Location of the command list for a project: <workspaceRoot>/.pi/commands.json */
+/** Location of the command list for a project: <workspaceRoot>/.omp/commands.json */
 export function commandsFilePath(workspaceRoot: string): string {
-	return join(workspaceRoot, ".pi", "commands.json");
+	return join(workspaceRoot, ".omp", "commands.json");
 }
 
 /** Expand ${pwd} (and ~) in a cwd/command string against the session's cwd. */
@@ -126,7 +126,7 @@ export async function saveCommandsFile(
 ): Promise<{ path: string; error?: string }> {
 	const path = commandsFilePath(workspaceRoot);
 	try {
-		await mkdir(join(workspaceRoot, ".pi"), { recursive: true });
+		await mkdir(join(workspaceRoot, ".omp"), { recursive: true });
 		const payload: CommandsFile = { commands };
 		await writeFile(path, JSON.stringify(payload, null, 2) + "\n", "utf8");
 		return { path };
@@ -186,10 +186,10 @@ const MAX_ID = 80;
 /**
  * 终端活力检测阈值：agent 触碰过的终端连续静默这么久且该对话正在运行时，
  * 通过 onAgentIdle 回调通知宿主（宿主注入一条 steer 消息唤醒 AI 去检查）。
- * PI_WEB_TERMINAL_IDLE_MS 覆盖；0 = 关闭检测。每次调用时读取（测试可注入）。
+ * OMP_WEB_TERMINAL_IDLE_MS 覆盖；0 = 关闭检测。每次调用时读取（测试可注入）。
  */
 export function terminalIdleNotifyMs(): number {
-	const raw = Number(process.env.PI_WEB_TERMINAL_IDLE_MS);
+	const raw = Number(process.env.OMP_WEB_TERMINAL_IDLE_MS);
 	return Number.isFinite(raw) && raw >= 0 ? raw : 15_000;
 }
 
@@ -250,10 +250,10 @@ function bashArgs(shell: string): string[] {
  * - Windows: prefer bash — it matches the SDK's bash tool, so the agent and
  *   the terminal speak the same shell language (no more PowerShell/bash
  *   混用 that leaves heredocs / `&&` / `<<` hanging or erroring). Order:
- *   1. PI_WEB_SHELL (explicit override)
+ *   1. OMP_WEB_SHELL (explicit override)
  *   2. $SHELL when it exists on disk (user launched from a Git Bash session)
  *   3. Git Bash install paths (ProgramFiles / ProgramFiles(x86))
- *   4. busybox-w32 fallback in <home>/.pi-web/bin/bash.exe (ensure-bash.ts
+ *   4. busybox-w32 fallback in <home>/.omp-web/bin/bash.exe (ensure-bash.ts
  *      downloads it automatically when 2–3 are absent)
  *   5. $COMSPEC (cmd.exe — always set)
  *   6. powershell.exe (last resort)
@@ -263,7 +263,7 @@ function bashArgs(shell: string): string[] {
  */
 function resolveShell(): { shell: string; args: string[] } {
 	if (isWindows) {
-		const explicit = process.env.PI_WEB_SHELL;
+		const explicit = process.env.OMP_WEB_SHELL;
 		if (explicit) return { shell: explicit, args: bashArgs(explicit) };
 		const she = process.env.SHELL;
 		if (she && existsSync(she)) return { shell: she, args: bashArgs(she) };
@@ -275,7 +275,7 @@ function resolveShell(): { shell: string; args: string[] } {
 		]) {
 			if (cand && existsSync(cand)) return { shell: cand, args: ["-i"] };
 		}
-		const busybox = join(homedir(), ".pi-web", "bin", "bash.exe");
+		const busybox = join(homedir(), ".omp-web", "bin", "bash.exe");
 		if (existsSync(busybox)) return { shell: busybox, args: ["-i"] };
 		return { shell: process.env.COMSPEC || "powershell.exe", args: [] };
 	}
@@ -298,7 +298,7 @@ function resolveBashShell(): { shell: string; args: string[] } {
 		]) {
 			if (cand && existsSync(cand)) return { shell: cand, args: ["-i"] };
 		}
-		const busybox = join(homedir(), ".pi-web", "bin", "bash.exe");
+		const busybox = join(homedir(), ".omp-web", "bin", "bash.exe");
 		if (existsSync(busybox)) return { shell: busybox, args: ["-i"] };
 	}
 	const she = process.env.SHELL;
@@ -350,7 +350,7 @@ console.warn = (...args: unknown[]) => {
 // execute bit (mode 0644 in the npm tarball), so posix_spawn fails with EACCES
 // and node-pty throws the generic "posix_spawnp failed". Locally-built
 // copies (build/Release) are fine; every `npm install` that picks the prebuild
-// — e.g. `npm i -g pi-web-ui`, which is what system-service installs run — is
+// — e.g. `npm i -g omp-web-ui`, which is what system-service installs run — is
 // broken until the bit is restored. Self-heal at startup AND lazily before
 // every spawn (an `npm i -g` while the server is running replaces the helper
 // under the running process, so the startup-only repair misses it).
@@ -409,7 +409,7 @@ function brokenSpawnHelper(): string {
 // macOS TCC camera/mic warning (launchd-spawned servers)
 // ---------------------------------------------------------------------------
 // TCC attributes camera/mic access to the process chain's "responsible
-// process". When pi-web-ui runs as a launchd LaunchAgent (node ← launchd),
+// process". When omp-web-ui runs as a launchd LaunchAgent (node ← launchd),
 // the responsible process is node itself — a bare CLI binary with no app
 // bundle / Info.plist / NSCameraUsageDescription — so TCC silently denies
 // camera access (no prompt, nothing to tick in System Settings) and
@@ -421,7 +421,7 @@ const TCC_HINT = [
 	"\x1b[90m  · 需要隐私权限的命令会被系统静默拒绝：不弹授权窗，系统设置里也无法勾选，表现多为卡死或无输出。",
 	"  · 这类任务请在你自己已授权的前台终端里运行。",
 	"  · 本终端内可运行不需要隐私权限的命令（如文件处理、网络请求、远程设备流）。",
-	"  · 若改在前台终端里运行 pi-web-ui，本提示即不再出现。\x1b[0m",
+	"  · 若改在前台终端里运行 omp-web-ui，本提示即不再出现。\x1b[0m",
 ].join("\r\n") + "\r\n";
 
 /** True when this server was spawned by launchd (or orphaned) on macOS — no GUI app in the ancestry, so camera/mic TCC grants are unavailable. */

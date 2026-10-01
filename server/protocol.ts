@@ -1,5 +1,5 @@
 /**
- * Wire protocol between the browser client and the pi-web-ui server.
+ * Wire protocol between the browser client and the omp-web-ui server.
  * Pure JSON over WebSocket. The web frontend mirrors these types in
  * web/src/types.ts (kept in sync by hand — types only, no shared runtime code).
  */
@@ -65,7 +65,7 @@ export type UiContentBlock =
 export interface UiTodoSnapshot {
 	action?: string;
 	error?: string;
-	tasks: { id: number; subject: string; status: "pending" | "in_progress" | "completed" | "deleted" }[];
+	tasks: { id: number; subject: string; phase?: string; blocker?: string; status: "pending" | "in_progress" | "completed" | "deleted" | "blocked" }[];
 }
 
 export interface UiMessage {
@@ -162,6 +162,7 @@ export interface UiState {
 	streamingMessage: UiMessage | null;
 	/** Server-derived current task; null before the first user prompt. */
 	taskProgress?: TaskProgress | null;
+	subagents?: { id: string; agent: string; description?: string; status: string }[];
 	isStreaming: boolean;
 	model: UiModelInfo | null;
 	thinkingLevel: string;
@@ -217,7 +218,7 @@ export interface UiState {
 // Client -> Server
 // ---------------------------------------------------------------------------
 
-/** A user-defined command shown in the terminal command list (.pi/commands.json). */
+/** A user-defined command shown in the terminal command list (.omp/commands.json). */
 export interface CommandDef {
 	name: string;
 	/** Shell command to run in the terminal. */
@@ -339,10 +340,10 @@ export type ClientMessage =
 			conversationId?: string;
 	  }
 	// Re-discover extensions/skills/prompt templates from disk after an
-	// external change (e.g. `pi remove npm:<pkg>` finished in the terminal).
+	// external change (e.g. `omp plugin uninstall <pkg>` finished in the terminal).
 	// Streaming-safe: deferred to agent_end while a run is in flight.
 	| { type: "extensions_reload" }
-	// -- command list (.pi/commands.json) ------------------------------------
+	// -- command list (.omp/commands.json) ------------------------------------
 	| { type: "list_commands" }
 	| { type: "save_commands"; commands: CommandDef[] }
 	| { type: "abort" }
@@ -409,7 +410,7 @@ export type ClientMessage =
 	| { type: "complete_path"; path: string }
 	| { type: "dialog_response"; id: number; value: string | boolean | null }
 	// -- self-update ----------------------------------------------------------
-	/** Check the npm registry for a newer pi-web-ui version. */
+	/** Check the npm registry for a newer omp-web-ui version. */
 	| { type: "check_update" }
 	| { type: "check_component_updates"; requestId: string }
 	| { type: "update_component"; requestId: string; id: string }
@@ -522,7 +523,7 @@ export type ClientMessage =
 	| { type: "plugin_message"; pluginId: string; payload: unknown }
 	/** Re-scan the plugin directory: deactivate removed entries, activate new
 	 *  ones, bump the epoch and re-push the catalog. Same spirit as
-	 *  extensions_reload but for pi-web-ui's own UI plugins. */
+	 *  extensions_reload but for omp-web-ui's own UI plugins. */
 	| { type: "plugins_reload" }
 	/** Save the CURRENT settings as a named preset (overwrites if it exists). */
 	| { type: "save_preset"; name: string }
@@ -783,6 +784,7 @@ export interface UiProviderConfig {
 	api?: string;
 	baseUrl?: string;
 	apiKey?: string;
+	auth?: "apiKey" | "none" | "oauth";
 	authHeader?: boolean;
 	/** headers are NOT returned to the browser — they can contain Authorization
 	 *  / API-key values; saveModelConfig preserves them server-side. */
@@ -793,7 +795,7 @@ export interface UiProviderConfig {
 // Plugins (optional UI components dropped into <dataDir>/plugins/<id>/)
 // ---------------------------------------------------------------------------
 
-/** One installed pi-web-ui plugin (see server/plugins.ts). A plugin is a
+/** One installed omp-web-ui plugin (see server/plugins.ts). A plugin is a
  *  directory under <dataDir>/plugins/<id>/ with a manifest.json and optional
  *  server entry (index.mjs) + client view bundle (client/entry.mjs). Not
  *  bundled with the app — users install by dropping the directory in and
@@ -842,7 +844,7 @@ export interface UiPluginInfo {
 	settingsSchema?: UiPluginSettingField[];
 	/** Current stored values (storage.json "settings" key, defaults applied). */
 	settingsValues?: Record<string, unknown>;
-	/** Install source recorded by `pi-web-ui install` (<dir>/.pi-source.json):
+	/** Install source recorded by `omp-web-ui install` (<dir>/.pi-source.json):
 	 *  the original spec the user typed (owner/repo, URL or local path). The
 	 *  settings panel offers an Update button only when this exists. */
 	source?: string;
@@ -905,6 +907,8 @@ export interface ComponentUpdate {
 }
 
 export interface UiExtensionInfo {
+	/** Native OMP plugin package, when installed under its plugin root. */
+	packageName?: string;
 	/** Stable identity for the toggle: the npm spec for packages, the resolved
 	 *  entry path otherwise. */
 	id: string;
@@ -940,6 +944,8 @@ export interface UiVisionBridgeModel {
 
 /** Full settings state pushed to the browser (settings_state). */
 export interface UiSettingsState {
+	/** Bundled native CLI invocation for visible plugin maintenance. */
+	agentCommand?: string;
 	promptMode: "append" | "replace";
 	customSystemPrompt: string;
 	disabledSkills: string[];
@@ -995,7 +1001,7 @@ export type ServerMessage =
 	| {
 			type: "ready";
 			clientId: string;
-			/** Running pi-web-ui package version, independent of the pi SDK version. */
+			/** Running omp-web-ui package version, independent of the OMP runtime version. */
 			serverVersion: string;
 			/** Wire-protocol version (server/protocol-version.ts). The client
 			 *  compares it against its own copy — a mismatch means the page was
@@ -1075,7 +1081,7 @@ export type ServerMessage =
 	| { type: "terminal_output"; conversationId?: string; terminalId: string; data: string }
 	| { type: "terminal_exit"; conversationId?: string; terminalId: string; exitCode: number | null }
 	| { type: "terminal_list"; conversationId?: string; terminals: TerminalInfo[] }
-	// -- command list (.pi/commands.json) ------------------------------------
+	// -- command list (.omp/commands.json) ------------------------------------
 	| { type: "commands"; cwd: string; commands: CommandDef[]; path: string }
 	/** The slash-command catalog for the chat input (builtin + extension +
 	 *  prompt template + skill commands). Pushed on attach, on project switch
@@ -1222,12 +1228,13 @@ export type ServerMessage =
 	| {
 			type: "dialog";
 			id: number;
-			kind: "select" | "confirm" | "input";
+			kind: "select" | "confirm" | "input" | "editor";
 			title: string;
 			args: unknown[];
 	  }
 	/** The server resolved (or abandoned) a dialog — the client must close it. */
 	| { type: "dialog_closed"; id: number }
+	| { type: "editor_text"; conversationId: string; text: string; id: string }
 	// -- self-update ----------------------------------------------------------
 	/** Result of a check_update run (current/latest from the npm registry). */
 	| {

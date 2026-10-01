@@ -22,7 +22,7 @@ let server;
 let browser;
 try {
 	assert.equal(await portUp(port), false);
-	server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(cwd, "data"), PI_CODING_AGENT_DIR: join(cwd, "agent") }, stdio: ["ignore", "pipe", "pipe"] });
+	server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), OMP_WEB_CWD: cwd, OMP_WEB_DATA_DIR: join(cwd, "data"), OMP_WEB_AGENT_DIR: join(cwd, "agent") }, stdio: ["ignore", "pipe", "pipe"] });
 	let serverOutput = "";
 	server.stderr.on("data", (chunk) => { serverOutput += chunk; });
 	for (let i = 0; i < 100 && !await portUp(port); i++) await sleep(100);
@@ -89,7 +89,7 @@ try {
 	await page.mouse.down();
 	await page.mouse.move(handle.x - 80, handle.y + 120);
 	await page.mouse.up();
-	const savedShare = await page.evaluate(() => Number(localStorage.getItem("pi-web-ui:editor-share")));
+	const savedShare = await page.evaluate(() => Number(localStorage.getItem("omp-web-ui:editor-share")));
 	assert(savedShare > 0.45 && savedShare < 0.7);
 	await page.locator(".fp-back").click();
 	await page.locator(".fp-leave").getByRole("button", { name: "放弃修改" }).click();

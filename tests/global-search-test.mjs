@@ -39,8 +39,8 @@ async function startServer() {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			PI_WEB_DATA_DIR: dataDir,
-			PI_WEB_CWD: workDir,
+			OMP_WEB_DATA_DIR: dataDir,
+			OMP_WEB_CWD: workDir,
 		},
 		stdio: "ignore",
 	});

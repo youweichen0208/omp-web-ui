@@ -19,7 +19,7 @@ try {
 	assert(CHROME_PATH, "Chrome is required for the browser test");
 	assert.equal(await portUp(PORT), false);
 	server = spawn(process.execPath, ["dist/server/index.js"], {
-		env: { ...process.env, PORT: String(PORT), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(temp, "data"), PI_CODING_AGENT_DIR: join(temp, "agent") },
+		env: { ...process.env, PORT: String(PORT), OMP_WEB_CWD: cwd, OMP_WEB_DATA_DIR: join(temp, "data"), OMP_WEB_AGENT_DIR: join(temp, "agent") },
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	let stderr = "";
