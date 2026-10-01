@@ -28,7 +28,9 @@ OMP 是执行与持久化的唯一事实源。宿主不修改 Agent 私有字段
 
 ## 配置与凭据
 
-新配置目录为 `~/.omp/agent`（`OMP_WEB_AGENT_DIR` 可覆盖），Web 状态为 `~/.omp-web`，桌面状态为 `~/.omp-web-desktop`。不导入或改写 `~/.pi` 和旧应用状态。工作进程不继承旧 profile 与 XDG 数据重定向，避免显式隔离目录意外读到别处的状态。
+新配置目录为 `~/.omp/agent`（`OMP_WEB_AGENT_DIR` 可覆盖），Web 状态为 `~/.omp-web`，桌面状态为 `~/.omp-web-desktop`。旧 Pi 文件与旧应用状态保持原样。工作进程不继承旧 profile 与 XDG 数据重定向，避免显式隔离目录意外读到别处的状态。
+
+默认目录尚无 models.yml/models.yaml 时，ModelRuntime 首次创建会通过 Bun 管理进程只读转换 `~/.pi/agent/models.json`，保留模型、地址、API key 与 headers；缺少内联 key 时仅补入 auth.json 中同名服务商的 api_key。不会迁移 OAuth、历史、扩展或其他旧设置。模型经 OMP 原生校验后以 0600 权限原子创建，已有文件（包括空配置）不覆盖；并发启动只有一个写入者成功。Pi 默认模型仅在 OMP 尚无配置文件时写入 modelRoles.default。导入失败不阻止首次设置，也不向日志输出原始配置。设置 OMP_WEB_AGENT_DIR 或使用非默认 agentDir 会关闭自动导入。回归：`node tests/pi-model-import-test.mjs`（临时 HOME、原生模型目录、零模型调用）。
 
 - OMP 配置使用 config.yml、models.yml（兼容已有 models.yaml），会话使用原生 sessions 目录及索引。
 - 内置服务商 API key/OAuth 由 OMP SQLite 凭据存储管理。自定义服务商遵循 models.yml 原生 schema；密钥写入该文件，文件权限 0600。无需认证的本地模型显式设置 `auth: none`。

@@ -10,6 +10,7 @@ import { completeSimple } from "@oh-my-pi/pi-ai/stream";
 import { getBundledProviders } from "@oh-my-pi/pi-catalog/models";
 import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/manager";
 import { getPluginsPackageJson } from "@oh-my-pi/pi-utils";
+import { importPiModels } from "./pi-model-import.mjs";
 
 let auth;
 let request;
@@ -44,6 +45,14 @@ async function readModels() {
 }
 async function dispatch(input) {
 	switch (input.operation) {
+		case "import_pi_models": {
+			const agentDir = getAgentDir();
+			await mkdir(agentDir, { recursive: true });
+			return importPiModels({ sourceDir: input.sourceDir, agentDir, validate: async candidate => {
+				const { registry } = await context(candidate);
+				if (registry.getError()) throw { publicMessage: "Pi 模型配置不兼容 OMP，原配置已保留" };
+			} });
+		}
 		case "plugins_list": {
 			const manager = new PluginManager(process.cwd());
 			const plugins = await manager.list();

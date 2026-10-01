@@ -61,6 +61,7 @@ const ALL = [
 	"switch-session-background-test",
 	"terminal-smoke-test",
 	"omp-runtime-test",
+	"pi-model-import-test",
 	"omp-session-test",
 	"vision-bridge-test",
 	"version-handshake-test",

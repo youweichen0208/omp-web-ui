@@ -55,5 +55,6 @@ jobs:
       - run: npm ci
       - run: npm run build:server
       - run: node tests/omp-runtime-test.mjs
+      - run: node tests/pi-model-import-test.mjs
       - run: node tests/node-workbench-test.mjs
       - run: node tests/omp-session-test.mjs

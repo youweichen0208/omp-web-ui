@@ -6,7 +6,7 @@ OMP Web UI 是 Oh My Pi 的 Web 与 Electron 界面。npm 包 `@youweichen/omp-w
 
 Node/Electron 管理 HTTP、WebSocket、PTY、文件和 SSH；每个会话的 OMP 在独立 Bun 子进程运行。**修改运行时、工具、队列、模型配置、历史或打包前读 `docs/architecture-omp.md`。** 禁止重新引入旧 Pi SDK、私有 Agent 状态修改、rpiv-todo 或宿主伪调用恢复循环。
 
-配置全新使用 `~/.omp/agent`；Web 数据 `~/.omp-web`，桌面数据 `~/.omp-web-desktop`。不迁移或修改旧 `~/.pi` 配置和历史。桌面内部 appId 保留 `com.youweichen.pi-web-ui`，Debian 包身份保留 pi，以维持安装器升级识别。
+配置使用 `~/.omp/agent`；Web 数据 `~/.omp-web`，桌面数据 `~/.omp-web-desktop`。默认配置目录尚无模型文件时，只读导入 `~/.pi/agent/models.json` 与对应 API key、默认模型；已有 OMP 配置优先，显式配置目录不自动导入。不修改旧 Pi 文件，不迁移历史、OAuth 或扩展。桌面内部 appId 保留 `com.youweichen.pi-web-ui`，Debian 包身份保留 pi，以维持安装器升级识别。
 
 ## 代码导航
 

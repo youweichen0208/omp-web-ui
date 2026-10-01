@@ -20,7 +20,9 @@ omp-web-ui --port 9000 --cwd /path/to/project
 
 ### 版本与升级
 
-1.0.0-beta.1 是全面迁移 OMP 的候选版本，使用 npm next 标签。桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/omp-web-ui/releases)。旧 Pi 配置和历史保留原处，新版本使用全新的 OMP 环境，不自动导入。桌面内部安装器身份保留；macOS 更新提示打开对应 Release 手动下载安装包。
+1.0.0-beta.1 是全面迁移 OMP 的候选版本，使用 npm next 标签。桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/omp-web-ui/releases)。旧 Pi 配置和历史保留原处，应用使用独立的 OMP 环境。桌面内部安装器身份保留；macOS 更新提示打开对应 Release 手动下载安装包。
+
+当前开发版支持首次启动自动识别 Pi 模型：默认 `~/.omp/agent` 尚无模型文件时，读取 `~/.pi/agent/models.json`，导入模型与对应 API key；OMP 没有配置文件时也沿用默认模型。已有 OMP 配置不覆盖，旧 Pi 文件不修改；不迁移 OAuth、历史或扩展。设置 `OMP_WEB_AGENT_DIR` 时不自动导入。已发布的 beta.1 尚不包含此修复。
 
 ## SSH 节点工作台
 

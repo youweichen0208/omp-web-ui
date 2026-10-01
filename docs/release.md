@@ -4,7 +4,7 @@ OMP 使用仓库 `youweichen0208/omp-web-ui`、npm 包 `@youweichen/omp-web-ui`�
 
 ## 1.0.0 候选版
 
-首个候选版本是 `1.0.0-beta.1`，npm 发布到 `next`，GitHub 标记 prerelease。新版本只使用 Oh My Pi 和 `~/.omp/agent`，不迁移或改写旧 Pi 配置、凭据和历史。保留桌面内部 appId `com.youweichen.pi-web-ui` 和 Debian 包身份 `pi`，以维持安装器升级关系。
+首个候选版本是 `1.0.0-beta.1`，npm 发布到 `next`，GitHub 标记 prerelease。应用只使用 Oh My Pi 和 `~/.omp/agent`，不改写旧 Pi 文件。beta.1 尚不自动导入模型；开发版新增首次启动模型导入，范围与隔离规则见 [OMP 运行时](architecture-omp.md#配置与凭据)。保留桌面内部 appId `com.youweichen.pi-web-ui` 和 Debian 包身份 `pi`，以维持安装器升级关系。
 
 macOS 不使用付费签名或公证，构建后做 ad-hoc 签名。macOS 更新提示打开对应 Release，用户手动下载替换。
 
