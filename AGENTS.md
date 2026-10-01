@@ -201,7 +201,7 @@ npm publish --access public
 
 注意事项：版本号必须高于 npm registry；提交信息不要带 `Co-authored-by`；升级后需手动重启服务 `pi-web-ui server restart`；发布前检查示例文件不泄密。
 
-桌面版发布是独立的一条线（跟 npm 发布不绑在一起）：打一个 `v*` tag push 上去，`.github/workflows/release-desktop.yml` 会在 mac/win/linux 三个真机 runner 上各自构建安装包并传到 GitHub Releases（`electron-builder.yml` 里 `publish: provider: github` 生效，不需要额外配置 secrets，用的是 GitHub 自带的 `GITHUB_TOKEN`）。带 `-` 的 beta tag 自动生成 GitHub prerelease。当前不签名，mac 首次打开需要右键「打开」跳过 Gatekeeper。要单独重跑某个平台可以在 Actions 页手动触发这个 workflow 并选平台。
+桌面版发布是独立的一条线（跟 npm 发布不绑在一起）：打一个 `v*` tag push 上去，`.github/workflows/release-desktop.yml` 先创建草稿，在 mac/win/linux 真机 runner 上构建、执行打包产物回归，再上传附件；三个平台全部成功且附件齐全后才公开。使用 GitHub 自带的 `GITHUB_TOKEN`，带 `-` 的 beta tag 标记 prerelease。mac 使用 ad-hoc 签名，首次打开可能需要右键「打开」。手动单平台重建只更新附件，不单独公开草稿。
 Windows job 的终端冒烟测试必须通过才能上传安装包；`AttachConsole failed` 清理竞态由 `server/patch-node-pty.ts` 处理，不能以 `continue-on-error` 跳过终端读写失败。
 
 ## 7. 环境变量

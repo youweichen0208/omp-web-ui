@@ -2,6 +2,12 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.8.8 正式版
+
+`0.8.8` 将内置 Pi SDK 升级至 0.99.2，接入原生 MCP/Codemode、官方账号授权、嵌套调用和图片展示，并保护模型编辑/刷新中的类型与额外配置。说明见 `.github/release-notes/v0.8.8.md`。npm 使用 `latest`；GitHub 标签使用 `v0.8.8`。
+
+桌面工作流先创建 draft；macOS/Windows/Linux 各自构建、检查打包后的启动/SQLite/原生工具/OAuth，并上传验证后的附件。三个平台全部成功、安装包与更新元数据齐全后，最后一个 job 才公开 Release。手动单平台重建只更新附件，不单独公开草稿。macOS 打包前运行终端回归，确保 node-pty 补丁在签名前进入产物。
+
 ## 0.8.6 正式版
 
 `0.8.6` 整理 Web 与桌面版的聊天任务清单：连续成功更新合并成展开卡片，后续只记录变化，支持跳回历史清单并高亮任务项；保留失败展示、跨轮次状态与 clear 身份隔离。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.6.md`。

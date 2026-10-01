@@ -145,10 +145,10 @@ linux:
   artifactName: "${productName}-${version}-linux-${arch}.${ext}"
 
 # 发布：push v* tag 时由 .github/workflows/release-desktop.yml 触发，
-# 三平台各自 electron-builder build --publish always 上传到 GitHub Releases
+# 三平台构建并验证后上传草稿，全部成功后由工作流公开 GitHub Release
 # （GITHUB_TOKEN 自带，workflow 里已经给了 contents: write 权限，不用额外配置）。
 publish:
   provider: github
   owner: youweichen0208
-  repo: pi-web-ui
-  releaseType: release
+  repo: omp-web-ui
+  releaseType: draft

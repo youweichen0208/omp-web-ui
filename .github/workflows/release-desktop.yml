@@ -48,7 +48,7 @@ jobs:
           version=$(node -p "require('./package.json').version")
           test "$RELEASE_TAG" = "v$version"
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            args=(--verify-tag --title "$RELEASE_TAG")
+            args=(--verify-tag --title "$RELEASE_TAG" --draft)
             if [ -f ".github/release-notes/$RELEASE_TAG.md" ]; then
               args+=(--notes-file ".github/release-notes/$RELEASE_TAG.md")
             else
@@ -80,12 +80,32 @@ jobs:
       - name: Build web + server
         run: npm run build
 
-      - name: Build + publish Electron (macOS)
-        run: npx electron-builder build --mac --arm64 --publish always
+      - name: Verify native tools and OAuth (plain Node)
+        run: |
+          node tests/terminal-bash-test.mjs
+          node tests/native-tools-desktop-test.mjs
+          node tests/provider-auth-test.mjs
+          node tests/model-config-preservation-test.mjs
+
+      - name: Build Electron (macOS)
+        run: npx electron-builder build --mac --arm64 --publish never
+
+      - name: Verify packaged server, native worker and OAuth
+        run: |
+          app="release/mac-arm64/pi.app"
+          root="$app/Contents/Resources/app"
+          executable="$app/Contents/MacOS/pi"
+          node tests/packaged-server-start-test.mjs "$executable" "$root"
+          node tests/native-tools-desktop-test.mjs "$executable" "$root"
+          ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$PWD/$root"
+          codesign --verify --deep --strict "$app"
+
+      - name: Upload verified macOS packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EP_PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
-          # macOS 签名（可选）——上面几个 secrets 没配的话就是未签名构建
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release upload "$tag" release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml --clobber
 
   build-win:
     needs: prepare-release
@@ -117,6 +137,12 @@ jobs:
       - name: Terminal smoke test (plain Node)
         run: node tests/terminal-smoke-test.mjs
 
+      - name: Verify native tools and OAuth (plain Node)
+        run: |
+          node tests/native-tools-desktop-test.mjs
+          node tests/provider-auth-test.mjs
+          node tests/model-config-preservation-test.mjs
+
       - name: Install browser for toolbar regression
         run: npx playwright-core install chromium
 
@@ -131,6 +157,12 @@ jobs:
         run: |
           node tests/packaged-server-start-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
           if ($LASTEXITCODE -ne 0) { throw "Packaged server cannot start" }
+          node tests/native-tools-desktop-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
+          if ($LASTEXITCODE -ne 0) { throw "Packaged native tools failed" }
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          & ./release/win-unpacked/pi.exe tests/provider-auth-test.mjs "$PWD/release/win-unpacked/resources/app"
+          if ($LASTEXITCODE -ne 0) { throw "Packaged OAuth failed" }
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
 
@@ -142,18 +174,7 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $tag = "v$version"
           gh release view $tag
-          if ($LASTEXITCODE -ne 0) {
-            if ($version.Contains('-')) {
-              gh release create $tag --verify-tag --title $tag --notes "Desktop prerelease $version" --prerelease
-            } else {
-              gh release create $tag --verify-tag --title $tag --notes "Desktop release $version"
-            }
-            if ($LASTEXITCODE -ne 0) {
-              # Another platform may have created the release concurrently.
-              gh release view $tag
-              if ($LASTEXITCODE -ne 0) { throw "Cannot create release" }
-            }
-          }
+          if ($LASTEXITCODE -ne 0) { throw "Release draft is missing" }
           $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip', '.blockmap' -or $_.Name -eq 'latest.yml' }
           if ($assets.Count -lt 5) { throw "Windows release assets are incomplete" }
           gh release upload $tag @($assets.FullName) --clobber
@@ -183,8 +204,49 @@ jobs:
       - name: Build web + server
         run: npm run build
 
-      - name: Build + publish Electron (Linux)
-        run: npx electron-builder build --linux --x64 --publish always
+      - name: Verify native tools and OAuth (plain Node)
+        run: |
+          node tests/terminal-bash-test.mjs
+          node tests/native-tools-desktop-test.mjs
+          node tests/provider-auth-test.mjs
+          node tests/model-config-preservation-test.mjs
+
+      - name: Build Electron (Linux)
+        run: npx electron-builder build --linux --x64 --publish never
+
+      - name: Verify packaged server, native worker and OAuth
+        run: |
+          root="$PWD/release/linux-unpacked/resources/app"
+          executable="$PWD/release/linux-unpacked/pi"
+          node tests/packaged-server-start-test.mjs "$executable" "$root"
+          node tests/native-tools-desktop-test.mjs "$executable" "$root"
+          ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$root"
+
+      - name: Upload verified Linux packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EP_PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release upload "$tag" release/*.AppImage release/*.deb release/latest-linux.yml --clobber
+
+  publish-release:
+    needs: [build-mac, build-win, build-linux]
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify attachments and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$RELEASE_TAG" --json assets > /tmp/release-assets.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const version = JSON.parse(readFileSync('package.json')).version;
+          const names = new Set(JSON.parse(readFileSync('/tmp/release-assets.json')).assets.map(asset => asset.name));
+          for (const name of [`pi-${version}-mac-arm64.dmg`, `pi-${version}-mac-arm64.zip`, `pi-${version}-setup-x64.exe`, `pi-${version}-win-x64.exe`, `pi-${version}-win-x64.zip`, `pi-${version}-linux-x86_64.AppImage`, `pi-${version}-linux-amd64.deb`, 'latest-mac.yml', 'latest.yml', 'latest-linux.yml']) {
+            if (!names.has(name)) throw new Error(`Missing release attachment: ${name}`);
+          }
+          NODE
+          gh release edit "$RELEASE_TAG" --draft=false
