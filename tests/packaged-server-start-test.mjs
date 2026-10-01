@@ -19,12 +19,14 @@ if (process.platform === "win32") {
 	console.log("PASS packaged node-pty includes the ConPTY cleanup patch");
 }
 // Loading the lazy provider is essential: startup alone does not import it.
-const provider = pathToFileURL(join(appRoot, "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js")).href;
+for (const module of ["api/anthropic-messages.js", "auth/oauth/openai-chatgpt.js"]) {
+const provider = pathToFileURL(join(appRoot, "node_modules/@earendil-works/pi-ai/dist", module)).href;
 execFileSync(executable, ["--input-type=module", "--eval", `await import(${JSON.stringify(provider)})`], {
 	env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_PATH: "", NODE_OPTIONS: "" },
 	timeout: 30000,
 	stdio: "pipe",
 });
+}
 const temp = mkdtempSync(join(tmpdir(), "pi-packaged-start-"));
 const workspace = join(temp, "workspace");
 mkdirSync(workspace);

@@ -56,6 +56,10 @@ Windows ConPTY 关闭终端时还有一个 node-pty 1.1.0 竞态：console-list 
 
 ## 终端接管 bash（terminal-backed bash）
 
+输出因预览或结构化上限而缩短时，`full_output_path` 指向权限为 0600 的临时文件，供后续 read 工具读取完整输出；后台结果中的文件只包含截至解阻时已有的输出。
+
+Pi 0.99 的 Codemode 调用需要结构化结果。一次性 bash 保留官方工具定义的 `outputSchema`、提示贡献和返回值；动态分流使用涵盖两种实现的输出 schema。终端接管结果提供 `structuredContent.output/truncated/exit_code/wall_time_seconds`，完成时非零退出设置 `isError`；静默解阻时 `running:true`、`exit_code:null` 与 `terminal_id` 明确表示尚未完成。`tail` 和聊天预览截断只影响模型可见文本，脚本可读输出最多保留 1 MiB（超限保留头尾）。`tests/terminal-bash-test.mjs` 使用真实 PTY 验证成功、失败、空输出、tail、后台完成和中断。
+
 设置面板开关 `terminalBash`（默认关）。`terminals.ts` 的 `makeTerminalBashTool` + agent-service 的 `makeAdaptiveBashTool` 动态分流：开启后 bash 工具的执行体改为往持久可见终端 `ai-bash` 写命令（单行哨兵技术：`{cmd}; __pi_rc=$?; printf '\\n[pi-exit:%s]\\n' "$__pi_rc"`，多行脚本经 `$'...'` 转义 eval，避免被交互 shell 的 stdin/bracketed-paste 吃掉），等哨兵行拿到**真实退出码**后返回完整输出（`stripAnsi` 清理 ANSI/OSC/孤立 CR、截掉回显与新提示符）。
 
 行为语义：

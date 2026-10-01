@@ -1,3 +1,4 @@
+import { isChatModelConfig, mergeChatProvider } from "./model-config-merge.js";
 /**
  * model-admin — 模型/服务商配置管理，从 agent-service.ts 抽出。
  *
@@ -364,6 +365,7 @@ export class ModelAdminService {
 						id: p.id,
 						name: p.name,
 						configured: st?.configured ?? false,
+						oauth: !!p.auth.oauth,
 						source: st?.source,
 					};
 				} catch {
@@ -460,7 +462,7 @@ export class ModelAdminService {
 		const list: UiProviderConfig[] = Object.entries(providers).map(
 			([providerId, p]) => {
 				const models = Array.isArray(p.models)
-					? (p.models as Record<string, unknown>[]).map((m) => ({
+					? (p.models as Record<string, unknown>[]).filter(isChatModelConfig).map((m) => ({
 							id: String(m.id ?? ""),
 							name: m.name as string | undefined,
 							reasoning: m.reasoning as boolean | undefined,
@@ -474,7 +476,7 @@ export class ModelAdminService {
 					name: p.name as string | undefined,
 					api: p.api as string | undefined,
 					baseUrl: p.baseUrl as string | undefined,
-					apiKey: p.apiKey as string | undefined,
+					nonChatModelCount: Array.isArray(p.models) ? p.models.filter(model => !isChatModelConfig(model)).length : 0,
 					authHeader: p.authHeader as boolean | undefined,
 					// headers are intentionally NOT sent to the browser — they may
 					// contain Authorization / API-key values; kept server-side only.
@@ -715,7 +717,7 @@ static async probeModelsEndpoint(
 						apiKey?: string;
 						authHeader?: boolean;
 						headers?: Record<string, string>;
-						models?: UiModelConfigEntry[];
+						models?: (UiModelConfigEntry & { type?: string })[];
 				  }
 				| undefined;
 			if (!saved?.baseUrl?.trim()) {
@@ -735,7 +737,7 @@ static async probeModelsEndpoint(
 			);
 
 			// Merge: manual values win; fetched fills blanks and appends new ids.
-			const prev = new Map((saved.models ?? []).map((m) => [m.id, m]));
+			const prev = new Map((saved.models ?? []).filter(m => m.type === undefined || m.type === "chat").map((m) => [m.id, m]));
 			let added = 0;
 			for (const f of fetched) {
 				const cur = prev.get(f.id);
@@ -811,20 +813,7 @@ static async probeModelsEndpoint(
 		}
 		try {
 			const { providers } = this.readModelsConfig();
-			// headers never reach the browser, so the incoming config can't carry
-			// them — preserve the previously stored values when they are absent.
-			const prevHeaders = providers[pid]?.headers;
-			providers[pid] = {
-				...(config.name?.trim() ? { name: config.name.trim() } : {}),
-				...(config.api?.trim() ? { api: config.api.trim() } : {}),
-				...(config.baseUrl?.trim() ? { baseUrl: config.baseUrl.trim() } : {}),
-				...(config.apiKey?.trim() ? { apiKey: config.apiKey.trim() } : {}),
-				...(config.authHeader ? { authHeader: true } : {}),
-				...(prevHeaders && Object.keys(prevHeaders).length > 0
-					? { headers: prevHeaders }
-					: {}),
-				models,
-			};
+			providers[pid] = mergeChatProvider(providers[pid] ?? {}, { ...config, models });
 			mkdirSync(this.host.agentDir, { recursive: true });
 			writeFileSync(
 				this.modelsConfigPath(),

@@ -717,6 +717,18 @@ wss.on("connection", (ws) => {
 			case "install_pi_agent":
 				void cs.installPiAgent();
 				break;
+			case "logout_provider":
+				void cs.providerAuth.logout(msg.provider);
+				break;
+			case "login_provider":
+				void cs.providerAuth.login(msg.provider);
+				break;
+			case "cancel_provider_login":
+				cs.providerAuth.cancel(msg.requestId);
+				break;
+			case "provider_auth_response":
+				cs.providerAuth.respond(msg.requestId, msg.promptId, msg.value);
+				break;
 			case "set_provider_api_key":
 				void cs.setProviderApiKey(msg.provider, msg.apiKey);
 				break;

@@ -1,0 +1,43 @@
+/** Exercise the production model editor read/save path with isolated configuration. */
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ModelAdminService } from '../dist/server/model-admin.js';
+import { createServer } from 'node:http';
+const directory = mkdtempSync(join(tmpdir(), 'pi-model-preservation-'));
+const endpoint = createServer((request, response) => response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data: [{ id: 'chat' }, { id: 'picture' }] })));
+try {
+	const image = { id: 'picture', type: 'image', maxImages: 3 };
+	const classifier = { id: 'label', type: 'classifier', samplingParams: { temperature: 0 } };
+	const chat = { id: 'chat', type: 'chat', cost: { input: 2 }, samplingParams: { temperature: 0.4 } };
+	const original = { api: 'openai-completions', headers: { Authorization: 'FIXTURE_SECRET' }, operations: { image: { enabled: true } }, models: [chat, image, classifier] };
+	const path = join(directory, 'models.json');
+	writeFileSync(path, JSON.stringify({ providers: { fixture: original } }));
+	const wire = [];
+	let refreshes = 0;
+	const service = new ModelAdminService({ agentDir: directory, emit: message => wire.push(message), flushSnapshot() {}, isDisposed: () => false, modelRuntime: () => ({ refresh: async () => { refreshes++; } }), invalidatePiConfig() {}, pushModels: async () => {} });
+	await service.listModelsConfig();
+	const form = wire.at(-1).providers[0];
+	assert.deepEqual(form.models.map(model => model.id), ['chat']);
+	assert(!JSON.stringify(wire).includes('FIXTURE_SECRET'));
+	form.models[0].name = 'Renamed';
+	await service.saveModelConfig('fixture', form);
+	assert.equal(refreshes, 1);
+	assert.deepEqual(JSON.parse(readFileSync(path)).providers.fixture, { ...original, models: [{ ...chat, name: 'Renamed' }, image, classifier] });
+	const before = readFileSync(path, 'utf8');
+	await service.saveModelConfig('fixture', { providerId: 'fixture', models: [{ id: 'chat' }, { id: 'chat' }] });
+	assert.equal(readFileSync(path, 'utf8'), before);
+	assert.equal(wire.at(-1).level, 'error');
+	await new Promise((resolve, reject) => { endpoint.once('error', reject); endpoint.listen(0, '127.0.0.1', resolve); });
+	const configured = JSON.parse(readFileSync(path));
+	configured.providers.fixture.baseUrl = `http://127.0.0.1:${endpoint.address().port}`;
+	writeFileSync(path, JSON.stringify(configured));
+	await service.refreshProviderModels('fixture', 1);
+	const refreshed = JSON.parse(readFileSync(path)).providers.fixture.models;
+	assert.deepEqual(refreshed.find(model => model.type === 'image'), image);
+	assert.deepEqual(refreshed.find(model => model.type === 'classifier'), classifier);
+	assert(refreshed.some(model => model.id === 'picture' && !model.type));
+	assert.equal(refreshed.find(model => model.id === 'chat').name, 'Renamed');
+	console.log('PASS production model editor preserves typed models and metadata; duplicate chat IDs do not mutate configuration');
+} finally { endpoint.closeAllConnections(); await new Promise(resolve => endpoint.close(resolve)); rmSync(directory, { recursive: true, force: true }); }

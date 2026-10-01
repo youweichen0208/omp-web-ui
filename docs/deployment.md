@@ -1,5 +1,11 @@
 # 部署
 
+## 内置 Pi 与用户配置
+
+Desktop 使用安装包内精确锁定的 Pi SDK。终端执行 `pi update` 更新的是外部 CLI，不会替换桌面内置依赖；内置版本随应用构建升级。用户安装的原生扩展和凭据则由 Desktop 使用的 agent 目录加载，重启或 `/reload` 可加载其变化；不要把“内置版本固定”理解为“用户扩展配置永远无效”。
+
+Pi 0.99 的原生 MCP 配置入口和旧界面 MCP 桥不同，见 [插件文档](architecture-plugins.md)。模型管理提供官方账号登录桥，OpenAI 支持 ChatGPT 授权；真实账号授权由用户在浏览器完成。macOS 产物回归检查 ChatGPT 的 lazy 模块，不能仅凭应用能启动判断 OAuth 功能完整。
+
 ## CLI
 
 ```bash

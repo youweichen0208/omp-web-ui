@@ -84,12 +84,14 @@ try {
 		const text = result?.content?.[0]?.text ?? "";
 		check("输出包含命令结果", text.includes("hello-tbash"), JSON.stringify(text));
 		check("退出码 0", /\[exit:0\]$/.test(text.trim()));
+		check("结构化输出与成功状态", result.structuredContent?.output === "hello-tbash" && result.structuredContent.exit_code === 0 && result.isError === false);
 		check("不含哨兵原文与回显标记", !text.includes("__pi_rc") && !text.includes("pi-exit"));
 		check("阻塞到命令真正结束", Date.now() - t0 >= 50);
 	}
 	{
 		const { result } = await run("sh -c 'exit 3'");
 		check("非零退出码透传", /\[exit:3\]/.test(result?.content?.[0]?.text ?? ""));
+		check("非零退出标记错误且保留空输出", result.isError === true && result.structuredContent?.exit_code === 3 && result.structuredContent.output === "");
 	}
 
 	// ---- 3. 多行脚本 ----
@@ -119,6 +121,7 @@ try {
 			JSON.stringify(text),
 		);
 		const full = await run("seq 1 30");
+		check("tail 不截断脚本读取的结构化输出", result.structuredContent?.output === full.result.structuredContent?.output && result.structuredContent.truncated === false);
 		const fullLines = (full.result?.content?.[0]?.text ?? "")
 			.split("\n")
 			.filter((l) => /^\d+$/.test(l.trim())).length;
@@ -137,6 +140,7 @@ try {
 		check("返回「仍在运行」说明", text.includes("仍在持久终端 ai-bash 中运行"));
 		check("返回已有部分输出", text.includes("started-bg"));
 		check("details 标记 running", result?.details?.running === true);
+		check("后台结果未伪造退出码", result.structuredContent?.running === true && result.structuredContent.exit_code === null && result.structuredContent.output === "started-bg" && result.structuredContent.wall_time_seconds > 0);
 		// 等后台命令真正结束 → notifyBackgroundDone
 		for (let i = 0; i < 60 && !bgDone; i++) await sleep(100);
 		check("完成后主动回调通知", bgDone !== null);

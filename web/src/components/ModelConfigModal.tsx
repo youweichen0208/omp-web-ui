@@ -65,6 +65,7 @@ interface DraftModel {
 }
 
 interface Draft {
+	nonChatModelCount?: number;
 	providerId: string;
 	name: string;
 	api: string;
@@ -96,6 +97,7 @@ const emptyDraft = (): Draft => ({
 function toDraft(p: UiProviderConfig): Draft {
 	return {
 		providerId: p.providerId,
+		nonChatModelCount: p.nonChatModelCount,
 		name: p.name ?? "",
 		api: p.api ?? "openai-completions",
 		baseUrl: p.baseUrl ?? "",
@@ -380,6 +382,7 @@ export function ModelConfigModal({
 										</span>
 									</div>
 									<div className="provider-actions">
+										{p.oauth && <><button className="btn sm" type="button" onClick={() => send({ type: "login_provider", provider: p.id })}>{p.id === "openai" ? t("providerChatGPTLogin") : t("providerLogin")}</button>{p.configured && p.source === "stored" && <button className="btn sm" type="button" onClick={() => send({ type: "logout_provider", provider: p.id })}>{t("providerLogout")}</button>}</>}
 										{p.configured && !replacing[p.id] ? (
 											<>
 												<span className="auth-badge">{t("keyReady")}</span>
@@ -571,6 +574,7 @@ export function ModelConfigModal({
 							</label>
 						</div>
 
+						{!!editing.nonChatModelCount && <p className="hint">{t("nonChatModelsPreserved", { n: editing.nonChatModelCount })}</p>}
 						<div className="model-section-head">
 							<span className="form-section-title">{t("modelsTitle")}</span>
 							<span className="model-section-actions">

@@ -24,7 +24,7 @@ const THINKING_VALUES = [
  *  stable while tokens stream in, so the shallow-compared memo() below keeps
  *  both toolbars idle during streaming. */
 interface Props {
-	state: Pick<UiState, "model" | "thinkingLevel" | "availableThinkingLevels"> | null;
+	state: Pick<UiState, "model" | "thinkingLevel" | "availableThinkingLevels" | "routedModel"> | null;
 	models: ModelInfo[];
 	modelsLoading: boolean;
 	send: (msg: ModelThinkingMsg) => boolean;
@@ -108,6 +108,7 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 						<FiCpu />
 						<span className="chip-model">
 							{model ? model.name : t("selectModel")}
+							{state?.routedModel && <span className="chip-routed-model" title={`${state.routedModel.provider}/${state.routedModel.id}${state.routedModel.thinkingLevel ? ` · ${state.routedModel.thinkingLevel}` : ""}`}> → {state.routedModel.name}</span>}
 						</span>
 						{!compact && model?.vision && (
 							<span className="chip-vision" title={t("vision")}>

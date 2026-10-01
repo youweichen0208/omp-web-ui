@@ -73,6 +73,10 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ## MCP 工具桥（server/mcp-bridge.ts）
 
+Pi 0.99 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独立。新配置优先使用 `<agentDir>/mcp.json` 的 `mcpServers`（项目配置需获得 Pi 信任），由 `server/native-tools.ts` 注册官方 `mcp`、`codemode`、`tool-search` factories，支持 stdio、streamable HTTP 和 SDK 原生认证。工具启用遵循 Pi 的 `defaultTools` 与 `-builtin:<name>` 设置；不强制开启所有工具。`/mcp` 在 RPC 模式输出状态并通过现有扩展 UI 桥处理交互。
+
+旧 `<dataDir>/mcp.json` 的 `servers` 配置继续工作，不自动迁移。迁移时先移除旧桥中的同一服务，再加入原生配置并重启，避免重复连接。原生内置扩展不作为用户可更新组件列出。回归：`native-tools-desktop-test.mjs` 使用本地 stdio/HTTP 服务运行实际 Codemode worker，并检查嵌套调用记录；可传入 Electron 可执行文件和打包 app 根目录验证产物。
+
 读取 `<dataDir>/mcp.json` 启动外部 MCP 服务器（stdio、换行分隔 JSON-RPC，零三方依赖；`{servers:{名:{command,args,cwd,env}}}`），握手 initialize→initialized→tools/list→tools/call 后把每个远端工具适配成 PluginAgentTool（名字归一化 sanitizeToolName），并入 plugin.d.ts 的 pluginToolsProvider（与插件工具同一 customTools 管线）。单服务器失败隔离（rejectAll + 日志，不炸进程）；dispose 时 kill 子进程；请求按 id 匹配 + 超时看门狗。
 
 ## 真实插件

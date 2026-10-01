@@ -1,3 +1,5 @@
+import { nativeToolExtensions } from "./native-tools.js";
+import { ProviderAuthService } from "./provider-auth.js";
 import { packageManagerFor, updateTargets, checkComponents, componentRestartRequired, updateComponentPackage } from "./component-updates.js";
 import { boundedBashOperations } from "./bounded-bash.js";
 import { toolOutputUpdate } from "./tool-output.js";
@@ -34,7 +36,7 @@ import {
 	createAgentSessionFromServices,
 	createAgentSessionRuntime,
 	createAgentSessionServices,
-	createBashTool,
+	createBashToolDefinition,
 	createLocalBashOperations,
 	defineTool,
 	getAgentDir,
@@ -198,7 +200,7 @@ function makeKillableBashTool(
 	kills: Set<AbortController>,
 ): ToolDefinition {
 	const base = boundedBashOperations(createLocalBashOperations());
-	const tool = createBashTool(cwd, {
+	const tool = createBashToolDefinition(cwd, {
 		operations: {
 			exec: async (command, c, opts) => {
 				const ac = new AbortController();
@@ -218,22 +220,7 @@ function makeKillableBashTool(
 			},
 		},
 	});
-	// AgentTool → ToolDefinition (same fields; customTools expects definitions).
-	return {
-		name: tool.name,
-		label: tool.label,
-		description: `${tool.description}\n\n${BASH_BACKGROUND_GUIDANCE}`,
-		parameters: tool.parameters,
-		prepareArguments: tool.prepareArguments,
-		executionMode: tool.executionMode,
-		execute: (toolCallId, params, signal, onUpdate) =>
-			tool.execute(
-				toolCallId,
-				params as { command: string; timeout?: number },
-				signal,
-				onUpdate,
-			),
-	} as ToolDefinition;
+	return { ...tool, description: `${tool.description}\n\n${BASH_BACKGROUND_GUIDANCE}` } as ToolDefinition;
 }
 
 /**
@@ -247,6 +234,7 @@ function makeAdaptiveBashTool(
 ): ToolDefinition {
 	return {
 		...killable,
+		outputSchema: terminalBacked.outputSchema,
 		execute: (id, params, signal, onUpdate, ctx) =>
 			(useTerminal() ? terminalBacked : killable).execute(
 				id,
@@ -809,6 +797,7 @@ export class ClientSession {
 	}
 
 	/** Web-facing extension UI context (widgets, notifications). */
+	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piCheckCache = null; await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
 	private webUi = new WebUIContext((msg) => this.emit(msg));
 	private widgetsTimer: ReturnType<typeof setInterval> | null = null;
 	/** Model-stall watchdog interval (see startStallTimer). */
@@ -979,7 +968,10 @@ export class ClientSession {
 				// 新对话（新 runtime）也会自动带上当前设置。
 				resourceLoaderOptions: {
 					additionalExtensionPaths: [TODO_EXTENSION_PATH],
-					extensionFactories: [{ name: "web-tool-call-recovery", hidden: true, factory: toolCallRecoveryExtension(() => recoverySession) }],
+					extensionFactories: [
+						...nativeToolExtensions(),
+						{ name: "web-tool-call-recovery", hidden: true, factory: toolCallRecoveryExtension(() => recoverySession) },
+					],
 					// 系统提示词：replace 模式整体替换；append 模式追加到提示词末尾。
 					systemPromptOverride: (base?: string) => {
 						// Remember the built-in default so the settings panel can show
@@ -1156,6 +1148,7 @@ export class ClientSession {
 	/** Add a socket to this client's broadcast set; flushes buffered startup notices. */
 	attachSink(send: (msg: ServerMessage) => void): void {
 		this.sinks.add(send);
+		this.providerAuth.replay();
 		for (const conv of this.convs.values()) if (conv.stallNoticed && conv.session.isStreaming) send({ type: "agent_silence", conversationId: conv.id, phase: "silent", since: conv.lastSdkEventAt, activity: conv.runningToolNames.size ? "tool" : "model" });
 		for (const msg of this.pendingNotices) send(msg);
 		this.pendingNotices = [];
@@ -1311,6 +1304,11 @@ export class ClientSession {
 				break;
 			}
 			case "tool_execution_start": {
+				if (event.parentToolCallId) this.emit({
+					type: "tool_status", conversationId: conv.id, parentToolCallId: event.parentToolCallId,
+					toolCallId: event.toolCallId, toolName: event.toolName, isError: false, running: true,
+					argumentsText: JSON.stringify(event.args)?.slice(0, 20_000),
+				});
 				conv.runningToolNames.set(event.toolCallId, event.toolName);
 				conv.toolsExecutedSincePrompt = true;
 				// Record the moment the tool actually starts so tool_status can
@@ -1374,6 +1372,9 @@ export class ClientSession {
 				}
 				this.emit({
 					type: "tool_status",
+					conversationId: conv.id,
+					running: false,
+					parentToolCallId: event.parentToolCallId,
 					toolCallId: event.toolCallId,
 					toolName: event.toolName,
 					isError: event.isError,
@@ -1387,6 +1388,7 @@ export class ClientSession {
 				if (update) {
 					this.emit({
 						type: "tool_delta",
+						parentToolCallId: event.parentToolCallId,
 						conversationId: conv.id,
 						seq: ++conv.deltaSeq,
 						toolCallId: event.toolCallId,
@@ -1657,6 +1659,12 @@ export class ClientSession {
 						vision: model.input?.includes("image") ?? false,
 				  }
 				: null,
+			...(this.session.routedModel ? { routedModel: {
+				id: this.session.routedModel.model.id, name: this.session.routedModel.model.name,
+				provider: this.session.routedModel.model.provider,
+				vision: this.session.routedModel.model.input.includes("image"),
+				thinkingLevel: this.session.routedModel.thinkingLevel,
+			} } : {}),
 			thinkingLevel: state.thinkingLevel,
 			// Only the levels the current model actually supports — the SDK clamps
 			// anything else, so the UI must not offer (or must disable) the rest.
@@ -3567,6 +3575,7 @@ export class ClientSession {
 		}
 		this.files.unwatchDir();
 		this.files.unwatchGit();
+		this.providerAuth.cancel();
 		this.webUi.dispose();
 		this.bg.stop();
 		for (const conv of this.convs.values()) {

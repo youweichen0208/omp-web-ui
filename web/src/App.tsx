@@ -1,3 +1,4 @@
+import { ProviderAuthModal } from "./components/ProviderAuthModal";
 import { WorkspacePathContext } from "./workspace-context";
 import {
 	lazy,
@@ -715,13 +716,14 @@ export function App() {
 			model
 				? {
 						model,
+						routedModel: conversationState?.routedModel,
 						thinkingLevel: thinkingLevel ?? "off",
 						availableThinkingLevels: availableThinkingLevels ?? [],
 				  }
 				: null,
 		// Deps are the STABLE inner refs (server reuses them across snapshots),
 		// so the object identity survives token deltas and ChatInput's memo holds.
-		[model, thinkingLevel, availableThinkingLevels],
+		[model, thinkingLevel, availableThinkingLevels, conversationState?.routedModel],
 	);
 
 	// A same-project history switch changes the owner without changing cwd.
@@ -1033,6 +1035,7 @@ export function App() {
 						onClose={() => setSetupDismissed(true)}
 					/>
 				)}
+			<ProviderAuthModal state={chat.providerAuth} send={send} />
 			{manageModelsOpen && (
 				<ModelConfigModal
 					send={send}

@@ -36,6 +36,7 @@ export function updateTargets(session: AgentSession, manager: DefaultPackageMana
 	}
 	const roots = packages.flatMap((pkg) => pkg.installedPath ? [pkg.installedPath.replaceAll("\\", "/").replace(/\/$/, "") + "/"] : []);
 	for (const extension of session.resourceLoader.getExtensions().extensions) {
+		if (extension.hidden || extension.resolvedPath.startsWith("builtin:")) continue;
 		const path = extension.resolvedPath;
 		if (path === TODO_EXTENSION_PATH || roots.some((root) => path.replaceAll("\\", "/").startsWith(root))) continue;
 		targets.push({ id: `local:${path}`, name: extensionDisplay(path).name, current: null, kind: "local" });

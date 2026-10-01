@@ -120,14 +120,23 @@ export function serializeMessage(
 
 		case "toolResult": {
 			const raw = m.content
-				.map((c) => (c.type === "text" ? c.text : "[image result]"))
+				.map((c) => (c.type === "text" ? c.text : ""))
 				.join("\n");
 			const { text, truncated } = truncate(raw, TOOL_OUTPUT_CAP);
 			const todo = m.toolName === "todo" ? todoSnapshot(m.details) : undefined;
+			let nestedComplete = m.nestedCalls?.complete === true && m.nestedCalls.calls.length <= 256;
+			const nestedCalls = m.nestedCalls?.calls.slice(0, 256).map(call => {
+				const args = call.arguments ? truncate(JSON.stringify(call.arguments), ARGS_CAP) : undefined;
+				if (args?.truncated) nestedComplete = false;
+				return { id: call.id, name: call.name, status: call.status, durationMs: call.durationMs,
+					error: call.error?.slice(0, 500), argumentsBytes: call.argumentsBytes,
+					argumentsText: args?.text };
+			});
 			return {
 				id: `t-${m.toolCallId}`,
 				role: "toolResult",
-				content: [{ type: "text", text, truncated }],
+				content: [{ type: "text", text, truncated }, ...serializeUserContent(m.content.filter(block => block.type === "image"))],
+				...(nestedCalls ? { nestedCalls: { complete: nestedComplete, calls: nestedCalls } } : {}),
 				toolCallId: m.toolCallId,
 				toolName: m.toolName,
 				isError: m.isError,

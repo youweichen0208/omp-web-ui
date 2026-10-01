@@ -23,7 +23,7 @@ import { LeakedThinkingBlock } from "./LeakedThinkingBlock";
 import { Markdown } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
-import { GrepSummary, isSubagentCall, ReadGroup, SubagentGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
+import { GrepSummary, isSubagentCall, liveNestedCalls, ReadGroup, SubagentGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
 import { EditWriteCard, EditWriteGroup } from "./EditWriteCard";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
@@ -330,7 +330,7 @@ export const Message = memo(function Message({
 	const renderContentBlocks = (skipText: boolean): ReactNode[] => {
 		if (recoveryKey) return skipText ? [] : [<p key="recovery">{t(recoveryKey)}</p>];
 		const elements: ReactNode[] = [];
-		const viewFor = (item: UiToolCallBlock): ToolView => ({ result: toolResults.get(item.id), liveOutput: liveOutputs.get(item.id)?.text, status: toolStatuses.get(item.id), streaming });
+		const viewFor = (item: UiToolCallBlock): ToolView => ({ result: toolResults.get(item.id), nestedCalls: liveNestedCalls(item.id, toolStatuses), liveOutput: liveOutputs.get(item.id)?.text, status: toolStatuses.get(item.id), streaming });
 		for (let i = 0; i < message.content.length; i++) {
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
@@ -806,6 +806,7 @@ function Block({
 		const result = toolResults.get(toolCall.id);
 		const live = liveOutputs.get(toolCall.id);
 		const view: ToolView = {
+			nestedCalls: liveNestedCalls(toolCall.id, toolStatuses),
 			result,
 			liveOutput: live?.text,
 			streaming,

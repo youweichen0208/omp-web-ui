@@ -34,6 +34,10 @@ export type FileContent = Extract<ServerMessage, { type: "file_content" }>;
 
 /** A tool FINISHED executing (payload of the tool_status ServerMessage). */
 export interface ToolStatus {
+	conversationId?: string;
+	parentToolCallId?: string;
+	running?: boolean;
+	argumentsText?: string;
 	toolCallId: string;
 	toolName: string;
 	isError: boolean;

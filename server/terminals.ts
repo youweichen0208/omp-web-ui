@@ -13,9 +13,10 @@
  * directory (the same directory the agent operates in — see set_cwd).
  */
 import { chmodSync, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 // MUST run before node-pty is required: rewrites the installed node-pty copies
 // so their worker/agent handlers tolerate Node `--watch`'s IPC traffic (see the
@@ -24,6 +25,7 @@ import "./patch-node-pty.js";
 import { spawn, type IPty } from "node-pty";
 import {
 	defineTool,
+	type AgentToolResult,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -1187,7 +1189,7 @@ function cleanBashOutput(raw: string): string {
 	if (last) text = text.slice(0, last.index);
 	const lines = text.split("\n");
 	while (lines.length > 0 && !lines[lines.length - 1].trim()) lines.pop();
-	return truncateMiddle(lines.join("\n").trim());
+	return lines.join("\n").trim();
 }
 
 /**
@@ -1225,6 +1227,11 @@ export function makeTerminalBashTool(
 	return defineTool({
 		name: "bash",
 		label: "Run bash command",
+		outputSchema: Type.Object({
+			output: Type.String(), truncated: Type.Boolean(), exit_code: Type.Union([Type.Number(), Type.Null()]),
+			wall_time_seconds: Type.Number(), running: Type.Optional(Type.Boolean()), terminal_id: Type.Optional(Type.String()),
+			full_output_path: Type.Optional(Type.String()),
+		}),
 		description:
 			"Run a shell command and return its full output plus exit code. Commands execute in a PERSISTENT visible terminal ('ai-bash'): shell state such as cd, venv activation or ssh sessions is retained across calls. Run the bare command — do NOT pipe through tail/head/more/less (output is returned complete anyway, and pipes hide live progress in the visible terminal). If a command stays silent for a while it keeps running in the background and you get an automatic notice when it finishes; use terminal_wait to re-block until it finishes, or terminal_read / terminal_input / terminal_key on 'ai-bash' to observe or interact anytime.",
 		promptSnippet: "run commands in the persistent visible terminal (state retained across calls)",
@@ -1255,6 +1262,7 @@ export function makeTerminalBashTool(
 			}
 			// 阻塞等待期间挂起活力提醒（我们自己在检测静默，避免双重通知）。
 			terminals.suspendIdleWatch(TERM_ID);
+			const startedAt = Date.now();
 			const start = terminals.endCursor(TERM_ID)!;
 			const ac = new AbortController();
 			opts.kills.add(ac);
@@ -1295,7 +1303,7 @@ export function makeTerminalBashTool(
 					const m = lastSentinel(collected);
 					if (m) {
 						terminals.setSentinelPending(TERM_ID, false);
-						const text = applyTail(cleanBashOutput(collected));
+						const text = truncateMiddle(applyTail(cleanBashOutput(collected)));
 						return {
 							content: [
 								{
@@ -1304,6 +1312,8 @@ export function makeTerminalBashTool(
 								},
 							],
 							details: { exitCode: Number(m[1]), output: text },
+							isError: Number(m[1]) !== 0,
+							structuredContent: { ...await persistTerminalOutput(cleanBashOutput(collected)), exit_code: Number(m[1]), wall_time_seconds: (Date.now() - startedAt) / 1000 },
 						};
 					}
 					if (deadline !== null && Date.now() > deadline) {
@@ -1319,8 +1329,10 @@ export function makeTerminalBashTool(
 							terminals,
 							opts,
 							p.command,
-							applyTail(cleanBashOutput(collected)),
+							cleanBashOutput(collected),
 							Math.round((Date.now() - lastDataAt) / 1000),
+							(Date.now() - startedAt) / 1000,
+							applyTail,
 						);
 					}
 				}
@@ -1332,13 +1344,29 @@ export function makeTerminalBashTool(
 }
 
 /** 静默解阻路径：注册完成观察器后立即返回「仍在后台运行」。 */
-function backgroundResult(
+export function structuredTerminalOutput(text: string): { output: string; truncated: boolean } {
+	const buffer = Buffer.from(text), cap = 1024 * 1024;
+	return buffer.length <= cap ? { output: text, truncated: false } : { output: `${buffer.subarray(0, cap / 2 - 32).toString()}\n… [truncated] …\n${buffer.subarray(-cap / 2 + 32).toString()}`, truncated: true };
+}
+
+/** Preserve the complete output for read() when either consumer sees a shortened view. */
+export async function persistTerminalOutput(text: string): Promise<{ output: string; truncated: boolean; full_output_path?: string }> {
+	const result = structuredTerminalOutput(text);
+	if (!result.truncated && text.length <= 30_000) return result;
+	const path = join(tmpdir(), `pi-terminal-output-${randomUUID()}.txt`);
+	await writeFile(path, text, { flag: "wx", mode: 0o600 });
+	return { ...result, full_output_path: path };
+}
+
+async function backgroundResult(
 	terminals: TerminalManager,
 	opts: Parameters<typeof makeTerminalBashTool>[1],
 	command: string,
 	partialText: string,
 	silentSeconds: number,
-): { content: { type: "text"; text: string }[]; details: unknown } {
+	elapsedSeconds: number,
+	applyTail: (text: string) => string,
+): Promise<AgentToolResult<unknown>> {
 	terminals.watchOutput("ai-bash", BASH_SENTINEL_RE, (m) => {
 		// 后台命令最终结束（或终端被关）→ 清除待决标记，terminal_wait 不再适用。
 		terminals.setSentinelPending("ai-bash", false);
@@ -1348,12 +1376,12 @@ function backgroundResult(
 			exitCode: m ? Number(m[1]) : null,
 		});
 	});
-	// partialText 已在调用方做过 cleanBashOutput + applyTail。
-	const partial = truncateMiddle(partialText, 6000);
+	// Keep full cleaned output for scripts; only the model-facing text uses tail.
+	const partial = truncateMiddle(applyTail(partialText), 6000);
 	return {
 		content: [
 			{
-				type: "text",
+				type: "text" as const,
 				text:
 					`命令仍在持久终端 ai-bash 中运行（已连续 ${silentSeconds} 秒无输出，未结束）。` +
 					`本次调用不阻塞——命令继续在后台执行，结束时你会收到自动通知。\n` +
@@ -1362,6 +1390,7 @@ function backgroundResult(
 			},
 		],
 		details: { running: true, terminalId: "ai-bash", silentSeconds },
+		structuredContent: { ...await persistTerminalOutput(partialText), exit_code: null, wall_time_seconds: elapsedSeconds, running: true, terminal_id: "ai-bash" },
 	};
 }
 

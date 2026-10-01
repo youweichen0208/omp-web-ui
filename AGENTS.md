@@ -52,6 +52,9 @@ pi-web-ui/
 │   ├── tool-call-recovery.ts   # 伪调用的有界纠正；官方 agent_before_settle 边界才入队，修改时读 docs/architecture-core.md
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
+│   ├── model-config-merge.ts   # 聊天模型表单合并；保留 typed models 和未知字段
+│   ├── provider-auth.ts        # 官方 OAuth 登录桥；凭据由 SDK 保存，不下发浏览器
+│   ├── native-tools.ts         # 原生 MCP/codemode/tool_search factories；见 docs/architecture-plugins.md
 │   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData + 视觉桥）
 │   ├── webui-context.ts        # 扩展 UI 桥（WebUIContext：widgets/statuses/dialog → 浏览器）
 │   ├── plugins.ts              # 可选界面组件插件（扫描 <dataDir>/plugins/<id>/）

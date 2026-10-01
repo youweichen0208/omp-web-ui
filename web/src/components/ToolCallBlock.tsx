@@ -16,6 +16,7 @@ import { displayReadPath, readPath, splitFrontmatter } from "../read-presentatio
 import { bashCommand, parseBashDiagnostics, parseLabeledBashSteps, type BashStepRun } from "../bash-steps";
 
 export interface ToolView {
+	nestedCalls?: UiMessage["nestedCalls"];
 	/** Tool result message if the tool already finished. */
 	result?: UiMessage;
 	/** Live output accumulated from tool_delta while running. */
@@ -25,6 +26,15 @@ export interface ToolView {
 	/** Set the moment tool_execution_end fires (tool_status) — the command
 	 *  exited but the model hasn't responded yet. */
 	status?: ToolStatus;
+}
+
+export function liveNestedCalls(parentId: string, statuses: ReadonlyMap<string, ToolStatus>): UiMessage["nestedCalls"] {
+	const calls = [...statuses.values()].filter(status => status.parentToolCallId === parentId).slice(0, 256).map(status => ({
+		id: status.toolCallId, name: status.toolName, argumentsText: status.argumentsText,
+		status: status.running ? "unfinished" as const : status.isError ? "error" as const : "ok" as const,
+		durationMs: status.durationMs,
+	}));
+	return calls.length ? { calls, complete: false } : undefined;
 }
 
 /** Kill just the running bash command(s) — the agent run itself continues. */
@@ -335,6 +345,7 @@ function BashCommandHeader({ command, original, directory, running, elapsed, sta
 }
 
 function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCallBlockProps) {
+	const nestedCalls = view.result?.nestedCalls ?? view.nestedCalls;
 	const t = useT();
 	const [open, setOpen] = useState(wrap);
 	const [copied, setCopied] = useState(false);
@@ -466,6 +477,16 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					)}
 				</div>
 			)}
+			{nestedCalls && <details className="tool-nested-calls" open>
+				<summary>{t("nestedToolCalls", { n: nestedCalls.calls.length })}</summary>
+				{nestedCalls.calls.map(call => <details key={call.id} className="tool-nested-call">
+					<summary><code>{call.name}</code><span className={call.status === "error" ? "err" : ""}>{t(call.status === "ok" ? "done" : call.status === "error" ? "error" : "running")}{call.durationMs !== undefined ? ` · ${formatDuration(call.durationMs)}` : ""}</span></summary>
+					{call.argumentsText && <pre>{call.argumentsText}</pre>}
+					{call.error && <pre className="err">{call.error}</pre>}
+				</details>)}
+				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
+			</details>}
+			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <a key={index} href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">

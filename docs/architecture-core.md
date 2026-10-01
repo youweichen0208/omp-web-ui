@@ -4,6 +4,12 @@
 
 ## 快照驱动
 
+Pi 0.99 工具结果的 `nestedCalls` 投影为独立子调用记录（参数、状态、耗时与错误），不会伪造成顶层助手调用。工具返回的 image 块作为图片保留；工具执行增量和结束事件传递 `parentToolCallId`。虚拟模型快照保留用户选择的 `model` 并附带 SDK `session.routedModel`，模型控件显示实际路由。
+
+模型编辑器只修改聊天模型和表单拥有的字段；保存时保留 image/classifier 条目、operations、headers、采样及其他未知字段。不同 operation 可以使用相同模型 ID。已保存的密钥不回传表单，留空表示保留服务器上的密钥。`model-config-preservation-test.mjs` 覆盖实际读写路径。
+
+账号登录由 `server/provider-auth.ts` 桥接公开 `ModelRuntime.login/logout`。浏览器仅收到授权 URL、设备码或请求提示，凭据由 SDK 保存；响应同时匹配 requestId/promptId，取消和 dispose 中断待处理请求。OpenAI ChatGPT 登录的稳定设备 ID 来自 SDK SettingsManager。模拟 OAuth 回归不证明真实账号授权成功；浏览器回归验证授权码提交、取消及中英文展示。
+
 - **服务端是唯一事实源**：每次 SDK 事件后节流 60ms 推快照（`UiState`），浏览器只按快照渲染。重连只需重发 `get_state`。
 - **增量快照（协议 v2）**：持久化消息内容不可变 + 对象引用稳定，`emitSnapshotNow` 用 O(n) 指针等同性遍历检测追加式增长——能追加则发 `snapshot_delta`（轻字段 + `appended` 尾部，baseRev 链），中途变更/截断/切会话/强制 resync 回落全量 `snapshot`。前端 reducer 按 rev 链合并，缺口触发防抖 `get_state`；背压下 delta 与 snapshot 同样可丢弃，丢包靠 rev 链断裂自愈。`get_state` 恒返全量。回归：`snapshot-delta-test`。**测试适配**：等「动作后快照」的测试必须同时接受 snapshot_delta（参照 conv-cwd/vision-bridge 的 rev 链合并写法）；连接后的首个快照恒为全量。
 - **WS permessage-deflate**：WebSocketServer 开启压缩（threshold 16KB），大会话多 MB snapshot 线上传输降数倍；小消息（notice/心跳）不压省 CPU。

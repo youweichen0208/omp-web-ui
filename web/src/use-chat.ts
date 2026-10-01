@@ -111,6 +111,7 @@ export interface ChatState {
 	installResult: { ok: boolean; detail: string } | null;
 	/** Path completions for the cwd input. */
 	pathCompletions: { name: string; path: string; type: "dir" | "file" }[];
+	providerAuth: Extract<ServerMessage, { type: "provider_auth" }>["state"] | null;
 	componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 	/** Self-update status (result of check_update). */
 	update: {
@@ -213,6 +214,7 @@ export interface PendingEcho {
 }
 
 type Action =
+	| { type: "provider_auth"; state: Extract<ServerMessage, { type: "provider_auth" }>["state"] | null }
 	| { type: "status"; status: ConnStatus }
 	| { type: "snapshot"; state: UiState }
 	| { type: "snapshot_delta"; msg: Extract<ServerMessage, { type: "snapshot_delta" }> }
@@ -428,8 +430,8 @@ function pruneToolStatuses(
 		if (m.role === "toolResult" && m.toolCallId) landed.add(m.toolCallId);
 	}
 	let changed = false;
-	for (const id of statuses.keys()) {
-		if (landed.has(id)) {
+	for (const [id, status] of statuses) {
+		if (landed.has(id) || status.parentToolCallId && landed.has(status.parentToolCallId)) {
 			statuses.delete(id);
 			changed = true;
 		}
@@ -528,11 +530,12 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, state: applyMessageDelta(ui, action.msg) };
 		}
 		case "tool_status":
+			if (action.status.conversationId && state.state?.conversationId !== action.status.conversationId) return state;
 			return {
 				...state,
 				toolStatuses: new Map(state.toolStatuses).set(
 					action.status.toolCallId,
-					action.status,
+					{ ...state.toolStatuses.get(action.status.toolCallId), ...action.status },
 				),
 			};
 		case "notice":
@@ -589,6 +592,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, models: action.models, modelsLoading: action.loading };
 		case "models_config":
 			return { ...state, modelsConfig: action.providers };
+		case "provider_auth":
+			return { ...state, providerAuth: action.state };
 		case "providers_status":
 			return { ...state, providers: action.providers };
 		case "fetch_models_result":
@@ -752,6 +757,7 @@ export function useChat() {
 		pathCompletions: [],
 		update: null,
 		componentUpdates: null,
+		providerAuth: null,
 		widgets: [],
 		statuses: [],
 		dialog: null,
@@ -1085,6 +1091,9 @@ export function useChat() {
 					break;
 				case "models_config":
 					dispatch({ type: "models_config", providers: msg.providers });
+					break;
+				case "provider_auth":
+					dispatch({ type: "provider_auth", state: msg.state });
 					break;
 				case "providers_status":
 					dispatch({ type: "providers_status", providers: msg.providers });

@@ -68,6 +68,16 @@ export interface UiTodoSnapshot {
 	tasks: { id: number; subject: string; status: "pending" | "in_progress" | "completed" | "deleted" }[];
 }
 
+export interface UiNestedToolCall {
+	id: string;
+	name: string;
+	argumentsText?: string;
+	argumentsBytes?: number;
+	status: "ok" | "error" | "unfinished";
+	durationMs?: number;
+	error?: string;
+}
+
 export interface UiMessage {
 	/** Stable-ish id for React keys: u-<ts>-<seq> / a-<ts>-<seq> / t-<toolCallId>. */
 	id: string;
@@ -85,6 +95,7 @@ export interface UiMessage {
 	toolName?: string;
 	isError?: boolean;
 	todoSnapshot?: UiTodoSnapshot;
+	nestedCalls?: { calls: UiNestedToolCall[]; complete: boolean };
 	/** Extension-injected custom messages. */
 	customType?: string;
 	/** Extension-provided metadata (e.g. attachment file name/path). */
@@ -164,6 +175,7 @@ export interface UiState {
 	taskProgress?: TaskProgress | null;
 	isStreaming: boolean;
 	model: UiModelInfo | null;
+	routedModel?: UiModelInfo & { thinkingLevel?: string };
 	thinkingLevel: string;
 	/**
 	 * Thinking levels the CURRENT model actually supports (SDK clamps any
@@ -417,6 +429,10 @@ export type ClientMessage =
 	/** Auto-install the pi agent (mkdir config dir + npm i -g the CLI). */
 	| { type: "install_pi_agent" }
 	/** Persist an api-key credential for a provider (auth.json) and apply it now. */
+	| { type: "logout_provider"; provider: string }
+	| { type: "login_provider"; provider: string }
+	| { type: "cancel_provider_login"; requestId: string }
+	| { type: "provider_auth_response"; requestId: string; promptId: string; value: string }
 	| { type: "set_provider_api_key"; provider: string; apiKey: string }
 	/** Clear a built-in provider's stored key (auth.json entry + runtime
 	 *  override) so it returns to the unconfigured state. Only meaningful for
@@ -777,6 +793,8 @@ export interface UiModelConfigEntry {
 
 /** A custom provider block in models.json (providers.<id>). */
 export interface UiProviderConfig {
+	/** Typed image/classifier entries are retained server-side by the chat editor. */
+	nonChatModelCount?: number;
 	providerId: string;
 	name?: string;
 	/** api type: openai-completions / openai-responses / anthropic-messages / google-generative-ai. */
@@ -849,10 +867,21 @@ export interface UiPluginInfo {
 }
 
 /** One of pi's built-in providers, with whether auth is configured. */
+export interface ProviderAuthState {
+	requestId: string;
+	provider: string;
+	phase: "pending" | "success" | "cancelled" | "error";
+	url?: string;
+	code?: string;
+	message?: string;
+	prompt?: { id: string; kind: "text" | "secret" | "select" | "manual_code"; message: string; placeholder?: string; options?: { id: string; label: string }[] };
+}
+
 export interface ProviderStatus {
 	id: string;
 	name: string;
 	configured: boolean;
+	oauth?: boolean;
 	/** Where auth came from: stored / runtime / environment / models_json_key … */
 	source?: string;
 }
@@ -1032,6 +1061,7 @@ export type ServerMessage =
 	  }
 	| {
 			type: "tool_delta";
+			parentToolCallId?: string;
 			conversationId: string;
 			/** Per-conversation monotonic sequence, shared with message_delta —
 			 *  a gap tells the client to resync via get_state. */
@@ -1063,6 +1093,11 @@ export type ServerMessage =
 	 *  for the model" instead of an indefinite "running". */
 	| {
 			type: "tool_status";
+			conversationId?: string;
+			/** Nested calls also send a start status before their eventual end. */
+			running?: boolean;
+			argumentsText?: string;
+			parentToolCallId?: string;
 			toolCallId: string;
 			toolName: string;
 			isError: boolean;
@@ -1148,6 +1183,7 @@ export type ServerMessage =
 	  }
 	| { type: "models"; models: ModelInfo[] }
 	| { type: "models_config"; providers: UiProviderConfig[] }
+	| { type: "provider_auth"; state: ProviderAuthState }
 	| { type: "providers_status"; providers: ProviderStatus[] }
 	/** Result of a fetch_models probe: ok + the advertised models (id plus
 	 *  whatever metadata the endpoint provided — contextWindow / vision input /
