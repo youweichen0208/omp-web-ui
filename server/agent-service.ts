@@ -1181,6 +1181,10 @@ export class ClientSession {
 			case "message_end": {
 				if (event.message.role === "assistant") {
 					conv.thinkingTimings.finish(event.message.timestamp);
+					if (event.thinkingDurations) {
+						conv.thinkingTimings.setFinishedDurations(event.message.timestamp, event.thinkingDurations);
+						for (const key of conv.uiMessageCache.keys()) if (key.startsWith(`assistant:${event.message.timestamp}:`)) conv.uiMessageCache.delete(key);
+					}
 					this.thinkingDurationStore.save(conv.session.sessionFile, event.message.timestamp, conv.thinkingTimings.finishedDurations(event.message.timestamp));
 				}
 				break;

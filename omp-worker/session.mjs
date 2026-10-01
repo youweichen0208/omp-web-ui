@@ -8,6 +8,7 @@ import { createAgentSession, Settings } from "@oh-my-pi/pi-coding-agent/sdk";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { runRpcMode } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import { RpcDecoder, encodeFrame } from "../dist/server/omp/rpc.js";
+import { ThinkingTimings } from "../dist/server/thinking-timing.js";
 
 if (!process.send) throw new Error("OMP management IPC is required");
 let writes = Promise.resolve();
@@ -126,8 +127,13 @@ creation = await createAgentSession({
 session = creation.session;
 // Snapshot messages and their revision are read synchronously on this pipe.
 // The host can discard events already included in a concurrently requested snapshot.
+const thinkingTimings = new ThinkingTimings();
 session.subscribe(event => {
-	if (event.type === "message_end") void send({ ...event, type: "webui_message_end", messageRevision: ++messageRevision }).catch(() => process.exit(1));
+	if (event.type === "message_update") thinkingTimings.observe(event.message.timestamp, event.assistantMessageEvent);
+	if (event.type === "message_end") {
+		thinkingTimings.finish(event.message.timestamp);
+		void send({ ...event, type: "webui_message_end", messageRevision: ++messageRevision, thinkingDurations: thinkingTimings.finishedDurations(event.message.timestamp) }).catch(() => process.exit(1));
+	}
 });
 defaultSystemPrompt ||= session.systemPrompt.join("\n\n");
 await runRpcMode(session, { setToolUIContext: creation.setToolUIContext, subagentEventBus: creation.subagentEventBus });

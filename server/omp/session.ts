@@ -14,7 +14,7 @@ import type { ToolDefinition } from "./tools.js";
 import { randomUUID } from "node:crypto";
 import { projectPrompt, type PromptThumbnails } from "./prompt-content.js";
 
-export type AgentSessionEvent = NativeEvent | RpcSubagentFrame | { type: "session_settled"; messages: AgentMessage[] } | { type: "runtime_error"; error: string } | { type: "command_output"; text: string };
+export type AgentSessionEvent = (NativeEvent & { thinkingDurations?: Record<string, number> }) | RpcSubagentFrame | { type: "session_settled"; messages: AgentMessage[] } | { type: "runtime_error"; error: string } | { type: "command_output"; text: string };
 type Metadata = HistorySnapshot & {
 	messages: AgentMessage[]; messageRevision: number;
 	stats: SessionStats; skills: Skill[]; prompts: PromptTemplate[];

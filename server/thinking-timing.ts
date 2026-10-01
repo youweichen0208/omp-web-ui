@@ -14,6 +14,7 @@ export class ThinkingTimings {
 		}
 		const index = event.contentIndex;
 		let timing = blocks.get(index);
+		if (timing?.end !== undefined) return;
 		if (!timing && event.type !== "thinking_end") {
 			timing = { start: now }; blocks.set(index, timing);
 		}
@@ -21,6 +22,15 @@ export class ThinkingTimings {
 	}
 	finish(timestamp: number, now = Date.now()) {
 		for (const timing of this.messages.get(timestamp)?.values() ?? []) timing.end ??= now;
+	}
+	/** Worker measurements are authoritative even if transport events arrive late. */
+	setFinishedDurations(timestamp: number, durations: Record<string, number>) {
+		const blocks = new Map<number, { start: number; end: number }>();
+		for (const [index, duration] of Object.entries(durations)) {
+			if (Number.isInteger(Number(index)) && Number(index) >= 0 && Number.isFinite(duration) && duration >= 0) blocks.set(Number(index), { start: 0, end: duration });
+		}
+		this.messages.set(timestamp, blocks);
+		if (this.messages.size > 256) this.messages.delete(this.messages.keys().next().value!);
 	}
 	finishedDurations(timestamp: number): Record<string, number> {
 		const result: Record<string, number> = {};
