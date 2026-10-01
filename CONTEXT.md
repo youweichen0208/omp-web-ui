@@ -1,6 +1,6 @@
-# pi-web-ui
+# omp-web-ui
 
-pi-web-ui（Pi 的 Web 与桌面聊天工作台，两端共用同一套 Web UI）的领域术语表。只记录本上下文特有的概念，不记录实现细节。
+omp-web-ui（Oh My Pi 的 Web 与桌面聊天工作台，两端共用同一套 Web UI）的领域术语表。只记录本上下文特有的概念，不记录实现细节。
 
 ## Language
 

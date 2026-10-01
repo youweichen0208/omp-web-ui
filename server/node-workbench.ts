@@ -348,6 +348,7 @@ export class NodeWorkbench {
 		clearInterval(this.timer);
 		for (const n of this.nodes) this.cancelApprovals(n.id);
 		for (const c of [...this.connections.values()]) this.drop(c);
+		await Promise.allSettled([...this.chatLoading.values()]);
 		await Promise.all([...this.chats.values()].map(async chat => { if (chat.updateTimer) clearTimeout(chat.updateTimer); await chat.session.dispose(); }));
 		this.transientSecrets.clear();
 	}
@@ -528,8 +529,10 @@ export class NodeWorkbench {
 		const readTool: ToolDefinition<typeof readParams> = { name: "remote_read", label: "Remote read", description: "Read a file on the current SSH node via SFTP.", parameters: readParams, execute: async (_id, p, signal) => { const c = this.connection(clientId, nodeId); await this.authorize(clientId, nodeId, undefined, safePath(p.path), "read", signal); this.ensureCurrent(c); return { content: [{ type: "text", text: await this.read(c, safePath(p.path)) }], details: undefined }; } };
 		const writeTool: ToolDefinition<typeof writeParams> = { name: "remote_write", label: "Remote write", description: "Write a UTF-8 file on the current SSH node via SFTP.", parameters: writeParams, execute: async (_id, p, signal) => { const c = this.connection(clientId, nodeId); await this.authorize(clientId, nodeId, undefined, `${safePath(p.path)}\n${p.text}`, "write", signal); this.ensureCurrent(c); await this.write(this.connection(clientId, nodeId), safePath(p.path), p.text); return { content: [{ type: "text", text: "文件已写入" }], details: undefined }; } };
 		const { session } = await createSession({ cwd: sessionDir, agentDir: getAgentDir(), sessionManager: SessionManager.continueRecent(sessionDir, sessionDir), restricted: true, customTools: [commandTool, readTool, writeTool], systemPrompt: `You are an SSH node agent for node ${this.node(nodeId).name}. Use only the provided remote tools. Commands run in the currently selected manual terminal. Never refer to a local workspace.` });
-		if (this.disposed || !this.nodes.some((node) => node.id === nodeId)) { await session.dispose(); throw new Error("节点已删除"); }
-		await session.setActiveToolsByName(["remote_command", "remote_read", "remote_write"]);
+		try {
+			await session.setActiveToolsByName(["remote_command", "remote_read", "remote_write"]);
+			if (this.disposed || !this.nodes.some((node) => node.id === nodeId)) throw new Error("节点已删除");
+		} catch (error) { await session.dispose(); throw error; }
 		const chat: Chat = { session, conversationId: `node:${nodeId}`, nodeId, clientId, busy: false };
 		this.chats.set(key, chat);
 		session.subscribe(() => this.scheduleChat(chat));

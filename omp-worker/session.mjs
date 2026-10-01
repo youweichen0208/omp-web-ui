@@ -24,6 +24,7 @@ const hostCalls = new Map();
 let session, creation;
 let messageRevision = 0;
 const decoder = new RpcDecoder(frame => {
+	console.error("[DEBUG-omp] receive", frame.type);
 	if (frame.type === "webui_init") { initialized.resolve(frame); return; }
 	if (frame.type === "host_tool_result" || frame.type === "host_tool_update") {
 		const pending = hostCalls.get(frame.id);
@@ -32,7 +33,7 @@ const decoder = new RpcDecoder(frame => {
 		else { hostCalls.delete(frame.id); pending.cleanup(); frame.isError ? pending.reject(new Error(frame.result.content?.map(c => c.text ?? "").join("\n") || "Remote tool failed")) : pending.resolve(frame.result); }
 		return;
 	}
-	void manage(frame).then(data => send({ type: "response", command: frame.type, id: frame.id, success: true, data }), error => send({ type: "response", command: frame.type, id: frame.id, success: false, error: error.message })).catch(() => process.exit(1));
+	void manage(frame).then(data => { console.error("[DEBUG-omp] complete", frame.type); return send({ type: "response", command: frame.type, id: frame.id, success: true, data }); }, error => send({ type: "response", command: frame.type, id: frame.id, success: false, error: error.message })).catch(() => process.exit(1));
 });
 input.on("data", chunk => { try { decoder.push(chunk); } catch (error) { console.error(error.message); process.exit(1); } });
 input.on("error", error => { console.error(error.message); process.exit(1); });
