@@ -48,4 +48,6 @@ npm view @youweichen/omp-web-ui@next version
 
 `prepublishOnly` 自动构建；npm 包必须包含 omp-worker、dist、web/dist，以及声明的 Bun/OMP 精确依赖。正式 1.0.0 才发布到 `latest`。不要发布新版本到旧包名，也不要因旧包历史编号而改变候选版策略。
 
+首次创建 npm 包的例外：2026-10-01 使用 `--tag next` 发布 1.0.0-beta.1 后，registry 自动附加了 `latest`；经身份验证后的删除请求仍返回 HTTP 400。因此该首版目前同时由 `next`/`latest` 指向，版本性质仍为 beta。后续候选版只显式更新 `next`，正式版再主动更新 `latest`。上游记录：https://github.com/npm/cli/issues/8490。
+
 安装后执行 `omp-web-ui server restart` 使运行中的服务加载新版；Docker 重建并替换容器。发布结束核对 npm dist-tag、GitHub 标签/提交、Release 状态及三平台全部附件。
