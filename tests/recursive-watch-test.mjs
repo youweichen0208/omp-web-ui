@@ -87,9 +87,9 @@ async function main() {
 				env: {
 					...process.env,
 					PORT: String(PORT),
-					PI_WEB_CWD: workspace,
-					PI_WEB_DATA_DIR: dataDir,
-					PI_WEB_HOST: "127.0.0.1",
+					OMP_WEB_CWD: workspace,
+					OMP_WEB_DATA_DIR: dataDir,
+					OMP_WEB_HOST: "127.0.0.1",
 				},
 				stdio: ["ignore", "pipe", "pipe"],
 			},

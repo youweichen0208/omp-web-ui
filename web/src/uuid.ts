@@ -3,7 +3,7 @@
  *
  * 为什么不用 crypto.randomUUID()：
  *   它只在安全上下文（HTTPS 或 localhost）可用——通过普通 HTTP 局域网 IP /
- *   远程主机访问 pi-web-ui 时它是 undefined；Safari < 15.4 更是完全没有。
+ *   远程主机访问 omp-web-ui 时它是 undefined；Safari < 15.4 更是完全没有。
  *   之前 WebSocket onopen 里调用它抛异常，hello 发不出去，整个会话挂死。
  *
  * 兜底用 crypto.getRandomValues()（RFC 4122 v4）——它在非安全上下文和所有

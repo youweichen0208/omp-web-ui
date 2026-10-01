@@ -33,8 +33,8 @@ async function startServer() {
 			// 隔离 cwd + client-state：绝不写进仓库根的真实会话存储；
 			// 历史快照里也不会再出现旧 toolResult 干扰排序断言。
 			// （agent 目录保留 —— 本测试需真模型执行 bash 工具）
-			PI_WEB_CWD: mkdtempSync(join(tmpdir(), "piweb-toolstatus-")),
-			PI_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "piweb-toolstatus-data-")),
+			OMP_WEB_CWD: mkdtempSync(join(tmpdir(), "piweb-toolstatus-")),
+			OMP_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "piweb-toolstatus-data-")),
 		},
 		stdio: "ignore",
 	});

@@ -1,7 +1,7 @@
 /**
  * model-admin — 模型/服务商配置管理，从 agent-service.ts 抽出。
  *
- * 职责：auth.json 的 provider api-key 存取（set/clear）、models.json 读写
+ * 职责：agent.db 的 provider api-key 存取（set/clear）、models.yml 读写
  * （listModelsConfig/saveModelConfig/deleteModelConfig）、自定义服务商「自动获取
  * 模型列表」（fetch_models：服务端探测 OpenAI 兼容 /models 端点，绕开 CORS；
  * anthropic/google 鉴权头各不同；裸 /models 404 回退 /v1/models）与已保存供应商
@@ -11,9 +11,9 @@
  * 经 ModelAdminHost 与 ClientSession 解耦（同 settings/goal/slash 服务模式）。
  * UI 文案直接中文（服务端 notice 约定）。apiKey/headers 绝不下发浏览器。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { runOmpAdmin } from "./omp/admin.js";
 import { dirname, join } from "node:path";
-import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "./omp/index.js";
 import type { ServerMessage, UiModelConfigEntry, UiProviderConfig } from "./protocol.js";
 
 /** ClientSession 提供给本服务的宿主能力（窄接口）。 */
@@ -154,7 +154,7 @@ function parseGoogleModel(m: unknown): UiModelConfigEntry {
 export class ModelAdminService {
 	constructor(private readonly host: ModelAdminHost) {}
 
-	/** Persist an api-key credential for a provider (auth.json) and apply it now. */
+	/** Persist an api-key credential for a provider (agent.db) and apply it now. */
 	async setProviderApiKey(provider: string, apiKey: string): Promise<void> {
 		const key = apiKey.trim();
 		if (!provider.trim()) {
@@ -166,23 +166,6 @@ export class ModelAdminService {
 			return;
 		}
 		try {
-			// Persist to auth.json (auth.json shape: { <provider>: { type: "api_key", key } }).
-			const authPath = join(this.host.agentDir, "auth.json");
-			mkdirSync(this.host.agentDir, { recursive: true });
-			let data: Record<string, unknown> = {};
-			try {
-				data = JSON.parse(readFileSync(authPath, "utf8")) as Record<
-					string,
-					unknown
-				>;
-			} catch {
-				// no file yet / unparsable — start fresh
-			}
-			data[provider.trim()] = { type: "api_key", key };
-			writeFileSync(authPath, JSON.stringify(data, null, 2) + "\n");
-			// Apply immediately for this session (runtime credentials are cached), then
-			// refresh models. allowNetwork downloads the provider's official model
-			// catalog (openai/anthropic/… are dynamic providers with no built-in list).
 			const mr = this.host.modelRuntime();
 			await mr.setRuntimeApiKey(provider.trim(), key);
 			await mr.refresh({ allowNetwork: true });
@@ -205,7 +188,7 @@ export class ModelAdminService {
 	}
 
 	/**
-	 * Clear a built-in provider's stored API key (auth.json entry + runtime
+	 * Clear a built-in provider's stored API key (agent.db entry + runtime
 	 * override) so it returns to the unconfigured state — its models disappear
 	 * from the picker until a key is set again. Only meaningful for keys that
 	 * were stored via set_provider_api_key (source "stored"); env-var sourced
@@ -218,37 +201,14 @@ export class ModelAdminService {
 			return;
 		}
 		try {
-			// Remove from auth.json ({ <provider>: { type: "api_key", key } }).
-			const authPath = join(this.host.agentDir, "auth.json");
-			let data: Record<string, unknown> = {};
-			try {
-				data = JSON.parse(readFileSync(authPath, "utf8")) as Record<
-					string,
-					unknown
-				>;
-			} catch {
-				// no file yet / unparsable — nothing stored to clear
-			}
-			if (!(pid in data)) {
-				this.host.emit({
-					type: "notice",
-					level: "info",
-					text: `${pid} 没有已保存的密钥`,
-				});
-				return;
-			}
-			delete data[pid];
-			writeFileSync(authPath, JSON.stringify(data, null, 2) + "\n");
-			// Drop the runtime override too, then re-read credentials so the
-			// provider goes back to unconfigured and its models leave the list.
 			const mr = this.host.modelRuntime();
-			await mr.removeRuntimeApiKey(pid);
+			const removed = await mr.removeRuntimeApiKey(pid);
 			await mr.refresh();
 			this.host.invalidatePiConfig();
 			this.host.emit({
 				type: "notice",
 				level: "info",
-				text: `🗑  已清除 ${pid} 的密钥，该服务商回到未配置状态`,
+				text: removed ? `已清除 ${pid} 保存的 API 密钥（OAuth 和环境变量认证保留）` : `${pid} 没有已保存的密钥`,
 			});
 			await this.host.pushModels();
 			await this.listProviders();
@@ -289,7 +249,7 @@ export class ModelAdminService {
 				fail(`${pid} 没有 baseUrl（OAuth/环境变量型供应商），无法复制为自定义服务商`);
 				return;
 			}
-			// Map runtime models → models.json rows; dynamic providers ship an
+			// Map runtime models → models.yml rows; dynamic providers ship an
 			// empty catalog until refreshed over the network.
 			const readModels = (): { api: string; entry: UiModelConfigEntry }[] => {
 				try {
@@ -319,7 +279,7 @@ export class ModelAdminService {
 				fail(`${pid} 的模型列表为空，无法复制（请稍后重试）`);
 				return;
 			}
-			// models.json 的 api 是 provider 级：取占比最高的 api，只复制该 api 的模型。
+			// models.yml 的 api 是 provider 级：取占比最高的 api，只复制该 api 的模型。
 			const counts = new Map<string, number>();
 			for (const m of models) counts.set(m.api, (counts.get(m.api) ?? 0) + 1);
 			let api = models[0].api;
@@ -328,7 +288,7 @@ export class ModelAdminService {
 			// Suggest a free id (<pid>-2, -3, …) — save_model_config would silently
 			// overwrite an existing custom entry with the same id.
 			const taken = new Set([
-				...Object.keys(this.readModelsConfig().providers),
+				...Object.keys((await this.readModelsConfig()).providers),
 				...mr.getRegisteredProviderIds(),
 			]);
 			let newId = `${pid}-2`;
@@ -390,73 +350,17 @@ export class ModelAdminService {
 	}
 
 	// ---------------------------------------------------------------------------
-	// Custom model config (agentDir/models.json)
+	// Custom model config (agentDir/models.yml)
 	// ---------------------------------------------------------------------------
 
-	private modelsConfigPath(): string {
-		return join(this.host.agentDir, "models.json");
+	private async readModelsConfig(): Promise<{ providers: Record<string, Record<string, unknown>> }> {
+		const config = await runOmpAdmin<{ providers?: Record<string, Record<string, unknown>> }>("models_read", {}, { agentDir: this.host.agentDir });
+		return { providers: config.providers ?? {} };
 	}
 
-	/** Strip // and /* *\/ comments without touching string literals (URLs contain //). */
-	private static stripJsonComments(src: string): string {
-		let out = "";
-		let inString = false;
-		let i = 0;
-		while (i < src.length) {
-			const c = src[i];
-			const next = src[i + 1];
-			if (inString) {
-				out += c;
-				if (c === "\\") {
-					out += next ?? "";
-					i += 2;
-					continue;
-				}
-				if (c === '"') inString = false;
-				i++;
-				continue;
-			}
-			if (c === '"') {
-				inString = true;
-				out += c;
-				i++;
-				continue;
-			}
-			if (c === "/" && next === "/") {
-				while (i < src.length && src[i] !== "\n") i++;
-				continue;
-			}
-			if (c === "/" && next === "*") {
-				i += 2;
-				while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++;
-				i += 2;
-				continue;
-			}
-			out += c;
-			i++;
-		}
-		return out;
-	}
-
-	/** Read + parse models.json (tolerating // and /* *\/ comments like the SDK). */
-	private readModelsConfig(): {
-		providers: Record<string, Record<string, unknown>>;
-	} {
-		const path = this.modelsConfigPath();
-		try {
-			const raw = readFileSync(path, "utf8");
-			const parsed = JSON.parse(stripJsonComments(raw)) as {
-				providers?: Record<string, Record<string, unknown>>;
-			};
-			return { providers: parsed?.providers ?? {} };
-		} catch {
-			return { providers: {} };
-		}
-	}
-
-	/** Send the current models.json custom providers to the client. */
+	/** Send the current models.yml custom providers to the client. */
 	async listModelsConfig(): Promise<void> {
-		const { providers } = this.readModelsConfig();
+		const { providers } = await this.readModelsConfig();
 		const list: UiProviderConfig[] = Object.entries(providers).map(
 			([providerId, p]) => {
 				const models = Array.isArray(p.models)
@@ -474,8 +378,8 @@ export class ModelAdminService {
 					name: p.name as string | undefined,
 					api: p.api as string | undefined,
 					baseUrl: p.baseUrl as string | undefined,
-					apiKey: p.apiKey as string | undefined,
 					authHeader: p.authHeader as boolean | undefined,
+					auth: p.auth as UiProviderConfig["auth"],
 					// headers are intentionally NOT sent to the browser — they may
 					// contain Authorization / API-key values; kept server-side only.
 					models,
@@ -695,7 +599,7 @@ static async probeModelsEndpoint(
 
 	/**
 	 * Re-probe a SAVED custom provider's model list and merge it into its
-	 * models.json entry — credentials never leave the server (unlike the
+	 * models.yml entry — credentials never leave the server (unlike the
 	 * edit-form fetch, which sends whatever the browser typed). Merge rules:
 	 * existing ids keep all manually-entered fields and only gain metadata
 	 * they were missing; brand-new ids are appended. Hot-reloads the runtime.
@@ -705,8 +609,8 @@ static async probeModelsEndpoint(
 			this.host.emit({ type: "refresh_provider_result", reqId, ok, ...extra });
 		try {
 			const pid = providerId.trim();
-			const { providers } = this.readModelsConfig();
-			// models.json 原始形状是 Record<string, unknown>——按已保存条目的结构断言
+			const { providers } = await this.readModelsConfig();
+			// models.yml 原始形状是 Record<string, unknown>——按已保存条目的结构断言
 			const saved = providers[pid] as
 				| {
 						name?: string;
@@ -726,12 +630,13 @@ static async probeModelsEndpoint(
 				});
 				return done(false, { error: "provider missing or no baseUrl" });
 			}
+			const auth = await runOmpAdmin<{ apiKey?: string; headers?: Record<string, string> }>("provider_auth", { provider: pid }, { agentDir: this.host.agentDir });
 			const fetched = await ModelAdminService.probeModelsEndpoint(
 				saved.baseUrl,
-				saved.apiKey,
+				auth.apiKey,
 				saved.authHeader === true ? true : undefined,
 				saved.api,
-				saved.headers as Record<string, string> | undefined,
+				{ ...saved.headers, ...auth.headers },
 			);
 
 			// Merge: manual values win; fetched fills blanks and appends new ids.
@@ -781,7 +686,7 @@ static async probeModelsEndpoint(
 		}
 	}
 
-	/** Upsert one provider into models.json and hot-reload the model runtime. */
+	/** Upsert one provider into models.yml and hot-reload the model runtime. */
 	async saveModelConfig(
 		providerId: string,
 		config: UiProviderConfig,
@@ -810,52 +715,24 @@ static async probeModelsEndpoint(
 			return;
 		}
 		try {
-			const { providers } = this.readModelsConfig();
+			const { providers } = await this.readModelsConfig();
 			// headers never reach the browser, so the incoming config can't carry
 			// them — preserve the previously stored values when they are absent.
 			const prevHeaders = providers[pid]?.headers;
 			providers[pid] = {
+				...providers[pid],
+				...(config.apiKey?.trim() ? { apiKey: config.apiKey.trim() } : {}),
+				...(["apiKey", "none", "oauth"].includes(config.auth ?? "") ? { auth: config.auth } : {}),
 				...(config.name?.trim() ? { name: config.name.trim() } : {}),
 				...(config.api?.trim() ? { api: config.api.trim() } : {}),
 				...(config.baseUrl?.trim() ? { baseUrl: config.baseUrl.trim() } : {}),
-				...(config.apiKey?.trim() ? { apiKey: config.apiKey.trim() } : {}),
-				...(config.authHeader ? { authHeader: true } : {}),
+				...(typeof config.authHeader === "boolean" ? { authHeader: config.authHeader } : {}),
 				...(prevHeaders && Object.keys(prevHeaders).length > 0
 					? { headers: prevHeaders }
 					: {}),
 				models,
 			};
-			mkdirSync(this.host.agentDir, { recursive: true });
-			writeFileSync(
-				this.modelsConfigPath(),
-				JSON.stringify({ providers }, null, 2) + "\n",
-			);
-
-			// Allow a custom models.json entry to reuse the provider credential
-			// already stored in auth.json.  Seed the shared runtime too, because
-			// older pi-ai versions did not always fall back to stored credentials
-			// for a newly-created custom provider.  Never copy the secret into
-			// models.json.
-			try {
-				const auth = JSON.parse(
-					readFileSync(join(this.host.agentDir, "auth.json"), "utf8"),
-				) as Record<string, unknown>;
-				const credential = auth[pid];
-				if (
-					credential &&
-					typeof credential === "object" &&
-					"key" in credential &&
-					typeof credential.key === "string" &&
-					credential.key.trim()
-				) {
-					await this.host.modelRuntime().setRuntimeApiKey(
-						pid,
-						credential.key,
-					);
-				}
-			} catch {
-				// auth.json is optional; models.json can still use its own apiKey.
-			}
+			await runOmpAdmin("models_write", { providers }, { agentDir: this.host.agentDir });
 			await this.host.modelRuntime().refresh();
 			await this.listModelsConfig();
 			await this.host.pushModels();
@@ -874,10 +751,10 @@ static async probeModelsEndpoint(
 		this.host.flushSnapshot();
 	}
 
-	/** Remove a provider from models.json and hot-reload. */
+	/** Remove a provider from models.yml and hot-reload. */
 	async deleteModelConfig(providerId: string): Promise<void> {
 		try {
-			const { providers } = this.readModelsConfig();
+			const { providers } = await this.readModelsConfig();
 			if (!(providerId in providers)) {
 				this.host.emit({
 					type: "notice",
@@ -887,10 +764,7 @@ static async probeModelsEndpoint(
 				return;
 			}
 			delete providers[providerId];
-			writeFileSync(
-				this.modelsConfigPath(),
-				JSON.stringify({ providers }, null, 2) + "\n",
-			);
+			await runOmpAdmin("models_write", { providers }, { agentDir: this.host.agentDir });
 			await this.host.modelRuntime().refresh();
 			await this.listModelsConfig();
 			await this.host.pushModels();

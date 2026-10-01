@@ -1,5 +1,5 @@
 /* Smoke test: commands.json is per-project (follows the current cwd).
- * Server on PORT=8791 with temp work dirs; each dir has its own .pi/commands.json.
+ * Server on PORT=8791 with temp work dirs; each dir has its own .omp/commands.json.
  */
 import { WebSocket } from "ws";
 

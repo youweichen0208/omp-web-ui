@@ -65,7 +65,7 @@ const IGNORED_ENTRIES = new Set([
 	"venv",
 	"__pycache__",
 	"coverage",
-	".pi-web",
+	".omp-web",
 	".DS_Store",
 	"Thumbs.db",
 ]);
@@ -77,7 +77,7 @@ const IGNORED_ENTRIES = new Set([
 const IGNORED_ENTRIES_WIN = new Set([
 	"node_modules",
 	".git",
-	".pi-web",
+	".omp-web",
 	".DS_Store",
 	"Thumbs.db",
 	"desktop.ini",

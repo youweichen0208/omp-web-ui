@@ -1,17 +1,17 @@
 /**
- * pi-web-ui 的 pi 扩展 —— 提供命令行集成。
+ * omp-web-ui 的 pi 扩展 —— 提供命令行集成。
  *
  * 能力：
- *   /webui                      启动本机 pi-web-ui 服务器，打开浏览器访问
+ *   /webui                      启动本机 omp-web-ui 服务器，打开浏览器访问
  *   /webui --port 9000          指定端口启动
  *   /webui --no-browser         启动但不开浏览器
  *   /webui stop                 停止已启动的服务器
  *   /webui status               查看运行状态 / URL
  *
  * 实现说明：
- *   - 不依赖全局 bin（pi install 后 pi-web-ui 命令不一定在 PATH），直接用
- *     node 调包内 dist/server/index.js，通过环境变量 PORT / PI_WEB_CWD /
- *     PI_WEB_DATA_DIR 控制。
+ *   - 不依赖全局 bin（pi install 后 omp-web-ui 命令不一定在 PATH），直接用
+ *     node 调包内 dist/server/index.js，通过环境变量 PORT / OMP_WEB_CWD /
+ *     OMP_WEB_DATA_DIR 控制。
  *   - 工作目录默认用当前 pi 会话的 ctx.cwd；可用 --cwd / path 覆盖。
  *   - 服务器作为子进程后台运行，/webui 不阻塞 pi。
  *   - 每个 pi 会话管理一个子进程；session_shutdown 时清理，避免孤儿进程。
@@ -22,12 +22,12 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 
 // 本文件位于 <pkg>/extensions/webui.ts → 包根在上一级
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_ENTRY = join(PKG_ROOT, "dist", "server", "index.js");
-const NODE = process.execPath;
+const NODE = process.env.OMP_WEB_NODE || "node";
 
 /** 每个会话的服务器子进程 + 元数据 */
 interface RunningServer {
@@ -99,7 +99,7 @@ async function openBrowser(url: string): Promise<void> {
 
 export default function (pi: ExtensionAPI): void {
 	pi.registerCommand("webui", {
-		description: "启动本机 pi-web-ui Web 界面（/webui [--port N] [--cwd PATH] [--no-browser] | stop | status）",
+		description: "启动本机 omp-web-ui Web 界面（/webui [--port N] [--cwd PATH] [--no-browser] | stop | status）",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
 			const sid = ctx.sessionManager.getSessionId();
 			const opts = parseArgs(args);
@@ -109,12 +109,12 @@ export default function (pi: ExtensionAPI): void {
 			if (action === "stop" || action === "kill") {
 				const inst = running.get(sid);
 				if (!inst) {
-					ctx.ui.notify("没有正在运行的本机 pi-web-ui 服务器", "info");
+					ctx.ui.notify("没有正在运行的本机 omp-web-ui 服务器", "info");
 					return;
 				}
 				inst.proc.kill("SIGTERM");
 				running.delete(sid);
-				ctx.ui.notify(`已停止 pi-web-ui (${inst.url})`, "info");
+				ctx.ui.notify(`已停止 omp-web-ui (${inst.url})`, "info");
 				return;
 			}
 
@@ -122,12 +122,12 @@ export default function (pi: ExtensionAPI): void {
 			if (action === "status") {
 				const inst = running.get(sid);
 				if (!inst) {
-					ctx.ui.notify("本机 pi-web-ui 未运行", "info");
+					ctx.ui.notify("本机 omp-web-ui 未运行", "info");
 					return;
 				}
 				const alive = inst.proc.exitCode === null;
 				ctx.ui.notify(
-					alive ? `pi-web-ui 运行中 → ${inst.url}\n端口 ${inst.port} · cwd ${inst.cwd}` : `已退出(exit=${inst.proc.exitCode})`,
+					alive ? `omp-web-ui 运行中 → ${inst.url}\n端口 ${inst.port} · cwd ${inst.cwd}` : `已退出(exit=${inst.proc.exitCode})`,
 					alive ? "info" : "warning",
 				);
 				return;
@@ -142,14 +142,14 @@ export default function (pi: ExtensionAPI): void {
 			// 已运行则提示
 			const existing = running.get(sid);
 			if (existing && existing.proc.exitCode === null) {
-				ctx.ui.notify(`pi-web-ui 已在运行 → ${existing.url}`, "info");
+				ctx.ui.notify(`omp-web-ui 已在运行 → ${existing.url}`, "info");
 				return;
 			}
 
 			// 检查是否已构建
 			if (!existsSync(SERVER_ENTRY)) {
 				ctx.ui.notify(
-					"缺少 dist/ 产物（当前安装未包含已构建前端）。请运行 `npm run build` 后重试，或用 pi-web-ui 官方 npm 包。",
+					"缺少 dist/ 产物（当前安装未包含已构建前端）。请运行 `npm run build` 后重试，或用 omp-web-ui 官方 npm 包。",
 					"warning",
 				);
 				return;
@@ -162,14 +162,14 @@ export default function (pi: ExtensionAPI): void {
 			const env = {
 				...process.env,
 				PORT: String(port),
-				PI_WEB_CWD: cwd,
-				...(process.env.PI_WEB_DATA_DIR ? {} : { PI_WEB_DATA_DIR: join(cwd, ".pi-web") }),
+				OMP_WEB_CWD: cwd,
+				...(process.env.OMP_WEB_DATA_DIR ? {} : { OMP_WEB_DATA_DIR: join(cwd, ".omp-web") }),
 			};
 			const proc = spawn(NODE, [SERVER_ENTRY], { cwd, env, stdio: "ignore", detached: true });
 			proc.unref();
 			running.set(sid, { proc, port, cwd, url });
 
-			ctx.ui.notify(`pi-web-ui 启动中 → ${url}\n端口 ${port} · cwd ${cwd}\n(几秒后可用，/webui status 查看)`);
+			ctx.ui.notify(`omp-web-ui 启动中 → ${url}\n端口 ${port} · cwd ${cwd}\n(几秒后可用，/webui status 查看)`);
 
 			if (!opts.noBrowser) await openBrowser(url);
 

@@ -2,7 +2,7 @@
  * Auto-restart handoff test (foreground path):
  *
  * 1. start instance A on PORT
- * 2. start instance B with PI_WEB_RESTART_CHILD=1 on the same PORT — it must
+ * 2. start instance B with OMP_WEB_RESTART_CHILD=1 on the same PORT — it must
  *    WAIT (not crash with EADDRINUSE) until A releases the port
  * 3. kill A → B takes over and serves /api/health
  */
@@ -33,7 +33,7 @@ try {
 } catch {}
 await sleep(400);
 
-const env = { ...process.env, PORT: String(PORT), PI_WEB_CWD: PROJ };
+const env = { ...process.env, PORT: String(PORT), OMP_WEB_CWD: PROJ };
 
 // Instance A: the old process.
 const a = spawn("node", ["dist/server/index.js"], {
@@ -51,7 +51,7 @@ check("A answers health", health?.ok === true);
 // Instance B: the auto-restart replacement. Must NOT crash — it waits.
 const b = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,
-	env: { ...env, PI_WEB_RESTART_CHILD: "1" },
+	env: { ...env, OMP_WEB_RESTART_CHILD: "1" },
 	stdio: "ignore",
 });
 await sleep(2500);

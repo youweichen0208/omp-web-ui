@@ -104,7 +104,7 @@ describe("apiVersion 门控", () => {
 		makePlugin("futuristic", "export default {};", { apiVersion: PLUGIN_API_VERSION + 1 });
 		makePlugin("classic", "export default {};", { apiVersion: 1 });
 		const list = await mgr.ensureLoaded();
-		expect(list.find((p) => p.id === "futuristic")?.error).toContain("请升级 pi-web-ui");
+		expect(list.find((p) => p.id === "futuristic")?.error).toContain("请升级 omp-web-ui");
 		expect(list.find((p) => p.id === "classic")?.error).toBeUndefined();
 	});
 });

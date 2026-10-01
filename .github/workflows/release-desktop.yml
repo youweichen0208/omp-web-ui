@@ -1,4 +1,4 @@
-# pi-web-ui Electron 桌面版发布 CI
+# omp-web-ui Electron 桌面版发布 CI
 # 在 tag（v*）推送时触发：三平台各自构建安装包并上传到 GitHub Releases
 # （electron-builder.yml 里的 publish: provider: github 配置生效）。
 # 也支持手动触发（workflow_dispatch），比如某个平台构建失败要单独重跑。
@@ -48,7 +48,7 @@ jobs:
           version=$(node -p "require('./package.json').version")
           test "$RELEASE_TAG" = "v$version"
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            args=(--verify-tag --title "$RELEASE_TAG")
+            args=(--verify-tag --draft --title "$RELEASE_TAG")
             if [ -f ".github/release-notes/$RELEASE_TAG.md" ]; then
               args+=(--notes-file ".github/release-notes/$RELEASE_TAG.md")
             else
@@ -80,12 +80,25 @@ jobs:
       - name: Build web + server
         run: npm run build
 
-      - name: Build + publish Electron (macOS)
-        run: npx electron-builder build --mac --arm64 --publish always
+      - name: Rebuild Electron host terminal module
+        run: npm run rebuild:electron
+
+      - name: Build Electron (macOS)
+        run: npx electron-builder build --mac --arm64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
           # macOS 签名（可选）——上面几个 secrets 没配的话就是未签名构建
+
+      - name: Verify packaged OMP runtime and server
+        run: node tests/packaged-server-start-test.mjs release/mac-arm64/OMP.app/Contents/MacOS/OMP release/mac-arm64/OMP.app/Contents/Resources/app
+
+      - name: Upload verified macOS assets to draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release upload "$tag" release/*.dmg release/*.zip release/*mac*.yml release/*.blockmap --clobber
 
   build-win:
     needs: prepare-release
@@ -123,13 +136,16 @@ jobs:
       - name: Verify desktop toolbar layout on Windows
         run: node tests/desktop-toolbar-test.mjs
 
+      - name: Rebuild Electron host terminal module
+        run: npm run rebuild:electron
+
       - name: Build Electron (Windows)
         run: npx electron-builder build --win --x64 --publish never
 
       - name: Verify packaged server and portable relaunch
         shell: pwsh
         run: |
-          node tests/packaged-server-start-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
+          node tests/packaged-server-start-test.mjs release/win-unpacked/OMP.exe release/win-unpacked/resources/app
           if ($LASTEXITCODE -ne 0) { throw "Packaged server cannot start" }
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
@@ -141,20 +157,7 @@ jobs:
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $tag = "v$version"
-          gh release view $tag
-          if ($LASTEXITCODE -ne 0) {
-            if ($version.Contains('-')) {
-              gh release create $tag --verify-tag --title $tag --notes "Desktop prerelease $version" --prerelease
-            } else {
-              gh release create $tag --verify-tag --title $tag --notes "Desktop release $version"
-            }
-            if ($LASTEXITCODE -ne 0) {
-              # Another platform may have created the release concurrently.
-              gh release view $tag
-              if ($LASTEXITCODE -ne 0) { throw "Cannot create release" }
-            }
-          }
-          $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip', '.blockmap' -or $_.Name -eq 'latest.yml' }
+          $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip', '.blockmap' -or $_.Name -match '^(latest|beta)\.yml$' }
           if ($assets.Count -lt 5) { throw "Windows release assets are incomplete" }
           gh release upload $tag @($assets.FullName) --clobber
           if ($LASTEXITCODE -ne 0) { throw "Release upload failed" }
@@ -183,8 +186,33 @@ jobs:
       - name: Build web + server
         run: npm run build
 
-      - name: Build + publish Electron (Linux)
-        run: npx electron-builder build --linux --x64 --publish always
+      - name: Rebuild Electron host terminal module
+        run: npm run rebuild:electron
+
+      - name: Build Electron (Linux)
+        run: npx electron-builder build --linux --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_PRE_RELEASE: ${{ contains(github.ref_name, '-') }}
+
+      - name: Verify packaged OMP runtime and server
+        run: node tests/packaged-server-start-test.mjs release/linux-unpacked/OMP release/linux-unpacked/resources/app
+
+      - name: Upload verified Linux assets to draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release upload "$tag" release/*.AppImage release/*.deb release/*linux*.yml --clobber
+
+  publish-release:
+    needs: [build-mac, build-win, build-linux]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' || inputs.platform == 'all') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Publish after all three packaged runtimes pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --draft=false

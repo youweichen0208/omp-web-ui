@@ -46,3 +46,9 @@ dev/*-preview.html
 
 # Cowork 在仓库根建的输出目录
 Claude outputs/
+
+# OMP runtime and application state
+.omp/
+.omp-web/
+.omp-web-desktop/
+.omp-subagents/

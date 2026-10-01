@@ -26,7 +26,7 @@ copyFileSync(path, join(graph, "no-extension"));
 writeFileSync(join(graph, "bad.db"), "not SQLite");
 writeFileSync(join(graph, "note.txt"), "regular file");
 const before = readFileSync(path);
-const env = { ...process.env, PI_WEB_CWD: workspace, PI_WEB_DATA_DIR: join(root, "data"), PI_CODING_AGENT_DIR: join(root, "agent") };
+const env = { ...process.env, OMP_WEB_CWD: workspace, OMP_WEB_DATA_DIR: join(root, "data"), OMP_WEB_AGENT_DIR: join(root, "agent") };
 let browser, app, server;
 try {
 	let page;

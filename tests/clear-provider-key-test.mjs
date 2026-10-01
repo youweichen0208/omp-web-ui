@@ -1,12 +1,13 @@
 // clear_provider_api_key — built-in provider key clearing (zero token).
 //
 // 1. set_provider_api_key writes { provider: { type: "api_key", key } } to
-//    <agentDir>/auth.json
+//    <agentDir>/agent.db
 // 2. clear_provider_api_key removes the entry + drops the runtime override
 // 3. clearing a provider with nothing stored → info notice, no crash
 //
 // Usage: npm run build && node tests/clear-provider-key-test.mjs [port]
 import WebSocket from "ws";
+import { runOmpAdmin } from "../dist/server/omp/admin.js";
 import { mkdtempSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,9 +28,9 @@ const server = spawn(NODE, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		PI_WEB_DATA_DIR: dataDir,
-		PI_WEB_CWD: workdir,
-		PI_CODING_AGENT_DIR: agentDir,
+		OMP_WEB_DATA_DIR: dataDir,
+		OMP_WEB_CWD: workdir,
+		OMP_WEB_AGENT_DIR: agentDir,
 	},
 	stdio: ["ignore", "ignore", "ignore"],
 	windowsHide: true,
@@ -89,14 +90,10 @@ async function connect() {
 	throw new Error("server not ready");
 }
 
-const authPath = join(agentDir, "auth.json");
-const readAuth = () => {
-	try {
-		return JSON.parse(readFileSync(authPath, "utf8"));
-	} catch {
-		return {};
-	}
-};
+async function readAuth() {
+	const catalog = await runOmpAdmin("catalog", {}, { agentDir, cwd: workdir });
+	return Object.fromEntries(catalog.providers.filter(p => p.source === "stored").map(p => [p.id, true]));
+}
 
 let clean = false;
 function cleanup() {
@@ -120,27 +117,27 @@ try {
 	// 1) 存一个 key（deepseek 是内置静态目录供应商，离线安全）
 	c.send({ type: "set_provider_api_key", provider: "deepseek", apiKey: "sk-test-123" });
 	await c.waitForNotice("已保存", 30000);
-	check("key stored in auth.json", readAuth().deepseek?.key === "sk-test-123");
+	check("key stored in agent.db", (await readAuth()).deepseek === true);
 
 	// 2) 清空
 	c.send({ type: "clear_provider_api_key", provider: "deepseek" });
 		await c.waitForNotice("已清除", 30000);
-	check("auth.json entry removed", !readAuth().deepseek);
+	check("agent.db entry removed", !(await readAuth()).deepseek);
 
 	// 3) 再清一次 → 友好提示不崩
 	c.send({ type: "clear_provider_api_key", provider: "deepseek" });
 	const n = await c.waitForNotice("没有已保存的密钥", 15000);
 	check("second clear → friendly notice", !!n);
 
-	// 4) auth.json 里其他条目不受影响
+	// 4) agent.db 里其他条目不受影响
 	c.send({ type: "set_provider_api_key", provider: "openai", apiKey: "sk-oa" });
 	await c.waitForNotice("已保存", 30000);
 	c.send({ type: "set_provider_api_key", provider: "anthropic", apiKey: "sk-an" });
 	await c.waitForNotice("已保存", 30000);
 	c.send({ type: "clear_provider_api_key", provider: "openai" });
 	await c.waitForNotice("已清除", 30000);
-	const auth = readAuth();
-	check("other entries untouched", !auth.openai && auth.anthropic?.key === "sk-an");
+	const auth = await readAuth();
+	check("other entries untouched", !auth.openai && auth.anthropic === true);
 
 	console.log(`\n${passed} passed, ${failed} failed`);
 } catch (err) {

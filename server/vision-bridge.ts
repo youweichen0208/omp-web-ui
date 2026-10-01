@@ -16,7 +16,7 @@
  * No separate API key / baseUrl is needed: the shared ModelRuntime already
  * resolves credentials for every configured provider.
  */
-import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "./omp/index.js";
 
 // TypeScript can't import pi-ai's `Model`/`Context` directly (it's a nested
 // dependency of pi-coding-agent), so derive them from completeSimple's
@@ -36,7 +36,7 @@ export interface VisionModelRef {
 
 /** Per-batch timeout; a slow vision provider shouldn't stall a prompt forever. */
 const TRANSCRIBE_TIMEOUT_MS = Number(
-	process.env.PI_WEB_VISION_TIMEOUT_MS ?? 90_000,
+	process.env.OMP_WEB_VISION_TIMEOUT_MS ?? 90_000,
 );
 /** Cap the transcript length so it doesn't blow up the main context. */
 const MAX_TRANSCRIBE_TOKENS = 4000;
@@ -161,7 +161,7 @@ export async function transcribeImages(
 				: "image/png",
 		}));
 		const context: VisionContext = {
-			systemPrompt: options.systemPrompt ?? SYSTEM_PROMPT,
+			systemPrompt: [options.systemPrompt ?? SYSTEM_PROMPT],
 			messages: [
 				{
 					role: "user",

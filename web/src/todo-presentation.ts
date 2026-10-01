@@ -41,6 +41,7 @@ export function todoPresentation(messages: UiMessage[], results: ReadonlyMap<str
 				card = undefined; previous = []; run = undefined;
 				continue;
 			}
+			if (snapshot.action === "init") { card = undefined; previous = []; run = undefined; }
 			if (!card && !snapshot.tasks.length) {
 				// An empty inspection has no checklist to show; retain the ordinary tool row.
 				run = undefined;

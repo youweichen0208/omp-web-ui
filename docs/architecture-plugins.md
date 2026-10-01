@@ -71,9 +71,11 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 `GET /plugins/:id/client/*` 映射到插件目录的 client/ 子树（**只暴露这个子树**——manifest 与服务端 index.mjs 可能含凭据，绝不下载；id 校验 + resolve 前缀防穿越）。dev 模式 vite 已代理 /plugins。
 
-## MCP 工具桥（server/mcp-bridge.ts）
+## 原生 MCP 与 OMP 插件
 
-读取 `<dataDir>/mcp.json` 启动外部 MCP 服务器（stdio、换行分隔 JSON-RPC，零三方依赖；`{servers:{名:{command,args,cwd,env}}}`），握手 initialize→initialized→tools/list→tools/call 后把每个远端工具适配成 PluginAgentTool（名字归一化 sanitizeToolName），并入 plugin.d.ts 的 pluginToolsProvider（与插件工具同一 customTools 管线）。单服务器失败隔离（rejectAll + 日志，不炸进程）；dispose 时 kill 子进程；请求按 id 匹配 + 超时看门狗。
+MCP 由 OMP 原生发现与执行，配置使用 `~/.omp/agent/mcp.json` 的 `mcpServers` schema（项目配置遵循 OMP 规则）。Web 宿主不再读取旧 `<dataDir>/mcp.json`，也不再自行实现 MCP JSON-RPC。原生发现可以延迟，单个服务器失败不阻塞 Web 首屏。
+
+OMP 原生插件位于 `~/.omp/plugins`，与 `~/.omp/agent` 为同级目录；界面插件仍在 `~/.omp-web/plugins`。组件更新使用原生 PluginManager 查询/更新，设置面板卸载命令指向随应用内置的 Bun/OMP，无需全局安装 omp。原生扩展开关仍按实际入口路径持久化。
 
 ## 真实插件
 

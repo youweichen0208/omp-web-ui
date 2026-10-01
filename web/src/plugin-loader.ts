@@ -36,7 +36,7 @@ export interface LoadedPluginView {
 	module: PluginViewModule;
 }
 
-const PLUGIN_DATA_EVENT = "pi-web-ui:plugin-data";
+const PLUGIN_DATA_EVENT = "omp-web-ui:plugin-data";
 
 /** use-chat 调用：把服务端 plugin_data 消息转成分发事件。 */
 export function emitPluginData(pluginId: string, payload: unknown): void {

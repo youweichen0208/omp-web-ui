@@ -14,18 +14,18 @@ const agent = join(root, 'agent');
 const registryMock = join(root, 'registry-mock.mjs');
 writeFileSync(registryMock, `const original=globalThis.fetch; globalThis.fetch=(url,options)=>String(url).startsWith('https://registry.npmjs.org/') ? Promise.resolve(new Response(JSON.stringify(String(url).endsWith('/latest')?{version:'999.0.0'}:{'dist-tags':{latest:'999.0.0'}}),{status:String(url).includes('broken')?503:200,headers:{'content-type':'application/json'}})) : original(url,options);`);
 for (const name of ['sample', 'pinned', 'broken']) {
-	const directory = join(agent, 'npm', 'node_modules', name);
+	const directory = join(root, 'plugins', 'node_modules', name);
 	mkdirSync(directory, { recursive: true });
-	writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version: '1.0.0', pi: { extensions: ['index.ts'] } }));
+	writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version: '1.0.0', omp: { hooks: 'index.ts' } }));
 	writeFileSync(join(directory, 'index.ts'), 'export default function () {}');
 }
-writeFileSync(join(agent, 'settings.json'), JSON.stringify({ packages: ['npm:sample', 'npm:pinned@1.0.0', 'npm:broken'] }));
-const server = spawn(process.execPath, ['--import', pathToFileURL(registryMock).href, 'dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: join(root, 'data'), PI_WEB_CWD: root, PI_CODING_AGENT_DIR: agent }, stdio: 'ignore' });
+writeFileSync(join(root, 'plugins', 'package.json'), JSON.stringify({ dependencies: { sample: '^1.0.0', pinned: '1.0.0', broken: '^1.0.0' } }));
+const server = spawn(process.execPath, ['--import', pathToFileURL(registryMock).href, 'dist/server/index.js'], { env: { ...process.env, PORT: String(port), OMP_WEB_DATA_DIR: join(root, 'data'), OMP_WEB_CWD: root, OMP_WEB_AGENT_DIR: agent }, stdio: 'ignore' });
 let browser, ws;
 const messages = [];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function wait(predicate) {
-	for (let i = 0; i < 200; i++) { const found = messages.find(predicate); if (found) return found; await sleep(50); }
+async function wait(predicate, attempts = 200) {
+	for (let i = 0; i < attempts; i++) { const found = messages.find(predicate); if (found) return found; await sleep(50); }
 	throw Error('Timed out waiting for update response');
 }
 try {
@@ -34,15 +34,15 @@ try {
 	ws.on('message', wire => messages.push(JSON.parse(wire.toString())));
 	await new Promise(resolve => ws.once('open', resolve));
 	ws.send(JSON.stringify({ type: 'hello', clientId: 'component-test' }));
-	await wait(m => m.type === 'ready');
+	await wait(m => m.type === 'ready', 1200);
 	ws.send(JSON.stringify({ type: 'check_component_updates', requestId: 'check-1' }));
 	const report = await wait(m => m.type === 'component_updates' && m.requestId === 'check-1' && m.phase === 'ready');
 	assert.equal(report.items.find(item => item.id === 'builtin:agent').canUpdate, false);
-	assert.equal(report.items.find(item => item.id === 'builtin:todo').status, 'available');
+	assert.equal(report.items.find(item => item.id === 'builtin:agent').status, 'available');
 	assert.equal(report.items.find(item => item.name === 'sample').canUpdate, true);
 	assert.equal(report.items.find(item => item.name === 'pinned').status, 'pinned');
 	assert.equal(report.items.find(item => item.name === 'broken').status, 'error');
-	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-builtin', id: 'builtin:todo' }));
+	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-builtin', id: 'builtin:agent' }));
 	await wait(m => m.type === 'component_updates' && m.requestId === 'reject-builtin' && m.phase === 'error');
 	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-arbitrary', id: 'npm:injected' }));
 	await wait(m => m.type === 'component_updates' && m.requestId === 'reject-arbitrary' && m.phase === 'error');
@@ -69,8 +69,8 @@ try {
 		await page.locator('.topbar-more .chip').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="组件更新"]').click();
-		await page.locator('.component-update-row', { hasText: 'pi Agent' }).waitFor();
-		const builtin = page.locator('.component-update-row', { hasText: 'rpiv-todo' });
+		await page.locator('.component-update-row', { hasText: 'Oh My Pi' }).waitFor();
+		const builtin = page.locator('.component-update-row', { hasText: 'Oh My Pi' });
 		assert.equal(await builtin.getByRole('button', { name: '更新扩展' }).count(), 0);
 		await builtin.getByText('有新版本', { exact: true }).waitFor();
 		await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).waitFor();

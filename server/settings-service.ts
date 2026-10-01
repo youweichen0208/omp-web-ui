@@ -6,11 +6,11 @@
  * 预设存取 + 何时需要 reload」，真正动 runtime 的 session.reload() 走宿主回调
  * （reloadSession 里还会刷新斜杠命令目录）。
  */
+import { ompShellCommand } from "./omp/paths.js";
 import { extensionDisplay } from "./extension-display.js";
-import { TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { AgentSession } from "./omp/index.js";
 import type { ServerMessage, UiExtensionInfo, UiSettingsState, UiSkillInfo, UiVisionBridgeModel } from "./protocol.js";
 import { extensionKey, type ClientStateStore, type ClientSettings, type PromptMode } from "./client-state.js";
 import { findVisionModels, SYSTEM_PROMPT } from "./vision-bridge.js";
@@ -117,8 +117,8 @@ export class SettingsService {
 		const disabledExts = new Set(this.settings.disabledExtensions);
 		let loadedSkillNames: Set<string> | null = null;
 		try {
-			const loadedSkills = this.host.getSession().resourceLoader.getSkills().skills;
-			const loadedExts = this.host.getSession().resourceLoader.getExtensions().extensions;
+			const loadedSkills = this.host.getSession().skills;
+			const loadedExts = this.host.getSession().extensions;
 			loadedSkillNames = new Set(loadedSkills.map((s) => s.name));
 			// Prune entries that no longer exist on disk AND aren't disabled
 			// (e.g. a skill/extension file was deleted). Disabled entries are
@@ -149,8 +149,9 @@ export class SettingsService {
 				const p = e.sourceInfo?.path ?? e.path;
 				this.knownExtensions.set(id, {
 					id,
-					...extensionDisplay(p, e.sourceInfo?.origin === "package" ? e.sourceInfo.source : undefined, TODO_EXTENSION_PATH),
+					...extensionDisplay(p, e.sourceInfo?.origin === "package" ? e.sourceInfo.source : undefined),
 					path: p,
+					packageName: e.packageName,
 					enabled: true,
 				});
 			}
@@ -188,7 +189,7 @@ export class SettingsService {
 			if (!this.knownExtensions.has(id)) {
 				this.knownExtensions.set(id, {
 					id,
-					...extensionDisplay(id.startsWith("npm:") ? "" : id, id.startsWith("npm:") ? id : undefined, TODO_EXTENSION_PATH),
+					...extensionDisplay(id.startsWith("npm:") ? "" : id, id.startsWith("npm:") ? id : undefined),
 					path: id.startsWith("npm:") ? "" : id,
 					enabled: false,
 				});
@@ -206,6 +207,7 @@ export class SettingsService {
 		this.host.emit({
 			type: "settings_state",
 			settings: {
+				agentCommand: ompShellCommand(this.host.agentDir()),
 				promptMode: this.settings.promptMode,
 				customSystemPrompt: this.settings.customSystemPrompt,
 				terminalToolsEnabled: this.settings.terminalToolsEnabled,
@@ -405,7 +407,14 @@ export class SettingsService {
 	 * overrides read this.settings at call time, so a reload re-applies them.
 	 * Reloading mid-stream would tear down the in-flight run — defer instead.
 	 */
-	async applyRuntime(): Promise<void> {
+	private reloadWork: Promise<void> = Promise.resolve();
+	applyRuntime(): Promise<void> {
+		const work = this.reloadWork.then(() => this.applyCurrentRuntime());
+		this.reloadWork = work.catch(() => {});
+		return work;
+	}
+
+	private async applyCurrentRuntime(): Promise<void> {
 		if (this.host.isDisposed()) return;
 		if (this.host.isStreaming()) {
 			this.pendingReload = true;

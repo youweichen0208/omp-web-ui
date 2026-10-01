@@ -52,7 +52,7 @@ export function EditWriteCard({ item, compact = false, retried = false }: { item
 	const state = retried ? "retried" : status(item);
 	const noDiff = change.kind === "edit" && change.empty && !change.error && state === "done";
 	const path = change.path || item.block.name;
-	const openFile = () => window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: change.path, ...(change.fromArguments ? {} : { line: change.firstChangedLine }) } }));
+	const openFile = () => window.dispatchEvent(new CustomEvent("omp-web-ui:open-tool-file", { detail: { path: change.path, ...(change.fromArguments ? {} : { line: change.firstChangedLine }) } }));
 	return <div className={`change-card ${state}`} data-tool-call-id={item.block.id} onMouseEnter={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: item.block.id } }))} onMouseLeave={() => window.dispatchEvent(new CustomEvent("pi:tool-hover", { detail: { toolCallId: null } }))}>
 		<div className="change-card-head">
 			<button type="button" className="change-card-toggle" aria-expanded={open && !noDiff} disabled={noDiff} onClick={() => setOpen((value) => !value)}>{!noDiff && <FiChevronRight className={open ? "open" : ""} />}<span className="change-verb">{item.block.name === "edit" ? t("changeEdit") : t("changeWrite")}</span><code title={path}>{path}</code></button>

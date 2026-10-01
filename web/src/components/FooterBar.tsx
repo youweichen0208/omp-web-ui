@@ -146,7 +146,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 		<footer className="statusbar">
 			<span className={`status-dot ${connClass}`} title={connLabel} />
 			<span className="status-item status-connection">{connLabel}</span>
-			{chat.serverVersion && <span className="status-item status-version" title={`pi-web-ui v${chat.serverVersion}`}>v{chat.serverVersion}</span>}
+			{chat.serverVersion && <span className="status-item status-version" title={`omp-web-ui v${chat.serverVersion}`}>v{chat.serverVersion}</span>}
 			<span className="status-sep">·</span>
 
 			<span className="status-item status-ctx" title={t("contextUsage")}>

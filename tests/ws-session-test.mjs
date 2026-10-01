@@ -7,7 +7,7 @@
  * 用法（需先有 server 在跑，或用环境变量指定）:
  *   node ws-session-test.mjs                        # 连 ws://localhost:${PORT:-8787}
  *   PORT=9000 node ws-session-test.mjs              # 自定义端口
- *   WS_ROOT=/abs/media.d  node ws-session-test.mjs  # 自定义媒体目录（默认 .pi-web/../media）
+ *   WS_ROOT=/abs/media.d  node ws-session-test.mjs  # 自定义媒体目录（默认 .omp-web/../media）
  *
  * 与仓库其它 test.mjs 一致：clientId 随机生成，端口可配，不依赖特定项目文件。
  */

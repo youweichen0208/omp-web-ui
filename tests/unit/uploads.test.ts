@@ -21,17 +21,17 @@ afterEach(() => {
 
 describe("uploadRetentionDays", () => {
 	it("默认 14 天", () => {
-		delete process.env.PI_WEB_UPLOAD_RETENTION_DAYS;
+		delete process.env.OMP_WEB_UPLOAD_RETENTION_DAYS;
 		expect(uploadRetentionDays()).toBe(14);
 	});
 	it("环境变量覆盖；0 = 关闭清理", () => {
-		process.env.PI_WEB_UPLOAD_RETENTION_DAYS = "3";
+		process.env.OMP_WEB_UPLOAD_RETENTION_DAYS = "3";
 		expect(uploadRetentionDays()).toBe(3);
-		process.env.PI_WEB_UPLOAD_RETENTION_DAYS = "0";
+		process.env.OMP_WEB_UPLOAD_RETENTION_DAYS = "0";
 		expect(uploadRetentionDays()).toBe(0);
-		process.env.PI_WEB_UPLOAD_RETENTION_DAYS = "abc";
+		process.env.OMP_WEB_UPLOAD_RETENTION_DAYS = "abc";
 		expect(uploadRetentionDays()).toBe(14);
-		delete process.env.PI_WEB_UPLOAD_RETENTION_DAYS;
+		delete process.env.OMP_WEB_UPLOAD_RETENTION_DAYS;
 	});
 });
 

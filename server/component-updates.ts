@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { DefaultPackageManager, VERSION, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { VERSION, type AgentSession } from "./omp/index.js";
+import { runOmpAdmin } from "./omp/admin.js";
 import type { ComponentUpdate } from "./protocol.js";
-import { TODO_EXTENSION_PATH } from "./todo-extension.js";
 import { extensionDisplay } from "./extension-display.js";
 
 let restartRequired = false;
@@ -18,27 +18,23 @@ function packageInfo(directory: string): { name?: string; version?: string } {
 		return { name: typeof value?.name === "string" ? value.name : undefined, version: typeof value?.version === "string" ? value.version : undefined };
 	} catch { return {}; }
 }
-export function packageManagerFor(session: AgentSession, cwd: string, agentDir: string): DefaultPackageManager {
-	return new DefaultPackageManager({ cwd, agentDir, settingsManager: session.settingsManager });
+type NativePlugin = { name: string; version: string; path: string; spec?: string };
+export function packageManagerFor(_session: AgentSession, cwd: string, agentDir: string) {
+	return {
+		list: () => runOmpAdmin<NativePlugin[]>("plugins_list", {}, { cwd, agentDir }),
+		update: async (name: string) => { await runOmpAdmin("plugin_update", { name }, { cwd, agentDir, timeoutMs: 10 * 60_000 }); },
+	};
 }
-export function updateTargets(session: AgentSession, manager: DefaultPackageManager): UpdateTarget[] {
-	const todo = packageInfo(dirname(TODO_EXTENSION_PATH));
-	const targets: UpdateTarget[] = [
-		{ id: "builtin:agent", name: "pi Agent", current: VERSION, kind: "bundled", packageName: "@earendil-works/pi-coding-agent" },
-		{ id: "builtin:todo", name: "rpiv-todo", current: todo.version ?? null, kind: "bundled", packageName: "@juicesharp/rpiv-todo" },
-	];
-	const packages = manager.listConfiguredPackages();
-	for (const pkg of packages) {
-		const parsed = npmSource.exec(pkg.source);
-		const metadata = pkg.installedPath ? packageInfo(pkg.installedPath) : {};
-		const git = /^(?:git:|https?:\/\/|git@|ssh:\/\/)/.test(pkg.source);
-		targets.push({ id: `${pkg.scope}:${pkg.source}`, name: parsed?.[1] ?? metadata.name ?? pkg.source, source: pkg.source, scope: pkg.scope, directory: pkg.installedPath, kind: parsed && ["@youweichen/pi-web-ui", "pi-web-ui"].includes(parsed[1]) ? "bundled" : parsed ? "npm" : git ? "git" : "local", packageName: parsed?.[1], current: metadata.version ?? null, ambiguous: packages.filter((other) => parsed ? npmSource.exec(other.source)?.[1] === parsed[1] : other.source === pkg.source).length > 1, pinned: parsed ? !!parsed[2] : git && pkg.source.includes("#") });
+export async function updateTargets(session: AgentSession, manager: ReturnType<typeof packageManagerFor>): Promise<UpdateTarget[]> {
+	const targets: UpdateTarget[] = [{ id: "builtin:agent", name: "Oh My Pi", current: VERSION, kind: "bundled", packageName: "@oh-my-pi/pi-coding-agent" }];
+	const plugins = await manager.list();
+	for (const plugin of plugins) {
+		const npm = plugin.spec && /^(?:[~^*]|[0-9]|latest)/.test(plugin.spec);
+		targets.push({ id: `user:${plugin.name}`, name: plugin.name, source: plugin.name, scope: "user", directory: plugin.path, kind: npm ? "npm" : "local", packageName: plugin.name, current: plugin.version, pinned: !!plugin.spec && /^\d/.test(plugin.spec) });
 	}
-	const roots = packages.flatMap((pkg) => pkg.installedPath ? [pkg.installedPath.replaceAll("\\", "/").replace(/\/$/, "") + "/"] : []);
-	for (const extension of session.resourceLoader.getExtensions().extensions) {
-		const path = extension.resolvedPath;
-		if (path === TODO_EXTENSION_PATH || roots.some((root) => path.replaceAll("\\", "/").startsWith(root))) continue;
-		targets.push({ id: `local:${path}`, name: extensionDisplay(path).name, current: null, kind: "local" });
+	for (const extension of session.extensions) {
+		if (plugins.some(p => extension.resolvedPath.startsWith(p.path + "/"))) continue;
+		targets.push({ id: `local:${extension.resolvedPath}`, name: extensionDisplay(extension.path).name, current: null, kind: "local" });
 	}
 	return targets;
 }
