@@ -1,7 +1,6 @@
 /** Bun-only bootstrap. OMP owns both the agent loop and the public RPC protocol.
- * fd 3 is an inherited, private management pipe; it is never a network endpoint.
+ * The inherited Node IPC channel is private; it is never a network endpoint.
  */
-import { createReadStream, createWriteStream } from "node:fs";
 import { getPluginsNodeModules } from "@oh-my-pi/pi-utils";
 import { relative, isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -10,12 +9,11 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { runRpcMode } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import { RpcDecoder, encodeFrame } from "../dist/server/omp/rpc.js";
 
-const input = createReadStream("", { fd: 3, autoClose: false });
-const output = createWriteStream("", { fd: 3, autoClose: false });
+if (!process.send) throw new Error("OMP management IPC is required");
 let writes = Promise.resolve();
 function send(frame) {
 	writes = writes.then(async () => {
-		for (const line of encodeFrame(frame)) await new Promise((resolve, reject) => output.write(line, error => error ? reject(error) : resolve()));
+		for (const line of encodeFrame(frame)) await new Promise((resolve, reject) => process.send(line, error => error ? reject(error) : resolve()));
 	});
 	return writes;
 }
@@ -24,7 +22,6 @@ const hostCalls = new Map();
 let session, creation;
 let messageRevision = 0;
 const decoder = new RpcDecoder(frame => {
-	console.error("[DEBUG-omp] receive", frame.type);
 	if (frame.type === "webui_init") { initialized.resolve(frame); return; }
 	if (frame.type === "host_tool_result" || frame.type === "host_tool_update") {
 		const pending = hostCalls.get(frame.id);
@@ -33,11 +30,17 @@ const decoder = new RpcDecoder(frame => {
 		else { hostCalls.delete(frame.id); pending.cleanup(); frame.isError ? pending.reject(new Error(frame.result.content?.map(c => c.text ?? "").join("\n") || "Remote tool failed")) : pending.resolve(frame.result); }
 		return;
 	}
-	void manage(frame).then(data => { console.error("[DEBUG-omp] complete", frame.type); return send({ type: "response", command: frame.type, id: frame.id, success: true, data }); }, error => send({ type: "response", command: frame.type, id: frame.id, success: false, error: error.message })).catch(() => process.exit(1));
+	void manage(frame).then(data => send({ type: "response", command: frame.type, id: frame.id, success: true, data }), error => send({ type: "response", command: frame.type, id: frame.id, success: false, error: error.message })).catch(() => process.exit(1));
 });
-input.on("data", chunk => { try { decoder.push(chunk); } catch (error) { console.error(error.message); process.exit(1); } });
-input.on("error", error => { console.error(error.message); process.exit(1); });
-input.on("end", () => { void Promise.resolve(session?.dispose()).finally(() => process.exit(0)); });
+process.on("message", message => {
+	try {
+		if (typeof message !== "string") throw new Error("Invalid OMP management frame");
+		decoder.push(Buffer.from(message));
+	} catch { process.exit(1); }
+});
+process.on("disconnect", () => { void Promise.resolve(session?.dispose()).finally(() => process.exit(0)); });
+// Tell the parent that the management listener is installed before it sends init.
+await send({ type: "webui_control_ready" });
 
 function remoteTool(definition) {
 	return { ...definition, execute: (toolCallId, args, update, _context, signal) => new Promise((resolve, reject) => {

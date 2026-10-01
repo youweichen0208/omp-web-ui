@@ -7,7 +7,7 @@
 Node/Electron 负责 HTTP、WebSocket、PTY、文件和 SSH。每个会话由一个内置 Bun 子进程运行 Oh My Pi，Node 不加载 OMP 的运行时代码。`server/omp/` 是宿主接口；`omp-worker/` 是 Bun 入口。
 
 - `session.mjs` 调用 OMP 公开的 `createAgentSession` 与 `runRpcMode`，无需预先配置模型即可进入首次设置。
-- stdin/stdout 使用 OMP RPC v2；工具回调与交互响应采用官方协议。继承的 fd 3 是私有管理管道，承担初始化、历史投影、应用自定义消息和工具开关，不监听网络。
+- stdin/stdout 使用 OMP RPC v2；工具回调与交互响应采用官方协议。继承的 Node IPC 通道使用 JSON 序列化，承担初始化、历史投影、应用自定义消息和工具开关，不监听网络。管理消息仍经过分块和大小校验；避免 Windows 下将双向管道同时交给 fs.ReadStream/WriteStream 导致响应停滞。
 - Bun 二进制从本包依赖解析，不能依赖用户 PATH。插件管理需要的 `bun` 名称由应用配置目录中的 runtime-bin 提供。
 - RPC 有启动/请求超时、帧大小限制、分块校验、UTF-8 增量解码；进程失败拒绝挂起请求，关闭时先终止再强制退出。
 - `compat.mjs` 修正固定 OMP 版本中 ratchet/prelude 的 Bun 模块解析冲突，以及 Windows 跨盘配置根目录的 join/resolve 差异。升级依赖时验证是否仍需要该补丁，禁止修改用户或 node_modules 中的源文件。

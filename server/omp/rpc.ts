@@ -1,7 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { StringDecoder } from "node:string_decoder";
-import type { Duplex } from "node:stream";
 import { ompEnvironment, ompRuntimePaths } from "./paths.js";
 
 export type Frame = Record<string, unknown> & { type: string; id?: string };
@@ -81,28 +80,33 @@ export class OmpRpc {
 	private readyTimer: ReturnType<typeof setTimeout>;
 	private stderr = "";
 	private exitPromise: Promise<void>;
-	private control?: Duplex;
+	private hasControl = false;
+	private initialization?: Record<string, unknown>;
 	private restricted = false;
 	private failureKill?: ReturnType<typeof setTimeout>;
 
 	constructor(options: { cwd: string; agentDir?: string; args?: string[]; executable?: string; entry?: string; init?: Record<string, unknown> }) {
 		const paths = options.executable && options.entry ? { bun: options.executable, cli: options.entry } : ompRuntimePaths();
 		this.child = spawn(paths.bun, [paths.cli, "--mode", "rpc-ui", ...(options.args ?? [])], {
-			cwd: options.cwd, env: ompEnvironment(options.agentDir), stdio: options.init ? ["pipe", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"], windowsHide: true,
-		});
+			cwd: options.cwd, env: ompEnvironment(options.agentDir), stdio: options.init ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"], serialization: "json", windowsHide: true,
+		}) as ChildProcessWithoutNullStreams;
 		this.readyTimer = setTimeout(() => this.fail(new Error("OMP startup timed out")), 60_000);
 		const decoder = new RpcDecoder((frame) => this.receive(frame));
 		this.child.stdout.on("data", (chunk: Buffer) => { try { decoder.push(chunk); } catch (error) { this.fail(error as Error); } });
 		this.child.stdout.on("end", () => { try { decoder.end(); } catch (error) { if (!this.stopping) this.fail(error as Error); } });
 		this.child.stderr.on("data", (chunk: Buffer) => { this.stderr = (this.stderr + chunk.toString()).slice(-8192); });
 		if (options.init) {
+			this.initialization = options.init;
 			this.restricted = options.init.restricted === true;
-			this.control = this.child.stdio[3] as Duplex;
+			this.hasControl = true;
 			const controlDecoder = new RpcDecoder((frame) => this.receive(frame));
-			this.control.on("data", (chunk: Buffer) => { try { controlDecoder.push(chunk); } catch (error) { this.fail(error as Error); } });
-			this.control.on("error", (error) => { if (!this.stopping) this.fail(error); });
-			this.control.on("end", () => { try { controlDecoder.end(); } catch (error) { if (!this.stopping) this.fail(error as Error); } });
-			void this.send({ type: "webui_init", ...options.init }).catch((error: Error) => this.fail(error));
+			this.child.on("message", (message: unknown) => {
+				try {
+					if (typeof message !== "string") throw new Error("Invalid OMP management frame");
+					controlDecoder.push(Buffer.from(message));
+				} catch (error) { this.fail(error as Error); }
+			});
+			this.child.on("disconnect", () => { if (!this.stopping) this.fail(new Error("OMP management channel closed")); });
 		}
 		this.child.stdin.on("error", (error) => { if (!this.stopping) this.fail(error); });
 		this.child.on("error", (error) => this.fail(error));
@@ -120,7 +124,11 @@ export class OmpRpc {
 	}
 	subscribe(listener: (frame: Frame) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
 	private receive(frame: Frame): void {
-		if (frame.type === "ready") {
+		if (frame.type === "webui_control_ready" && this.initialization) {
+			const init = this.initialization;
+			this.initialization = undefined;
+			void this.send({ type: "webui_init", ...init }).catch((error: Error) => this.fail(error));
+		} else if (frame.type === "ready") {
 			if (!Array.isArray(frame.supportedProtocolVersions) || !frame.supportedProtocolVersions.includes(2)) { this.fail(new Error("OMP RPC protocol 2 is required")); return; }
 			clearTimeout(this.readyTimer); this.readyResolve();
 		} else if (frame.type === "response" && frame.id) {
@@ -144,10 +152,14 @@ export class OmpRpc {
 	send(frame: Frame): Promise<void> {
 		if (this.closed || this.stopping) return Promise.reject(new Error("OMP process is closed"));
 		const lines = encodeFrame(frame);
-		const output = (frame.type.startsWith("webui_") || (this.restricted && frame.type.startsWith("host_tool_"))) && this.control ? this.control : this.child.stdin;
+		const control = this.hasControl && (frame.type.startsWith("webui_") || (this.restricted && frame.type.startsWith("host_tool_")));
 		const write = this.writes.then(async () => {
 			if (this.closed || this.stopping) throw new Error("OMP process is closed");
-			for (const line of lines) await new Promise<void>((resolve, reject) => output.write(line, (error) => error ? reject(error) : resolve()));
+			for (const line of lines) await new Promise<void>((resolve, reject) => {
+				const done = (error: Error | null | undefined) => error ? reject(error) : resolve();
+				if (control) this.child.send(line, done);
+				else this.child.stdin.write(line, done);
+			});
 		});
 		this.writes = write.catch(() => {});
 		return write;

@@ -38,7 +38,4 @@ try {
 	}
 	await worker.request("webui_active_tools", { names: [] }, 10_000);
 	console.log("OMP bootstrap: unconfigured environment and remote-only tool isolation passed");
-} catch (error) {
-	console.error(worker.stderr.split("\n").filter(line => line.startsWith("[DEBUG-omp]")).join("\n"));
-	throw error;
 } finally { await worker.dispose(); rmSync(clean, { recursive: true, force: true }); }

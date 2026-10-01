@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, feat/omp-migration]
+    branches: [main, develop]
   pull_request:
     branches: [main, develop]
 
