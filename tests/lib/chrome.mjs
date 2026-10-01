@@ -1,7 +1,7 @@
 /**
  * 浏览器 E2E 测试用的 Chrome 可执行文件探测。
  * 路径不再写死本机（旧常量是 macOS 专属的 playwright 缓存路径）：
- * 1. 环境变量 OMP_WEB_CHROME 最优先；
+ * 1. 环境变量 PI_WEB_CHROME 最优先；
  * 2. 常见平台默认位置逐个探测，取第一个存在的。
  */
 import { existsSync } from "node:fs";
@@ -23,4 +23,4 @@ const CANDIDATES = [
 ];
 
 export const CHROME_PATH =
-	process.env.OMP_WEB_CHROME ?? CANDIDATES.find((p) => existsSync(p)) ?? "";
+	process.env.PI_WEB_CHROME ?? CANDIDATES.find((p) => existsSync(p)) ?? "";

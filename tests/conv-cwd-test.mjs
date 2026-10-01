@@ -36,7 +36,7 @@ try {
 }
 const server = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,
-	env: { ...process.env, PORT: String(PORT), OMP_WEB_CWD: A, OMP_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-cwd-data-")), OMP_WEB_AGENT_DIR: mkdtempSync(join(tmpdir(), "pi-cwd-agent-")) },
+	env: { ...process.env, PORT: String(PORT), PI_WEB_CWD: A, PI_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-cwd-data-")), PI_CODING_AGENT_DIR: mkdtempSync(join(tmpdir(), "pi-cwd-agent-")) },
 	stdio: "ignore",
 });
 for (let i = 0; i < 40 && !(await portUp(PORT)); i++) await sleep(250);
@@ -92,7 +92,7 @@ const waitFor = async (pred, what, timeout = 8000) => {
 ws.on("open", () => {
 	ws.send(JSON.stringify({ type: "hello", clientId }));
 });
-await waitFor(() => snapshot !== null, "initial snapshot", 60000);
+await waitFor(() => snapshot !== null, "initial snapshot");
 
 // --- conv1 in A (server cwd) ---
 check("conv1 cwd = A", snapshot?.cwd === A, snapshot?.cwd);

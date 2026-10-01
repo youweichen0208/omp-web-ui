@@ -78,8 +78,8 @@ function makeCtx(opts: {
 describe("buildAttachmentMessages — 编辑重问附件恢复", () => {
 	it("新 fileData 上传的 aside 卡带 upload:true（供按路径恢复）", async () => {
 		const dataDir = tempDir();
-		const oldDataDir = process.env.OMP_WEB_DATA_DIR;
-		process.env.OMP_WEB_DATA_DIR = dataDir;
+		const oldDataDir = process.env.PI_WEB_DATA_DIR;
+		process.env.PI_WEB_DATA_DIR = dataDir;
 		try {
 			const notices: { level: string; text: string }[] = [];
 			const ctx = makeCtx({ dataDir, cwd: tempDir(), notices });
@@ -103,15 +103,15 @@ describe("buildAttachmentMessages — 编辑重问附件恢复", () => {
 			);
 			expect(out[0].message.content[0].text).toContain("hello world");
 		} finally {
-			if (oldDataDir === undefined) delete process.env.OMP_WEB_DATA_DIR;
-			else process.env.OMP_WEB_DATA_DIR = oldDataDir;
+			if (oldDataDir === undefined) delete process.env.PI_WEB_DATA_DIR;
+			else process.env.PI_WEB_DATA_DIR = oldDataDir;
 		}
 	});
 
 	it("恢复的 uploadPath 从 uploads 目录重读字节、按同路径附加", async () => {
 		const dataDir = tempDir();
-		const oldDataDir = process.env.OMP_WEB_DATA_DIR;
-		process.env.OMP_WEB_DATA_DIR = dataDir;
+		const oldDataDir = process.env.PI_WEB_DATA_DIR;
+		process.env.PI_WEB_DATA_DIR = dataDir;
 		try {
 			const clientId = "edit-client";
 			// 先真正落一个上传文件，模拟“之前 prompt 上传过”
@@ -139,15 +139,15 @@ describe("buildAttachmentMessages — 编辑重问附件恢复", () => {
 			expect(out[0].message.details.path).toBe(abs.replace(/\\/g, "/"));
 			expect(out[0].message.content[0].text).toContain('size="5"');
 		} finally {
-			if (oldDataDir === undefined) delete process.env.OMP_WEB_DATA_DIR;
-			else process.env.OMP_WEB_DATA_DIR = oldDataDir;
+			if (oldDataDir === undefined) delete process.env.PI_WEB_DATA_DIR;
+			else process.env.PI_WEB_DATA_DIR = oldDataDir;
 		}
 	});
 
 	it("恢复的 uploadPath 越出本客户端 uploads 目录 → 拒绝 + notice", async () => {
 		const dataDir = tempDir();
-		const oldDataDir = process.env.OMP_WEB_DATA_DIR;
-		process.env.OMP_WEB_DATA_DIR = dataDir;
+		const oldDataDir = process.env.PI_WEB_DATA_DIR;
+		process.env.PI_WEB_DATA_DIR = dataDir;
 		try {
 			// 别的客户端目录里的文件
 			const other = saveUpload("other-client", "x.txt", Buffer.from("x"), dataDir);
@@ -165,15 +165,15 @@ describe("buildAttachmentMessages — 编辑重问附件恢复", () => {
 				true,
 			);
 		} finally {
-			if (oldDataDir === undefined) delete process.env.OMP_WEB_DATA_DIR;
-			else process.env.OMP_WEB_DATA_DIR = oldDataDir;
+			if (oldDataDir === undefined) delete process.env.PI_WEB_DATA_DIR;
+			else process.env.PI_WEB_DATA_DIR = oldDataDir;
 		}
 	});
 
 	it("恢复的 uploadPath 文件已被清理 → notice + 跳过", async () => {
 		const dataDir = tempDir();
-		const oldDataDir = process.env.OMP_WEB_DATA_DIR;
-		process.env.OMP_WEB_DATA_DIR = dataDir;
+		const oldDataDir = process.env.PI_WEB_DATA_DIR;
+		process.env.PI_WEB_DATA_DIR = dataDir;
 		try {
 			const notices: { level: string; text: string }[] = [];
 			const ctx = makeCtx({ dataDir, cwd: tempDir(), clientId: "edit-client", notices });
@@ -189,8 +189,8 @@ describe("buildAttachmentMessages — 编辑重问附件恢复", () => {
 			expect(out.length).toBe(0);
 			expect(notices.some((n) => /已被清理或不可读/.test(n.text))).toBe(true);
 		} finally {
-			if (oldDataDir === undefined) delete process.env.OMP_WEB_DATA_DIR;
-			else process.env.OMP_WEB_DATA_DIR = oldDataDir;
+			if (oldDataDir === undefined) delete process.env.PI_WEB_DATA_DIR;
+			else process.env.PI_WEB_DATA_DIR = oldDataDir;
 		}
 	});
 

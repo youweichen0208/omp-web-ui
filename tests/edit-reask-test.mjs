@@ -1,5 +1,5 @@
 /* Smoke test for edit-and-re-ask (edit_message → runtime.fork → re-prompt).
- * Needs a server on PORT=8791 with OMP_WEB_DATA_DIR and a temp agent dir that
+ * Needs a server on PORT=8791 with PI_WEB_DATA_DIR and a temp agent dir that
  * has a dummy auth.json (the user message is appended before the API call, so
  * the fork mechanics are testable even though the real call fails).
  */

@@ -1,5 +1,5 @@
 /**
- * Skill-invocation block parsing — mirrors the OMP runtime's `parseSkillBlock`
+ * Skill-invocation block parsing — mirrors the pi SDK's `parseSkillBlock`
  * (dist/core/agent-session.js). When the user sends `/skill:name args`, the
  * SDK expands the prompt text into:
  *

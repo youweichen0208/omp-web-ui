@@ -1,16 +1,16 @@
-# omp-web-ui Electron 打包配置
+# pi-web-ui Electron 打包配置
 # 构建：npm run build:electron 或 npm run build:electron:mac / :win / :linux
 # 推送 v* 标签后由 release-desktop.yml 构建并发布到 GitHub Releases。
 
 appId: com.youweichen.pi-web-ui
-productName: OMP
+productName: pi
 copyright: Copyright © 2026 youweichen
 
 # electron-builder 26.x 起，没有显式配置时 executableName 会从 package.json 的
 # "name" 字段推导（不是 productName），而我们的 "name" 是带 scope 的 npm 包名
-# "@youweichen/omp-web-ui" —— 25.x 之前没这个问题，是这次升级到 26.15.3 才炸出来的。
+# "@youweichen/pi-web-ui" —— 25.x 之前没这个问题，是这次升级到 26.15.3 才炸出来的。
 # 显式指定成 productName 同一个值，避免再从 package.json 的 name 推导。
-executableName: OMP
+executableName: pi
 
 directories:
   output: release
@@ -58,18 +58,9 @@ files:
   # Cowork 在仓库根建的目录，可能装着随手生成的文件，别跟着 app 发出去
   - "!Claude outputs/**"
 
-# OMP 原生模块由 Bun 加载；打包前只运行 npm run rebuild:electron 重建 node-pty。
-npmRebuild: false
-
-# The npm binary is named .exe even on POSIX, which default dependency filters omit.
-extraResources:
-  - from: node_modules/bun/bin/bun.exe
-    to: app/runtime/bun.exe
-  - from: node_modules/@oh-my-pi/pi-coding-agent/CHANGELOG.md
-    to: app/node_modules/@oh-my-pi/pi-coding-agent/CHANGELOG.md
-  # Native tools load .d.ts files as text assets at runtime; retain source assets.
-  - from: node_modules/@oh-my-pi/pi-coding-agent/src
-    to: app/node_modules/@oh-my-pi/pi-coding-agent/src
+# 原生模块：electron-builder 自动 rebuild（node-pty 等）
+# 不需要额外配置，默认行为就是 rebuild
+npmRebuild: true
 
 # 图标：build/icon.png（1024x1024）。electron-builder 会自动为各平台生成
 # .icns / .ico，不需要手动提供平台专属格式。
@@ -135,13 +126,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: OMP
+  shortcutName: pi
   artifactName: "${productName}-${version}-setup-x64.${ext}"
 
-# Linux: preserve the installed Debian package identity across the product rename.
-deb:
-  packageName: pi
-
+# Linux
 linux:
   target:
     - target: AppImage
@@ -154,10 +142,10 @@ linux:
   artifactName: "${productName}-${version}-linux-${arch}.${ext}"
 
 # 发布：push v* tag 时由 .github/workflows/release-desktop.yml 触发，
-# 三平台先构建并验证，上传 draft 后由最终 job 公开 GitHub Release
+# 三平台各自 electron-builder build --publish always 上传到 GitHub Releases
 # （GITHUB_TOKEN 自带，workflow 里已经给了 contents: write 权限，不用额外配置）。
 publish:
   provider: github
   owner: youweichen0208
-  repo: omp-web-ui
-  releaseType: draft
+  repo: pi-web-ui
+  releaseType: release

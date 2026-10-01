@@ -50,13 +50,21 @@ Windows ConPTY 关闭终端时还有一个 node-pty 1.1.0 竞态：console-list 
 
 ## 终端活力检测（liveness watchdog）
 
-`terminals.ts` 的 `noteAgentActivity` / `armIdleWatch` + agent-service 的 `notifyTerminalIdle`：agent 工具路径的 terminal_create/input/key 会启动一个「静默纪元」——该终端连续 `OMP_WEB_TERMINAL_IDLE_MS`（默认 15s）无输出且**该对话正在流式运行**时，经 onAgentIdle 回调由宿主 `sendUserMessage` 注入一条 steer 提醒唤醒 AI 去检查（等输入/已挂起）。
+`terminals.ts` 的 `noteAgentActivity` / `armIdleWatch` + agent-service 的 `notifyTerminalIdle`：agent 工具路径的 terminal_create/input/key 会启动一个「静默纪元」——该终端连续 `PI_WEB_TERMINAL_IDLE_MS`（默认 15s）无输出且**该对话正在流式运行**时，经 onAgentIdle 回调由宿主 `sendUserMessage` 注入一条 steer 提醒唤醒 AI 去检查（等输入/已挂起）。
 
 防骚扰设计：①用户手开的终端永不参与（只有工具包装层调 noteAgentActivity，浏览器路径不调）；②一次性——触发后解除武装，agent 再次触碰才重新计时；③纪元内任何输出/输入都重置倒计时；④退出/关闭即拆钟。系统提示词引导 TERMINAL_TOOLS_GUIDANCE 已告知模型该机制。回归：`tests/terminal-idle-test.mjs`（直接实例化 TerminalManager + 小阈值，零 token 不起 server；win32 未验证）。
 
-## 原生 bash 与持久终端
+## 终端接管 bash（terminal-backed bash）
 
-OMP 执行原生 bash，应用不覆盖它。需要持续 shell 状态时使用应用的 terminal_create/run/read/key/close 工具，其输出仍在终端面板可见。旧 terminalBash 配置只保留协议兼容，不再显示开关或接管原生 bash。
+设置面板开关 `terminalBash`（默认关）。`terminals.ts` 的 `makeTerminalBashTool` + agent-service 的 `makeAdaptiveBashTool` 动态分流：开启后 bash 工具的执行体改为往持久可见终端 `ai-bash` 写命令（单行哨兵技术：`{cmd}; __pi_rc=$?; printf '\\n[pi-exit:%s]\\n' "$__pi_rc"`，多行脚本经 `$'...'` 转义 eval，避免被交互 shell 的 stdin/bracketed-paste 吃掉），等哨兵行拿到**真实退出码**后返回完整输出（`stripAnsi` 清理 ANSI/OSC/孤立 CR、截掉回显与新提示符）。
+
+行为语义：
+- ①默认阻塞到命令结束
+- ②连续 `terminalBashIdleMs`（默认 15s，0=一直等）无输出 → **静默解阻**：立即返回「仍在后台运行」+ 已有输出，同时注册 `watchOutput` 完成观察器，命令真正结束后由宿主 `notifyTerminalBashDone` 通知 AI（流式中 sendUserMessage steer / 空闲时 sendCustomMessage nextTurn 排队不唤醒）
+- ③shell 状态跨调用保留（cd/venv/ssh）
+- ④abort_bash 复用同一 kills 集合，abort 时向 PTY 发 Ctrl+C 杀前台进程、终端保留
+
+开关经 makeAdaptiveBashTool 在每次调用时读取设置 → 即时生效（customTools 固定于 runtime 创建，不能创建时二选一）；阈值随预设存取。回归：`tests/terminal-bash-test.mjs`（直接实例化 + 小阈值注入，零 token 不起 server；win32 未验证）。
 
 ## macOS launchd / TCC 问题
 
@@ -64,7 +72,7 @@ macOS 下若服务由 launchd 拉起（`process.ppid === 1`，LaunchAgent/孤儿
 
 ## Windows shell 解析
 
-`terminals.ts` 的 `resolveShell()` 每次创建终端时解析，优先 bash——`OMP_WEB_SHELL` 显式 → `$SHELL` → Git Bash（ProgramFiles）→ busybox 兜底（`~/.omp-web/bin/bash.exe`，`ensure-bash.ts` 无 Git Bash 时自动下载 busybox-w32）→ `$COMSPEC` → powershell。与 SDK bash 工具（Git Bash / PATH 上的 bash）保持一致，避免 PowerShell/bash 混用挂死。
+`terminals.ts` 的 `resolveShell()` 每次创建终端时解析，优先 bash——`PI_WEB_SHELL` 显式 → `$SHELL` → Git Bash（ProgramFiles）→ busybox 兜底（`~/.pi-web/bin/bash.exe`，`ensure-bash.ts` 无 Git Bash 时自动下载 busybox-w32）→ `$COMSPEC` → powershell。与 SDK bash 工具（Git Bash / PATH 上的 bash）保持一致，避免 PowerShell/bash 混用挂死。
 
 底栏通过 `get_git_branch` / `git_branch` 显示当前工作区分支，替代费用显示。查询仅执行 `symbolic-ref`（分离 HEAD 时回退短提交号），不扫描文件状态；复用 Git 目录 watcher，在切换工作区、Git 变化或窗口重新聚焦时刷新。结果携带 cwd 防止串项目，非仓库显示 `—`。回归：`tests/footer-branch-test.mjs`。
 
@@ -72,4 +80,4 @@ macOS 下若服务由 launchd 拉起（`process.ppid === 1`，LaunchAgent/孤儿
 
 一次性 bash 在所有平台注入显式超时和后台执行指导。POSIX/SSH 启动服务时使用 `cd /path || exit; nohup command </dev/null > /tmp/service.log 2>&1 &`，再执行有超时的健康检查。不要将 `cd … && nohup …` 整个 AND 列表放到后台：外层 shell 可能持续持有 SSH 输出管道，导致服务已启动、探测已完成，但 SSH 和工具一直不结束。`nohup` 本身不能解决继承的管道；使用命令组时需重定向整个后台组。该约束是模型执行指导，不会自动改写用户命令。
 
-一次性 bash 的超时及取消由 OMP 原生实现负责；应用额外保留会话级工具看门狗。流式 HTTP 探测应使用 curl --max-time，head -c 不能保证上游连接结束。
+一次性 bash 由服务端兜底 120 秒超时（`server/bounded-bash.ts`），模型显式设置的 timeout 保留，用于较长构建。超时通过 SDK 返回工具错误并终止本机命令树；不会自动清理远端服务。持久终端接管 bash 仍走其原有静默解阻逻辑。流式 HTTP 探测应使用 `curl --max-time`，`head -c` 不能保证上游连接结束。

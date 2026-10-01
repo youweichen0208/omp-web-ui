@@ -15,7 +15,7 @@ let ws;
 const dataDir = mkdtempSync(join(tmpdir(), "steer-queue-"));
 const fakeAgentDir = mkdtempSync(join(tmpdir(), "steer-agent-"));
 mkdirSync(join(fakeAgentDir, "skills"), { recursive: true });
-writeFileSync(join(fakeAgentDir, "models.yml"), JSON.stringify({}), "utf8");
+writeFileSync(join(fakeAgentDir, "models.json"), JSON.stringify({}), "utf8");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -23,7 +23,7 @@ async function connect() {
 	const { default: WebSocket } = await import("ws");
 	return new Promise((resolve, reject) => {
 		ws = new WebSocket(URL);
-		const timer = setTimeout(() => reject(new Error("no ready")), 60000);
+		const timer = setTimeout(() => reject(new Error("no ready")), 8000);
 		ws.on("open", () => {
 			ws.send(JSON.stringify({ type: "hello", clientId: "smoke" }));
 		});
@@ -53,9 +53,9 @@ try {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			OMP_WEB_DATA_DIR: dataDir,
-			OMP_WEB_AGENT_DIR: fakeAgentDir,
-			OMP_WEB_CWD: dataDir,
+			PI_WEB_DATA_DIR: dataDir,
+			PI_CODING_AGENT_DIR: fakeAgentDir,
+			PI_WEB_CWD: process.cwd(),
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});

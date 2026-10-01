@@ -3,22 +3,22 @@
 ## CLI
 
 ```bash
-omp-web-ui --port 9000 --cwd /path          # 前台
-omp-web-ui install <源> [--name --force --data-dir]  # 安装 GitHub 界面插件到 <dataDir>/plugins/
+pi-web-ui --port 9000 --cwd /path          # 前台
+pi-web-ui install <源> [--name --force --data-dir]  # 安装 GitHub 界面插件到 <dataDir>/plugins/
 #                                源: owner/repo · https://github.com/o/r[/tree/分支/子目录] · #分支 · 本地目录；刷新浏览器即生效
-omp-web-ui plugins / uninstall <id>          # 列出 / 卸载界面插件
-omp-web-ui plugins --check-updates          # 逐个对比远端 HEAD，列出可更新插件
-omp-web-ui plugins --rollback <id>          # 回滚到最近一份更新前备份（<dataDir>/plugin-backups/）
-omp-web-ui server install [--port --cwd --data-dir --name]   # 开机自启：
+pi-web-ui plugins / uninstall <id>          # 列出 / 卸载界面插件
+pi-web-ui plugins --check-updates          # 逐个对比远端 HEAD，列出可更新插件
+pi-web-ui plugins --rollback <id>          # 回滚到最近一份更新前备份（<dataDir>/plugin-backups/）
+pi-web-ui server install [--port --cwd --data-dir --name]   # 开机自启：
                                            #   macOS→launchd（无需 sudo）
                                            #   Linux→systemd（自动 sudo）
                                            #   Windows→计划任务（登录自启，隐藏窗口无黑窗）
-omp-web-ui server shortcut [--port --cwd --data-dir --name]  # 桌面「一键启动」图标（启动服务并打开浏览器）：
+pi-web-ui server shortcut [--port --cwd --data-dir --name]  # 桌面「一键启动」图标（启动服务并打开浏览器）：
                                            #   Windows→桌面 .lnk（WScript.Shell COM，OneDrive 安全；服务未运行则在本
                                            #     隐藏窗口前台启动并记录 PID，server stop/uninstall 可止停）
                                            #   macOS→桌面 .command 双击启动器（已装 launchd 则 kickstart，否则终端前台）
-                                           #   Linux→桌面 .desktop 图标 + ~/.local/share/omp-web-ui 启动脚本（systemctl 优先）
-omp-web-ui server status|restart|stop|uninstall
+                                           #   Linux→桌面 .desktop 图标 + ~/.local/share/pi-web-ui 启动脚本（systemctl 优先）
+pi-web-ui server status|restart|stop|uninstall
 # Docker：docker-compose.yml（端口映射 + 挂载数据目录）
 ```
 
@@ -26,9 +26,9 @@ omp-web-ui server status|restart|stop|uninstall
 
 ## Windows 下载选择
 
-- `OMP-<版本>-setup-x64.exe`：安装版，包含安装向导、安装目录选择，以及桌面和开始菜单快捷方式。
-- `OMP-<版本>-win-x64.exe`：免安装便携版，双击直接启动，没有安装向导，也不自动创建快捷方式。
-- `OMP-<版本>-win-x64.zip`：解压后运行 `OMP.exe`。
+- `pi-<版本>-setup-x64.exe`：安装版，包含安装向导、安装目录选择，以及桌面和开始菜单快捷方式。
+- `pi-<版本>-win-x64.exe`：免安装便携版，双击直接启动，没有安装向导，也不自动创建快捷方式。
+- `pi-<版本>-win-x64.zip`：解压后运行 `pi.exe`。
 
 Windows 打包使用 `win.signExecutable: false` 跳过签名，保留 EXE 图标和产品信息写入；不要设置 `signAndEditExecutable: false`，它会连资源编辑一起禁用。安装器、卸载器和应用使用 `build/icon.ico` 的紫色 π 图标。
 
@@ -36,7 +36,7 @@ Windows 打包使用 `win.signExecutable: false` 跳过签名，保留 EXE 图�
 
 不进 npm 发布包（`package.json` `files` 不含 `electron/`/`build/`）——桌面版走自己的发布渠道：
 push 一个 `v*` tag，`.github/workflows/release-desktop.yml` 会在 mac/win/linux 真机 runner 上
-各自构建、执行包内运行时验证后将产物传到 draft，全部通过后公开到 [GitHub Releases](https://github.com/youweichen0208/omp-web-ui/releases)
+各自构建并 `--publish always` 传到 [GitHub Releases](https://github.com/youweichen0208/pi-web-ui/releases)
 （`electron-builder.yml` 里 `publish: provider: github` 已经配好，用的是 CI 自带的
 `GITHUB_TOKEN`，不需要额外配 secrets；当前不签名）。本地手动构建命令如下：
 
@@ -59,16 +59,16 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
-- 通过 stdout 里的 `⚡ omp-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
+- 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
   判断 server 就绪，再让 `BrowserWindow` 加载 `http://127.0.0.1:{随机空闲端口}`。
 - 子进程意外退出后，主进程在同一端口最多重启 3 次（间隔 1/2/4 秒），窗口保留原 URL，
   WebSocket 会自行重连；三次均失败时显示错误弹窗。退出应用时不会触发重启。
-- `OMP_WEB_PKG_ROOT` 告诉 server 去哪找 `web/dist`（打包后指向
+- `PI_WEB_PKG_ROOT` 告诉 server 去哪找 `web/dist`（打包后指向
   `process.resourcesPath`，即 `electron-builder.yml` 里 `extraResources` 复制的
   `dist/`、`web/dist/`、`extensions/`）。
-- `OMP_WEB_DATA_DIR` 桌面版单独用 `~/.omp-web-desktop`，和命令行版的 `~/.omp-web` 分开，
+- `PI_WEB_DATA_DIR` 桌面版单独用 `~/.pi-web-desktop`，和命令行版的 `~/.pi-web` 分开，
   避免两边同时跑时抢 `client-state.json` 等运行时状态；对话历史本身走 SDK 的
-  `~/.omp/agent`，两边共享，不受影响。
+  `~/.pi/agent`，两边共享，不受影响。
 - 关闭窗口 → 最小化到托盘（不退出）；托盘菜单可重新打开 / 退出。
 - 桌面窗口共用一条内容顶栏：macOS 隐藏系统标题栏、保留左侧原生红黄绿按钮；
   Windows/Linux 使用无边框窗口和右侧自绘最小化、最大化、关闭按钮。可拖动区域
@@ -89,17 +89,17 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   更新通知。没网络/没新版本时 `checkForUpdates()` 静默失败，不影响正常使用。
 
 注意：这个 Electron 壳子和 CLI 共用同一份 `server/index.ts`，改 server 端代码
-时两边都要重新验证——尤其是 `resolvePkgRoot()`（`OMP_WEB_PKG_ROOT` 覆盖逻辑）和
-启动就绪标记（`⚡ omp-web-ui` 字符串），main.mjs 依赖这两处约定。
+时两边都要重新验证——尤其是 `resolvePkgRoot()`（`PI_WEB_PKG_ROOT` 覆盖逻辑）和
+启动就绪标记（`⚡ pi-web-ui` 字符串），main.mjs 依赖这两处约定。
 
 交叉构建 Windows 版的坑：
 
 - `npmRebuild: true` 会触发 `@electron/rebuild` 用 node-gyp 从源码重编译 `node-pty`；node-gyp **不支持跨平台编译**，在 mac/Linux 上给 Windows target 跑会直接报错 `node-gyp does not support cross-compiling native modules from source`。在真机 Windows 上构建，或者 CI 用 windows runner 时不受影响，正常走 `npmRebuild: true` 即可。
 - 在非 Windows 机器上要出 zip（`-c.npmRebuild=false`）时，跳过的是重编译这一步，实际用的是 `node-pty` 包自带的 `prebuilds/win32-x64/pty.node`（跟 mac 版同理，不是本项目编译的，是 node-pty 官方发布时带的预编译产物）。electron-builder 会自动把 `.node` 原生模块解到 `app.asar.unpacked/`（不进 asar 压缩包），不需要手动配 `asarUnpack`。这条路径下**终端功能在 Windows 上是否正常没有用真机验证过**，其余功能（聊天/文件树/模型管理）不依赖 node-pty，应该没问题。
 - `npm run build:electron:win` 默认的 `nsis`/`portable` 两个 target 要跑 `makensis`，在非 Windows 机器上必须装 `wine`（本仓库开发用的沙箱环境没有 root 权限装不了）——要出正式的安装包，得在真机 Windows 上跑，或者接 GitHub Actions 的 `windows-latest` runner。
-- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/omp-web-ui`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `omp-web-ui`，干净的，不带 scope）。
+- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/pi-web-ui`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `pi-web-ui`，干净的，不带 scope）。
 
-桌面测试可设置 `OMP_WEB_DATA_DIR` 指向临时数据目录；未设置时继续使用 `~/.omp-web-desktop`。Chromium 配置可用 `--user-data-dir` 隔离。
+桌面测试可设置 `PI_WEB_DATA_DIR` 指向临时数据目录；未设置时继续使用 `~/.pi-web-desktop`。Chromium 配置可用 `--user-data-dir` 隔离。
 
 桌面文件编辑与 Web 共用右栏组件。关闭窗口到托盘保留草稿；退出或刷新遇到未保存内容时，主进程通过 `will-prevent-unload` 显示原生放弃确认，取消后服务继续运行。
 

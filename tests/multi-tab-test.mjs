@@ -34,9 +34,9 @@ const server = spawn(NODE, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		OMP_WEB_DATA_DIR: dataDir,
-		OMP_WEB_CWD: workdir,
-		OMP_WEB_AGENT_DIR: agentDir,
+		PI_WEB_DATA_DIR: dataDir,
+		PI_WEB_CWD: workdir,
+		PI_CODING_AGENT_DIR: agentDir,
 	},
 	stdio: ["ignore", "inherit", "inherit"],
 	windowsHide: true,
@@ -80,7 +80,7 @@ const waitChatReady = (page) =>
 
 try {
 	await waitReady();
-	if (!CHROME_PATH) throw new Error("no Chrome found (set OMP_WEB_CHROME)");
+	if (!CHROME_PATH) throw new Error("no Chrome found (set PI_WEB_CHROME)");
 	const browser = await chromium.launch({
 		executablePath: CHROME_PATH,
 		headless: true,

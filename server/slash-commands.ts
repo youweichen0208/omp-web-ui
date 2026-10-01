@@ -12,7 +12,7 @@
  * UI 文案直接中文（服务端 notice 约定）。/help 与 /copy 是纯客户端动作（不到服务端），
  * 保留在目录里供选择器展示，exec 里吞掉防止 SDK 当文本。
  */
-import type { AgentSession } from "./omp/index.js";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ServerMessage, SlashCommandInfo } from "./protocol.js";
 import type { PluginCommandDef } from "./plugins.js";
 
@@ -24,7 +24,6 @@ export interface SlashHost {
 	/** 活动对话的 session。 */
 	getSession: () => AgentSession;
 	startNewSession: () => Promise<void>;
-	reloadSession: () => Promise<void>;
 	setModel: (modelId: string) => Promise<void>;
 	setCwd: (path: string) => Promise<void>;
 	setThinking: (level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") => void;
@@ -66,7 +65,7 @@ export const NATIVE_COMMANDS: {
 	{ name: "reload", description: "重新加载扩展、技能与模板", descriptionEn: "Reload extensions, skills & templates" },
 	{ name: "help", description: "显示全部命令", descriptionEn: "Show all commands" },
 	{ name: "copy", description: "复制上一条助手回复", descriptionEn: "Copy last assistant reply" },
-	{ name: "omp-web-ui:quit", description: "退出服务", descriptionEn: "Quit server (supervisor will restart)" },
+	{ name: "pi-web-ui:quit", description: "退出服务", descriptionEn: "Quit server (supervisor will restart)" },
 ];
 
 /** Parse a prompt into "/command args" — returns null when it isn't one. */
@@ -99,14 +98,14 @@ export class SlashCommandsService {
 			// Extension commands — the SDK already suffixes collisions with builtin
 			// names ("new:2"), and those still reach the SDK since exec() only
 			// intercepts the exact native names.
-			for (const cmd of s.commands) {
-				if (seen.has(cmd.name)) continue;
+			for (const cmd of s.extensionRunner.getRegisteredCommands()) {
+				if (seen.has(cmd.invocationName)) continue;
 				commands.push({
-					name: cmd.name,
+					name: cmd.invocationName,
 					description: cmd.description,
 					source: "extension",
 				});
-				seen.add(cmd.name);
+				seen.add(cmd.invocationName);
 			}
 			// Prompt templates: /templatename args
 			for (const t of s.promptTemplates) {
@@ -119,7 +118,7 @@ export class SlashCommandsService {
 				seen.add(t.name);
 			}
 			// Skills: /skill:name args
-			for (const skill of s.skills) {
+			for (const skill of s.resourceLoader.getSkills().skills) {
 				const name = `skill:${skill.name}`;
 				if (seen.has(name)) continue;
 				commands.push({
@@ -265,25 +264,28 @@ export class SlashCommandsService {
 				try {
 					// Re-discovers extensions / skills / prompt templates from disk and
 					// re-pushes the picker catalog (the CLI's /reload semantics).
-					await this.host.reloadSession();
+					await this.host.getSession().reload();
 					// reload() 会把 custom 工具加回活跃集——重放设置门控（终端开关等）。
 					this.host.afterReload?.();
 					await this.push();
 					const s = this.host.getSession();
-					const extensions = s.extensions;
-					const skills = s.skills;
-					const prompts = s.promptTemplates;
-					const errors = s.diagnostics;
-
+					const extensions = s.resourceLoader.getExtensions();
+					const skills = s.resourceLoader.getSkills();
+					const prompts = s.resourceLoader.getPrompts();
+					const errors = [
+						...extensions.errors.map((e) => ({ path: e.path, message: e.error })),
+						...skills.diagnostics.filter((d) => d.type === "error").map((d) => ({ path: d.path ?? "", message: d.message })),
+						...prompts.diagnostics.filter((d) => d.type === "error").map((d) => ({ path: d.path ?? "", message: d.message })),
+					];
 					this.host.emit({
 						type: "reload_status", ...context, phase: "done", timestamp: startedAt,
 						durationMs: Date.now() - startedAt,
-						extensions: extensions.length, skills: skills.length,
-						prompts: prompts.length, errors,
+						extensions: extensions.extensions.length, skills: skills.skills.length,
+						prompts: prompts.prompts.length, errors,
 						resources: {
-							extensions: extensions.map((extension) => extension.path),
-							skills: skills.map((skill) => skill.name),
-							prompts: prompts.map((prompt) => prompt.name),
+							extensions: extensions.extensions.map((extension) => extension.path),
+							skills: skills.skills.map((skill) => skill.name),
+							prompts: prompts.prompts.map((prompt) => prompt.name),
 						},
 					});
 				} catch (err) {
@@ -294,11 +296,11 @@ export class SlashCommandsService {
 					});
 				}
 				return true;
-			case "omp-web-ui:quit": {
+			case "pi-web-ui:quit": {
 				this.host.emit({
 					type: "notice",
 					level: "info",
-					text: "正在退出 omp-web-ui… supervisor 将自动重启服务",
+					text: "正在退出 pi-web-ui… supervisor 将自动重启服务",
 				});
 				setTimeout(() => {
 					const didSchedule = this.host.onQuit?.() ?? false;

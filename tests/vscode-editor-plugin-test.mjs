@@ -88,8 +88,8 @@ try {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			OMP_WEB_DATA_DIR: dataDir,
-			OMP_WEB_CWD: workspace,
+			PI_WEB_DATA_DIR: dataDir,
+			PI_WEB_CWD: workspace,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});

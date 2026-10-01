@@ -13,7 +13,7 @@ writeFileSync(join(root, "note.txt"), "before");
 let server, ws;
 try {
 	assert.equal(await portUp(port), false);
-	server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), OMP_WEB_CWD: root, OMP_WEB_DATA_DIR: join(root, "data"), OMP_WEB_AGENT_DIR: join(root, "agent") }, stdio: "ignore" });
+	server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: root, PI_WEB_DATA_DIR: join(root, "data"), PI_CODING_AGENT_DIR: join(root, "agent") }, stdio: "ignore" });
 	for (let n = 0; n < 80 && !(await portUp(port)); n++) await sleep(100);
 	assert.equal(await portUp(port), true);
 	ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
@@ -21,8 +21,8 @@ try {
 	ws.on("message", (wire) => messages.push(JSON.parse(wire)));
 	await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
 	const send = (msg) => ws.send(JSON.stringify(msg));
-	const wait = async (predicate, attempts = 150) => {
-		for (let n = 0; n < attempts; n++) {
+	const wait = async (predicate) => {
+		for (let n = 0; n < 150; n++) {
 			const index = messages.findIndex(predicate);
 			if (index >= 0) return messages.splice(index, 1)[0];
 			await sleep(50);
@@ -30,7 +30,7 @@ try {
 		throw new Error("response timeout");
 	};
 	send({ type: "hello", clientId: "file-editor-protocol" });
-	await wait((m) => m.type === "snapshot", 1200);
+	await wait((m) => m.type === "snapshot");
 	send({ type: "read_file", path: "note.txt", cwd: root, requestId: "r1" });
 	const content = await wait((m) => m.type === "file_content" && m.requestId === "r1");
 	assert.equal(content.cwd, root);

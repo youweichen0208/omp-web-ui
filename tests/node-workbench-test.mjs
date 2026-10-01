@@ -13,7 +13,6 @@ const dataDir = mkdtempSync(join(tmpdir(), "pi-node-test-"));
 const port = 8938;
 const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs1", format: "pem" });
 const mock = await startMockSsh(process.cwd(), port, [utils.parseKey(privateKey)]);
-process.env.OMP_WEB_AGENT_DIR = join(dataDir, "agent");
 const service = new NodeWorkbench(dataDir);
 const events = [];
 const detach = service.attach("client-a", (event) => events.push(event));
@@ -44,7 +43,7 @@ try {
 	assert.equal(opened.event, "result");
 	const conversationId = opened.data.conversationId;
 	const chatState = await call("chat_state", nodeId);
-	assert.equal(chatState.event, "result", JSON.stringify(chatState));
+	assert.equal(chatState.event, "result");
 	assert.equal(chatState.data.conversationId, conversationId);
 	assert.deepEqual(service.chats.get(JSON.stringify(["client-a", nodeId])).session.getActiveToolNames().sort(), ["remote_command", "remote_read", "remote_write"]);
 	assert.equal((await call("terminal_input", nodeId, { data: "hello\r" }, "term-a", conversationId)).event, "result");
@@ -215,10 +214,7 @@ try {
 	assert.equal((await call("credential_test", passwordNode.id, { auth: "password", secret: "secret123" })).event, "result");
 	assert.equal(passwordNode.localAuth, "password");
 	console.log("✓ SSH trust, key change, authentication, terminal command/interrupt/truncation, SFTP and node isolation");
-} catch (error) {
-	console.error("Node workbench test failed:", error);
-	throw error;
 } finally {
 	for (const c of [...service.connections.values()]) await call("disconnect", c.nodeId);
-	await service.dispose(); detach(); mock.close(); rmSync(dataDir, { recursive: true, force: true });
+	service.dispose(); detach(); mock.close(); rmSync(dataDir, { recursive: true, force: true });
 }

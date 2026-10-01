@@ -73,7 +73,7 @@ writeFileSync(
 	JSON.stringify({ main: { type: "api_key", key: "switch-session-test" } }),
 );
 writeFileSync(
-	join(agentDir, "models.yml"),
+	join(agentDir, "models.json"),
 	JSON.stringify({
 		providers: {
 			main: {
@@ -98,9 +98,9 @@ const server = spawn(process.execPath, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		OMP_WEB_DATA_DIR: dataDir,
-		OMP_WEB_CWD: workdir,
-		OMP_WEB_AGENT_DIR: agentDir,
+		PI_WEB_DATA_DIR: dataDir,
+		PI_WEB_CWD: workdir,
+		PI_CODING_AGENT_DIR: agentDir,
 	},
 	stdio: "ignore",
 	windowsHide: true,

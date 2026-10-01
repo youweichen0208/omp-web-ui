@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  omp-web-ui launchd agent — macOS auto-start at login.
+  pi-web-ui launchd agent — macOS auto-start at login.
 
   Install:
-    npm i -g omp-web-ui
-    cp deploy/com.xingshuyin.omp-web-ui.plist ~/Library/LaunchAgents/
-    # edit ProgramArguments / WorkingDirectory / OMP_WEB_CWD for your setup
-    launchctl load ~/Library/LaunchAgents/com.xingshuyin.omp-web-ui.plist
-    # (or: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.xingshuyin.omp-web-ui.plist)
+    npm i -g pi-web-ui
+    cp deploy/com.xingshuyin.pi-web-ui.plist ~/Library/LaunchAgents/
+    # edit ProgramArguments / WorkingDirectory / PI_WEB_CWD for your setup
+    launchctl load ~/Library/LaunchAgents/com.xingshuyin.pi-web-ui.plist
+    # (or: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.xingshuyin.pi-web-ui.plist)
 
-  Find the omp-web-ui binary path with: which omp-web-ui
+  Find the pi-web-ui binary path with: which pi-web-ui
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.xingshuyin.omp-web-ui</string>
+  <string>com.xingshuyin.pi-web-ui</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/omp-web-ui</string>
+    <string>/usr/local/bin/pi-web-ui</string>
   </array>
 
   <key>RunAtLoad</key>
@@ -36,13 +36,13 @@
   <dict>
     <key>PORT</key>
     <string>8787</string>
-    <key>OMP_WEB_CWD</key>
+    <key>PI_WEB_CWD</key>
     <string>/Users/YOUR_USER</string>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/tmp/omp-web-ui.log</string>
+  <string>/tmp/pi-web-ui.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/omp-web-ui.err</string>
+  <string>/tmp/pi-web-ui.err</string>
 </dict>
 </plist>

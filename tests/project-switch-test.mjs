@@ -10,18 +10,17 @@ import { CHROME_PATH } from "./lib/chrome.mjs";
 
 const base = mkdtempSync(join(tmpdir(), "pi-switch-"));
 const agent = join(base, "agent");
-process.env.OMP_WEB_AGENT_DIR = agent;
-const { seedOmpMessages } = await import("./lib/omp-fixtures.mjs");
+process.env.PI_CODING_AGENT_DIR = agent;
+const { SessionManager } = await import("@earendil-works/pi-coding-agent");
 const projects = ["short-a", "short-b", "long-c"].map((name) => join(base, name));
 for (const [i, project] of projects.entries()) {
 	mkdirSync(project, { recursive: true });
 	writeFileSync(join(project, `project-${i}.txt`), `project ${i}`);
-	const messages = [];
+	const session = SessionManager.create(project);
 	for (let n = 0; n < (i === 2 ? 250 : 2); n++) {
-		messages.push({ role: "user", content: [{ type: "text", text: `fixture-${i}-${n}` }], timestamp: Date.now() });
-		messages.push({ role: "assistant", content: [{ type: "text", text: `reply-${i}-${n} ` + "example text ".repeat(40) }], api: "openai-completions", provider: "test", model: "fixture", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() });
+		session.appendMessage({ role: "user", content: [{ type: "text", text: `fixture-${i}-${n}` }], timestamp: Date.now() });
+		session.appendMessage({ role: "assistant", content: [{ type: "text", text: `reply-${i}-${n} ` + "example text ".repeat(40) }], api: "openai-completions", provider: "test", model: "fixture", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() });
 	}
-	seedOmpMessages(project, agent, messages);
 }
 assert.equal(spawnSync("git", ["init", "-q", projects[2]]).status, 0);
 const probe = createServer();
@@ -29,7 +28,7 @@ await new Promise((r) => probe.listen(0, "127.0.0.1", r));
 const port = probe.address().port;
 await new Promise((r) => probe.close(r));
 assert(port >= 8900);
-const server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), OMP_WEB_CWD: projects[0], OMP_WEB_DATA_DIR: join(base, "data"), OMP_WEB_AGENT_DIR: agent }, stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: projects[0], PI_WEB_DATA_DIR: join(base, "data"), PI_CODING_AGENT_DIR: agent }, stdio: ["ignore", "pipe", "pipe"] });
 let logs = ""; server.stderr.on("data", (d) => { logs += d; });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ws, browser;

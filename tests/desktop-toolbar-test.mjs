@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { CHROME_PATH } from './lib/chrome.mjs';
 const data = mkdtempSync(join(tmpdir(), 'pi-toolbar-'));
-mkdirSync(join(data, 'agent', 'extensions'), { recursive: true });
-writeFileSync(join(data, 'agent', 'extensions', 'toolbar-probe.ts'), 'export default function () {}');
 const port = 8957;
-const server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), OMP_WEB_DATA_DIR: data, OMP_WEB_CWD: data, OMP_WEB_AGENT_DIR: join(data, 'agent') }, stdio: 'ignore' });
+const server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: data, PI_WEB_CWD: data, PI_CODING_AGENT_DIR: join(data, 'agent') }, stdio: 'ignore' });
 let browser;
 try {
 	for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) break; } catch {} await new Promise(r => setTimeout(r, 100)); }
@@ -17,8 +15,6 @@ try {
 	mkdirSync('tests/scratch', { recursive: true });
 	for (const platform of ['win32', 'darwin']) {
 		const page = await browser.newPage();
-		page.on("pageerror", error => console.error("Browser error:", error.message));
-		page.setDefaultTimeout(60000);
 		let socket, changeCount = 11;
 		await page.routeWebSocket('**/ws', route => {
 			socket = route;
@@ -98,26 +94,14 @@ try {
 		await page.locator('.sound-menu-summary').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="插件"]').click();
-		const builtin = page.locator('.set-row', { hasText: 'toolbar-probe' });
+		const builtin = page.locator('.set-row', { hasText: 'rpiv-todo · 内置任务清单' });
 		await builtin.waitFor();
 		assert.equal(await builtin.locator('.set-uninstall').count(), 0);
 		assert.equal(await builtin.getByRole('switch').getAttribute('aria-checked'), 'true');
 		await builtin.getByRole('switch').click();
-		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('toolbar-probe') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'false'));
+		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('rpiv-todo · 内置任务清单') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'false'));
 		await builtin.getByRole('switch').click();
-		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('toolbar-probe') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'true'));
-		await page.keyboard.press('Escape');
-		socket.send(JSON.stringify({ type: 'dialog', id: 100, kind: 'input', title: 'First request', args: [''] }));
-		socket.send(JSON.stringify({ type: 'dialog', id: 101, kind: 'editor', title: 'Second request', args: ['line one\nline two'] }));
-		await page.locator('.dialog-title', { hasText: 'First request' }).waitFor();
-		socket.send(JSON.stringify({ type: 'dialog_closed', id: 101 }));
-		assert.equal(await page.locator('.dialog-title').textContent(), 'First request');
-		socket.send(JSON.stringify({ type: 'dialog', id: 102, kind: 'editor', title: 'Third request', args: ['line one\nline two'] }));
-		socket.send(JSON.stringify({ type: 'dialog_closed', id: 100 }));
-		await page.locator('.dialog-title', { hasText: 'Third request' }).waitFor();
-		assert.equal(await page.locator('.dialog-input').inputValue(), 'line one\nline two');
-		socket.send(JSON.stringify({ type: 'dialog_closed', id: 102 }));
-		await page.locator('.dialog-inline').waitFor({ state: 'hidden' });
+		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('rpiv-todo · 内置任务清单') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'true'));
 		await page.close();
 	}
 	console.log('PASS Windows/macOS toolbar bounds and settings at 900/1000/1500px');

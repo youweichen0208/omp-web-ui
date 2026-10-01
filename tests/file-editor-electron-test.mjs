@@ -10,7 +10,7 @@ mkdirSync(workspace);
 writeFileSync(join(workspace, "note.md"), "# Electron");
 let app;
 try {
-	app = await electron.launch({ args: [".", `--user-data-dir=${join(base, "profile")}`], env: { ...process.env, OMP_WEB_DATA_DIR: join(base, "data"), OMP_WEB_CWD: workspace, OMP_WEB_AGENT_DIR: join(base, "agent") } });
+	app = await electron.launch({ args: [".", `--user-data-dir=${join(base, "profile")}`], env: { ...process.env, PI_WEB_DATA_DIR: join(base, "data"), PI_WEB_CWD: workspace, PI_CODING_AGENT_DIR: join(base, "agent") } });
 	let page;
 	for (let n = 0; n < 200; n++) {
 		page = app.windows().find((w) => w.url().startsWith("http://127.0.0.1:"));

@@ -1,15 +1,21 @@
 import { describe, it, expect } from "vitest";
+import { createBashTool } from "@earendil-works/pi-coding-agent";
 import { toolOutputUpdate } from "../../server/tool-output.js";
 import { mergeLiveToolOutput } from "../../web/src/live-tool-output.js";
 
 describe("SDK tool output → wire update → live output", () => {
-	it("renders cumulative OMP tool updates without duplicate lines", () => {
+	it("renders each line once when the real bash tool emits cumulative updates", async () => {
+		const outputs = ["PID: 123\n", "mock started\n", "HTTP 200\n"];
+		const tool = createBashTool(process.cwd(), { operations: { exec: async (_command, _cwd, { onData }) => {
+			for (const output of outputs) { onData(Buffer.from(output)); await new Promise((r) => setTimeout(r, 120)); }
+			return { exitCode: 0 };
+		} } });
 		let visible = "";
-		for (const text of ["PID: 123\n", "PID: 123\nmock started\n", "PID: 123\nmock started\nHTTP 200\n"]) {
-			const update = toolOutputUpdate({ content: [{ type: "text", text }] });
+		await tool.execute("test-bash", { command: "fixture" }, undefined, (partial) => {
+			const update = toolOutputUpdate(partial);
 			if (update) visible = mergeLiveToolOutput(visible, update);
-		}
-		expect(visible).toBe("PID: 123\nmock started\nHTTP 200\n");
+		});
+		expect(visible).toBe(outputs.join(""));
 	});
 	it("replaces rolling snapshots and allows an empty snapshot to clear output", () => {
 		const snapshot = (text: string) => toolOutputUpdate({ content: [{ type: "text", text }] })!;

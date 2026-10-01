@@ -24,7 +24,6 @@ interface ChatInputProps {
 	/** 发送即保存：当前文件有未保存修改时先落盘再发送。 */
 	contextSaver: MutableRefObject<SaveCurrentFile | null>;
 	stats?: UiState["stats"];
-	editorText: Extract<ServerMessage, { type: "editor_text" }> | null;
 	promptResult: Extract<ServerMessage, { type: "prompt_result" }> | null;
 	ready: boolean;
 	streaming: boolean;
@@ -80,7 +79,7 @@ interface ChatInputProps {
 export const ChatInput = memo(function ChatInput({
 	currentFile, contextReader, contextSaver,
 	stats,
-	ready, promptResult, editorText,
+	ready, promptResult,
 	streaming,
 	silentActivity,
 	messages,
@@ -123,13 +122,6 @@ export const ChatInput = memo(function ChatInput({
 			drafts.current.delete(activeConversationId);
 		}
 	}, [activeConversationId, text]);
-	const appliedEditorText = useRef<string>();
-	useLayoutEffect(() => {
-		if (!editorText || appliedEditorText.current === editorText.id) return;
-		appliedEditorText.current = editorText.id;
-		if (editorText.conversationId === activeConversationId) setText(editorText.text);
-		else drafts.current.set(editorText.conversationId, editorText.text);
-	}, [editorText, activeConversationId]);
 	useEffect(() => {
 		const pending = pendingSubmit.current;
 		if (!pending || promptResult?.requestId !== pending.id) return;

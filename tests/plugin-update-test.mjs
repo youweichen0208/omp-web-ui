@@ -1,6 +1,6 @@
 /**
  * 插件更新/回滚 E2E（零网络、自包含、独立临时目录）：
- * 用本地 git 仓库模拟“远端”，走真实 CLI（node bin/omp-web-ui.mjs）全链路：
+ * 用本地 git 仓库模拟“远端”，走真实 CLI（node bin/pi-web-ui.mjs）全链路：
  *   install（记录 .pi-git-sha）→ 远端加 commit → check-updates 报可更新 →
  *   install --force 更新（自动备份）→ check-updates 报最新 → --rollback 恢复旧版
  *  + 无 git 环境的兜底判断（win32 CI 无 git 时自动 skip）。
@@ -12,7 +12,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BIN = resolve(__dirname, "../bin/omp-web-ui.mjs");
+const BIN = resolve(__dirname, "../bin/pi-web-ui.mjs");
 const GIT = "git";
 
 function git(...args) {

@@ -22,15 +22,6 @@ it("finishes interrupted thinking at message end", () => {
 	timings.finish(7, 1100);
 	expect(timings.annotate(message, 7, 9000)?.content[0]).toMatchObject({ durationMs: 1000 });
 });
-it("keeps worker durations when delayed pipe events arrive after completion", () => {
-	const timings = new ThinkingTimings();
-	timings.observe(42, { type: "thinking_start", contentIndex: 0 }, 9000);
-	timings.setFinishedDurations(42, { 0: 150 });
-	timings.observe(42, { type: "thinking_end", contentIndex: 0 }, 9001);
-	timings.finish(42, 9002);
-	expect(timings.annotate(message, 42, 9500)?.content[0]).toMatchObject({ durationMs: 150 });
-	expect(timings.finishedDurations(42)).toEqual({ 0: 150 });
-});
 it("restores measured block durations after a service restart, scoped to the transcript", () => {
 	const dir = mkdtempSync(join(tmpdir(), "pi-thinking-duration-"));
 	try {

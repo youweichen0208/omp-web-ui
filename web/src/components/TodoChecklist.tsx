@@ -2,7 +2,7 @@ import { useT, type Translate } from "../i18n";
 import type { TodoChange, TodoPresentation } from "../todo-presentation";
 
 function changeLabel(change: TodoChange, t: Translate): string {
-	const keys = { added: "todoItemAdded", updated: "todoItemUpdated", pending: "todoItemPending", in_progress: "todoItemStarted", completed: "todoItemCompleted", deleted: "todoItemDeleted", blocked: "todoItemBlocked" } as const;
+	const keys = { added: "todoItemAdded", updated: "todoItemUpdated", pending: "todoItemPending", in_progress: "todoItemStarted", completed: "todoItemCompleted", deleted: "todoItemDeleted" } as const;
 	return t(keys[change.kind], { n: change.position });
 }
 
@@ -21,7 +21,7 @@ export function TodoChecklist({ view, toolCallId }: { view: TodoPresentation; to
 		<header className="todo-checklist-head"><strong>{t("taskPlanSource")}</strong><span>{t("todoCounts", { total: active.length, completed })}</span><span className="todo-checklist-state">{t(status)}</span></header>
 		<ol className="todo-checklist-items">{view.tasks.map((task) => <li key={task.id} className={`todo-checklist-item ${task.status}`} data-todo-item-id={task.id} tabIndex={-1}>
 			<span className="todo-checklist-mark" role="img" aria-label={t(task.status === "completed" ? "done" : task.status === "in_progress" ? "running" : task.status === "deleted" ? "todoRemoved" : "todoPending")}>{task.status === "completed" ? "✓" : task.status === "deleted" ? "−" : ""}</span>
-			<span>{task.phase && <small className="todo-phase">{task.phase}</small>}{task.subject}{task.blocker && <small className="todo-blocker">{task.blocker}</small>}</span>
+			<span>{task.subject}</span>
 		</li>)}</ol>
 	</section>;
 }

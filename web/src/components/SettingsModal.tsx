@@ -329,14 +329,13 @@ export function SettingsModal({
 		onClose();
 	};
 
-	/** Uninstall a native OMP plugin via the bundled CLI in a
+	/** Uninstall a `pi install`-ed package: run `pi remove npm:<pkg>` in a
 	 *  visible terminal tab (see runTerminalCommand). */
 	const runUninstall = (pkgName: string) => {
 		setConfirmUninstall(null);
-		const quoted = "'" + pkgName.replaceAll("'", "'\"'\"'") + "'";
 		runTerminalCommand(
 			`${t("uninstallTitle")} ${pkgName}`,
-			`${settings?.agentCommand ?? "omp"} plugin uninstall ${quoted}`,
+			`pi remove npm:${pkgName}`,
 		);
 	};
 
@@ -346,7 +345,7 @@ export function SettingsModal({
 		setConfirmUiUninstall(null);
 		runTerminalCommand(
 			`${t("uninstallTitle")} ${id}`,
-			`omp-web-ui uninstall ${id}`,
+			`pi-web-ui uninstall ${id}`,
 		);
 	};
 
@@ -355,7 +354,7 @@ export function SettingsModal({
 	const runUiPluginUpdate = (id: string, source: string) => {
 		runTerminalCommand(
 			`${t("pluginUpdate")} ${id}`,
-			`omp-web-ui install ${source} --name ${id} --force`,
+			`pi-web-ui install ${source} --name ${id} --force`,
 		);
 	};
 
@@ -507,7 +506,37 @@ export function SettingsModal({
 					{!settings.terminalToolsEnabled && (
 						<p className="set-hint">{t("terminalToolsOffHint")}</p>
 					)}
-
+					<ToggleRow
+						title={t("terminalBashTakeover")}
+						tip={t("terminalBashTakeoverDesc")}
+						enabled={settings.terminalBash}
+						onToggle={() =>
+							setPartial({ terminalBash: !settings.terminalBash })
+						}
+					/>
+					{settings.terminalBash && (
+						<div className="set-field">
+							<label className="set-field-label" htmlFor="tb-idle-ms">
+								{t("terminalBashIdleMs")}
+							</label>
+							<input
+								id="tb-idle-ms"
+								className="set-input"
+								type="number"
+								min={0}
+								step={1000}
+								value={idleMsDraft}
+								onChange={(e) => setIdleMsDraft(e.target.value)}
+								onBlur={() => {
+									const n = Math.max(0, Math.floor(Number(idleMsDraft) || 0));
+									setIdleMsDraft(String(n));
+									if (n !== settings.terminalBashIdleMs) {
+										setPartial({ terminalBashIdleMs: n });
+									}
+								}}
+							/>
+						</div>
+					)}
 				</div>
 				)}
 
@@ -594,7 +623,7 @@ export function SettingsModal({
 					) : (
 						<div className="set-list">
 							{settings.extensions.map((e) => {
-								const pkgName = e.packageName ?? null;
+								const pkgName = !e.builtin && e.id.startsWith("npm:") ? e.id.slice(4) : null;
 								return (
 									<ToggleRow
 										key={e.id}

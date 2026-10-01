@@ -19,7 +19,7 @@ const childPid=(parent)=>{
 };
 let app;
 try {
-	app=await electron.launch({args:['.',`--user-data-dir=${join(root,'profile')}`],env:{...process.env,OMP_WEB_DATA_DIR:join(root,'data'),OMP_WEB_CWD:cwd,OMP_WEB_AGENT_DIR:join(root,'agent')}});
+	app=await electron.launch({args:['.',`--user-data-dir=${join(root,'profile')}`],env:{...process.env,PI_WEB_DATA_DIR:join(root,'data'),PI_WEB_CWD:cwd,PI_CODING_AGENT_DIR:join(root,'agent')}});
 	let page;
 	for(let n=0;n<200;n++){
 		page=app.windows().find(window=>window.url().startsWith('http://127.0.0.1:'));

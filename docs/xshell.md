@@ -1,6 +1,6 @@
 # Xshell 与 SSH 连接手册
 
-Xshell 是 Windows 上独立的 SSH 客户端。它可以连接与 omp-web-ui 内置 SSH 节点工作台相同的 Linux/macOS 服务器，但 Xshell 会话和 omp-web-ui 节点资料分别管理。Xshell 不承载 omp-web-ui 的节点 Agent 对话。
+Xshell 是 Windows 上独立的 SSH 客户端。它可以连接与 pi-web-ui 内置 SSH 节点工作台相同的 Linux/macOS 服务器，但 Xshell 会话和 pi-web-ui 节点资料分别管理。Xshell 不承载 pi-web-ui 的节点 Agent 对话。
 
 ## 用 Xshell 建立会话
 
@@ -12,15 +12,15 @@ Xshell 是 Windows 上独立的 SSH 客户端。它可以连接与 omp-web-ui �
 
 界面名称可能随 Xshell 版本和语言变化。具体菜单和认证选项以 [Xshell 官方手册](https://www.netsarang.com/docs/Xshell8_manual.pdf) 为准。
 
-## 与 omp-web-ui 工作台并用
+## 与 pi-web-ui 工作台并用
 
-在 omp-web-ui 顶栏打开「SSH 节点」，点 `＋` 新增节点，手动填写与 Xshell 会话相同的主机、端口和用户名。认证方式在 omp-web-ui 中单独设置：密码、客户端本机私钥路径或 SSH agent。连接时也需要单独核对主机密钥指纹。
+在 pi-web-ui 顶栏打开「SSH 节点」，点 `＋` 新增节点，手动填写与 Xshell 会话相同的主机、端口和用户名。认证方式在 pi-web-ui 中单独设置：密码、客户端本机私钥路径或 SSH agent。连接时也需要单独核对主机密钥指纹。
 
-两者可以同时连接同一台服务器，但各自打开的 shell 拥有独立的目录与环境。在 Xshell 中执行的 `cd` 不会改变 omp-web-ui 标签的目录；omp-web-ui Agent 只使用工作台中当前选中的终端。Xshell 会话配置目前不能直接导入 omp-web-ui；工作台的「导入 Remote-SSH 配置」指旧版 omp-web-ui 插件，不是 Xshell。
+两者可以同时连接同一台服务器，但各自打开的 shell 拥有独立的目录与环境。在 Xshell 中执行的 `cd` 不会改变 pi-web-ui 标签的目录；pi-web-ui Agent 只使用工作台中当前选中的终端。Xshell 会话配置目前不能直接导入 pi-web-ui；工作台的「导入 Remote-SSH 配置」指旧版 pi-web-ui 插件，不是 Xshell。
 
 ## 不使用 Xshell 时
 
-Windows 与 macOS 都可以直接使用 omp-web-ui 的内置工作台。系统 SSH 命令也可用于先验证网络和账号：
+Windows 与 macOS 都可以直接使用 pi-web-ui 的内置工作台。系统 SSH 命令也可用于先验证网络和账号：
 
 ```bash
 ssh -p 22 user@your-host

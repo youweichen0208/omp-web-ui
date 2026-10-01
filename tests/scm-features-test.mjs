@@ -13,8 +13,8 @@ const NODE = realpathSync(process.execPath);
 const PORT = 31200 + Math.floor(Math.random() * 5000);
 const workdir = mkdtempSync(join(tmpdir(), "piweb-scmfeat-"));
 const repo = join(workdir, "repo");
-process.env.OMP_WEB_CWD = repo;
-process.env.OMP_WEB_DATA_DIR = join(workdir, "data");
+process.env.PI_WEB_CWD = repo;
+process.env.PI_WEB_DATA_DIR = join(workdir, "data");
 process.env.PORT = String(PORT);
 
 let pass = 0;

@@ -40,8 +40,8 @@ async function startServer() {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			OMP_WEB_DATA_DIR: dataDir,
-			OMP_WEB_CWD: REPO_ROOT,
+			PI_WEB_DATA_DIR: dataDir,
+			PI_WEB_CWD: REPO_ROOT,
 		},
 		stdio: "ignore",
 	});
@@ -79,7 +79,7 @@ try {
 		ws.once("error", j);
 	});
 	ws.send(JSON.stringify({ type: "hello", clientId: "snapdelta-test" }));
-	for (let i = 0; i < 1200 && !sawReady; i++) await sleep(50);
+	for (let i = 0; i < 100 && !sawReady; i++) await sleep(50);
 	check("ready received with protocolVersion=2", sawReady);
 
 	const fullCount = () => stream.filter((m) => m.type === "snapshot").length;
@@ -152,6 +152,6 @@ try {
 	console.error("💥", err.message ?? err);
 } finally {
 	server?.kill("SIGTERM");
-	if (server && server.exitCode === null) await new Promise(resolve => server.once("exit", resolve));
+	await freePort(PORT);
 	process.exit(failures === 0 ? 0 : 1);
 }

@@ -35,7 +35,7 @@ const messages=[
 ];
 let server,browser,app;
 try{
-const env={...process.env,OMP_WEB_CWD:cwd,OMP_WEB_DATA_DIR:join(root,'data'),OMP_WEB_AGENT_DIR:join(root,'agent')};
+const env={...process.env,PI_WEB_CWD:cwd,PI_WEB_DATA_DIR:join(root,'data'),PI_CODING_AGENT_DIR:join(root,'agent')};
 let page;
 if(process.argv.includes('--electron')){
 app=await electron.launch({args:['.',`--user-data-dir=${join(root,'profile')}`],env});

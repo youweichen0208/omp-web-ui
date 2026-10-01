@@ -26,7 +26,7 @@ describe("extensionKeyCandidates", () => {
 	});
 
 	it("scoped 包推导 @scope/name", () => {
-		const e = { path: "/home/u/.omp/agent/npm/node_modules/@scope/foo/dist/index.js" };
+		const e = { path: "/home/u/.pi/agent/npm/node_modules/@scope/foo/dist/index.js" };
 		expect(extensionKeyCandidates(e)).toContain("npm:@scope/foo");
 	});
 

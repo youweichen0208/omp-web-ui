@@ -44,9 +44,9 @@ writeFileSync(
 	}),
 );
 process.env.PORT = String(PORT);
-process.env.OMP_WEB_CWD = workdir;
-process.env.OMP_WEB_DATA_DIR = dataDir;
-process.env.OMP_WEB_AGENT_DIR = agentDir;
+process.env.PI_WEB_CWD = workdir;
+process.env.PI_WEB_DATA_DIR = dataDir;
+process.env.PI_CODING_AGENT_DIR = agentDir;
 const CLIENT_ID = "collapse-test-client";
 
 const server = spawn(

@@ -1,53 +1,136 @@
 # 发布流程
 
-OMP 使用仓库 `youweichen0208/omp-web-ui`、npm 包 `@youweichen/omp-web-ui`、命令 `omp-web-ui`，桌面显示名称为 **OMP**。发布者 npm 账号为 `youweichen`。历史 Pi 版本的说明保留在 `.github/release-notes/v0.*.md`。
+> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
-## 1.0.0 候选版
+## 0.8.6 正式版
 
-首个候选版本是 `1.0.0-beta.1`，npm 发布到 `next`，GitHub 标记 prerelease。新版本只使用 Oh My Pi 和 `~/.omp/agent`，不迁移或改写旧 Pi 配置、凭据和历史。保留桌面内部 appId `com.youweichen.pi-web-ui` 和 Debian 包身份 `pi`，以维持安装器升级关系。
+`0.8.6` 整理 Web 与桌面版的聊天任务清单：连续成功更新合并成展开卡片，后续只记录变化，支持跳回历史清单并高亮任务项；保留失败展示、跨轮次状态与 clear 身份隔离。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.6.md`。
 
-macOS 不使用付费签名或公证，构建后做 ad-hoc 签名。macOS 更新提示打开对应 Release，用户手动下载替换。
+## 0.8.5 正式版
 
-## 验证与提交
+`0.8.5` 修复长任务中的重复伪调用恢复、工具超时状态混淆，以及 SDK 异步准备期间用户插队后过期纠正提示仍执行的竞态。纠正按原生工具成功结果重新允许，每轮最多 3 次；保留停止及排队边界。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.5.md`。
 
-版本同步修改 package.json 和 package-lock.json（含根 package 项）；先检查 npm 上该版本未被占用。检查示例、测试日志和构建产物不含真实凭据。运行：
+## 0.8.4 桌面正式版
+
+`0.8.4` 修复伪工具调用恢复被 todo 状态阻断的问题，并补充历史会话中明确继续后仅口头承诺的单次纠正；保留停止、排队与等待边界。本次发布 GitHub Release 及三平台桌面安装包。说明见 `.github/release-notes/v0.8.4.md`。
+
+## 0.8.3 正式版
+
+`0.8.3` 明确 `/new` 与 `/compact` 遵循 pi SDK 原生语义，修正 `/new` 命令说明，并将会话身份、历史恢复、取消及上下文隔离的回归测试纳入 CI。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.3.md`。
+
+## 0.8.2 正式版
+
+`0.8.2` 修复正文伪工具调用导致任务中断时的恢复与状态判断，保留停止、排队和当前任务边界；修复扩展消息缓存碰撞，优化历史摘要和模型附加内容提示。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.2.md`。
+
+## 0.8.1 正式版
+
+`0.8.1` 加强 todo 实施引导，区分任务清单与执行记录，移除任务总标题并整理设置菜单；修复节点页右侧设置入口意外出现。npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.1.md`。
+
+## 0.8.0 正式版
+
+`0.8.0` 内置原生 rpiv-todo 任务清单，改进扩展名称展示，并新增组件更新检查和用户扩展手动更新。pi Agent 与内置任务清单随应用升级；npm 与三平台桌面版统一版本。说明见 `.github/release-notes/v0.8.0.md`。
+
+## 0.7.4 正式版
+
+`0.7.4` 修复会话切换后的空白终端与 `/new` 重置行为，更新工作区顶栏、运行命令和任务提纲，并明确 `task_plan` 与 skill 的流程边界。npm 与三平台桌面版统一版本；说明见 `.github/release-notes/v0.7.4.md`。
+
+## 0.7.3 正式版
+
+`0.7.3` 修复 `/new` 后延迟快照引起的旧消息和用量残留，补充节点 Agent 发送后的等待动画与状态提示。发布说明见 `.github/release-notes/v0.7.3.md`。
+
+## 0.7.2 正式版
+
+`0.7.2` 修复 Windows/Linux 顶栏窗口按钮占位，并支持来源节点在本机切换密码／公钥认证。Windows 发布增加顶栏浏览器回归门槛。npm 与桌面版统一版本；说明见 `.github/release-notes/v0.7.2.md`。
+
+## 0.7.1 正式版
+
+`0.7.1` 加入一次性 bash 默认超时兜底，改进项目栏折叠／调宽、设置入口、Xshell 本机私钥绑定与任务记录排版，并移除来源更新提示。npm 与三平台桌面安装包统一版本；说明见 `.github/release-notes/v0.7.1.md`。
+
+## 0.7.0 正式版
+
+`0.7.0` 发布 Xshell/OpenSSH 来源同步与节点工作台，修复工具输出快照重复追加，并补充 SSH 后台执行指导。沿当前 `0.6.x` 发布线升级；历史 `0.51.x` 不作为当前版本线的升级基准。npm 与三平台桌面安装包统一版本；说明及同步限制见 `.github/release-notes/v0.7.0.md`。
+
+## 0.6.10 正式版
+
+`0.6.10` 修复长命令卡片标题换行、任务进度重复标题、思考模式按钮样式、编辑结果缺少可见变化，以及折叠消息摘要排版。Web、npm 包及 macOS／Windows／Linux 桌面安装包统一使用 `0.6.10`。发布说明见 `.github/release-notes/v0.6.10.md`。
+
+## 0.6.9 正式版
+
+`0.6.9` 修正工作中输入框提示、任务标题和阶段展示、命令输出卡片及编辑零差异卡片；底栏显示 pi-web-ui 自身版本号。Web、npm 包及三平台桌面安装包统一使用 `0.6.9`。发布说明见 `.github/release-notes/v0.6.9.md`。
+
+## 0.6.8 正式版
+
+`0.6.8` 统一发布编辑／写入逐行 diff 卡片、任务面板状态与阶段摘要修正，以及精简后的上下文窗口和缓存命中用量弹窗。Web、npm 包和 macOS／Windows／Linux 桌面安装包使用同一版本号。发布说明见 `.github/release-notes/v0.6.8.md`。
+
+## 0.6.7 正式版
+
+`0.6.7` 为任务面板加入按任务规模分级展示：纯聊天不显示任务，单阶段直接列操作，多阶段汇总结果和过程，长任务可由 pi 提前给出并更新计划。修复新对话首条消息被推到消息区底部的问题，调整助手等待提示的位置，并移除输入框下方重复的快捷键提示。Web、npm 包和 macOS／Windows／Linux 桌面安装包使用同一版本号。
+
+## 0.6.6 正式版
+
+`0.6.6` 修正助手等待状态间距，收紧输入工具栏，并将右栏任务进度整理成阶段与结果卡片；文件栏移除「本次对话涉及」。按自检、推送源码、发布 npm `latest`、推送 `v0.6.6` 标签、核对三平台安装包的顺序发布。
+
+## 0.6.5 正式版
+
+`0.6.5` 增加从对话记录推断的当前任务步骤、工具与模型静默状态区分、连续写入卡片和文件操作分组，并修复长命令展开／收起。发布顺序：自检 → 推送源码 → 发布 npm `latest` → 推送 `v0.6.5` 标签触发三平台桌面包 → 核对 Release 附件。
+
+## 0.6.4 正式版
+
+`0.6.4` 将 npm、GitHub Release 和三平台桌面安装包统一到同一个版本，包含输入框用量显示、终端字符表格与路径链接、长消息折叠、等待状态间距修正等。发布前运行类型检查、构建、单测、协议冒烟、浏览器回归及 `npm pack --dry-run`。推送源码后发布 `@youweichen/pi-web-ui@0.6.4` 到 npm `latest`，再推送 `v0.6.4` 标签触发桌面安装包构建。最终核对 npm `latest`、工作流和 macOS/Windows/Linux 附件。
+
+## 0.6.3 正式版
+
+`0.6.3` 修复消息导航、用户消息折叠与命令输出预览，并在输入框显示上下文和模型缓存用量。推送 `v0.6.3` 标签会触发 macOS、Windows、Linux 安装包构建并生成 GitHub Release。本次 GitHub 发布与 npm 分开；只有完成 `npm publish` 后才将 npm 版本说明改为 `0.6.3`。
+
+## 0.6.2 正式版
+
+`0.6.2` 修复工作区文件误报、命令输出展示、断线时的工作状态与桌面服务恢复，并在 Web/Desktop 底栏显示运行版本。发布前核对 npm 版本未占用，保持 `package.json` 和 `package-lock.json` 一致，运行协议检查、类型检查、构建、单测、冒烟测试及 `npm pack --dry-run`。提交并推送源代码后，以 `npm publish --access public --tag latest` 发布 npm 包；推送 `v0.6.2` 标签会触发 macOS、Windows、Linux 的 Electron 安装包构建，生成正式 GitHub Release。最后核对 npm `latest`、GitHub Release 状态与三平台安装包。
+
+**版本排序提醒**：SemVer 将 `0.6.x` 排在旧正式版 `0.51.2` 之前。npm 的 `latest` 标签可指向 `0.6.2`，但依赖范围 `^0.51.2` 不会自动升级；依赖方需要显式更新版本范围。后续版本规划需考虑这一历史编号。
+
+## 步骤
 
 ```bash
-npm ci
-npm run check:protocol
+# 1) 升版本（patch/minor 视改动；npm 上已存在该版本会 404 拒绝）
+#    两处都要改，保持一致：
+#      package.json 的 "version" 和 package-lock.json 的 "version"（第 2 行 + packages[""]）
+
+# 2) 自检 + 构建
 npm run typecheck
 npm run build
-npm test
-npm run test:smoke
-npm pack --dry-run
+
+# 3) 提交（Conventional Commits：feat/fix/perf/chore(scope): 描述，说明 why）
+git add -A
+git commit -m "feat(files): <一句话描述>"
+
+# 4) 推送 GitHub（仓库公开：youweichen0208/pi-web-ui，分支 develop）
+git push origin develop
+
+# 5) 发布 npm（会自动跑 prepublishOnly 构建；scope 包必须 --access public）
+npm publish --access public
+
+# 6) 验证
+npm view @youweichen/pi-web-ui version        # 应显示新版本（registry 有缓存延迟属正常）
+curl -s https://registry.npmjs.org/@youweichen/pi-web-ui/latest | jq .version
 ```
 
-执行相关浏览器回归，并将真实 tarball 安装到临时目录，验证内置 Bun 和 OMP 会话。测试使用临时 agent/data/cwd，不连接开发者的模型或旧配置。Conventional Commit 使用 breaking change 标记；提交不得添加 Co-authored-by。
+## 注意事项
 
-## 桌面 Release
+- 版本号必须在当前发布线递增且尚未占用；发布前用 `npm view @youweichen/pi-web-ui dist-tags --json` 核对。当前从 `0.6.x` 升至 `0.7.x`，不要为超过历史 `0.51.x` 擅自跳号。
+- 提交信息不要带 `Co-authored-by`（P1 规则，仓库 hook 会拦）。
+- `.pi/commands.json` 是**每个项目各自**的个人命令（当前 cwd 的 `.pi/ 下），已被 gitignore，永远不会进公开仓库；切换 cwd 时命令列表自动刷新为该项目的命令。
+- 大改动发布前先问用户是否要 `npm publish`（会真实消耗账号权限、触发构建）。
+- **升级后的重启**：`npm i -g` 只更新磁盘文件，已运行进程内存里还是旧代码——前端是每次请求实时读盘的（会先变新），但 WS 消息处理是进程内旧逻辑，新旧混跑会表现为「界面是新的、某功能一直加载中」。界面内「立即更新」（顶栏更新下拉）现在是在可见终端 tab 中跑 `npm i -g @youweichen/pi-web-ui@latest`（复用 SCM/插件卸载同款 tab 模式），完成后需手动重启服务生效：`pi-web-ui server restart`（launchd/systemd 由服务管理器拉起；Docker 需 `docker compose restart`）。服务端保留 `PI_WEB_RESTART_CHILD` 端口等待握手（restart-handoff-test 回归），供外部编排的替换子进程使用。
+- **发布前检查示例文件不泄密**：`deploy/`、`README` 等随 npm 包（`files` 白名单含 `deploy/`）和 GitHub 分发的文件**绝不放真实 IP / 域名 / 密钥**——用占位符（如 `<LAN_IP>`、`<PUBLIC_IP>:<PUBLIC_PORT>`、`your-host`）。真实环境配置只在本地改，不进仓库。
 
-推送 `v1.0.0-beta.1` 标签触发 `.github/workflows/release-desktop.yml`：
+## 历史 IP 泄露的清理方法
 
-1. 校验标签与 package 版本一致，创建 draft prerelease。
-2. macOS、Windows、Linux 原生 runner 安装依赖、构建前后端；只对 node-pty 执行 Electron rebuild。
-3. electron-builder 使用 `--publish never` 生成产物。
-4. 每个平台运行 packaged-server-start-test，使用包内 Electron/Bun 验证凭据、工具、todo、历史、SQLite 和 HTTP。Windows 另需终端、布局与 portable 重启回归。
-5. 验证后的安装包和更新元数据上传 draft。三个 job 全部成功，最后一个 job 才将 draft 公开。
+2026-08 实操过（`deploy/nginx-subpath.conf` 曾含 `192.168.1.101` / `39.99.235.208:60018`，波及 53/128 个 commit）：
 
-单平台手动重跑只上传该平台产物，不自动公开 Release。不得用 continue-on-error 绕过终端或包内启动失败。Bun 的 `.exe` 文件、原生工具使用的 `.d.ts` 文本资源和 CHANGELOG.md 必须显式保留，不能依赖 electron-builder 的默认过滤规则。
+1. 先改工作区文件为占位符；
+2. `git filter-branch --force --index-filter 'if git cat-file -e :<file> 2>/dev/null; then BLOB=$(git cat-file blob :<file> | sed -e "s/<旧IP>/<占位符>/g" ... | git hash-object -w --stdin); git update-index --cacheinfo "100644,$BLOB,<file>"; fi' -- --all`（**不要用 xargs 传 cacheinfo**，Git for Windows 下参数会碎导致 `option 'cacheinfo' expects <mode>,<sha1>,<path>`）；
+3. 重写后**手动把 tag 移到重写版**（`git tag -f vX.Y.Z $(git log main --format='%h %s' | grep -F '<tag的message>' | head -1 | cut -d' ' -f1)`，filter-branch 不会自动跟）；
+4. 删备份分支 + `rm -rf .git/refs/original` + `git reflog expire --expire=now --all` + `git gc --prune=now --aggressive`；
+5. 验证 `git rev-list --all | while read c; do git grep -l '<IP>' $c -- . 2>/dev/null; done` 为空后 `git push --force` main + tag。
 
-## npm
-
-GitHub 和三平台验证通过后发布候选版：
-
-```bash
-npm whoami
-npm publish --access public --tag next
-npm view @youweichen/omp-web-ui@next version
-```
-
-`prepublishOnly` 自动构建；npm 包必须包含 omp-worker、dist、web/dist，以及声明的 Bun/OMP 精确依赖。正式 1.0.0 才发布到 `latest`。不要发布新版本到旧包名，也不要因旧包历史编号而改变候选版策略。
-
-首次创建 npm 包的例外：2026-10-01 使用 `--tag next` 发布 1.0.0-beta.1 后，registry 自动附加了 `latest`；经身份验证后的删除请求仍返回 HTTP 400。因此该首版目前同时由 `next`/`latest` 指向，版本性质仍为 beta。后续候选版只显式更新 `next`，正式版再主动更新 `latest`。上游记录：https://github.com/npm/cli/issues/8490。
-
-安装后执行 `omp-web-ui server restart` 使运行中的服务加载新版；Docker 重建并替换容器。发布结束核对 npm dist-tag、GitHub 标签/提交、Release 状态及三平台全部附件。
+**残留提醒**：已发布 npm 包的 tarball 无法追回（只能靠新版本替换）；GitHub 上被 force push 覆盖的旧对象对访问者不可见但服务器会留存（需联系 GitHub 支持彻底删）。

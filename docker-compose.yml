@@ -1,33 +1,29 @@
 # One-command deploy: `docker compose up -d`
 # Auto-restarts on boot when the Docker daemon starts (restart: unless-stopped).
 services:
-  omp-web-ui:
+  pi-web-ui:
     build: .
-    image: omp-web-ui:latest
+    image: pi-web-ui:latest
     ports:
       - "8787:8787"
     environment:
       PORT: "8787"
-      OMP_WEB_DATA_DIR: /home/node/.omp-web
-      OMP_WEB_AGENT_DIR: /home/node/.omp/agent
       # The container must bind ALL interfaces so the -p port mapping works —
       # the server defaults to loopback-only for security.
-      OMP_WEB_HOST: "0.0.0.0"
+      PI_WEB_HOST: "0.0.0.0"
       # Workspace the agent operates in (read/edit/bash/write). Mount your
-      # project dir and point OMP_WEB_CWD at it, e.g.:
-      # OMP_WEB_CWD: /workspace
+      # project dir and point PI_WEB_CWD at it, e.g.:
+      # PI_WEB_CWD: /workspace
       # volumes:
       #   - /host/path/to/project:/workspace
-      # OMP config and SQLite credentials require a writable directory:
-      # OMP_WEB_AGENT_DIR: /omp-agent
+      # pi config (auth.json, models, skills) — mount ~/.pi/agent read-only:
+      # PI_CODING_AGENT_DIR: /pi-agent
       # volumes:
-      #   - /home/YOU/.omp/agent:/omp-agent
+      #   - /home/YOU/.pi/agent:/pi-agent:ro
     volumes:
       # Persist per-client chat sessions across container restarts.
-      - omp-web-data:/home/node/.omp-web
-      - omp-agent-data:/home/node/.omp
+      - pi-web-data:/app/.pi-web
     restart: unless-stopped
 
 volumes:
-  omp-web-data:
-  omp-agent-data:
+  pi-web-data:

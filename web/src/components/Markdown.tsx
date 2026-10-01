@@ -81,7 +81,7 @@ function openLocalFile(reference: string): void {
 	const match = /^(.+):([1-9]\d*)$/.exec(reference);
 	if (!match) return;
 	try {
-		window.dispatchEvent(new CustomEvent("omp-web-ui:open-tool-file", { detail: { path: decodeURIComponent(match[1]), line: Number(match[2]) } }));
+		window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: { path: decodeURIComponent(match[1]), line: Number(match[2]) } }));
 	} catch { /* Ignore malformed links pasted into a message. */ }
 }
 

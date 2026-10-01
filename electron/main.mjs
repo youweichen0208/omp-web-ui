@@ -1,5 +1,5 @@
 /**
- * omp-web-ui Electron 桌面版主进程。
+ * pi-web-ui Electron 桌面版主进程。
  *
  * 架构：
  *   - 主进程 fork 一个隐藏子进程跑 server（ELECTRON_RUN_AS_NODE=1），
@@ -15,17 +15,17 @@
  *   如有 Vite dev server (:5173)，优先加载它获取 HMR。
  *
  * 与当前 server/index.ts 的耦合点（重构时请对照检查）：
- *   - 就绪标记：server 启动后 stdout 打印 "⚡ omp-web-ui"（见 server/index.ts
+ *   - 就绪标记：server 启动后 stdout 打印 "⚡ pi-web-ui"（见 server/index.ts
  *     httpServer.listen 回调），本文件靠这行判断 server 已就绪。
- *   - OMP_WEB_PKG_ROOT：告诉 server 去哪找 web/dist（resolvePkgRoot()），
+ *   - PI_WEB_PKG_ROOT：告诉 server 去哪找 web/dist（resolvePkgRoot()），
  *     打包后指向 process.resourcesPath（electron-builder extraResources）。
- *   - OMP_WEB_DATA_DIR：桌面版单独用 <home>/.omp-web-desktop，与命令行版
- *     的 <home>/.omp-web 分开，避免两边同时跑互相抢 client-state.json /
- *     terminals 等运行时状态（数据都在 SDK 的 ~/.omp/agent 里，两边共享，
+ *   - PI_WEB_DATA_DIR：桌面版单独用 <home>/.pi-web-desktop，与命令行版
+ *     的 <home>/.pi-web 分开，避免两边同时跑互相抢 client-state.json /
+ *     terminals 等运行时状态（数据都在 SDK 的 ~/.pi/agent 里，两边共享，
  *     不受影响）。
  */
 
-import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, Notification, ipcMain, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, Notification, ipcMain } from "electron";
 import { fork } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
@@ -89,7 +89,7 @@ async function startServer(reusePort) {
 
 	if (!existsSync(serverPath)) {
 		dialog.showErrorBox(
-			"OMP 启动失败",
+			"pi 启动失败",
 			`找不到 server 入口：${serverPath}\n\n请先执行 npm run build，然后重试。`,
 		);
 		app.quit();
@@ -97,9 +97,9 @@ async function startServer(reusePort) {
 	}
 
 	// 桌面版数据目录与命令行版分开（见文件头注释），确保存在
-	const dataDir = process.env.OMP_WEB_DATA_DIR || join(
+	const dataDir = process.env.PI_WEB_DATA_DIR || join(
 		process.env.HOME || process.env.USERPROFILE || "~",
-		".omp-web-desktop",
+		".pi-web-desktop",
 	);
 	mkdirSync(dataDir, { recursive: true });
 
@@ -107,10 +107,10 @@ async function startServer(reusePort) {
 		env: {
 			...process.env,
 			PORT: String(serverPort),
-			OMP_WEB_HOST: "127.0.0.1",
-			OMP_WEB_DATA_DIR: dataDir,
-			OMP_WEB_NO_BROWSER: "1", // 不要自动打开浏览器（本身也不会打开，桌面版有自己的窗口）
-			OMP_WEB_PKG_ROOT: getPkgRoot(), // 告诉 server 去哪找 web/dist / extensions
+			PI_WEB_HOST: "127.0.0.1",
+			PI_WEB_DATA_DIR: dataDir,
+			PI_WEB_NO_BROWSER: "1", // 不要自动打开浏览器（本身也不会打开，桌面版有自己的窗口）
+			PI_WEB_PKG_ROOT: getPkgRoot(), // 告诉 server 去哪找 web/dist / extensions
 			ELECTRON_RUN_AS_NODE: "1", // 以 Node.js 模式运行（非 Electron）
 		},
 		stdio: ["ignore", "pipe", "pipe", "ipc"],
@@ -130,7 +130,7 @@ async function startServer(reusePort) {
 		process.stderr.write(`[server:err] ${text}`);
 	});
 
-	// 等待 server 就绪：监听 stdout 中的 "⚡ omp-web-ui" 标记（见 server/index.ts）
+	// 等待 server 就绪：监听 stdout 中的 "⚡ pi-web-ui" 标记（见 server/index.ts）
 	await new Promise((resolvePromise, rejectPromise) => {
 		const timeout = setTimeout(() => {
 			rejectPromise(
@@ -140,7 +140,7 @@ async function startServer(reusePort) {
 
 		const checkOutput = (chunk) => {
 			const text = chunk.toString();
-			if (text.includes("⚡ omp-web-ui") || text.includes("http://localhost")) {
+			if (text.includes("⚡ pi-web-ui") || text.includes("http://localhost")) {
 				clearTimeout(timeout);
 				resolvePromise(undefined);
 			}
@@ -200,7 +200,7 @@ async function recoverServer() {
 		}
 	}
 	if (!isQuitting) dialog.showErrorBox(
-		"OMP 服务已断开",
+		"pi 服务已断开",
 		`服务重启失败，请重新打开应用。\n\n${lastError instanceof Error ? lastError.message : String(lastError)}`,
 	);
 }
@@ -213,7 +213,7 @@ function createWindow() {
 		height: 800,
 		minWidth: 800,
 		minHeight: 600,
-		title: "OMP",
+		title: "pi",
 		backgroundColor: "#ffffff",
 		show: false,
 		...(process.platform === "darwin"
@@ -307,7 +307,7 @@ function createTray() {
 	const iconPath = join(__dirname, "icon.png");
 	const icon = existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
 	tray = new Tray(icon.isEmpty() ? icon : icon.resize({ width: 16, height: 16 }));
-	tray.setToolTip("OMP");
+	tray.setToolTip("pi");
 
 	const contextMenu = Menu.buildFromTemplate([
 		{
@@ -321,13 +321,13 @@ function createTray() {
 		},
 		{ type: "separator" },
 		{
-			label: "关于 OMP",
+			label: "关于 pi",
 			click: () => {
 				dialog.showMessageBox({
 					type: "info",
-					title: "关于 OMP",
-					message: `OMP v${app.getVersion()}`,
-					detail: "Web and desktop interface for Oh My Pi.",
+					title: "关于 pi",
+					message: `pi v${app.getVersion()}`,
+					detail: "Web chat interface for the pi coding agent.",
 				});
 			},
 		},
@@ -361,16 +361,16 @@ function createTray() {
 function createAppMenu() {
 	const template = [
 		{
-			label: "OMP",
+			label: "pi",
 			submenu: [
 				{
-					label: "关于 OMP",
+					label: "关于 pi",
 					click: () => {
 						dialog.showMessageBox({
 							type: "info",
-							title: "关于 OMP",
-							message: `OMP v${app.getVersion()}`,
-							detail: "Web and desktop interface for Oh My Pi.",
+							title: "关于 pi",
+							message: `pi v${app.getVersion()}`,
+							detail: "Web chat interface for the pi coding agent.",
 						});
 					},
 				},
@@ -432,7 +432,7 @@ function setupAutoUpdater() {
 	if (isDev) return; // 开发模式不检查更新
 
 	autoUpdater.autoDownload = false;
-	autoUpdater.autoInstallOnAppQuit = process.platform !== "darwin";
+	autoUpdater.autoInstallOnAppQuit = true;
 
 	// 检查更新（启动后延迟 5s）。当前未配置发布 CI / publish feed，
 	// 找不到更新源时会静默失败，不影响正常使用。
@@ -444,12 +444,11 @@ function setupAutoUpdater() {
 
 	autoUpdater.on("update-available", (info) => {
 		const notification = new Notification({
-			title: "OMP 更新可用",
+			title: "pi 更新可用",
 			body: `版本 ${info.version} 可下载（当前 ${app.getVersion()}）`,
 		});
 		notification.on("click", () => {
-			if (process.platform === "darwin") void shell.openExternal(`https://github.com/youweichen0208/omp-web-ui/releases/tag/v${encodeURIComponent(info.version)}`);
-			else autoUpdater.downloadUpdate();
+			autoUpdater.downloadUpdate();
 		});
 		notification.show();
 	});
@@ -490,7 +489,7 @@ app.whenReady().then(async () => {
 		await startServer();
 		watchServerExit();
 	} catch (err) {
-		dialog.showErrorBox("OMP 启动失败", err instanceof Error ? err.message : String(err));
+		dialog.showErrorBox("pi 启动失败", err instanceof Error ? err.message : String(err));
 		app.quit();
 		return;
 	}

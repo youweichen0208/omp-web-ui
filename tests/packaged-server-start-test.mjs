@@ -7,22 +7,22 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { once } from "node:events";
-import { fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 const [executable, appRoot] = process.argv.slice(2).map((p) => resolve(p));
 assert(executable && appRoot, "Usage: node tests/packaged-server-start-test.mjs <executable> <resources/app>");
 if (process.platform === "win32") {
 	const helper = readFileSync(join(appRoot, "node_modules/node-pty/lib/conpty_console_list_agent.js"), "utf8");
-	assert.match(helper, /omp-web-ui: the console may already be gone during ConPTY teardown/);
+	assert.match(helper, /pi-web-ui: the console may already be gone during ConPTY teardown/);
 	console.log("PASS packaged node-pty includes the ConPTY cleanup patch");
 }
-// Exercise the bundled Bun binary, native provider, fd3 IPC, tool callback and
-// persisted session using only modules under resources/app.
-execFileSync(executable, [fileURLToPath(new URL("./omp-session-test.mjs", import.meta.url))], {
-	env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", OMP_TEST_APP_ROOT: appRoot, NODE_PATH: "", NODE_OPTIONS: "" },
-	timeout: 120000,
-	stdio: "inherit",
+// Loading the lazy provider is essential: startup alone does not import it.
+const provider = pathToFileURL(join(appRoot, "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js")).href;
+execFileSync(executable, ["--input-type=module", "--eval", `await import(${JSON.stringify(provider)})`], {
+	env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_PATH: "", NODE_OPTIONS: "" },
+	timeout: 30000,
+	stdio: "pipe",
 });
 const temp = mkdtempSync(join(tmpdir(), "pi-packaged-start-"));
 const workspace = join(temp, "workspace");
@@ -81,12 +81,12 @@ const child = fork(join(appRoot, "dist/server/index.js"), [], {
 		NODE_OPTIONS: "",
 		ELECTRON_RUN_AS_NODE: "1",
 		PORT: String(port),
-		OMP_WEB_HOST: "127.0.0.1",
-		OMP_WEB_CWD: workspace,
-		OMP_WEB_DATA_DIR: join(temp, "data"),
-		OMP_WEB_AGENT_DIR: join(temp, "agent"),
-		OMP_WEB_PKG_ROOT: appRoot,
-		OMP_WEB_NO_BROWSER: "1",
+		PI_WEB_HOST: "127.0.0.1",
+		PI_WEB_CWD: workspace,
+		PI_WEB_DATA_DIR: join(temp, "data"),
+		PI_CODING_AGENT_DIR: join(temp, "agent"),
+		PI_WEB_PKG_ROOT: appRoot,
+		PI_WEB_NO_BROWSER: "1",
 	},
 	stdio: ["ignore", "pipe", "pipe", "ipc"],
 	serialization: "json",

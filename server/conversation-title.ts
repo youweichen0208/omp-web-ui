@@ -55,7 +55,7 @@ export class ConversationTitleJob {
 		question: string,
 		answer: string,
 		generate: (context: string, signal: AbortSignal) => Promise<string | null>,
-		save: (title: string) => void | Promise<void>,
+		save: (title: string) => void,
 	): Promise<void> {
 		if (this.locked || this.pending || this.attempts >= 3 || !question.trim() || !answer.trim()) return;
 		// A greeting is not enough to name the conversation. Wait for the first
@@ -71,7 +71,7 @@ export class ConversationTitleJob {
 		try {
 			const title = await generate(`User request:\n${this.firstQuestion.slice(0, 4000)}\n\nAssistant response:\n${answer.slice(0, 4000)}`, controller.signal);
 			if (!this.locked && !controller.signal.aborted && title && title !== "__DEFER__") {
-				await save(languageMatchedTitle(this.firstQuestion, title));
+				save(languageMatchedTitle(this.firstQuestion, title));
 				this.locked = true;
 			}
 		} catch {

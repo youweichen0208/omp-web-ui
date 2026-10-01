@@ -9766,14 +9766,3 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .component-update-state.available { color: var(--accent); }
 .component-update-error { color: var(--red); font-size: 12px; overflow-wrap: anywhere; }
 .component-update-notice { padding: 10px 12px; background: var(--bg-elev); border-radius: 6px; }
-
-/* OMP native todo phases and blockers */
-.todo-phase, .todo-blocker { display: block; color: var(--text-muted); font-size: 11px; }
-.todo-checklist-item.blocked .todo-checklist-mark { border-color: var(--amber); }
-
-/* OMP native subagent progress, scoped to the active conversation. */
-.subagent-progress { max-height: 140px; overflow: auto; padding: 8px 16px; border-top: 1px solid var(--border); }
-.subagent-row { display: flex; gap: 8px; align-items: baseline; font-size: 12px; padding: 3px 0; }
-.subagent-row > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subagent-status { flex-shrink: 0; color: var(--muted); }
-.subagent-row[data-status="running"] .subagent-status { color: var(--accent); }

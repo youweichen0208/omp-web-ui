@@ -140,7 +140,7 @@ const PANEL_MIN = 180;
 const PANEL_MAX = 520;
 const PANEL_DEFAULT = 264;
 type PanelSide = "left" | "right" | "editor";
-const panelWidthKey = (side: PanelSide) => `omp-web-ui:${side}-panel-width`;
+const panelWidthKey = (side: PanelSide) => `pi-web-ui:${side}-panel-width`;
 function readPanelWidth(side: PanelSide): number {
 	const v = Number(localStorage.getItem(panelWidthKey(side)));
 	return Number.isFinite(v) && v >= PANEL_MIN && v <= PANEL_MAX ? v : side === "editor" ? 480 : side === "right" ? 272 : PANEL_DEFAULT;
@@ -298,7 +298,7 @@ export function App() {
 	const [rightWidth, setRightWidth] = useState(() => readPanelWidth("right"));
 	const resizeLeft = useCallback((w: number) => setLeftWidth(w), []);
 	const [editorShare, setEditorShare] = useState(() => {
-		const stored = Number(localStorage.getItem("omp-web-ui:editor-share"));
+		const stored = Number(localStorage.getItem("pi-web-ui:editor-share"));
 		return Number.isFinite(stored) && stored >= 0.15 && stored <= 0.85 ? stored : 0.45;
 	});
 	const resizeRight = useCallback((w: number) => setRightWidth(w), []);
@@ -310,7 +310,7 @@ export function App() {
 		if (available > 0) {
 			const share = Math.min(0.85, Math.max(0.15, w / available));
 			setEditorShare(share);
-			localStorage.setItem("omp-web-ui:editor-share", String(share));
+			localStorage.setItem("pi-web-ui:editor-share", String(share));
 		}
 	}, []);
 	// Mobile: which side panel is open as a drawer (null = both closed).
@@ -407,8 +407,8 @@ export function App() {
 			};
 			window.setTimeout(reveal, 100);
 		};
-		window.addEventListener("omp-web-ui:open-tool-file", onToolFile);
-		return () => window.removeEventListener("omp-web-ui:open-tool-file", onToolFile);
+		window.addEventListener("pi-web-ui:open-tool-file", onToolFile);
+		return () => window.removeEventListener("pi-web-ui:open-tool-file", onToolFile);
 	}, [openPreview, chat.state?.cwd]);
 	// Setup modal: one-time prompt when the pi agent config is missing.
 	const [setupDismissed, setSetupDismissed] = useState(false);
@@ -457,8 +457,8 @@ export function App() {
 			}
 			setView("terminal");
 		};
-		window.addEventListener("omp-web-ui:plugin-run-command", onPluginRunCommand);
-		return () => window.removeEventListener("omp-web-ui:plugin-run-command", onPluginRunCommand);
+		window.addEventListener("pi-web-ui:plugin-run-command", onPluginRunCommand);
+		return () => window.removeEventListener("pi-web-ui:plugin-run-command", onPluginRunCommand);
 	}, [chat, terminal, send]);
 
 	// Ctrl+K / Cmd+K opens global search (also reachable via the topbar button).
@@ -486,7 +486,7 @@ export function App() {
 		saveSoundSettings(sound);
 	}, [sound]);
 
-	// Maintenance watcher: when a `omp plugin uninstall …` / `omp-web-ui install|uninstall …`
+	// Maintenance watcher: when a `pi remove …` / `pi-web-ui install|uninstall …`
 	// command tab transitions running → exited, re-discover extensions/skills
 	// (extensions_reload) or re-scan the UI-plugin dir (plugins_reload).
 	useEffect(() => {
@@ -496,11 +496,11 @@ export function App() {
 			const cmd = tm.command?.command ?? "";
 			const before = prev.find((p) => p.id === tm.id);
 			if (!before?.running || tm.running) continue;
-			if (cmd.includes(" plugin uninstall ")) {
+			if (cmd.startsWith("pi remove ")) {
 				send({ type: "extensions_reload" });
 			} else if (
-				cmd.startsWith("omp-web-ui install ") ||
-				cmd.startsWith("omp-web-ui uninstall ")
+				cmd.startsWith("pi-web-ui install ") ||
+				cmd.startsWith("pi-web-ui uninstall ")
 			) {
 				send({ type: "plugins_reload" });
 			}
@@ -910,19 +910,12 @@ export function App() {
 							{chat.notices.length > 0 && <div className="notices">
 								{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} />)}
 							</div>}
-							{!!conversationState?.subagents?.length && <div className="subagent-progress" aria-live="polite">
-								{conversationState.subagents.map(agent => <div key={agent.id} className="subagent-row" data-status={agent.status}>
-									<span className="subagent-status">{t(agent.status === "running" || agent.status === "pending" ? "subagentRunning" : agent.status === "completed" ? "subagentCompleted" : agent.status === "aborted" ? "subagentAborted" : "subagentFailed")}</span>
-									<strong>{agent.agent}</strong><span>{agent.description}</span>
-								</div>)}
-							</div>}
 							<ChatInput
 								currentFile={!switching && currentFile?.cwd === chat.state?.cwd ? currentFile : null}
 								contextReader={contextReader}
 								contextSaver={contextSaver}
 								stats={conversationState?.stats}
 								promptResult={chat.promptResult}
-								editorText={chat.editorText}
 								send={send}
 								ready={chat.ready && !!conversationState}
 								streaming={conversationState?.isStreaming ?? false}
@@ -944,7 +937,7 @@ export function App() {
 							/>
 						</main>
 						{!isMobile && (!isNarrow || !!previewFile) && (!filesCollapsed || !!previewFile) && (
-							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("omp-web-ui:editor-share", "0.45"); } : undefined} />
+							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("pi-web-ui:editor-share", "0.45"); } : undefined} />
 						)}
 						<div
 							className={`panel-drawer drawer-right ${filesCollapsed && !previewFile ? "files-collapsed" : ""} ${drawer === "right" ? "open" : ""}`}

@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 /**
- * omp-web-ui CLI.
+ * pi-web-ui CLI.
  *
- *   omp-web-ui                              启动生产服务器（前台，Ctrl+C 停止，自动打开浏览器）
- *   omp-web-ui --port 9000 --cwd /path      同上，覆盖端口 / 工作目录 / 数据目录
- *   omp-web-ui --no-browser                 启动但不自动打开浏览器
- *   omp-web-ui --version | --help
- *   omp-web-ui server install [选项]         安装系统服务（开机自启）并启动
- *   omp-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
- *   omp-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
- *   omp-web-ui server start|stop|restart|status [选项]
- *   omp-web-ui install <源> [选项]           安装 GitHub 上的界面插件（见下方「界面插件」）
- *   omp-web-ui plugins / uninstall <id>      列出 / 卸载界面插件
+ *   pi-web-ui                              启动生产服务器（前台，Ctrl+C 停止，自动打开浏览器）
+ *   pi-web-ui --port 9000 --cwd /path      同上，覆盖端口 / 工作目录 / 数据目录
+ *   pi-web-ui --no-browser                 启动但不自动打开浏览器
+ *   pi-web-ui --version | --help
+ *   pi-web-ui server install [选项]         安装系统服务（开机自启）并启动
+ *   pi-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
+ *   pi-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
+ *   pi-web-ui server start|stop|restart|status [选项]
+ *   pi-web-ui install <源> [选项]           安装 GitHub 上的界面插件（见下方「界面插件」）
+ *   pi-web-ui plugins / uninstall <id>      列出 / 卸载界面插件
  *
  * 系统服务：
- *   - macOS   → launchd 用户代理，label 默认 com.xingshuyin.omp-web-ui
+ *   - macOS   → launchd 用户代理，label 默认 com.xingshuyin.pi-web-ui
  *              （--name 自定义时 com.<name>.server），无需 sudo
  *   - Linux   → systemd 单元 <name>.service（/etc/systemd/system/，自动 sudo）
  *   - Windows → 计划任务（Task Scheduler / schtasks，登录后自启，无需管理员），
  *              隐藏窗口启动（无黑窗）；PowerShell 启动脚本与任务 XML 生成在
- *              %APPDATA%\omp-web-ui\
+ *              %APPDATA%\pi-web-ui\
  *
- * 环境变量（前台与系统服务均适用）：PORT / OMP_WEB_CWD / OMP_WEB_DATA_DIR /
- * OMP_WEB_AGENT_DIR。
+ * 环境变量（前台与系统服务均适用）：PORT / PI_WEB_CWD / PI_WEB_DATA_DIR /
+ * PI_CODING_AGENT_DIR。
  */
 import { spawnSync } from "node:child_process";
 import { createConnection } from "node:net";
@@ -62,26 +62,26 @@ try {
 	// version is best-effort — the server itself doesn't need it
 }
 
-const HELP = `omp-web-ui v${pkg.version} — web chat for Oh My Pi
+const HELP = `pi-web-ui v${pkg.version} — web chat for the pi coding agent
 
 用法:
-  omp-web-ui                               启动服务器（前台，Ctrl+C 停止，自动打开浏览器）
-  omp-web-ui --port 9000 --cwd /path       启动并指定端口 / 工作目录 / 数据目录
-  omp-web-ui --no-browser                  启动但不自动打开浏览器
-  omp-web-ui server install [选项]         安装系统服务（开机自启）并启动
-  omp-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
-  omp-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
-  omp-web-ui server start|stop|restart|status [选项]
-  omp-web-ui server quiesce [选项]          进入排空模式：拒绝新的对话/消息/编辑，存量运行继续跑完
-  omp-web-ui server unquiesce [选项]        解除排空模式，恢复接收新工作
-  omp-web-ui --version / --help
+  pi-web-ui                               启动服务器（前台，Ctrl+C 停止，自动打开浏览器）
+  pi-web-ui --port 9000 --cwd /path       启动并指定端口 / 工作目录 / 数据目录
+  pi-web-ui --no-browser                  启动但不自动打开浏览器
+  pi-web-ui server install [选项]         安装系统服务（开机自启）并启动
+  pi-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
+  pi-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
+  pi-web-ui server start|stop|restart|status [选项]
+  pi-web-ui server quiesce [选项]          进入排空模式：拒绝新的对话/消息/编辑，存量运行继续跑完
+  pi-web-ui server unquiesce [选项]        解除排空模式，恢复接收新工作
+  pi-web-ui --version / --help
 
 server 选项:
   --port <n>        端口（默认 8787，或 $PORT）
-  --cwd <dir>       工作目录（默认 $OMP_WEB_CWD 或当前目录）
-  --data-dir <dir>  会话数据目录（默认 <cwd>/.omp-web）
-  --name <name>     服务名（默认 omp-web-ui；macOS 的 launchd label
-                    为 com.xingshuyin.omp-web-ui，自定义名时为 com.<name>.server）
+  --cwd <dir>       工作目录（默认 $PI_WEB_CWD 或当前目录）
+  --data-dir <dir>  会话数据目录（默认 <cwd>/.pi-web）
+  --name <name>     服务名（默认 pi-web-ui；macOS 的 launchd label
+                    为 com.xingshuyin.pi-web-ui，自定义名时为 com.<name>.server）
   --print           只打印将生成的配置文件，不实际安装
 
 平台: macOS → launchd 用户代理 · Linux → systemd · Windows → 计划任务（schtasks）
@@ -89,22 +89,22 @@ server 选项:
 快捷方式: Windows → 桌面 .lnk · macOS → 桌面 .command 启动器 · Linux → 桌面 .desktop 图标
 
 界面插件（安装到 <data-dir>/plugins/，服务运行中刷新浏览器即生效）:
-  omp-web-ui install <源>            从 GitHub 安装界面插件
-  omp-web-ui uninstall <id>          卸载已安装的界面插件
-  omp-web-ui plugins                 列出已安装的界面插件
+  pi-web-ui install <源>            从 GitHub 安装界面插件
+  pi-web-ui uninstall <id>          卸载已安装的界面插件
+  pi-web-ui plugins                 列出已安装的界面插件
 
   源写法: owner/repo · https://github.com/owner/repo · 本地目录路径
           URL 带 /tree/<分支>/<子目录> 可指定分支与仓库内子目录；任意写法
           末尾加 #<分支或tag> 也可指定分支（如 owner/repo#v1.2）
   install 选项: --name <id> 自定义插件目录名（默认取仓库名）
-                --data-dir <dir> 数据目录（默认 ~/.omp-web）
+                --data-dir <dir> 数据目录（默认 ~/.pi-web）
                 --force 目标已存在时覆盖
 
 环境变量（前台与系统服务均适用）:
-  PORT / OMP_WEB_CWD / OMP_WEB_DATA_DIR / OMP_WEB_AGENT_DIR
+  PORT / PI_WEB_CWD / PI_WEB_DATA_DIR / PI_CODING_AGENT_DIR
 `;
 
-/** Minimum Node version supported by the web host and its dependencies. */
+/** Minimum Node required by the pi SDK (its dist uses `import … with { type: "json" }`). */
 const NODE_MIN = [22, 19, 0];
 function checkNodeVersion() {
 	const v = process.versions.node.split(".").map(Number);
@@ -114,9 +114,9 @@ function checkNodeVersion() {
 		(v[0] === NODE_MIN[0] && v[1] === NODE_MIN[1] && v[2] < NODE_MIN[2]);
 	if (tooOld) {
 		console.error(
-			`✖ omp-web-ui 需要 Node.js >= ${NODE_MIN.join(".")}（当前 ${process.versions.node}）。\n` +
-				`  OMP Web 宿主需要较新的 Node 运行时。\n` +
-				`  请升级 Node：https://nodejs.org（或 nvm-windows / fnm）后重装：npm i -g @youweichen/omp-web-ui@next`,
+			`✖ pi-web-ui 需要 Node.js >= ${NODE_MIN.join(".")}（当前 ${process.versions.node}）。\n` +
+				`  pi SDK 的代码使用了 import attributes（with）语法，旧版 Node 无法解析。\n` +
+				`  请升级 Node：https://nodejs.org（或 nvm-windows / fnm）后重装：npm i -g pi-web-ui`,
 		);
 		process.exit(1);
 	}
@@ -259,8 +259,8 @@ function openBrowserWhenUp(url) {
 
 async function startForeground(opts) {
 	if (opts.port) process.env.PORT = opts.port;
-	if (opts.cwd) process.env.OMP_WEB_CWD = resolve(opts.cwd);
-	if (opts.dataDir) process.env.OMP_WEB_DATA_DIR = resolve(opts.dataDir);
+	if (opts.cwd) process.env.PI_WEB_CWD = resolve(opts.cwd);
+	if (opts.dataDir) process.env.PI_WEB_DATA_DIR = resolve(opts.dataDir);
 	const url = `http://localhost:${String(
 		opts.port ?? process.env.PORT ?? "8787",
 	)}`;
@@ -287,8 +287,8 @@ function uid() {
 /** launchd label / systemd unit name / Windows task name for a service name. */
 function serviceLabel(name) {
 	if (isMac) {
-		return name === "omp-web-ui"
-			? "com.xingshuyin.omp-web-ui"
+		return name === "pi-web-ui"
+			? "com.xingshuyin.pi-web-ui"
 			: `com.${name}.server`;
 	}
 	return name;
@@ -307,11 +307,11 @@ function systemdUnitPath(name) {
 	return `/etc/systemd/system/${name}.service`;
 }
 
-/** Windows: per-user config dir (%APPDATA%\omp-web-ui) holding the .cmd wrapper + task XML. */
+/** Windows: per-user config dir (%APPDATA%\pi-web-ui) holding the .cmd wrapper + task XML. */
 function winServiceDir() {
 	return join(
 		process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
-		"omp-web-ui",
+		"pi-web-ui",
 	);
 }
 
@@ -328,7 +328,7 @@ function winTaskXmlPath(name) {
 }
 
 function winLogPath() {
-	return join(homedir(), "omp-web-ui.log");
+	return join(homedir(), "pi-web-ui.log");
 }
 
 /** True when a scheduled task with this name exists (schtasks exits 0). */
@@ -343,12 +343,12 @@ function winTaskExists(name) {
 // 桌面快捷方式（server shortcut）
 // ---------------------------------------------------------------------------
 
-const SHORTCUT_LNK_NAME = "omp-web-ui.lnk"; // Windows 桌面快捷方式
-const SHORTCUT_MAC_NAME = "omp-web-ui.command"; // macOS 双击启动器
-const SHORTCUT_LINUX_NAME = "omp-web-ui.desktop"; // Linux 桌面图标
+const SHORTCUT_LNK_NAME = "pi-web-ui.lnk"; // Windows 桌面快捷方式
+const SHORTCUT_MAC_NAME = "pi-web-ui.command"; // macOS 双击启动器
+const SHORTCUT_LINUX_NAME = "pi-web-ui.desktop"; // Linux 桌面图标
 
 /** 快捷方式图标（品牌 .ico，随包发布；.lnk / .desktop 指向它）。 */
-const APP_ICO_NAME = "omp-web-ui-logo.ico"; // 复制到用户目录后的稳定文件名（避开 omp-web-ui.ico —— Windows 对该路径有损坏的图标缓存残留，见 issue #xxx）
+const APP_ICO_NAME = "pi-web-ui-logo.ico"; // 复制到用户目录后的稳定文件名（避开 pi-web-ui.ico —— Windows 对该路径有损坏的图标缓存残留，见 issue #xxx）
 const APP_ICO_SOURCE = join(BIN_DIR, "..", "web", "public", "icon.ico"); // 包内品牌图标源文件（10 帧多分辨率，DPI 密度帧保证桌面/任务栏各尺寸颜色不失真）
 /** Branded SVG logo (source of truth: web/public/favicon.svg) — used on Linux. */
 const APP_SVG_PACKAGE = join(BIN_DIR, "..", "web", "public", "favicon.svg");
@@ -445,7 +445,7 @@ function buildWinShortcutPs1(env, cwd, taskName, url, logPath, pidPath) {
 		.join("\r\n");
 	const node = realNode();
 	return [
-		"# Generated by: omp-web-ui server shortcut (rerun to change)",
+		"# Generated by: pi-web-ui server shortcut (rerun to change)",
 		"# Runs hidden from the desktop shortcut: if the server is already up it",
 		"# opens the browser; a scheduled task (if installed) is used; otherwise",
 		"# the server runs in the foreground of this hidden window and its PID is",
@@ -472,7 +472,7 @@ function buildWinShortcutPs1(env, cwd, taskName, url, logPath, pidPath) {
 		"    Start-Sleep -Milliseconds 250",
 		"    if (Test-Up) { Open-Browser; exit 0 }",
 		"  }",
-		"  Write-Host ('✖ omp-web-ui 服务未在 30 秒内就绪，请查看日志: ' + $log)",
+		"  Write-Host ('✖ pi-web-ui 服务未在 30 秒内就绪，请查看日志: ' + $log)",
 		"  exit 1",
 		"}",
 		"",
@@ -561,7 +561,7 @@ function installWinShortcut(opts) {
 		`$lnk.TargetPath = ${psQuote(winWscript())}`,
 		`$lnk.Arguments = ${psQuote(vbsPath)}`,
 		`$lnk.WorkingDirectory = ${psQuote(cwd)}`,
-		"$lnk.Description = 'omp-web-ui — 双击启动服务并打开浏览器'",
+		"$lnk.Description = 'pi-web-ui — 双击启动服务并打开浏览器'",
 		`$lnk.IconLocation = ${psQuote(winIcoPath())} + ',0'`,
 		"$lnk.Save()",
 		`Write-Output (Join-Path $desktop ${psQuote(SHORTCUT_LNK_NAME)})`,
@@ -584,7 +584,7 @@ function installWinShortcut(opts) {
 	const lnk = (res.stdout ?? "").trim();
 	console.log(`✅ 已创建桌面快捷方式: ${lnk}`);
 	console.log(`   双击 : 服务未运行则启动（隐藏窗口，无黑窗），就绪后自动打开浏览器`);
-	console.log(`   停止 : omp-web-ui server stop（快捷方式启动的实例也会一并停止）`);
+	console.log(`   停止 : pi-web-ui server stop（快捷方式启动的实例也会一并停止）`);
 	console.log(`   端口 : ${port}`);
 	console.log(`   目录 : ${cwd}`);
 }
@@ -596,14 +596,14 @@ function buildMacShortcut(label, plist, url, env) {
 		.join("\n");
 	const node = realNode();
 	return `#!/bin/bash
-# omp-web-ui 启动器 — generated by: omp-web-ui server shortcut
+# pi-web-ui 启动器 — generated by: pi-web-ui server shortcut
 # 双击运行：确保服务在运行，然后打开浏览器。
 #   · 已安装 launchd 服务（登录自启）→ kickstart，图标主要用于「启动 + 打开」
 #   · 未安装服务 → 在本终端前台运行（关闭窗口即停止）
 LABEL=${shQuote(label)}
 PLIST=${shQuote(plist)}
 URL=${shQuote(url)}
-LOG=/tmp/omp-web-ui-shortcut.log
+LOG=/tmp/pi-web-ui-shortcut.log
 NODE=${shQuote(node)}
 ENTRY=${shQuote(SERVER_ENTRY)}
 ${exports}
@@ -655,10 +655,10 @@ function installMacShortcut(opts) {
 
 /** Linux: launcher script run by the .desktop icon. */
 function buildLinuxStartScript(unitName, url) {
-	const log = join(homedir(), ".local", "share", "omp-web-ui", "omp-web-ui.log");
+	const log = join(homedir(), ".local", "share", "pi-web-ui", "pi-web-ui.log");
 	const node = realNode();
 	return `#!/bin/bash
-# omp-web-ui 启动器 — generated by: omp-web-ui server shortcut
+# pi-web-ui 启动器 — generated by: pi-web-ui server shortcut
 # 双击运行：确保服务在运行，然后打开浏览器。
 #   · systemd 单元已安装 → systemctl start（系统单元需要授权，失败则前台运行）
 #   · 未安装 → 在本进程前台运行（终端关闭即停止）
@@ -690,18 +690,18 @@ if [ -n "\${SERVER_PID:-}" ]; then wait "$SERVER_PID"; fi
 function installLinuxShortcut(opts) {
 	const { name, port, cwd, dataDir } = serviceOptions(opts);
 	const url = `http://localhost:${port}`;
-	const scriptDir = join(homedir(), ".local", "share", "omp-web-ui");
+	const scriptDir = join(homedir(), ".local", "share", "pi-web-ui");
 	const scriptPath = join(scriptDir, `${name}-start.sh`);
 	const desktopPath = join(homedir(), "Desktop", SHORTCUT_LINUX_NAME);
 	const icoPath = join(scriptDir, APP_ICO_NAME); // 备用；优先 SVG
-	const svgPath = join(scriptDir, "omp-web-ui.svg");
+	const svgPath = join(scriptDir, "pi-web-ui.svg");
 	const script = buildLinuxStartScript(name, url);
 	const desktopIcon = existsSync(APP_SVG_PACKAGE) ? svgPath : APP_ICO_NAME;
 	const desktop = `[Desktop Entry]
 Version=1.0
 Type=Application
-Name=omp-web-ui
-Comment=启动 omp-web-ui 服务并打开浏览器
+Name=pi-web-ui
+Comment=启动 pi-web-ui 服务并打开浏览器
 Exec=${shQuote(scriptPath)}
 Icon=${shQuote(desktopIcon)}
 Terminal=false
@@ -755,7 +755,7 @@ function removeShortcut(name) {
 	} else if (isLinux) {
 		const p = join(homedir(), "Desktop", SHORTCUT_LINUX_NAME);
 		if (existsSync(p)) rmSync(p);
-		rmSync(join(homedir(), ".local", "share", "omp-web-ui"), {
+		rmSync(join(homedir(), ".local", "share", "pi-web-ui"), {
 			recursive: true,
 			force: true,
 		});
@@ -781,7 +781,7 @@ function buildWinStartPs1(env, cwd, logPath) {
 		.map(([k, v]) => `$env:${k} = ${psQuote(v)}`)
 		.join("\r\n");
 	return [
-		"# Generated by: omp-web-ui server install (rerun to change)",
+		"# Generated by: pi-web-ui server install (rerun to change)",
 		"# Starts the server with a hidden console window (no black cmd box).",
 		sets,
 		`Set-Location ${psQuote(cwd)}`,
@@ -801,7 +801,7 @@ function buildWinTaskXml(ps1Path, cwd) {
 	return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>omp-web-ui — web chat for Oh My Pi (auto-start at logon)</Description>
+    <Description>pi-web-ui — web chat for the pi coding agent (auto-start at logon)</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -863,7 +863,7 @@ function buildPlist(label, cwd, env) {
 		.join("\n");
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Generated by: omp-web-ui server install (do not edit by hand — rerun to change) -->
+<!-- Generated by: pi-web-ui server install (do not edit by hand — rerun to change) -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -891,9 +891,9 @@ ${entries}
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/tmp/omp-web-ui.log</string>
+  <string>/tmp/pi-web-ui.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/omp-web-ui.err</string>
+  <string>/tmp/pi-web-ui.err</string>
 </dict>
 </plist>
 `;
@@ -904,9 +904,9 @@ function buildUnit(cwd, env) {
 	const envLines = Object.entries(env)
 		.map(([k, v]) => `Environment=${k}=${v}`)
 		.join("\n");
-	return `# Generated by: omp-web-ui server install (do not edit by hand — rerun to change)
+	return `# Generated by: pi-web-ui server install (do not edit by hand — rerun to change)
 [Unit]
-Description=omp-web-ui — web chat for Oh My Pi
+Description=pi-web-ui — web chat for the pi coding agent
 After=network.target
 
 [Service]
@@ -938,18 +938,18 @@ function ensureRootForSystemctl() {
 
 /** Shared option normalization for install. */
 function serviceOptions(opts) {
-	const name = opts.name ?? "omp-web-ui";
+	const name = opts.name ?? "pi-web-ui";
 	const port = String(opts.port ?? process.env.PORT ?? "8787");
 	if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
 		fail(`无效端口: ${port}`);
 	}
-	const cwd = resolve(opts.cwd ?? process.env.OMP_WEB_CWD ?? process.cwd());
+	const cwd = resolve(opts.cwd ?? process.env.PI_WEB_CWD ?? process.cwd());
 	if (!existsSync(cwd)) fail(`工作目录不存在: ${cwd}`);
 	let dataDir;
 	if (opts.dataDir) {
 		dataDir = resolve(opts.dataDir);
-	} else if (process.env.OMP_WEB_DATA_DIR) {
-		dataDir = resolve(process.env.OMP_WEB_DATA_DIR);
+	} else if (process.env.PI_WEB_DATA_DIR) {
+		dataDir = resolve(process.env.PI_WEB_DATA_DIR);
 	}
 	return { name, port, cwd, dataDir };
 }
@@ -957,7 +957,7 @@ function serviceOptions(opts) {
 function serviceEnv(port, cwd, dataDir) {
 	const env = {
 		PORT: port,
-		OMP_WEB_CWD: cwd,
+		PI_WEB_CWD: cwd,
 	};
 	// Interactive Windows tasks inherit the user's PATH; only systemd/launchd
 	// run with a minimal environment that needs an explicit PATH.
@@ -968,7 +968,7 @@ function serviceEnv(port, cwd, dataDir) {
 	// shell's locale into the service env so spawned terminals are UTF-8.
 	if (!isWin && process.env.LANG) env.LANG = process.env.LANG;
 	if (!isWin && process.env.LC_ALL) env.LC_ALL = process.env.LC_ALL;
-	if (dataDir) env.OMP_WEB_DATA_DIR = dataDir;
+	if (dataDir) env.PI_WEB_DATA_DIR = dataDir;
 	return env;
 }
 
@@ -993,9 +993,9 @@ function installLaunchd(opts) {
 	console.log(`   端口 : ${port}`);
 	console.log(`   目录 : ${cwd}`);
 	console.log(`   访问 : http://localhost:${port}`);
-	console.log(`   日志 : /tmp/omp-web-ui.log  /tmp/omp-web-ui.err`);
-	console.log(`   管理 : omp-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : omp-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   日志 : /tmp/pi-web-ui.log  /tmp/pi-web-ui.err`);
+	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function installSystemd(opts) {
@@ -1015,12 +1015,12 @@ function installSystemd(opts) {
 	console.log(`   目录 : ${cwd}`);
 	console.log(`   访问 : http://localhost:${port}`);
 	console.log(`   日志 : journalctl -u ${name}.service -f`);
-	console.log(`   管理 : omp-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : omp-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function uninstallLaunchd(opts) {
-	const name = opts.name ?? "omp-web-ui";
+	const name = opts.name ?? "pi-web-ui";
 	const label = serviceLabel(name);
 	const plist = launchAgentPlist(name);
 	run("launchctl", ["bootout", `gui/${uid()}/${label}`], {
@@ -1034,7 +1034,7 @@ function uninstallLaunchd(opts) {
 }
 
 function uninstallSystemd(opts) {
-	const name = opts.name ?? "omp-web-ui";
+	const name = opts.name ?? "pi-web-ui";
 	ensureRootForSystemctl();
 	run("systemctl", ["disable", "--now", `${name}.service`], {
 		ignoreError: true,
@@ -1082,12 +1082,12 @@ function installWindows(opts) {
 	console.log(
 		`   说明 : 登录后自启（与 launchd 用户代理一致）；stop 停止，uninstall 移除`,
 	);
-	console.log(`   管理 : omp-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : omp-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function uninstallWindows(opts) {
-	const name = opts.name ?? "omp-web-ui";
+	const name = opts.name ?? "pi-web-ui";
 	if (winTaskExists(name)) {
 		run("schtasks", ["/Delete", "/TN", name, "/F"], { ignoreError: true });
 	}
@@ -1119,12 +1119,12 @@ function uninstallWindows(opts) {
 function controlPath(opts) {
 	const dir = opts.dataDir
 		? resolve(opts.dataDir)
-		: process.env.OMP_WEB_DATA_DIR
-			? resolve(process.env.OMP_WEB_DATA_DIR)
-			: join(homedir(), ".omp-web");
+		: process.env.PI_WEB_DATA_DIR
+			? resolve(process.env.PI_WEB_DATA_DIR)
+			: join(homedir(), ".pi-web");
 	return isWin
-		? `\\\\.\\pipe\\omp-web-ui-${String(opts.port ?? process.env.PORT ?? "8787")}`
-		: join(dir, "omp-web-ui.sock");
+		? `\\\\.\\pipe\\pi-web-ui-${String(opts.port ?? process.env.PORT ?? "8787")}`
+		: join(dir, "pi-web-ui.sock");
 }
 
 /** Send one control command to a RUNNING server; resolves null if unreachable. */
@@ -1186,13 +1186,13 @@ async function setQuiesce(opts, on) {
 	console.log(
 		on
 			? "⏸  已进入排空模式（quiesce）：拒绝新的对话/消息/编辑，存量运行继续跑完。\n" +
-				"    跑完后用 omp-web-ui server unquiesce 恢复。"
+				"    跑完后用 pi-web-ui server unquiesce 恢复。"
 			: "▶  已解除排空模式（unquiesce）：恢复接收新的对话/消息/编辑。",
 	);
 }
 
 function controlService(action, opts) {
-	const name = opts.name ?? "omp-web-ui";
+	const name = opts.name ?? "pi-web-ui";
 
 	if (isMac) {
 		const label = serviceLabel(name);
@@ -1209,7 +1209,7 @@ function controlService(action, opts) {
 				const state = (res.stdout.match(/state = (\w+)/) ?? [])[1] ?? "loaded";
 				console.log(`${label}: ${state}（已加载，开机自启中）`);
 			} else {
-				console.log(`${label}: 未安装（运行 omp-web-ui server install 安装）`);
+				console.log(`${label}: 未安装（运行 pi-web-ui server install 安装）`);
 			}
 			return;
 		}
@@ -1220,7 +1220,7 @@ function controlService(action, opts) {
 			} else {
 				const plist = launchAgentPlist(name);
 				if (!existsSync(plist)) {
-					fail(`找不到 ${plist}，请先运行 omp-web-ui server install`);
+					fail(`找不到 ${plist}，请先运行 pi-web-ui server install`);
 				}
 				run("launchctl", ["bootstrap", `gui/${uid()}`, plist]);
 			}
@@ -1229,7 +1229,7 @@ function controlService(action, opts) {
 		}
 
 		if (action === "restart") {
-			if (!loaded()) fail(`${label} 未加载，请先 omp-web-ui server start`);
+			if (!loaded()) fail(`${label} 未加载，请先 pi-web-ui server start`);
 			run("launchctl", ["kickstart", "-k", target]);
 			console.log(`✅ 已重启 ${label}`);
 			return;
@@ -1265,7 +1265,7 @@ function controlService(action, opts) {
 			const pid = winReadPid(name);
 			const instAlive = pid && pidAlive(pid);
 			if (!exists) {
-				console.log(`${name}: 未安装（运行 omp-web-ui server install 安装）`);
+				console.log(`${name}: 未安装（运行 pi-web-ui server install 安装）`);
 				if (instAlive) console.log(`   快捷方式实例 : 运行中 (PID ${pid})`);
 				return;
 			}
@@ -1289,7 +1289,7 @@ function controlService(action, opts) {
 				{ encoding: "utf8" },
 			);
 			if (ps.status !== 0 || (ps.stdout ?? "").includes("NOT_INSTALLED")) {
-				console.log(`${name}: 未安装（运行 omp-web-ui server install 安装）`);
+				console.log(`${name}: 未安装（运行 pi-web-ui server install 安装）`);
 				return;
 			}
 			console.log(`${name}: 计划任务\n${(ps.stdout ?? "").trim()}`);
@@ -1301,14 +1301,14 @@ function controlService(action, opts) {
 		}
 
 		if (action === "start") {
-			if (!exists) fail(`${name} 不存在，请先运行 omp-web-ui server install`);
+			if (!exists) fail(`${name} 不存在，请先运行 pi-web-ui server install`);
 			run("schtasks", ["/Run", "/TN", name]);
 			console.log(`✅ 已启动 ${name}`);
 			return;
 		}
 
 		if (action === "restart") {
-			if (!exists) fail(`${name} 不存在，请先运行 omp-web-ui server install`);
+			if (!exists) fail(`${name} 不存在，请先运行 pi-web-ui server install`);
 			run("schtasks", ["/End", "/TN", name], {
 				ignoreError: true,
 				silent: true,
@@ -1354,9 +1354,9 @@ function controlService(action, opts) {
 const PLUGIN_ID_RE = /^[A-Za-z0-9_-]+$/;
 
 const PLUGIN_HELP = `用法:
-  omp-web-ui install <源> [选项]     安装 GitHub 上的界面插件
-  omp-web-ui uninstall <id> [选项]   卸载已安装的界面插件
-  omp-web-ui plugins [选项]          列出已安装的界面插件
+  pi-web-ui install <源> [选项]     安装 GitHub 上的界面插件
+  pi-web-ui uninstall <id> [选项]   卸载已安装的界面插件
+  pi-web-ui plugins [选项]          列出已安装的界面插件
 
 源写法（任选其一）:
   owner/repo                                        简写
@@ -1367,7 +1367,7 @@ const PLUGIN_HELP = `用法:
 
 install 选项:
   --name <id>       插件目录名/id（默认取仓库名或 manifest.id，仅限字母数字-_）
-  --data-dir <dir>  数据目录（默认 ~/.omp-web 或 $OMP_WEB_DATA_DIR）
+  --data-dir <dir>  数据目录（默认 ~/.pi-web 或 $PI_WEB_DATA_DIR）
   --force           目标目录已存在时覆盖（覆盖前自动备份旧版本）
 
 plugins 选项:
@@ -1376,7 +1376,7 @@ plugins 选项:
 `;
 
 function pluginDataDir(opts) {
-	return resolve(opts.dataDir ?? process.env.OMP_WEB_DATA_DIR ?? join(homedir(), ".omp-web"));
+	return resolve(opts.dataDir ?? process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"));
 }
 
 /** 解析安装源为 { owner, repo, ref, subpath, cloneUrl } 或本地路径；非法输入直接退出。 */
@@ -1491,7 +1491,7 @@ function locatePluginRoot(checkout, subpath, repoLabel) {
 	if (existsSync(join(checkout, "manifest.json"))) return checkout;
 	const hits = findManifestDirs(checkout);
 	if (hits.length === 0)
-		fail(`"${repoLabel}" 里没找到 manifest.json —— 不是 omp-web-ui 界面插件`);
+		fail(`"${repoLabel}" 里没找到 manifest.json —— 不是 pi-web-ui 界面插件`);
 	if (hits.length > 1)
 		fail(
 			`${repoLabel} 里有多个插件（多个 manifest.json），请用子目录写法指定其中一个:\n  ` +
@@ -1508,14 +1508,14 @@ async function pluginInstallCmd(argv) {
 		return;
 	}
 	if (positionals.length !== 1)
-		fail(`用法: omp-web-ui install <源> [--name <id>] [--data-dir <dir>] [--force]\n${PLUGIN_HELP}`);
+		fail(`用法: pi-web-ui install <源> [--name <id>] [--data-dir <dir>] [--force]\n${PLUGIN_HELP}`);
 	const rawSpec = positionals[0];
 	const pluginsDir = join(pluginDataDir(opts), "plugins");
 	// 本地目录直接装（离线开发调试），否则从 GitHub 拉取
 	const localCandidate = resolve(rawSpec.replace(/^file:\/\//, ""));
 	const isLocal = existsSync(localCandidate);
 	const src = isLocal ? null : parsePluginSource(rawSpec);
-	const tmp = mkdtempSync(join(tmpdir(), "omp-web-ui-plugin-"));
+	const tmp = mkdtempSync(join(tmpdir(), "pi-web-ui-plugin-"));
 	let backupTs = null;
 	try {
 		let checkout;
@@ -1588,7 +1588,7 @@ async function pluginInstallCmd(argv) {
 			/* 尽力而为：没有来源信息只是不显示更新按钮 */
 		}
 		// 记录本次安装的远端 sha（git ls-remote HEAD，离线也支持本地 git 源）：
-		// 供 `omp-web-ui plugins --check-updates` 对比更新。失败静默（无 sha = 保守可更新）。
+		// 供 `pi-web-ui plugins --check-updates` 对比更新。失败静默（无 sha = 保守可更新）。
 		try {
 			const sha = await resolveRemoteSha(rawSpec);
 			if (sha) writeFileSync(join(target, ".pi-git-sha"), sha + "\n");
@@ -1600,7 +1600,7 @@ async function pluginInstallCmd(argv) {
 		);
 		if (manifest.description) console.log(`  ${manifest.description}`);
 		console.log(`  位置: ${target}`);
-		console.log(`  生效: 服务运行中刷新浏览器即可加载；未运行则下次启动生效。卸载: omp-web-ui uninstall ${id}`);
+		console.log(`  生效: 服务运行中刷新浏览器即可加载；未运行则下次启动生效。卸载: pi-web-ui uninstall ${id}`);
 	} finally {
 		rmSync(tmp, { recursive: true, force: true });
 	}
@@ -1616,7 +1616,7 @@ function pluginUninstallCmd(argv) {
 	const id = positionals[0];
 	if (!PLUGIN_ID_RE.test(id)) fail(`非法插件 id: ${id}`);
 	const target = join(pluginDataDir(opts), "plugins", id);
-	if (!existsSync(target)) fail(`未安装插件 "${id}"（omp-web-ui plugins 查看已装列表）`);
+	if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-web-ui plugins 查看已装列表）`);
 	rmSync(target, { recursive: true, force: true });
 	console.log(`✔ 已卸载插件 ${id} —— 运行中的服务刷新浏览器后消失。`);
 }
@@ -1633,7 +1633,7 @@ function pluginListCmd(argv) {
 		const id = String(opts.rollback);
 		if (!PLUGIN_ID_RE.test(id)) fail(`非法插件 id: ${id}`);
 		const target = join(dataDir, "plugins", id);
-		if (!existsSync(target)) fail(`未安装插件 "${id}"（omp-web-ui plugins 查看已装列表）`);
+		if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-web-ui plugins 查看已装列表）`);
 		const ts = restorePluginBackup(dataDir, id);
 		if (!ts) fail(`插件 "${id}" 没有更新备份（从未覆盖安装 / 备份已用完）`);
 		console.log(`✔ 已回滚插件 ${id} 到 ${ts} 的快照 —— 运行中的服务刷新浏览器后生效。`);
@@ -1661,7 +1661,7 @@ function pluginListCmd(argv) {
 		}
 	}
 	if (rows.length === 0) {
-		console.log(`尚未安装任何界面插件（目录: ${pluginsDir}）\n安装示例: omp-web-ui install owner/repo`);
+		console.log(`尚未安装任何界面插件（目录: ${pluginsDir}）\n安装示例: pi-web-ui install owner/repo`);
 		return;
 	}
 	console.log(`已安装的界面插件（${pluginsDir}）:\n${rows.join("\n")}`);
@@ -1684,7 +1684,7 @@ async function checkUpdatesCmd(dataDir) {
 		const label = r.name && r.name !== r.id ? `${r.id}（${r.name}）` : r.id;
 		if (r.updatable) {
 			console.log(`  🔄 ${label}${r.version ? ` v${r.version}` : ""}  可更新（已装 ${r.localSha ?? "未知"} → 远端 ${r.remoteSha}）`);
-			console.log(`     更新: omp-web-ui install ${r.source} --name ${r.id} --force`);
+			console.log(`     更新: pi-web-ui install ${r.source} --name ${r.id} --force`);
 			any = true;
 		} else if (r.remoteSha) {
 			console.log(`  ✓ ${label}${r.version ? ` v${r.version}` : ""}  已是最新（${r.remoteSha}）`);

@@ -110,7 +110,7 @@ try {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			OMP_WEB_DATA_DIR: dataDir,
+			PI_WEB_DATA_DIR: dataDir,
 			PI_DB_CLIENT_NO_AUTOINSTALL: "1",
 		},
 		stdio: ["ignore", "ignore", "pipe"],

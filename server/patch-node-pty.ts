@@ -73,7 +73,7 @@ function applyPatches(): void {
 		pkgDir,
 		"lib/windowsConoutConnection.js",
 		"console.warn('Unexpected ConoutWorkerMessage', message);",
-		"break; // omp-web-ui: ignore Node --watch worker messages",
+		"break; // pi-web-ui: ignore Node --watch worker messages",
 	);
 	// 2. windowsPtyAgent kill path: only accept a real console-list reply
 	//    (watch messages arrive first on the fork channel and carry no
@@ -84,7 +84,7 @@ function applyPatches(): void {
 		"agent.on('message', function (message) {\n                clearTimeout(timeout);\n                resolve(message.consoleProcessList);\n            });",
 		[
 			"            agent.on('message', function (message) {",
-			"                // omp-web-ui: ignore Node --watch messages on the fork channel",
+			"                // pi-web-ui: ignore Node --watch messages on the fork channel",
 			"                if (message && Array.isArray(message.consoleProcessList)) {",
 			"                    clearTimeout(timeout);",
 			"                    resolve(message.consoleProcessList);",
@@ -105,7 +105,7 @@ function applyPatches(): void {
 			"    process.send({ consoleProcessList: consoleProcessList });",
 			"} catch (error) {",
 			"    if (!error || error.message !== 'AttachConsole failed') throw error;",
-			"    // omp-web-ui: the console may already be gone during ConPTY teardown",
+			"    // pi-web-ui: the console may already be gone during ConPTY teardown",
 			"    process.send({ consoleProcessList: [] });",
 			"}",
 		].join("\n"),

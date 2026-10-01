@@ -10,7 +10,7 @@ import {
 
 export type Locale = "zh" | "en";
 
-const STORAGE_KEY = "omp-web-ui:lang";
+const STORAGE_KEY = "pi-web-ui:lang";
 
 /* ------------------------------------------------------------------ */
 /* zh (default)                                                        */
@@ -104,7 +104,7 @@ const zh = {
 	language: "语言",
 	langZh: "中文",
 	langEn: "English",
-	githubRepo: "GitHub 仓库（youweichen0208/omp-web-ui）",
+	githubRepo: "GitHub 仓库（youweichen0208/pi-web-ui）",
 	copy: "复制",
 
 	/* topbar */
@@ -278,7 +278,7 @@ const zh = {
 	bgTaskHours: "{n} 小时前",
 	bgTaskDays: "{n} 天前",
 	stopBash: "停止",
-	stopBashTip: "停止当前任务及正在运行的命令",
+	stopBashTip: "停止正在运行的 bash 命令（对话继续）",
 	supplement: "排队",
 	supplementTip: "加入队列：AI 回答完全结束后才发送（不打断）",
 	queueSteerTag: "插队",
@@ -322,7 +322,7 @@ const zh = {
 	componentCheckFailed: "检查失败，可重试",
 	componentChecking: "正在检查…",
 	componentCheck: "检查更新",
-	componentUpdateIntro: "查看运行中的 OMP 与扩展安装版本。检查不会自动安装；用户扩展更新后需重启应用。",
+	componentUpdateIntro: "查看运行中的 pi Agent 与扩展安装版本。检查不会自动安装；用户扩展更新后需重启应用。",
 	componentOffline: "连接恢复后可检查更新。",
 	componentInstalling: "正在更新扩展，请等待完成…",
 	componentRestart: "更新已安装，请重启应用以加载新版本。",
@@ -345,7 +345,6 @@ const zh = {
 	todoItemAdded: "新增第 {n} 项",
 	todoItemUpdated: "第 {n} 项已修改",
 	todoItemPending: "第 {n} 项待执行",
-	todoItemBlocked: "第 {n} 项受阻",
 	todoItemStarted: "第 {n} 项开始",
 	todoItemCompleted: "第 {n} 项完成",
 	todoItemDeleted: "第 {n} 项已移除",
@@ -511,7 +510,7 @@ const zh = {
 
 	/* self-update */
 	update: "更新",
-	updateTip: "检查并更新 omp-web-ui",
+	updateTip: "检查并更新 pi-web-ui",
 	currentVersion: "当前版本",
 	latestVersion: "最新版本",
 	checkingUpdate: "检查中…",
@@ -521,9 +520,9 @@ const zh = {
 	updateJustPublished:
 		"v{version} 刚刚发布，npm 缓存可能尚未同步——若未检测到新版本，请稍后重新检查",
 	updateNow: "在终端中更新",
-	updateTabTitle: "更新 omp-web-ui",
+	updateTabTitle: "更新 pi-web-ui",
 	updateTerminalHint:
-		"点击后会在可见终端中运行 npm i -g @youweichen/omp-web-ui@next；完成后重启服务生效（omp-web-ui server restart）。",
+		"点击后会在可见终端中运行 npm i -g pi-web-ui@latest；完成后重启服务生效（pi-web-ui server restart）。",
 
 	/* right panel */
 	rootDir: "根目录",
@@ -672,30 +671,25 @@ const zh = {
 	"sound.error.desc": "出现错误提示时",
 
 	/* pi setup modal */
-	setupTitle: "未检测到 OMP 配置",
+	setupTitle: "未检测到 pi agent 配置",
 	setupDesc:
-		"omp-web-ui 需要 OMP 的配置目录（~/.omp/agent）和至少一个 API 密钥才能运行智能体。OMP 内置了 openai、anthropic、deepseek 等服务商——选一个填密钥即可，全程无需打开终端。",
-	installFailed: "✖ OMP 安装失败：",
+		"pi-web-ui 需要 pi 的配置目录（~/.pi/agent）和至少一个 API 密钥才能运行智能体。pi 内置了 openai、anthropic、deepseek 等服务商——选一个填密钥即可，全程无需打开终端。",
+	installFailed: "✖ pi agent 安装失败：",
 	retryInstall: "重试安装",
 	skip: "跳过",
 	installDone:
-		"✅ OMP CLI 已安装。选择服务商并填入 API 密钥即可开始对话：",
+		"✅ pi agent CLI 已安装。选择服务商并填入 API 密钥即可开始对话：",
 	cliReadyHint:
-		"✅ 本地已检测到 OMP，选择服务商并填入 API 密钥即可开始对话：",
+		"✅ 本地已检测到 pi agent，选择服务商并填入 API 密钥即可开始对话：",
 	provider: "服务商",
 	configured: "已配置",
 	providerKeyReady: "该服务商已配置密钥，可直接使用或更换新密钥。",
 	apiKey: "API 密钥",
-	providerNoAuth: "此服务商无需认证（本地模型）",
-	subagentRunning: "执行中",
-	subagentCompleted: "已完成",
-	subagentAborted: "已停止",
-	subagentFailed: "失败",
 	saving: "保存中…",
 	saveAndStart: "保存并开始使用",
 	recheck: "重新检测",
-	installing: "正在安装 OMP CLI…",
-	autoInstall: "自动安装 OMP",
+	installing: "正在安装 pi agent CLI…",
+	autoInstall: "自动安装 pi agent",
 
 	/* messages */
 	attachment: "附件",
@@ -716,7 +710,7 @@ const zh = {
 	folderNotExpanded: "文件夹，未展开内容 —— 智能体会按需浏览目录",
 	fileNotExpanded: "文件较大（{size}），未展开内容 —— 智能体会按需读取",
 	"role.user": "你",
-	"role.assistant": "OMP",
+	"role.assistant": "pi",
 	"role.tool": "工具",
 	"role.bash": "终端",
 	"role.branch": "分支摘要",
@@ -812,7 +806,7 @@ const zh = {
 	noTerminal: "暂无终端",
 	exited: "（已退出{code}）",
 	closeTerminal: "关闭终端",
-	rerun: "重新读取 .omp/commands.json",
+	rerun: "重新读取 .pi/commands.json",
 	terminalTitle: "终端 {n}",
 	exampleName: "例如：启动开发服务器",
 	exampleCommand: "例如：npm run dev",
@@ -874,7 +868,7 @@ const zh = {
 	replaceKey: "更换密钥",
 	replaceKeyTitle: "替换已保存的密钥",
 	clearKey: "清空",
-	clearKeyTitle: "清除该服务商保存在 agent.db 的密钥，回到未配置状态（环境变量来源的无法在此清除）",
+	clearKeyTitle: "清除该服务商保存在 auth.json 的密钥，回到未配置状态（环境变量来源的无法在此清除）",
 	clearKeyConfirm: "清空 {id} 已保存的密钥？其模型将从列表消失，直到重新配置。",
 	cloneProvider: "复制为自定义",
 	cloning: "复制中",
@@ -884,7 +878,7 @@ const zh = {
 	saveKey: "保存密钥",
 	customProviders: "自定义服务商",
 	customDesc:
-		"用于 Ollama / vLLM / 兼容 OpenAI 的代理等，写入 OMP 的 models.yml，保存后热重载、立即生效。",
+		"用于 Ollama / vLLM / 兼容 OpenAI 的代理等，写入 pi 的 models.json，保存后热重载、立即生效。",
 	noCustomProviders: "还没有自定义服务商",
 	modelsCount: "{n} 个模型",
 	addProvider: "新增服务商",
@@ -894,7 +888,7 @@ const zh = {
 	displayNamePh: "我的代理",
 	apiType: "API 类型",
 	baseUrlHint: "（OpenAI 兼容端点）",
-	apiKeyHint: "sk-…（留空保留已保存的密钥）",
+	apiKeyHint: "sk-…（可留空，用 auth.json 的密钥）",
 	authHeader: "自动添加 Authorization 请求头",
 	modelsTitle: "模型",
 	modelIdReq: "模型 ID（必填）",
@@ -1006,14 +1000,14 @@ const zh = {
 		"替换模式：完全用自定义内容替换内置转写提示词。切换后输入框会显示内置默认提示词，可直接修改；不改动失焦则仍使用默认。",
 	uninstallExt: "卸载",
 	uninstallConfirm: "确认卸载？",
-	uninstallConfirmHint: "再次点击确认，将在终端执行 omp plugin uninstall",
-	uninstallHint: "通过可见终端执行 omp plugin uninstall 卸载此包，完成后自动刷新列表",
+	uninstallConfirmHint: "再次点击确认，将在终端执行 pi remove",
+	uninstallHint: "通过可见终端执行 pi remove 卸载此包，完成后自动刷新列表",
 	uninstallTitle: "卸载",
 	pluginUpdate: "更新",
 	pluginUpdateHint:
 		"从安装来源重新拉取并覆盖安装（保留 config.json 配置），完成后自动重载插件列表",
 	pluginUninstallHint:
-		"在可见终端执行 omp-web-ui uninstall 卸载此插件（再次点击确认），完成后自动刷新列表",
+		"在可见终端执行 pi-web-ui uninstall 卸载此插件（再次点击确认），完成后自动刷新列表",
 	settingsExtensions: "插件",
 	settingsUiPlugins: "界面插件",
 	noUiPlugins: "未安装界面组件（<dataDir>/plugins/）",
@@ -1035,7 +1029,7 @@ const zh = {
 
 	/* app */
 	loadingSession: "正在加载会话…",
-	connectingServer: "正在连接 omp-web-ui 服务器…",
+	connectingServer: "正在连接 pi-web-ui 服务器…",
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -1130,7 +1124,7 @@ const en: Record<keyof typeof zh, string> = {
 	language: "Language",
 	langZh: "中文",
 	langEn: "English",
-	githubRepo: "GitHub repository (youweichen0208/omp-web-ui)",
+	githubRepo: "GitHub repository (youweichen0208/pi-web-ui)",
 	copy: "Copy",
 
 	/* topbar */
@@ -1305,7 +1299,7 @@ const en: Record<keyof typeof zh, string> = {
 	bgTaskHours: "{n} hr ago",
 	bgTaskDays: "{n} days ago",
 	stopBash: "Stop",
-	stopBashTip: "Stop the current task and its running commands",
+	stopBashTip: "Stop the running bash command (conversation continues)",
 	supplement: "Queue",
 	supplementTip: "Add to queue: sent only after the whole run finishes (no interruption)",
 	queueSteerTag: "Steer",
@@ -1349,7 +1343,7 @@ const en: Record<keyof typeof zh, string> = {
 	componentCheckFailed: "Check failed; retry available",
 	componentChecking: "Checking\u2026",
 	componentCheck: "Check for updates",
-	componentUpdateIntro: "Running OMP and installed extension versions. Checks never install updates. Restart the app after updating user extensions.",
+	componentUpdateIntro: "Running pi Agent and installed extension versions. Checks never install updates. Restart the app after updating user extensions.",
 	componentOffline: "Reconnect to check for updates.",
 	componentInstalling: "Updating extension. Please wait\u2026",
 	componentRestart: "Update installed. Restart the app to load the new version.",
@@ -1372,7 +1366,6 @@ const en: Record<keyof typeof zh, string> = {
 	todoItemAdded: "Item {n} added",
 	todoItemUpdated: "Item {n} updated",
 	todoItemPending: "Item {n} pending",
-	todoItemBlocked: "Item {n} blocked",
 	todoItemStarted: "Item {n} started",
 	todoItemCompleted: "Item {n} completed",
 	todoItemDeleted: "Item {n} removed",
@@ -1408,7 +1401,7 @@ const en: Record<keyof typeof zh, string> = {
 	taskArtifactEdit: "Edit",
 	taskArtifactRun: "Run",
 	taskLines: "lines",
-	taskExplicitPlan: "OMP plan",
+	taskExplicitPlan: "Pi plan",
 	taskPlanSteps: "steps",
 	taskPlanPosition: "Step {current} / {total}",
 	taskPlanChanged: "Plan updated",
@@ -1539,7 +1532,7 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* self-update */
 	update: "Update",
-	updateTip: "Check & update omp-web-ui",
+	updateTip: "Check & update pi-web-ui",
 	currentVersion: "Current version",
 	latestVersion: "Latest version",
 	checkingUpdate: "Checking…",
@@ -1549,9 +1542,9 @@ const en: Record<keyof typeof zh, string> = {
 	updateJustPublished:
 		"v{version} was just published — npm cache may lag; if the new version isn't detected yet, re-check in a moment",
 	updateNow: "Update in terminal",
-	updateTabTitle: "Update omp-web-ui",
+	updateTabTitle: "Update pi-web-ui",
 	updateTerminalHint:
-		"Clicking runs npm i -g @youweichen/omp-web-ui@next in a visible terminal; restart the service afterwards to take effect (omp-web-ui server restart).",
+		"Clicking runs npm i -g pi-web-ui@latest in a visible terminal; restart the service afterwards to take effect (pi-web-ui server restart).",
 
 	/* right panel */
 	rootDir: "Root",
@@ -1702,30 +1695,25 @@ const en: Record<keyof typeof zh, string> = {
 	"sound.error.desc": "When an error notice appears",
 
 	/* pi setup modal */
-	setupTitle: "OMP config not detected",
+	setupTitle: "pi agent config not detected",
 	setupDesc:
-		"omp-web-ui needs OMP's config directory (~/.omp/agent) and at least one API key to run the agent. OMP has built-in providers such as openai, anthropic, and deepseek — just pick one and enter a key, no terminal needed.",
-	installFailed: "✖ OMP installation failed:",
+		"pi-web-ui needs pi's config directory (~/.pi/agent) and at least one API key to run the agent. pi has built-in providers such as openai, anthropic, and deepseek — just pick one and enter a key, no terminal needed.",
+	installFailed: "✖ pi agent installation failed:",
 	retryInstall: "Retry install",
 	skip: "Skip",
 	installDone:
-		"✅ OMP CLI installed. Pick a provider and enter an API key to start chatting:",
+		"✅ pi agent CLI installed. Pick a provider and enter an API key to start chatting:",
 	cliReadyHint:
-		"✅ OMP CLI already installed locally. Pick a provider and enter an API key to start chatting:",
+		"✅ pi agent CLI already installed locally. Pick a provider and enter an API key to start chatting:",
 	provider: "Provider",
 	configured: "configured",
 	providerKeyReady: "This provider already has a key — use it or replace it.",
 	apiKey: "API key",
-	providerNoAuth: "No authentication required (local models)",
-	subagentRunning: "Working",
-	subagentCompleted: "Completed",
-	subagentAborted: "Stopped",
-	subagentFailed: "Failed",
 	saving: "Saving…",
 	saveAndStart: "Save and start using",
 	recheck: "Recheck",
-	installing: "Installing OMP CLI…",
-	autoInstall: "Auto-install OMP",
+	installing: "Installing pi agent CLI…",
+	autoInstall: "Auto-install pi agent",
 
 	/* messages */
 	attachment: "Attachment",
@@ -1748,14 +1736,14 @@ const en: Record<keyof typeof zh, string> = {
 	fileNotExpanded:
 		"Large file ({size}) — content not expanded, the agent will read it as needed",
 	"role.user": "You",
-	"role.assistant": "OMP",
+	"role.assistant": "pi",
 	"role.tool": "Tool",
 	"role.bash": "Terminal",
 	"role.branch": "Branch summary",
 	"role.compaction": "Context compacted",
 
 	/* welcome / message list */
-	welcomeTitle: "Oh My Pi",
+	welcomeTitle: "pi coding agent",
 	welcomeSub: "Inspect, edit, run — always ready",
 	directory: "Directory",
 	clickToFill: "Click to fill input",
@@ -1848,7 +1836,7 @@ const en: Record<keyof typeof zh, string> = {
 	noTerminal: "No terminals",
 	exited: "(exited{code})",
 	closeTerminal: "Close terminal",
-	rerun: "Reload .omp/commands.json",
+	rerun: "Reload .pi/commands.json",
 	terminalTitle: "Terminal {n}",
 	exampleName: "e.g. start dev server",
 	exampleCommand: "e.g. npm run dev",
@@ -1912,7 +1900,7 @@ const en: Record<keyof typeof zh, string> = {
 	replaceKey: "Replace key",
 	replaceKeyTitle: "Replace the saved key",
 	clearKey: "Clear",
-	clearKeyTitle: "Remove this provider's key stored in agent.db; it returns to unconfigured (env-var sourced keys can't be cleared here)",
+	clearKeyTitle: "Remove this provider's key stored in auth.json; it returns to unconfigured (env-var sourced keys can't be cleared here)",
 	clearKeyConfirm: "Clear the stored key for {id}? Its models will leave the list until you configure it again.",
 	cloneProvider: "Clone as custom",
 	cloning: "Cloning",
@@ -1922,7 +1910,7 @@ const en: Record<keyof typeof zh, string> = {
 	saveKey: "Save key",
 	customProviders: "Custom providers",
 	customDesc:
-		"For Ollama / vLLM / OpenAI-compatible proxies, etc. Written to OMP's models.yml — hot-reloaded immediately.",
+		"For Ollama / vLLM / OpenAI-compatible proxies, etc. Written to pi's models.json — hot-reloaded immediately.",
 	noCustomProviders: "No custom providers yet",
 	modelsCount: "{n} models",
 	addProvider: "Add provider",
@@ -1932,7 +1920,7 @@ const en: Record<keyof typeof zh, string> = {
 	displayNamePh: "My proxy",
 	apiType: "API type",
 	baseUrlHint: "(OpenAI-compatible endpoint)",
-	apiKeyHint: "sk-… (optional — uses the agent.db key)",
+	apiKeyHint: "sk-… (optional — uses the auth.json key)",
 	authHeader: "Auto-add Authorization header",
 	modelsTitle: "Models",
 	modelIdReq: "Model ID (required)",
@@ -2044,14 +2032,14 @@ const en: Record<keyof typeof zh, string> = {
 		"Replace mode: custom text replaces the built-in transcription prompt entirely. After switching, the editor shows the built-in default prompt ready to edit; blurring without changes keeps the default.",
 	uninstallExt: "Uninstall",
 	uninstallConfirm: "Confirm?",
-	uninstallConfirmHint: "Click again to confirm — runs omp plugin uninstall in the terminal",
-	uninstallHint: "Runs omp plugin uninstall in a visible terminal, then refreshes the list automatically",
+	uninstallConfirmHint: "Click again to confirm — runs pi remove in the terminal",
+	uninstallHint: "Runs pi remove in a visible terminal, then refreshes the list automatically",
 	uninstallTitle: "Uninstall",
 	pluginUpdate: "Update",
 	pluginUpdateHint:
 		"Re-installs from the recorded source (--force, keeps config.json), then refreshes the plugin list automatically",
 	pluginUninstallHint:
-		"Runs omp-web-ui uninstall in a visible terminal (click again to confirm), then refreshes the list automatically",
+		"Runs pi-web-ui uninstall in a visible terminal (click again to confirm), then refreshes the list automatically",
 	settingsExtensions: "Extensions",
 	settingsUiPlugins: "UI plugins",
 	noUiPlugins: "No UI plugins installed (<dataDir>/plugins/)",
@@ -2073,7 +2061,7 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* app */
 	loadingSession: "Loading session…",
-	connectingServer: "Connecting to omp-web-ui server…",
+	connectingServer: "Connecting to pi-web-ui server…",
 };
 
 /* ------------------------------------------------------------------ */

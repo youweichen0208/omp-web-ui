@@ -1,5 +1,5 @@
 /**
- * omp-web-ui 插件管理器 —— 可选界面组件的加载与桥接。
+ * pi-web-ui 插件管理器 —— 可选界面组件的加载与桥接。
  *
  * 一个插件 = <dataDir>/plugins/<id>/ 目录：
  *   manifest.json   元数据 { id?, name, version?, description? }（id 缺省取目录名）
@@ -91,7 +91,7 @@ export interface PluginHost {
 	registerAgentTool(tool: PluginAgentTool): () => void;
 	/** 插件自己的持久化目录（<dataDir>/plugins/<id>）——凭据等放这里。 */
 	dir: string;
-	/** 全局数据目录（~/.omp-web）。 */
+	/** 全局数据目录（~/.pi-web）。 */
 	dataDir: string;
 	/** 当前智能体工作区——**活的**：跟随任意客户端 set_cwd 成功后的新根，
 	 *  插件可随时读；想主动感知变化用 onCwdChange。 */
@@ -122,7 +122,7 @@ export interface PluginHost {
 	 *  resolve 后的 import 才能成功——插件动态加载重型依赖前应 await 它。 */
 	ensureDeps(specs: string[], opts?: { onProgress?: (msg: string) => void }): Promise<boolean>;
 	/** 挂载 HTTP 路由：实际暴露为 /plugins-api/<id><path>（GET/POST/PUT/DELETE）。
-	 *  主站的 OMP_WEB_TOKEN 鉴权自动覆盖这些路由；body 已过 express.json 解析。
+	 *  主站的 PI_WEB_TOKEN 鉴权自动覆盖这些路由；body 已过 express.json 解析。
 	 *  handler 抛错由宿主转成 500，不炸进程。返回注销函数。需要能力 "http"。 */
 	route(
 		method: "GET" | "POST" | "PUT" | "DELETE",
@@ -189,7 +189,7 @@ interface LoadedPlugin {
 }
 
 /** 宿主提供的插件设施版本——manifest 声明的 apiVersion 高于此值则拒绝激活，
- *  插件能拿到明确的「请升级 omp-web-ui」而不是在新接口上莫名 undefined。 */
+ *  插件能拿到明确的「请升级 pi-web-ui」而不是在新接口上莫名 undefined。 */
 export const PLUGIN_API_VERSION = 1;
 
 /** 插件通过 host.registerCommand 注册的斜杠命令。run 的返回值若为非空字符串，
@@ -810,7 +810,7 @@ export class PluginManager {
 					// 声明式设置 schema + 当前存值（⚙ 面板自动渲染表单用）
 					settingsSchema: parseSettingsSchema(m.settings),
 					settingsValues: storedSettingsValues(dir, parseSettingsSchema(m.settings)),
-				// 安装来源（omp-web-ui install 写入的 .pi-source.json）——
+				// 安装来源（pi-web-ui install 写入的 .pi-source.json）——
 				// 设置面板据此显示「更新」按钮；手工拷入的插件没有此文件。
 				source: await readFile(join(dir, ".pi-source.json"), "utf8")
 					.then((raw) => {
@@ -850,7 +850,7 @@ export class PluginManager {
 			apiVersion = Number(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).apiVersion ?? 1) || 1;
 		} catch {}
 		if (apiVersion > PLUGIN_API_VERSION) {
-			const msg = `插件要求宿主 API v${apiVersion}，当前宿主 v${PLUGIN_API_VERSION} —— 请升级 omp-web-ui`;
+			const msg = `插件要求宿主 API v${apiVersion}，当前宿主 v${PLUGIN_API_VERSION} —— 请升级 pi-web-ui`;
 			console.error(`[plugin:${info.id}] ${msg}`);
 			this.loaded.set(info.id, { info: { ...info, error: msg }, toolHandlers, attachHandlers, cwdHandlers, httpRoutes, settingsHandlers: new Set() });
 			return;
@@ -1052,4 +1052,42 @@ export function resolvePluginClientFile(
 	const abs = resolve(root, rest);
 	if (abs !== root && !abs.startsWith(root + sep)) return null;
 	return abs;
+}
+
+/**
+ * 把插件 AI 工具定义同步进一个「会话状对象」（SDK AgentSession 的结构子集：
+ * 内部 _customTools 数组 + _refreshToolRegistry()——refresh 会重读数组，且新
+ * 工具名自动加入活跃集）。新增/更新/移除三向 diff；对象不兼容（SDK 改名）返回
+ * null 由调用方静默降级。返回新的已注入名单。
+ *
+ * 纯函数、不 import SDK —— vitest 直接测（tests/unit/plugin-tools.test.ts）。
+ */
+export function syncPluginToolsIntoSession(
+	session: {
+		_customTools?: Array<{ name: string } & Record<string, unknown>>;
+		_refreshToolRegistry?: () => void;
+	},
+	defs: Array<{ name: string } & Record<string, unknown>>,
+	prevNames: ReadonlySet<string>,
+): ReadonlySet<string> | null {
+	if (!Array.isArray(session._customTools) || typeof session._refreshToolRegistry !== "function")
+		return null;
+	const byName = new Map(session._customTools.map((d) => [d.name, d]));
+	let changed = false;
+	for (const d of defs) {
+		if (byName.get(d.name) !== d) {
+			byName.set(d.name, d);
+			changed = true;
+		}
+	}
+	for (const name of prevNames) {
+		if (!defs.some((d) => d.name === name) && byName.has(name)) {
+			byName.delete(name);
+			changed = true;
+		}
+	}
+	if (!changed) return new Set(defs.map((d) => d.name));
+	session._customTools = [...byName.values()];
+	session._refreshToolRegistry();
+	return new Set(defs.map((d) => d.name));
 }

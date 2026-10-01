@@ -1,32 +1,11 @@
-import { projectPrompt } from "./omp/prompt-content.js";
-import type { SessionManager } from "./omp/index.js";
+import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { TaskProgress, UiMessage, UiToolCallBlock } from "./protocol.js";
 import type { AgentMessage } from "./serialize.js";
 
-type Todo = { id: number; subject: string; phase?: string; blocker?: string; description?: string; status: "pending" | "in_progress" | "completed" | "deleted" | "blocked"; blockedBy?: number[]; metadata?: Record<string, unknown> };
+type Todo = { id: number; subject: string; description?: string; status: "pending" | "in_progress" | "completed" | "deleted"; blockedBy?: number[]; metadata?: Record<string, unknown> };
 type Snapshot = { tasks: Todo[]; nextId: number; action?: string; error?: string };
 export function todoSnapshot(value: unknown): Snapshot | undefined {
 	if (!value || typeof value !== "object") return;
-	if ("phases" in value) {
-		const native = value as { phases: unknown; op?: unknown };
-		if (!Array.isArray(native.phases)) return;
-		const tasks: Todo[] = [];
-		const ids = new Set<number>();
-		for (const phase of native.phases) {
-			if (!phase || typeof phase.name !== "string" || !Array.isArray(phase.tasks)) return;
-			for (const task of phase.tasks) {
-				if (!task || typeof task.content !== "string" || !["pending", "in_progress", "completed", "abandoned", "blocked"].includes(task.status)) return;
-				// Native tasks have no IDs. Content-based display IDs survive insertions;
-				// collisions and repeated content are disambiguated within this snapshot.
-				let id = 2166136261;
-				for (const char of `${phase.name}\0${task.content}`) id = Math.imul(id ^ char.charCodeAt(0), 16777619) >>> 0;
-				while (ids.has(id)) id = (id + 1) >>> 0;
-				ids.add(id);
-				tasks.push({ id, subject: task.content, phase: phase.name, status: task.status === "abandoned" ? "deleted" : task.status, ...(typeof task.blocker === "string" ? { blocker: task.blocker, description: task.blocker } : {}) });
-			}
-		}
-		return { tasks, nextId: tasks.length + 1, action: native.op === "init" ? "init" : !tasks.length && native.op !== "view" ? "clear" : typeof native.op === "string" ? native.op : undefined };
-	}
 	const data = value as Snapshot;
 	if (!Array.isArray(data.tasks) || !Number.isInteger(data.nextId) || !data.tasks.every((task) => task && Number.isInteger(task.id) && typeof task.subject === "string" && ["pending", "in_progress", "completed", "deleted"].includes(task.status))) return;
 	if (data.tasks.some((task) => task.blockedBy !== undefined && (!Array.isArray(task.blockedBy) || !task.blockedBy.every(Number.isInteger)))) return;
@@ -41,12 +20,10 @@ export function taskHistoryFromSession(manager: SessionManager, serialize: (mess
 	const leaf = manager.getLeafId() ?? undefined;
 	const previous = histories.get(manager);
 	if (previous && previous.leaf === leaf) return previous.messages;
-	const entries = manager.getBranch();
-	const hasTodo = entries.some(entry => entry.type === "custom" && entry.customType === "user_todo_edit" || entry.type === "message" && entry.message.role === "toolResult" && entry.message.toolName === "todo" && todoSnapshot(entry.message.details));
+	const entries = manager.getBranch().filter((entry) => entry.type === "message");
+	const hasTodo = entries.some((entry) => entry.message.role === "toolResult" && entry.message.toolName === "todo" && todoSnapshot(entry.message.details));
 	const messages = hasTodo ? entries.flatMap((entry) => {
-		if (entry.type === "custom" && entry.customType === "user_todo_edit") return [{ id: `omp-todo-${entry.id}`, role: "custom", customType: "omp-todo-snapshot", content: [], details: entry.data, timestamp: Date.parse(entry.timestamp) } satisfies UiMessage];
-		if (entry.type !== "message") return [];
-		const serialized = serialize(projectPrompt(entry.message).at(-1)!);
+		const serialized = serialize(entry.message);
 		const message = serialized ? { ...serialized } : null;
 		if (!message) return [];
 		if (entry.message.role === "toolResult" && entry.message.toolName === "todo") message.details = entry.message.details;
@@ -91,10 +68,10 @@ export function todoPlanFromTranscript(messages: UiMessage[]): { plan: NonNullab
 			const key = String(active);
 			tools.set(key, [...(tools.get(key) ?? []), call.id]);
 		}
-		if (!(message.role === "custom" && message.customType === "omp-todo-snapshot") && (message.role !== "toolResult" || message.toolName !== "todo" || message.isError)) continue;
+		if (message.role !== "toolResult" || message.toolName !== "todo" || message.isError) continue;
 		const snapshot = todoSnapshot(message.details);
 		if (!snapshot || snapshot.error) continue;
-		if (!latest || snapshot.action === "clear" || snapshot.action === "init") {
+		if (!latest || snapshot.action === "clear") {
 			startIndex = userIndex;
 			origin = message.id;
 			tools.clear(); times.clear(); revision = 0; changeSummary = undefined;

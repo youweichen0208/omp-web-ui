@@ -1,7 +1,7 @@
 {
-  "name": "@youweichen/omp-web-ui",
-  "version": "1.0.0-beta.1",
-  "description": "OMP Web and desktop interface for Oh My Pi, with a bundled Bun runtime",
+  "name": "@youweichen/pi-web-ui",
+  "version": "0.8.6",
+  "description": "Web chat interface for the pi coding agent, powered by the pi SDK (@earendil-works/pi-coding-agent) — one-command run, Docker/systemd/launchd deployable",
   "license": "MIT",
   "author": {
     "name": "youweichen",
@@ -9,7 +9,7 @@
   },
   "type": "module",
   "bin": {
-    "omp-web-ui": "bin/omp-web-ui.mjs"
+    "pi-web-ui": "bin/pi-web-ui.mjs"
   },
   "main": "electron/main.mjs",
   "files": [
@@ -20,21 +20,26 @@
     "deploy/",
     "extensions/",
     "README.md",
-    "LICENSE",
-    "omp-worker/"
+    "LICENSE"
   ],
   "keywords": [
-    "oh-my-pi",
-    "omp",
+    "pi",
+    "pi-package",
     "coding-agent",
     "ai",
     "chat",
     "web-ui",
-    "terminal"
+    "terminal",
+    "llm"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/youweichen0208/omp-web-ui.git"
+    "url": "git+https://github.com/youweichen0208/pi-web-ui.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
   },
   "engines": {
     "node": ">=22.19.0"
@@ -42,12 +47,12 @@
   "scripts": {
     "prepublishOnly": "npm run build",
     "dev": "concurrently -k -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "cross-env PORT=8788 OMP_WEB_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 node --watch --import tsx server/index.ts",
+    "dev:server": "cross-env PORT=8788 PI_WEB_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 node --watch --import tsx server/index.ts",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "npm run build:web && npm run build:server",
     "build:web": "vite build --config web/vite.config.ts",
-    "build:server": "node scripts/build-server.mjs",
-    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p tsconfig.extensions.json --noEmit",
+    "build:server": "tsc -p tsconfig.server.json",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:smoke": "node tests/run-smoke.mjs",
@@ -60,16 +65,12 @@
     "build:electron:mac": "electron-builder build --mac",
     "build:electron:win": "electron-builder build --win",
     "build:electron:linux": "electron-builder build --linux",
-    "publish:electron": "electron-builder build --publish always",
-    "rebuild:electron": "electron-rebuild --force --only node-pty"
+    "publish:electron": "electron-builder build --publish always"
   },
   "dependencies": {
-    "@oh-my-pi/pi-agent-core": "18.4.5",
-    "@oh-my-pi/pi-ai": "18.4.5",
-    "@oh-my-pi/pi-catalog": "18.4.5",
-    "@oh-my-pi/pi-coding-agent": "18.4.5",
-    "@oh-my-pi/pi-utils": "18.4.5",
-    "bun": "1.4.2",
+    "@earendil-works/pi-ai": "^0.84.2",
+    "@earendil-works/pi-coding-agent": "^0.84.2",
+    "@juicesharp/rpiv-todo": "2.11.0",
     "compression": "^1.8.1",
     "electron-updater": "^6.0.0",
     "express": "^4.21.2",
@@ -115,10 +116,5 @@
   "allowScripts": {
     "node-pty@1.1.0": true,
     "electron@41.10.7": true
-  },
-  "omp": {
-    "extensions": [
-      "./extensions"
-    ]
   }
 }

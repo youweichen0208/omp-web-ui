@@ -1,5 +1,5 @@
 /**
- * omp-web-ui server entry.
+ * pi-web-ui server entry.
  *
  * - Serves the built frontend (web/dist) in production; in dev, Vite serves it
  *   on :5173 and proxies /ws to this server.
@@ -8,13 +8,13 @@
  *
  * Env:
  *   PORT            HTTP port (default 8787)
- *   OMP_WEB_CWD      workspace the agent operates in (default: process.cwd())
- *   OMP_WEB_DATA_DIR where per-client UI state is stored (client-state.json,
- *   default: <home>/.omp-web). Chat sessions are NOT stored here — they live
- *   in the pi agent's global TUI session dir (~/.omp/agent/sessions/--<cwd>--/)
+ *   PI_WEB_CWD      workspace the agent operates in (default: process.cwd())
+ *   PI_WEB_DATA_DIR where per-client UI state is stored (client-state.json,
+ *   default: <home>/.pi-web). Chat sessions are NOT stored here — they live
+ *   in the pi agent's global TUI session dir (~/.pi/agent/sessions/--<cwd>--/)
  *   via the SDK default, so this web UI, the dev instance, and the pi CLI/TUI
  *   all share one conversation list per project.
- *   OMP_WEB_AGENT_DIR  pi config dir (auth/models/skills) — passed to the SDK
+ *   PI_CODING_AGENT_DIR  pi config dir (auth/models/skills) — passed to the SDK
  */
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -27,7 +27,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import compression from "compression";
 import { WebSocket, WebSocketServer } from "ws";
-import { VERSION, getAgentDir } from "./omp/index.js";
+import { VERSION, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { PROTOCOL_VERSION } from "./protocol-version.js";
 import { appVersion } from "./app-version.js";
 import {
@@ -42,40 +42,41 @@ import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
+import { McpBridge } from "./mcp-bridge.js";
 import { NodeWorkbench } from "./node-workbench.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
-const CWD = resolve(process.env.OMP_WEB_CWD ?? process.cwd());
-const DATA_DIR = resolve(process.env.OMP_WEB_DATA_DIR ?? join(homedir(), ".omp-web"));
+const CWD = resolve(process.env.PI_WEB_CWD ?? process.cwd());
+const DATA_DIR = resolve(process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"));
 
 /** Bind address. Default is loopback ONLY — the service is a local personal
  *  tool and should not be reachable from the network unless explicitly asked
- *  (e.g. OMP_WEB_HOST=0.0.0.0 for LAN access / Docker port mapping). */
-const HOST = process.env.OMP_WEB_HOST ?? "127.0.0.1";
+ *  (e.g. PI_WEB_HOST=0.0.0.0 for LAN access / Docker port mapping). */
+const HOST = process.env.PI_WEB_HOST ?? "127.0.0.1";
 /** Optional strict hostname allowlist (comma-separated) — only used when set.
  *  Origin / Host same-authority matching happens regardless. */
-const ALLOW_HOSTS = (process.env.OMP_WEB_ALLOW_HOSTS ?? "")
+const ALLOW_HOSTS = (process.env.PI_WEB_ALLOW_HOSTS ?? "")
 	.split(",")
 	.map((s) => s.trim().toLowerCase())
 	.filter(Boolean);
 /** Optional extra Origins allowed through the same-authority check (comma-
  *  separated, e.g. reverse-proxy setups where the browser origin differs
  *  from the Host the backend sees). */
-const ALLOW_ORIGINS = (process.env.OMP_WEB_ALLOW_ORIGINS ?? "")
+const ALLOW_ORIGINS = (process.env.PI_WEB_ALLOW_ORIGINS ?? "")
 	.split(",")
 	.map((s) => s.trim().toLowerCase())
 	.filter(Boolean);
-/** 可选共享口令（OMP_WEB_TOKEN）：设置后所有 HTTP/WS 请求必须携带——
+/** 可选共享口令（PI_WEB_TOKEN）：设置后所有 HTTP/WS 请求必须携带——
  *  Authorization: Bearer / X-PI-Token 头、?token= 查询参数或 pi_web_token cookie
  *  任一匹配即可；供 0.0.0.0 / 反代等暴露场景兜底，未设置则行为不变。 */
-const AUTH_TOKEN = process.env.OMP_WEB_TOKEN?.trim() ?? "";
+const AUTH_TOKEN = process.env.PI_WEB_TOKEN?.trim() ?? "";
 // Root of the SDK default per-project session dirs — chat transcripts live in
 // <SESSION_DIR_ROOT>/--<cwd>--/, shared with the pi CLI/TUI (getAgentDir
-// honors OMP_WEB_AGENT_DIR).
+// honors PI_CODING_AGENT_DIR).
 const SESSION_DIR_ROOT = join(getAgentDir(), "sessions");
 
-// Windows 轻量 bash 兜底：把 <home>/.omp-web/bin 前置到 PATH（SDK 的 bash 工具经
+// Windows 轻量 bash 兜底：把 <home>/.pi-web/bin 前置到 PATH（SDK 的 bash 工具经
 // findBashOnPath 会找到其中的 bash.exe），并在无 Git Bash 时后台下载 busybox-w32。
 // 终端面板的 shell 探测链也已包含该目录（见 terminals.ts resolveShell）。
 if (process.platform === "win32") {
@@ -127,7 +128,7 @@ if (AUTH_TOKEN) {
 			next();
 			return;
 		}
-		res.status(401).send("unauthorized: OMP_WEB_TOKEN required (?token=…)");
+		res.status(401).send("unauthorized: PI_WEB_TOKEN required (?token=…)");
 	});
 }
 
@@ -226,10 +227,10 @@ const here = dirname(fileURLToPath(import.meta.url)); // <pkg>/dist/server or <p
 // Resolve the package root robustly: dev runs from <repo>/server (tsx), prod
 // from <pkg>/dist/server — the ancestor that actually has package.json wins.
 function resolvePkgRoot(): string {
-	// OMP_WEB_PKG_ROOT: Electron 桌面版打包后，server 子进程从 extraResources 目录
+	// PI_WEB_PKG_ROOT: Electron 桌面版打包后，server 子进程从 extraResources 目录
 	//（process.resourcesPath）加载 web/dist 和 themes。通过这个 env var 告诉
 	// server 去哪里找 pkgRoot，避免 resolvePkgRoot 的候选路径找不到 package.json。
-	if (process.env.OMP_WEB_PKG_ROOT) return process.env.OMP_WEB_PKG_ROOT;
+	if (process.env.PI_WEB_PKG_ROOT) return process.env.PI_WEB_PKG_ROOT;
 	const candidates = [
 		resolve(here, ".."),
 		resolve(here, "..", ".."),
@@ -249,7 +250,7 @@ const APP_VERSION = appVersion(pkgRoot);
 // SPA catch-all below.
 const PLUGINS_DIR = join(DATA_DIR, "plugins");
 // 插件 HTTP 路由挂载点：host.route("GET", "/inbox") 实际暴露为
-// /plugins-api/<id>/inbox。OMP_WEB_TOKEN 鉴权（上方 app.use）自动覆盖；
+// /plugins-api/<id>/inbox。PI_WEB_TOKEN 鉴权（上方 app.use）自动覆盖；
 // 响应已在前面过了 express.json。注意不要在此 catch-all 里消费 body。
 app.all(["/plugins-api/:id/*", "/plugins-api/:id"], (req, res) => {
 	const rest = String((req.params as unknown as Record<string, string | undefined>)[0] ?? "");
@@ -274,7 +275,7 @@ app.get("/plugins/:id/client/*", (req, res) => {
 	});
 });
 /** Set in the env of the replacement child spawned by a self-update restart. */
-const RESTART_CHILD_ENV = "OMP_WEB_RESTART_CHILD";
+const RESTART_CHILD_ENV = "PI_WEB_RESTART_CHILD";
 const webDist = join(pkgRoot, "web", "dist");
 if (existsSync(webDist)) {
 	// gzip/deflate 响应压缩：前端 bundle ~1MB，局域网/反代场景传输量降到 ~1/4；
@@ -297,7 +298,7 @@ if (existsSync(webDist)) {
 		// with an unhandled ENOENT stack trace.
 		res.sendFile(join(webDist, "index.html"), (err) => {
 			if (err && !res.headersSent) {
-				res.status(503).send("正在更新 omp-web-ui，请稍后刷新…");
+				res.status(503).send("正在更新 pi-web-ui，请稍后刷新…");
 			}
 		});
 	});
@@ -308,7 +309,7 @@ if (existsSync(webDist)) {
 	// UI-less 404 with no explanation.
 	console.error(
 		"✖ 更新后的安装不完整（缺少 web/dist/index.html）。\n" +
-			"  请手动执行 npm i -g @youweichen/omp-web-ui@next 修复后重新启动。",
+			"  请手动执行 npm i -g pi-web-ui@latest 修复后重新启动。",
 	);
 	process.exit(1);
 }
@@ -333,7 +334,7 @@ const wss = new WebSocketServer({
 //
 // Dev-mode note: the Vite dev server (:5173) proxies /ws to the backend on
 // :8788, so their authorities differ — the dev:server script sets
-// OMP_WEB_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 for that.
+// PI_WEB_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 for that.
 // LAN / reverse-proxy setups add their own origin the same way.
 // ---------------------------------------------------------------------------
 
@@ -361,7 +362,7 @@ function originAllowed(req: IncomingMessage): boolean {
 	const ori = parseAuthority(o.replace(/^[a-z]+:\/\//, ""));
 	if (ori.hostname === host.hostname && ori.port === host.port) return true;
 	// Browsers treat host:port pairs on the SAME host as different origins —
-	// do not accept them. (Dev-mode proxying is handled by OMP_WEB_ALLOW_ORIGINS
+	// do not accept them. (Dev-mode proxying is handled by PI_WEB_ALLOW_ORIGINS
 	// set in the dev:server script; LAN/reverse-proxy setups add their origin.)
 	return false;
 }
@@ -419,12 +420,17 @@ const nodeWorkbench = new NodeWorkbench(DATA_DIR);
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
 // attach so freshly dropped plugins appear without a server restart.
 const pluginMgr = new PluginManager(DATA_DIR, CWD);
-// OMP discovers and owns its native MCP servers inside each worker.
+// MCP 工具桥：读取 <dataDir>/mcp.json 启动外部 MCP 服务器（stdio），把它们的
+// 工具并入与插件工具相同的 customTools 管线；单服务器失败不炸进程。
+const mcpBridge = new McpBridge(DATA_DIR, (...a) => console.log("[mcp]", ...a));
+void mcpBridge.load().then(() => {
+	if (mcpBridge.getTools().length) service.applyPluginAgentTools();
+});
 // 插件扩展点：SDK 工具执行事件（bash/读文件等 start+end）转发给已注册的插件。
 service.onToolEvent = (ev) => pluginMgr.emitToolEvent(ev);
 // 插件扩展点：插件注册的 AI 工具（registerAgentTool）+ MCP 桥工具 → 会话创建时
 // 带上 + 变化时动态注入/移除已有会话。
-service.pluginToolsProvider = () => pluginMgr.getAgentTools();
+service.pluginToolsProvider = () => [...pluginMgr.getAgentTools(), ...mcpBridge.getTools()];
 pluginMgr.onAgentToolsChanged = () => service.applyPluginAgentTools();
 // 插件扩展点：插件斜杠命令（registerCommand）→ 命令选择器目录 + prompt 拦截执行。
 pluginMgr.onCommandsChanged = () => service.applyPluginCommandCatalog();
@@ -440,9 +446,9 @@ service.onClientCwdChanged = (cwd) => pluginMgr.notifyCwd(cwd);
 // ---------------------------------------------------------------------------
 // Self-update
 // ---------------------------------------------------------------------------
-// In-app updates now run `npm i -g @youweichen/omp-web-ui@next` in a visible terminal
+// In-app updates now run `npm i -g pi-web-ui@latest` in a visible terminal
 // tab (frontend-initiated); after it finishes the user restarts via
-// `omp-web-ui server restart`. The OMP_WEB_RESTART_CHILD port-wait handshake
+// `pi-web-ui server restart`. The PI_WEB_RESTART_CHILD port-wait handshake
 // below stays: an externally orchestrated replacement child still needs it.
 
 function scheduleQuit(): boolean {
@@ -451,14 +457,14 @@ function scheduleQuit(): boolean {
 	const inDocker = existsSync("/.dockerenv");
 	if (isLaunchd || isSystemd || inDocker) {
 		setTimeout(() => {
-			console.log("omp-web-ui:quit — shutting down (supervisor will restart)…");
+			console.log("pi-web-ui:quit — shutting down (supervisor will restart)…");
 			if (isSystemd) process.exit(3);
 			void shutdown();
 		}, 300);
 		return true;
 	}
 	setTimeout(() => {
-		console.log("omp-web-ui:quit — shutting down (restart to reload)…");
+		console.log("pi-web-ui:quit — shutting down (restart to reload)…");
 		void shutdown();
 	}, 300);
 	return true;
@@ -961,11 +967,11 @@ if (process.env[RESTART_CHILD_ENV] === "1") {
 
 httpServer.listen(PORT, HOST, () => {
 	console.log("");
-	console.log("  ⚡ omp-web-ui — web chat for Oh My Pi");
+	console.log("  ⚡ pi-web-ui — web chat for the pi coding agent");
 	console.log(`    http://localhost:${PORT}`);
 	console.log(`    workspace   : ${CWD}`);
 	console.log(`    session dir : ${SESSION_DIR_ROOT}`);
-	console.log(`    OMP         : v${VERSION}`);
+	console.log(`    pi SDK      : v${VERSION}`);
 	console.log(`    bind        : ${HOST}:${PORT}`);
 	console.log("");
 });
@@ -974,7 +980,7 @@ httpServer.listen(PORT, HOST, () => {
 scheduleUploadCleanup();
 
 // Local control socket (status / quiesce / unquiesce) — same data dir the
-// CLI uses, so `omp-web-ui server status|quiesce|unquiesce` just works.
+// CLI uses, so `pi-web-ui server status|quiesce|unquiesce` just works.
 const stopControl = startControlServer({ service, dataDir: DATA_DIR, port: PORT });
 
 let shuttingDown = false;
@@ -984,8 +990,9 @@ async function shutdown(): Promise<void> {
 	console.log("\nshutting down…");
 	clearInterval(heartbeatTimer);
 	stopControl();
-	await nodeWorkbench.dispose();
+	nodeWorkbench.dispose();
 	pluginMgr.dispose();
+	mcpBridge.dispose();
 	await service.disposeAll();
 	wss.close();
 	httpServer.close();

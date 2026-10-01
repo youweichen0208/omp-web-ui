@@ -1,5 +1,5 @@
 /**
- * 插件更新辅助（备份/回滚 + 远端 sha 对比）——纯逻辑，供 CLI（bin/omp-web-ui.mjs）
+ * 插件更新辅助（备份/回滚 + 远端 sha 对比）——纯逻辑，供 CLI（bin/pi-web-ui.mjs）
  * 与单测共用。零网络依赖：远端 sha 经注入的 exec 获取（生产 = git ls-remote；
  * 测试 = fake exec 或本地 git 仓库路径，git ls-remote 支持本地仓库，完全离线）。
  *

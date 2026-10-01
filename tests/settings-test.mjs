@@ -6,7 +6,7 @@
 // per-client persistence across a reconnect.
 //
 // Runs against the compiled server on a dedicated port (8931). With an
-// isolated fake agent dir (OMP_WEB_AGENT_DIR → temp) it exercises the
+// isolated fake agent dir (PI_CODING_AGENT_DIR → temp) it exercises the
 // protocol only; point it at a real agent dir to also exercise the
 // skill/extension toggle round-trip (see settings-live flow in git history).
 // Usage: npm run build && node settings-test.mjs [port]
@@ -29,9 +29,9 @@ const server = spawn(process.execPath, ["dist/server/index.js"], {
 	env: {
 		...process.env,
 		PORT: String(PORT),
-		OMP_WEB_DATA_DIR: DATA_DIR,
-		OMP_WEB_CWD: process.cwd(),
-		OMP_WEB_AGENT_DIR: join(DATA_DIR, "agent"),
+		PI_WEB_DATA_DIR: DATA_DIR,
+		PI_WEB_CWD: process.cwd(),
+		PI_CODING_AGENT_DIR: join(DATA_DIR, "agent"),
 	},
 	stdio: ["ignore", "pipe", "pipe"],
 	windowsHide: true,
@@ -68,7 +68,7 @@ class Client {
 			}
 			await sleep(50);
 		}
-		throw new Error(`timeout waiting for ${type}: ${JSON.stringify(this.received.map(m => ({ type: m.type, text: m.text, error: m.error })))}`);
+		throw new Error(`timeout waiting for ${type}`);
 	}
 }
 
@@ -104,13 +104,14 @@ let c;
 try {
 	c = await connect();
 	c.send({ type: "hello", clientId: "settings-test-client" });
-	await c.waitFor("ready", 60000);
+	await c.waitFor("ready");
 	await c.waitFor(["snapshot", "snapshot_delta"]);
 	const st0 = await c.waitFor("settings_state");
 	check("settings_state pushed on attach", !!st0.settings);
 	check("has skills array", Array.isArray(st0.settings.skills));
 	check("has extensions array", Array.isArray(st0.settings.extensions));
-	const sampleExtension = st0.settings.extensions.find((e) => e.name === "sample-directory");
+	const builtinTodo = st0.settings.extensions.find((e) => e.builtin === "todo");
+	check("bundled todo has a recognizable built-in label", builtinTodo?.name === "rpiv-todo");
 	check("directory entry uses its extension name", st0.settings.extensions.some((e) => e.name === "sample-directory"));
 	check("standalone extension uses its own name", st0.settings.extensions.some((e) => e.name === "custom-footer"));
 
@@ -188,14 +189,14 @@ try {
 	}
 
 	// extension toggle
-	const extId = sampleExtension?.id;
+	const extId = builtinTodo?.id;
 	if (extId) {
 		c.send({ type: "set_settings", disabledExtensions: [extId] });
 		const st5 = await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.includes(extId));
 		check("extension disabled", st5.settings.disabledExtensions.includes(extId));
 		const e = st5.settings.extensions.find((x) => x.id === extId);
 		check("disabled extension still listed", e && !e.enabled);
-		check("disabled extension retains its label", e?.name === "sample-directory");
+		check("disabled builtin retains its label", e?.name === "rpiv-todo" && e?.builtin === "todo");
 		c.send({ type: "set_settings", disabledExtensions: [] });
 		await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.length === 0);
 		check("extension re-enabled", true);
@@ -224,7 +225,7 @@ try {
 	await sleep(300);
 	c = await connect();
 	c.send({ type: "hello", clientId: "settings-test-client" });
-	await c.waitFor("ready", 60000);
+	await c.waitFor("ready");
 	await c.waitFor(["snapshot", "snapshot_delta"]);
 	const st9 = await c.waitFor("settings_state");
 	check("prompt survives reconnect", st9.settings.customSystemPrompt === "你是一个测试助手。");

@@ -2,7 +2,7 @@
  * Lightweight bash fallback for Windows.
  *
  * When neither Git Bash nor a bash on PATH exists, download busybox-w32
- * (single self-contained ~1.5MB exe, no installer) into <home>/.omp-web/bin/
+ * (single self-contained ~1.5MB exe, no installer) into <home>/.pi-web/bin/
  * and expose it as bash.exe — busybox dispatches on argv[0], so `bash.exe`
  * runs its bash (ash) applet. The terminal panel (terminals.ts) and the SDK
  * bash tool (via PATH) then both resolve to it, so the agent never silently
@@ -31,7 +31,7 @@ const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 /** Directory holding the busybox fallback (shared with terminals.ts / PATH). */
 export function windowsBashDir(): string {
-	return join(homedir(), ".omp-web", "bin");
+	return join(homedir(), ".pi-web", "bin");
 }
 
 /** bash.exe (busybox bash applet) used by the terminal and the SDK bash tool. */

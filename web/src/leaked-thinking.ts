@@ -2,7 +2,7 @@
  * Defensive rendering guard for reasoning models that occasionally emit raw
  * `<think>`/`<thinking>` reasoning tags on the normal text channel instead
  * of the SDK's dedicated `thinking` channel (a model/provider output
- * glitch, not something this app or the OMP runtime can parse away upstream —
+ * glitch, not something this app or the pi SDK can parse away upstream —
  * from here it's indistinguishable from ordinary text until it shows up
  * literally in a reply). Different reasoning models/providers spell the tag
  * differently (`</think>` vs `</thinking>` vs Kimi-style `</antThinking>`

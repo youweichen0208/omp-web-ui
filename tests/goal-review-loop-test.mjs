@@ -34,8 +34,8 @@ async function startServer() {
 		env: {
 			...process.env,
 			PORT: String(PORT),
-			OMP_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-web-lock-")),
-			OMP_WEB_CWD: PROJ,
+			PI_WEB_DATA_DIR: mkdtempSync(join(tmpdir(), "pi-web-lock-")),
+			PI_WEB_CWD: PROJ,
 		},
 		stdio: ["ignore", "ignore", "pipe"],
 	});

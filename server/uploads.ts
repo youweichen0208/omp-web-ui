@@ -2,9 +2,9 @@
  * uploads — 文件对话上传的存储与清理。
  *
  * 上传文件落在 <dataDir>/uploads/<clientId>/<ts>-<name>（模型以绝对路径
- * reference 读取）。此前这里硬编码 ~/.omp-web，不吃 OMP_WEB_DATA_DIR —— 已改为
+ * reference 读取）。此前这里硬编码 ~/.pi-web，不吃 PI_WEB_DATA_DIR —— 已改为
  * 与 index.ts 相同的解析逻辑。清理策略：默认保留 14 天，启动时扫一次 +
- * 每 6 小时扫一次；OMP_WEB_UPLOAD_RETENTION_DAYS 覆盖保留天数，0 = 关闭清理。
+ * 每 6 小时扫一次；PI_WEB_UPLOAD_RETENTION_DAYS 覆盖保留天数，0 = 关闭清理。
  * 全程 best-effort：清理失败绝不影响服务。
  */
 import { readdir, rm, stat } from "node:fs/promises";
@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 
 /** Same resolution as index.ts DATA_DIR — kept in sync by env contract. */
 export function resolveDataDir(): string {
-	return resolve(process.env.OMP_WEB_DATA_DIR ?? join(homedir(), ".omp-web"));
+	return resolve(process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"));
 }
 
 export function uploadsRoot(dataDir = resolveDataDir()): string {
@@ -23,7 +23,7 @@ export function uploadsRoot(dataDir = resolveDataDir()): string {
 
 /** Retention in days; 0 disables sweeping. */
 export function uploadRetentionDays(): number {
-	const v = Number(process.env.OMP_WEB_UPLOAD_RETENTION_DAYS);
+	const v = Number(process.env.PI_WEB_UPLOAD_RETENTION_DAYS);
 	return Number.isFinite(v) && v >= 0 ? v : 14;
 }
 

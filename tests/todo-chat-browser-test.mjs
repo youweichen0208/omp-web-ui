@@ -16,7 +16,7 @@ const probe = createServer();
 await new Promise((resolve, reject) => { probe.once("error", reject); probe.listen(port, "127.0.0.1", resolve); });
 await new Promise((resolve) => probe.close(resolve));
 const data = mkdtempSync(join(tmpdir(), "pi-todo-chat-"));
-const server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), OMP_WEB_DATA_DIR: data, OMP_WEB_CWD: data, OMP_WEB_AGENT_DIR: join(data, "agent") }, stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: data, PI_WEB_CWD: data, PI_CODING_AGENT_DIR: join(data, "agent") }, stdio: ["ignore", "pipe", "pipe"] });
 let logs = "", browser;
 server.stdout.on("data", (chunk) => { logs += chunk; });
 server.stderr.on("data", (chunk) => { logs += chunk; });
@@ -72,7 +72,7 @@ try {
 		await page.addInitScript(({ platform, lang }) => {
 			if (platform !== "web") window.electronAPI = { platform, windowAction() {}, onWindowState() { return () => {}; } };
 			localStorage.setItem("pi-left-collapsed", "true");
-			localStorage.setItem("omp-web-ui:lang", lang);
+			localStorage.setItem("pi-web-ui:lang", lang);
 		}, { platform, lang });
 		await page.goto(`http://127.0.0.1:${port}`);
 		await page.locator(".todo-checklist-item").last().waitFor();

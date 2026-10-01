@@ -42,7 +42,7 @@ export interface Notice {
 
 export type ReloadStatus = Extract<ServerMessage, { type: "reload_status" }>;
 
-const RELOAD_EVENTS_KEY = "omp-web-ui:reload-events";
+const RELOAD_EVENTS_KEY = "pi-web-ui:reload-events";
 function restoreReloadEvents(): ReloadStatus[] {
 	try {
 		const events: unknown = JSON.parse(sessionStorage.getItem(RELOAD_EVENTS_KEY) ?? "[]");
@@ -95,7 +95,6 @@ export interface ChatState {
 	/** Latest file content fetched for the preview panel (request-matched in the file editor). */
 	fileContent: FileContent | null;
 	promptResult: Extract<ServerMessage, { type: "prompt_result" }> | null;
-	editorText: Extract<ServerMessage, { type: "editor_text" }> | null;
 	fileResult: Extract<ServerMessage, { type: "file_result" }> | null;
 
 	/** Last dir-changed push from the server fs.watch (path = listed directory). */
@@ -128,12 +127,11 @@ export interface ChatState {
 	/** Active extension dialog (select/confirm/input) awaiting a response. */
 	dialog: {
 		id: number;
-		kind: "select" | "confirm" | "input" | "editor";
+		kind: "select" | "confirm" | "input";
 		title: string;
 		args: unknown[];
 	} | null;
-	dialogQueue: NonNullable<ChatState["dialog"]>[];
-	/** User command list from .omp/commands.json (terminal left panel). */
+	/** User command list from .pi/commands.json (terminal left panel). */
 	commands: CommandDef[];
 	commandsPath: string;
 	/** Slash-command catalog for the chat input (builtin + extension +
@@ -241,7 +239,6 @@ type Action =
 
 	| { type: "file_changed"; path: string }
 	| { type: "file_content"; content: FileContent }
-	| { type: "editor_text"; result: Extract<ServerMessage, { type: "editor_text" }> }
 	| { type: "prompt_result"; result: Extract<ServerMessage, { type: "prompt_result" }> }
 	| { type: "file_result"; result: Extract<ServerMessage, { type: "file_result" }> }
 	| { type: "models"; models: ModelInfo[]; loading: boolean }
@@ -284,12 +281,11 @@ type Action =
 			type: "dialog";
 			dialog: {
 				id: number;
-				kind: "select" | "confirm" | "input" | "editor";
+				kind: "select" | "confirm" | "input";
 				title: string;
 				args: unknown[];
 			} | null;
 	  }
-	| { type: "dialog_closed"; id: number }
 	| { type: "commands"; commands: CommandDef[]; path: string }
 	| { type: "slash_commands"; commands: SlashCommandInfo[] }
 	| { type: "terminal_add"; meta: TerminalMeta }
@@ -583,7 +579,6 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, conversationFilesChecked: action.result };
 		case "file_changed":
 			return { ...state, fileChanged: { path: action.path } };
-		case "editor_text": return { ...state, editorText: action.result };
 		case "prompt_result":
 			return { ...state, promptResult: action.result };
 		case "file_result":
@@ -623,16 +618,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, widgets: action.widgets };
 		case "statuses":
 			return { ...state, statuses: action.statuses };
-		case "dialog": {
-			if (!action.dialog) return { ...state, dialog: null, dialogQueue: [] };
-			const queue = state.dialogQueue.filter(dialog => dialog.id !== action.dialog!.id);
-			queue.push(action.dialog);
-			return { ...state, dialogQueue: queue, dialog: queue[0] ?? null };
-		}
-		case "dialog_closed": {
-			const queue = state.dialogQueue.filter(dialog => dialog.id !== action.id);
-			return { ...state, dialogQueue: queue, dialog: queue[0] ?? null };
-		}
+		case "dialog":
+			return { ...state, dialog: action.dialog };
 		case "commands":
 			return {
 				...state,
@@ -756,7 +743,6 @@ export function useChat() {
 		fileChanged: null,
 		fileContent: null,
 		promptResult: null,
-		editorText: null,
 		fileResult: null,
 		models: [],
 		modelsLoading: false,
@@ -769,7 +755,6 @@ export function useChat() {
 		widgets: [],
 		statuses: [],
 		dialog: null,
-		dialogQueue: [],
 		commands: [],
 		commandsPath: "",
 		slashCommands: [],
@@ -1085,7 +1070,6 @@ export function useChat() {
 				case "file_changed":
 					dispatch({ type: "file_changed", path: msg.path });
 					break;
-				case "editor_text": dispatch({ type: "editor_text", result: msg }); break;
 				case "prompt_result":
 					dispatch({ type: "prompt_result", result: msg });
 					break;
@@ -1188,7 +1172,7 @@ export function useChat() {
 					});
 					break;
 				case "dialog_closed":
-					dispatch({ type: "dialog_closed", id: msg.id });
+					dispatch({ type: "dialog", dialog: null });
 					break;
 				case "terminal_output":
 					bridgeRef.current.write(
@@ -1376,7 +1360,6 @@ export function useChat() {
 		liveOutputs: new Map(),
 		toolStatuses: new Map(),
 		dialog: null,
-		dialogQueue: [],
 	} : { ...chat, ready: chat.ready && hasSnapshot, files: chat.files ?? cache.current.get(chat.state?.cwd ?? "")?.files ?? null };
 	return { ...chatApi.current, chat: displayChat, switching: switching?.path ?? null, switchError };
 }

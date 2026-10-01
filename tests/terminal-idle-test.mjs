@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // 小阈值加快测试；armIdleWatch 每次调用时读取 env，注入即生效。
-process.env.OMP_WEB_TERMINAL_IDLE_MS = "700";
+process.env.PI_WEB_TERMINAL_IDLE_MS = "700";
 
 const REPO = fileURLToPath(new globalThis.URL("../", import.meta.url));
 const { TerminalManager } = await import(join(REPO, "dist", "server", "terminals.js"));

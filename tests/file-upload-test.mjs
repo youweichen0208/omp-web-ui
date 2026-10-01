@@ -88,12 +88,12 @@ ws.on("message", async (d) => {
 	if (results.inline && results.refBig && results.bin) {
 		clearTimeout(timer);
 		log("PASS — checking uploads dir on disk");
-		// Uploaded files live in <home>/.omp-web/uploads/<clientId> (global, never
+		// Uploaded files live in <home>/.pi-web/uploads/<clientId> (global, never
 		// inside the project).
 		const { readdirSync } = await import("node:fs");
 		const { homedir } = await import("node:os");
 		const { join } = await import("node:path");
-		const dir = join(homedir(), ".omp-web", "uploads", clientId);
+		const dir = join(homedir(), ".pi-web", "uploads", clientId);
 		try {
 			const files = readdirSync(dir);
 			if (files.length >= 3) {

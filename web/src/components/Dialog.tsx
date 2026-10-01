@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 interface DialogProps {
 	dialog: {
 		id: number;
-		kind: "select" | "confirm" | "input" | "editor";
+		kind: "select" | "confirm" | "input";
 		title: string;
 		args: unknown[];
 	};
@@ -27,7 +27,7 @@ export function Dialog({ dialog, send }: DialogProps) {
 	};
 
 	useEffect(() => {
-		setInputValue(dialog.kind === "editor" && typeof dialog.args[0] === "string" ? dialog.args[0] : "");
+		setInputValue("");
 		setSel(0);
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") respond(null);
@@ -97,16 +97,6 @@ export function Dialog({ dialog, send }: DialogProps) {
 						>
 							{t("ok")}
 						</button>
-					</div>
-				</div>
-			)}
-
-			{dialog.kind === "editor" && (
-				<div className="dialog-body">
-					<textarea className="dialog-input" value={inputValue} autoFocus rows={8} onChange={e => setInputValue(e.target.value)} />
-					<div className="dialog-actions">
-						<button type="button" className="btn" onClick={() => respond(null)}>{t("cancel")}</button>
-						<button type="button" className="btn primary" onClick={() => respond(inputValue)}>{t("ok")}</button>
 					</div>
 				</div>
 			)}

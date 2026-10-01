@@ -1,9 +1,9 @@
 /**
- * Serializes OMP runtime AgentMessage[] into the browser-friendly UiMessage[] shape
+ * Serializes pi SDK AgentMessage[] into the browser-friendly UiMessage[] shape
  * defined in protocol.ts. Keeps payloads bounded (tool outputs and text blocks
  * are truncated with a marker) so snapshots stay cheap to stream.
  */
-import type { AgentSession } from "./omp/index.js";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { UiContentBlock, UiMessage } from "./protocol.js";
 import { todoSnapshot } from "./todo-progress.js";
 
@@ -134,7 +134,7 @@ export function serializeMessage(
 				...(todo ? { todoSnapshot: {
 					action: typeof todo.action === "string" ? todo.action : undefined,
 					error: typeof todo.error === "string" ? todo.error : undefined,
-					tasks: todo.tasks.map(({ id, subject, status, phase, blocker }) => ({ id, subject, status, phase, blocker })),
+					tasks: todo.tasks.map(({ id, subject, status }) => ({ id, subject, status })),
 				} } : {}),
 				timestamp: m.timestamp,
 			};
