@@ -1,6 +1,6 @@
 {
   "name": "@youweichen/pi-web-ui",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "Web chat interface for the pi coding agent, powered by the pi SDK (@earendil-works/pi-coding-agent) — one-command run, Docker/systemd/launchd deployable",
   "license": "MIT",
   "author": {

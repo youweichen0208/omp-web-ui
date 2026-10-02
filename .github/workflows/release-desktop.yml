@@ -179,6 +179,7 @@ jobs:
         run: node tests/terminal-smoke-test.mjs
 
       - name: Verify native tools and OAuth (plain Node)
+        shell: bash
         run: |
           node tests/native-tools-desktop-test.mjs
           node tests/provider-auth-test.mjs
@@ -193,6 +194,7 @@ jobs:
         run: node tests/desktop-toolbar-test.mjs
 
       - name: Verify language services and nested Maven (plain Node)
+        shell: bash
         run: |
           node tests/code-intelligence-test.mjs
           node tests/native-code-intelligence-test.mjs --install
