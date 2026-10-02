@@ -455,22 +455,6 @@ export class NativeCodeToolchains {
 	private async download(url: string, sha: string, path: string) {
 		if (!/^[a-f0-9]{64}$/i.test(sha))
 			throw new Error("Missing upstream SHA256");
-		if (url.startsWith("https://github.com/")) {
-			const parsed = new URL(url),
-				parts = parsed.pathname.split("/");
-			if (parts[3] === "releases" && parts[4] === "download") {
-				const release = (await (
-					await this.fetch(
-						`https://api.github.com/repos/${parts[1]}/${parts[2]}/releases/tags/${encodeURIComponent(decodeURIComponent(parts[5]))}`,
-					)
-				).json()) as { assets: { name: string; url: string }[] };
-				const asset = release.assets.find(
-					(a) => a.name === decodeURIComponent(parts.slice(6).join("/")),
-				);
-				if (!asset) throw new Error("GitHub release asset missing");
-				url = asset.url;
-			}
-		}
 		const response = await this.fetch(url);
 		let size = 0;
 		const hash = createHash("sha256"),
@@ -572,35 +556,10 @@ export class NativeCodeToolchains {
 	}
 	private async release(repo: string, tag: string, name: string) {
 		const pin = pinnedNativeAsset(name);
-		const release = (await (
-			await this.fetch(
-				`https://api.github.com/repos/${repo}/releases/tags/${tag}`,
-			)
-		).json()) as {
-			assets: {
-				name: string;
-				browser_download_url: string;
-				url: string;
-				digest?: string;
-			}[];
-		};
-		const asset = release.assets.find((asset) => asset.name === name);
-		if (!asset)
-			throw new Error(
-				`Verified asset unavailable for ${process.platform}/${process.arch}: ${name}`,
-			);
-		if (
-			!asset.url.startsWith(
-				`https://api.github.com/repos/${repo}/releases/assets/`,
-			) ||
-			!/\/assets\/\d+$/.test(asset.url)
-		)
-			throw new Error("Unexpected native release asset URL");
-		pinnedNativeAsset(
-			name,
-			asset.digest?.startsWith("sha256:") ? asset.digest.slice(7) : undefined,
-		);
-		return { url: asset.url, sha: pin.sha256 };
+		const expected = `https://github.com/${repo}/releases/download/${encodeURIComponent(tag)}/${name}`;
+		if (pin.url !== expected)
+			throw new Error("Unexpected pinned native release URL");
+		return { url: pin.url, sha: pin.sha256 };
 	}
 	private async prepare(language: NativeCodeLanguage, javaHome?: string) {
 		const root = this.root(language);

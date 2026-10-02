@@ -19,27 +19,20 @@ it("locks every shipped platform asset and rejects changed upstream digests", ()
 	);
 	expect(nativeToolchainPins.versions.jdk).toBe("jdk-21.0.12.1+1");
 });
-it("blocks a replaced release before fetching its executable and offers a local-path fallback", async () => {
+it("downloads a pinned release directly without GitHub API and rejects replacement bytes", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-pinned-release-")),
 		tools = new NativeCodeToolchains(root);
 	const fetch = vi.spyOn(tools as any, "fetch").mockResolvedValue(
-		new Response(
-			JSON.stringify({
-				assets: [
-					{
-						name: `rust-analyzer-${process.arch === "arm64" ? "aarch64" : "x86_64"}-${process.platform === "darwin" ? "apple-darwin.gz" : process.platform === "win32" ? "pc-windows-msvc.zip" : "unknown-linux-gnu.gz"}`,
-						url: "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/123",
-						digest: "sha256:" + "0".repeat(64),
-					},
-				],
-			}),
-		),
+		new Response("replaced executable"),
 	);
 	try {
 		await expect(tools.install("rust")).rejects.toThrow(
-			/committed pin[\s\S]*local server path/,
+			/SHA256 mismatch[\s\S]*local server path/,
 		);
 		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(fetch.mock.calls[0][0]).toMatch(
+			/^https:\/\/github\.com\/rust-lang\/rust-analyzer\/releases\/download\//,
+		);
 		await expect(readFile(join(root, "ready.json"))).rejects.toThrow();
 	} finally {
 		await tools.shutdown();
