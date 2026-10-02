@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { NativeCodeToolchains } from "../../server/code-native-toolchains.js";
@@ -7,6 +7,7 @@ import {
 	nativeToolchainPins,
 	pinnedNativeAsset,
 } from "../../server/native-toolchain-pins.js";
+import { codeDefaults } from "../../server/code-intelligence.js";
 import { rustAnalysisLimitation } from "../../server/code-languages.js";
 it("locks every shipped platform asset and rejects changed upstream digests", () => {
 	for (const [name, asset] of Object.entries(nativeToolchainPins.assets)) {
@@ -22,9 +23,9 @@ it("locks every shipped platform asset and rejects changed upstream digests", ()
 it("downloads a pinned release directly without GitHub API and rejects replacement bytes", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-pinned-release-")),
 		tools = new NativeCodeToolchains(root);
-	const fetch = vi.spyOn(tools as any, "fetch").mockResolvedValue(
-		new Response("replaced executable"),
-	);
+	const fetch = vi
+		.spyOn(tools as any, "fetch")
+		.mockResolvedValue(new Response("replaced executable"));
 	try {
 		await expect(tools.install("rust")).rejects.toThrow(
 			/SHA256 mismatch[\s\S]*local server path/,
@@ -127,6 +128,64 @@ it("explains GitHub rate limiting with a retry, proxy and local server fallback"
 			(tools as any).fetch("https://api.github.com/rate-test"),
 		).rejects.toThrow(/rate limited[\s\S]*local server path/);
 	} finally {
+		await tools.shutdown();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+it("retains the selected Java server JDK when the user later switches JAVA_HOME to Java 8", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-server-jdk-")),
+		tools = new NativeCodeToolchains(root),
+		serverHome = join(root, "external-jdk21");
+	const java = vi
+		.spyOn(tools as any, "java")
+		.mockResolvedValue(join(serverHome, "bin", "java"));
+	const previousJavaHome = process.env.JAVA_HOME;
+	vi.spyOn(tools as any, "fetch").mockResolvedValue(
+		new Response(
+			pinnedNativeAsset("jdt-language-server-1.61.0-202609031315.tar.gz")
+				.sha256,
+		),
+	);
+	vi.spyOn(tools as any, "download").mockImplementation(
+		async (...args: unknown[]) => {
+			await writeFile(String(args[2]), "fixture");
+		},
+	);
+	vi.spyOn(tools as any, "unpack").mockImplementation(
+		async (...args: unknown[]) => {
+			await mkdir(String(args[1]), { recursive: true });
+		},
+	);
+	try {
+		await tools.install("java");
+		expect((await (tools as any).installed("java")).jdk).toBe(serverHome);
+		const server = join((tools as any).root("java"), "server");
+		await mkdir(join(server, "plugins"), { recursive: true });
+		await writeFile(
+			join(server, "plugins", "org.eclipse.equinox.launcher_fixture.jar"),
+			"fixture",
+		);
+		const config =
+			process.platform === "darwin"
+				? "config_mac"
+				: process.platform === "win32"
+					? "config_win"
+					: "config_linux";
+		await mkdir(join(server, config));
+		process.env.JAVA_HOME = join(root, "jdk8");
+		java.mockImplementation(async (...args: unknown[]) =>
+			args[0] === serverHome ? join(serverHome, "bin", "java") : undefined,
+		);
+		const launch = await tools.launch(
+			"java",
+			join(root, "project"),
+			codeDefaults(),
+		);
+		expect(launch.command).toBe(join(serverHome, "bin", "java"));
+	} finally {
+		if (previousJavaHome === undefined) delete process.env.JAVA_HOME;
+		else process.env.JAVA_HOME = previousJavaHome;
 		await tools.shutdown();
 		await rm(root, { recursive: true, force: true });
 	}

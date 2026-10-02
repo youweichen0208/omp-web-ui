@@ -35,7 +35,7 @@ try {
 			promisify(execFile)(
 				process.execPath,
 				["--input-type=module", "-e", script],
-				{ env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, timeout: 60000 },
+				{ env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, timeout: process.platform === "win32" ? 180000 : 60000 },
 			),
 		),
 	);

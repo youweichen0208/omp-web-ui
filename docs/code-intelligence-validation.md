@@ -79,7 +79,7 @@
 - `release/pi-0.10.0-mac-arm64.zip`，约 245 MiB。
   SHA256：`ab98f7456bfc31b9a0d7cd93a5de6ee1786be15150531c828e4fc20b00a26f2f`
 
-包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.4 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
+包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.5 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
 
 ## 尚未完成的专项验收
 
@@ -110,3 +110,7 @@ Mac arm64 beta 包内 Electron 实测 TS/Python、Java/Go/Rust/C++、嵌套 Mave
 `beta.2` 的 Mac runner 命中 GitHub API 匿名限流，草稿未公开。`beta.3` 改为固定 Release URL 直接下载并检查固定 SHA256，不查询下载元数据 API；替换内容拒绝测试、全部 426 单测与类型检查通过。三平台结果仍由新标签工作流决定。
 
 `beta.3` 版本重命名误改了 lockfile 的 gensync 与 rolldown 依赖，CI 全新安装阻断发布；`beta.4` 恢复原锁定依赖，并只更新 package 与根 lockfile 的应用版本字段。
+
+`beta.4` 的 Mac Java 8 检查发现：安装时复用系统 JDK 21 后切换 JAVA_HOME，会遗失服务器运行时路径。`beta.5` 在 ready 记录中保存安装时选定的 JDK 21 路径，并用切换到 JDK 8 后的启动配置回归验证；427 个单测与类型检查通过。此前草稿均未公开。
+
+Windows beta.4 的并发冷解压 fixture 超过 60 秒被测试子进程计时器终止；生产锁等待上限原为 120 秒。beta.5 将 Windows 的单次解压 fixture 预算设为 180 秒、包内整项 LSP fixture 为 300 秒，保留生产初始化从解压完成后计时及服务启动/终端门槛；冷启动性能仍是正式版专项验收。

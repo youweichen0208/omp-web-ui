@@ -2,9 +2,9 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
-## 1.0.0-beta.4 预发布
+## 1.0.0-beta.5 预发布
 
-LSP 与内置子代理联合测试，版本同步为 `1.0.0-beta.4`，标签 `v1.0.0-beta.4`。本轮仅发布 GitHub 预发布，不发布 npm、不覆盖 latest。说明见 `.github/release-notes/v1.0.0-beta.4.md`。
+LSP 与内置子代理联合测试，版本同步为 `1.0.0-beta.5`，标签 `v1.0.0-beta.5`。本轮仅发布 GitHub 预发布，不发布 npm、不覆盖 latest。说明见 `.github/release-notes/v1.0.0-beta.5.md`。
 
 发布工作流复用 CI 的完整检查作为构建前门槛，包含三平台的 TS/Python 与真实 Java/Go/Rust/C++ 服务。打包后再次用包内 Electron/SDK 验证原生语言和嵌套 Maven；终端、子代理与原生工具回归继续保留。beta 更新元数据使用 beta-mac.yml / beta.yml / beta-linux.yml，不要求不存在的 latest 文件。三平台全部通过且附件齐全后才公开预发布；单平台重跑不单独公开。
 

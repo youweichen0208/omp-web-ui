@@ -19,7 +19,15 @@ import { constants, createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { open as openZip } from "yauzl";
 import { homedir } from "node:os";
-import { delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+	dirname,
+	delimiter,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+	sep,
+} from "node:path";
 import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { extract } from "tar";
@@ -699,7 +707,10 @@ export class NativeCodeToolchains {
 				await this.unpack(archive, join(staging, "server"));
 				await rm(archive);
 				command = "server";
-				if (!(await this.java(javaHome || process.env.JAVA_HOME))) {
+				const existingJava = await this.java(javaHome || process.env.JAVA_HOME);
+				if (existingJava) {
+					jdk = dirname(dirname(existingJava));
+				} else {
 					const os =
 							process.platform === "darwin"
 								? "mac"
