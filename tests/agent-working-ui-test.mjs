@@ -86,7 +86,7 @@ await page.mouse.move(0,0);
 await page.waitForFunction(()=>getComputedStyle(document.querySelector('.qn-rail')).opacity==='0');
 assert.equal(await page.locator('.panel-sessions .session-item.active').count(),1,'current conversation is highlighted');
 const emit=(state)=>{overrides=state;latestState={...latestState,...state,rev:latestState.rev+1};socket.send(JSON.stringify({type:'snapshot',state:latestState}));};
-await page.locator('.tree-filter').click();
+await page.locator('.tree-filter', { hasText: /^(改动|Changes)(?:\s|$)/ }).click();
 assert.equal(await page.locator('.file-name-text',{hasText:'AGENTS.md'}).count(),0);
 assert((await page.locator('.tree-modified-count').count()) >= 1,'folders carry change counts');
 assert.equal(await page.locator('.file-item.file .tree-modified-count').count(),0,'files have no numeric count');
@@ -96,7 +96,7 @@ assert.equal(await page.locator('.file-item',{hasText:'added.txt'}).locator('.tr
 assert.equal(await page.locator('.file-item',{hasText:'obsolete.txt'}).locator('.tree-change-badge').textContent(),'D');
 await page.locator('.file-dir-main',{hasText:'docs'}).click();
 await page.locator('.file-name-text',{hasText:'note.md'}).waitFor();
-await page.locator('.tree-filter').click();
+await page.locator('.tree-filter', { hasText: /^(改动|Changes)(?:\s|$)/ }).click();
 await page.locator('.file-name-text',{hasText:'AGENTS.md'}).waitFor();
 assert.equal(await page.locator('.msg-assistant > .msg-meta:visible').count(),1);
 const tool=(id,command)=>({id,role:'assistant',model:'glm-5.3',content:[{type:'toolCall',id:'call-'+id,name:'bash',argumentsText:JSON.stringify({command})}]});

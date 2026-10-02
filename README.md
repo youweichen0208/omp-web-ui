@@ -18,9 +18,9 @@ pi-web-ui --port 9000 --cwd /path/to/project
 
 不安装到全局也可以运行 `npx @youweichen/pi-web-ui`。升级后若使用开机自启服务，运行 `pi-web-ui server restart`，让服务端加载新版本。
 
-### 1.0.0-beta.7 测试版
+### 1.0.0-beta.8 测试版
 
-[LSP + 内置子代理联合测试版](https://github.com/youweichen0208/omp-web-ui/releases/tag/v1.0.0-beta.7) 面向正式 1.0.0 前的试用：主代理与子代理共享项目语言服务，支持 TS/JS、Python、Maven Java、Go、Rust、C/C++，状态栏可查看 LSP 启动和连接结果。Java 支持 8/17 项目 JDK 及用户/全局 Maven settings.xml；Gradle 暂不支持。自动编辑诊断默认关闭，原生服务按 SDK 项目信任启动。
+[LSP + 内置子代理联合测试版](https://github.com/youweichen0208/omp-web-ui/releases/tag/v1.0.0-beta.8) 面向正式 1.0.0 前的试用：主代理与子代理共享项目语言服务，支持 TS/JS、Python、Maven Java、Go、Rust、C/C++，状态栏可查看 LSP 启动和连接结果。Java 支持 8/17 项目 JDK 及用户/全局 Maven settings.xml；Gradle 暂不支持。自动编辑诊断默认关闭，原生服务按 SDK 项目信任启动。
 
 本次仅发布 GitHub 预发布，npm latest 保持稳定版本。原生语言工具链可在设置中按需安装或配置本机路径；Go/Rust/C++ 仍需本机开发环境。测试边界见 [验证记录](docs/code-intelligence-validation.md)。
 

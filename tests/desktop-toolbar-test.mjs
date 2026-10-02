@@ -74,7 +74,7 @@ try {
 			await page.locator('.task-progress:visible').waitFor();
 			assert(await page.locator('.task-progress').evaluate(el => document.activeElement === el));
 			assert.equal(await page.locator('.panel-right > .panel-title').evaluate(el => el.getBoundingClientRect().height), 40);
-			assert.equal(await page.locator('.tree-filter').textContent(), `改动 ${changeCount}`);
+			assert.equal(await page.getByRole('button', { name: `改动 ${changeCount}`, exact: true }).textContent(), `改动 ${changeCount}`);
 			if (width === 1500) {
 				await page.locator('.topbar-actions > .panel-toggle').click();
 				changeCount++;
