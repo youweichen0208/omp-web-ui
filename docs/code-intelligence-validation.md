@@ -79,7 +79,7 @@
 - `release/pi-0.10.0-mac-arm64.zip`，约 245 MiB。
   SHA256：`ab98f7456bfc31b9a0d7cd93a5de6ee1786be15150531c828e4fc20b00a26f2f`
 
-包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.1 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
+包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.2 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
 
 ## 尚未完成的专项验收
 
@@ -104,3 +104,5 @@ Mac arm64 beta 包内 Electron 实测 TS/Python、Java/Go/Rust/C++、嵌套 Mave
 - `pi-1.0.0-beta.1-mac-arm64.zip` SHA256：`c5adf524b88566da81868d4ad24afb4a0a093c8106a7601c8d91903f557564d1`
 
 本次只发布 GitHub 预发布；Windows / Linux 是否通过，以标签 Actions 最终状态为准，不以本机模拟代替。
+
+`v1.0.0-beta.1` 在旧 OMP 迁移中使用过，本轮发布采用 `v1.0.0-beta.2`，保留旧标签身份；以上 beta.1 为改名之前的本机验证包。
