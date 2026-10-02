@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main, develop]
   pull_request:
@@ -39,6 +40,25 @@ jobs:
       - name: Protocol smoke tests
         run: node tests/run-smoke.mjs
 
+  code-intelligence:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node tests/code-toolchain-build-test.mjs
+      - run: npx vitest run tests/unit/code-shutdown.test.ts tests/unit/project-watcher.test.ts
+      - run: node tests/code-intelligence-test.mjs
+
   node-workbench:
     strategy:
       fail-fast: false
@@ -55,3 +75,51 @@ jobs:
       - run: npm ci
       - run: npm run build:server
       - run: node tests/node-workbench-test.mjs
+
+  native-code-intelligence:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set isolated native toolchain directory
+        shell: bash
+        run: echo "PI_NATIVE_TEST_DATA=$RUNNER_TEMP/pi-native-tools" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+      - run: rustup component add rust-src
+      - run: npm ci
+      - run: npm run build
+      - run: node tests/native-code-intelligence-test.mjs --install
+      - run: node tests/maven-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_MAVEN_PREFIX: backend
+      - uses: actions/setup-java@v4
+        id: java8
+        with:
+          distribution: zulu
+          java-version: '8'
+      - run: node tests/native-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_TEST_LANGUAGES: java
+          PI_NATIVE_JAVA_VERSION: '8'
+          PI_NATIVE_PROJECT_JDK: ${{ steps.java8.outputs.path }}
+      - uses: actions/setup-java@v4
+        id: java17
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: node tests/native-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_TEST_LANGUAGES: java
+          PI_NATIVE_JAVA_VERSION: '17'
+          PI_NATIVE_PROJECT_JDK: ${{ steps.java17.outputs.path }}

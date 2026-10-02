@@ -27,6 +27,8 @@ execFileSync(executable, ["--input-type=module", "--eval", `await import(${JSON.
 	stdio: "pipe",
 });
 }
+assert(readFileSync(join(appRoot,"resources/code-toolchain/manifest.json"),"utf8").includes("5.9.3"));
+execFileSync(executable,[resolve("tests/code-intelligence-test.mjs"),appRoot],{env:{...process.env,ELECTRON_RUN_AS_NODE:"1",NODE_PATH:"",NODE_OPTIONS:""},timeout:60000,stdio:"inherit"});
 const temp = mkdtempSync(join(tmpdir(), "pi-packaged-start-"));
 const workspace = join(temp, "workspace");
 mkdirSync(workspace);

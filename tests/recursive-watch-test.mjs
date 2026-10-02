@@ -166,6 +166,16 @@ async function main() {
 			console.log(`✓ 列出目录切换后 path 跟随 (${ev2.path})`);
 		}
 
+		// Browsing an ignored directory still owns a direct file-panel watch.
+		mkdirSync(join(workspace, "dist"), { recursive: true });
+		await listDir("dist");
+		await sleep(500);
+		lastFileChanged = null;
+		setTimeout(() => writeFileSync(join(workspace, "dist", "output.js"), "export {};\n"), 100);
+		const ignoredDirectoryEvent = await nextFileChanged();
+		if (ignoredDirectoryEvent.path !== "dist") throw new Error("Ignored directory lost its focused watcher");
+		console.log("✓ 浏览 dist 时仍实时刷新");
+
 		ok = true;
 		console.log("\n全部通过 ✅");
 	} catch (err) {

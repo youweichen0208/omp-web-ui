@@ -35,6 +35,9 @@ permissions:
   contents: write
 
 jobs:
+  verify-code-intelligence:
+    uses: ./.github/workflows/ci.yml
+
   prepare-release:
     runs-on: ubuntu-latest
     steps:
@@ -54,12 +57,12 @@ jobs:
             else
               args+=(--notes "Desktop release $version")
             fi
-            if [[ "$version" == *-* ]]; then args+=(--prerelease); fi
+            if [[ "$version" == *-* ]]; then args+=(--prerelease --latest=false); fi
             gh release create "$RELEASE_TAG" "${args[@]}"
           fi
 
   build-mac:
-    needs: prepare-release
+    needs: [prepare-release, verify-code-intelligence]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'mac' }}
     runs-on: macos-latest
     timeout-minutes: 60
@@ -73,6 +76,17 @@ jobs:
 
       - name: Setup Python (setuptools for node-gyp)
         run: python3 -m pip install --upgrade setuptools --break-system-packages
+
+      - name: Set isolated native toolchain directory
+        shell: bash
+        run: echo "PI_NATIVE_TEST_DATA=$RUNNER_TEMP/pi-native-language-tools" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+
+      - name: Setup Rust standard library for LSP fixtures
+        run: rustup component add rust-src
 
       - name: Install dependencies
         run: npm ci
@@ -89,8 +103,18 @@ jobs:
           node tests/model-config-preservation-test.mjs
           node tests/builtin-subagents-test.mjs
 
+      - name: Verify language services and nested Maven (plain Node)
+        run: |
+          node tests/code-intelligence-test.mjs
+          node tests/native-code-intelligence-test.mjs --install
+          node tests/maven-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_MAVEN_PREFIX: backend
+
       - name: Build Electron (macOS)
-        run: npx electron-builder build --mac --arm64 --publish never
+        run: |
+          channel=$(node -p "require('./package.json').version.split('-')[1]?.split('.')[0] || 'latest'")
+          npx electron-builder build --mac --arm64 --publish never --config.publish.channel="$channel"
 
       - name: Verify packaged server, native worker and OAuth
         run: |
@@ -102,6 +126,7 @@ jobs:
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$PWD/$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/pi-one-images-test.mjs "$PWD/$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/builtin-subagents-test.mjs "$PWD/$executable" "$PWD/$root"
+          node tests/native-code-desktop-test.mjs "$executable" "$root"
           codesign --verify --deep --strict "$app"
 
       - name: Upload verified macOS packages
@@ -109,10 +134,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="v$(node -p "require('./package.json').version")"
-          gh release upload "$tag" release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml --clobber
+          channel=$(node -p "require('./package.json').version.split('-')[1]?.split('.')[0] || 'latest'")
+          gh release upload "$tag" release/*.dmg release/*.zip release/*.blockmap "release/$channel-mac.yml" --clobber
 
   build-win:
-    needs: prepare-release
+    needs: [prepare-release, verify-code-intelligence]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'win' }}
     runs-on: windows-2022
     timeout-minutes: 60
@@ -126,6 +152,17 @@ jobs:
 
       - name: Setup Python (setuptools for node-gyp)
         run: python3 -m pip install --upgrade setuptools
+
+      - name: Set isolated native toolchain directory
+        shell: bash
+        run: echo "PI_NATIVE_TEST_DATA=$RUNNER_TEMP/pi-native-language-tools" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+
+      - name: Setup Rust standard library for LSP fixtures
+        run: rustup component add rust-src
 
       - name: Install dependencies
         run: npm ci
@@ -155,8 +192,19 @@ jobs:
       - name: Verify desktop toolbar layout on Windows
         run: node tests/desktop-toolbar-test.mjs
 
+      - name: Verify language services and nested Maven (plain Node)
+        run: |
+          node tests/code-intelligence-test.mjs
+          node tests/native-code-intelligence-test.mjs --install
+          node tests/maven-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_MAVEN_PREFIX: backend
+
       - name: Build Electron (Windows)
-        run: npx electron-builder build --win --x64 --publish never
+        shell: bash
+        run: |
+          channel=$(node -p "require('./package.json').version.split('-')[1]?.split('.')[0] || 'latest'")
+          npx electron-builder build --win --x64 --publish never --config.publish.channel="$channel"
 
       - name: Verify packaged server and portable relaunch
         shell: pwsh
@@ -173,6 +221,8 @@ jobs:
           & ./release/win-unpacked/pi.exe tests/builtin-subagents-test.mjs "$PWD/release/win-unpacked/pi.exe" "$PWD/release/win-unpacked/resources/app"
           if ($LASTEXITCODE -ne 0) { throw "Packaged built-in subagents failed" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
+          node tests/native-code-desktop-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
+          if ($LASTEXITCODE -ne 0) { throw "Packaged language services failed" }
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
 
@@ -185,13 +235,14 @@ jobs:
           $tag = "v$version"
           gh release view $tag
           if ($LASTEXITCODE -ne 0) { throw "Release draft is missing" }
-          $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip', '.blockmap' -or $_.Name -eq 'latest.yml' }
+          $channel = if ($version.Contains('-')) { $version.Split('-')[1].Split('.')[0] } else { 'latest' }
+          $assets = Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip', '.blockmap' -or $_.Name -eq "$channel.yml" }
           if ($assets.Count -lt 5) { throw "Windows release assets are incomplete" }
           gh release upload $tag @($assets.FullName) --clobber
           if ($LASTEXITCODE -ne 0) { throw "Release upload failed" }
 
   build-linux:
-    needs: prepare-release
+    needs: [prepare-release, verify-code-intelligence]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -208,6 +259,17 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-setuptools 2>/dev/null || true
 
+      - name: Set isolated native toolchain directory
+        shell: bash
+        run: echo "PI_NATIVE_TEST_DATA=$RUNNER_TEMP/pi-native-language-tools" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+
+      - name: Setup Rust standard library for LSP fixtures
+        run: rustup component add rust-src
+
       - name: Install dependencies
         run: npm ci
 
@@ -223,8 +285,18 @@ jobs:
           node tests/model-config-preservation-test.mjs
           node tests/builtin-subagents-test.mjs
 
+      - name: Verify language services and nested Maven (plain Node)
+        run: |
+          node tests/code-intelligence-test.mjs
+          node tests/native-code-intelligence-test.mjs --install
+          node tests/maven-code-intelligence-test.mjs
+        env:
+          PI_NATIVE_MAVEN_PREFIX: backend
+
       - name: Build Electron (Linux)
-        run: npx electron-builder build --linux --x64 --publish never
+        run: |
+          channel=$(node -p "require('./package.json').version.split('-')[1]?.split('.')[0] || 'latest'")
+          npx electron-builder build --linux --x64 --publish never --config.publish.channel="$channel"
 
       - name: Verify packaged server, native worker and OAuth
         run: |
@@ -235,13 +307,15 @@ jobs:
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/pi-one-images-test.mjs "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/builtin-subagents-test.mjs "$executable" "$root"
+          node tests/native-code-desktop-test.mjs "$executable" "$root"
 
       - name: Upload verified Linux packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="v$(node -p "require('./package.json').version")"
-          gh release upload "$tag" release/*.AppImage release/*.deb release/latest-linux.yml --clobber
+          channel=$(node -p "require('./package.json').version.split('-')[1]?.split('.')[0] || 'latest'")
+          gh release upload "$tag" release/*.AppImage release/*.deb "release/$channel-linux.yml" --clobber
 
   publish-release:
     needs: [build-mac, build-win, build-linux]
@@ -258,8 +332,9 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
           const version = JSON.parse(readFileSync('package.json')).version;
+          const channel = version.split('-')[1]?.split('.')[0] || 'latest';
           const names = new Set(JSON.parse(readFileSync('/tmp/release-assets.json')).assets.map(asset => asset.name));
-          for (const name of [`pi-${version}-mac-arm64.dmg`, `pi-${version}-mac-arm64.zip`, `pi-${version}-setup-x64.exe`, `pi-${version}-win-x64.exe`, `pi-${version}-win-x64.zip`, `pi-${version}-linux-x86_64.AppImage`, `pi-${version}-linux-amd64.deb`, 'latest-mac.yml', 'latest.yml', 'latest-linux.yml']) {
+          for (const name of [`pi-${version}-mac-arm64.dmg`, `pi-${version}-mac-arm64.zip`, `pi-${version}-setup-x64.exe`, `pi-${version}-win-x64.exe`, `pi-${version}-win-x64.zip`, `pi-${version}-linux-x86_64.AppImage`, `pi-${version}-linux-amd64.deb`, `${channel}-mac.yml`, `${channel}.yml`, `${channel}-linux.yml`]) {
             if (!names.has(name)) throw new Error(`Missing release attachment: ${name}`);
           }
           NODE

@@ -1,0 +1,140 @@
+import { it, expect, vi } from "vitest";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { NativeCodeToolchains } from "../../server/code-native-toolchains.js";
+import {
+	nativeToolchainPins,
+	pinnedNativeAsset,
+} from "../../server/native-toolchain-pins.js";
+import { rustAnalysisLimitation } from "../../server/code-languages.js";
+it("locks every shipped platform asset and rejects changed upstream digests", () => {
+	for (const [name, asset] of Object.entries(nativeToolchainPins.assets)) {
+		expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
+		expect(pinnedNativeAsset(name, asset.sha256)).toEqual(asset);
+		expect(() => pinnedNativeAsset(name, "0".repeat(64))).toThrow(/changed/);
+	}
+	expect(() => pinnedNativeAsset("new-unreviewed-file.zip")).toThrow(
+		/No pinned/,
+	);
+	expect(nativeToolchainPins.versions.jdk).toBe("jdk-21.0.12.1+1");
+});
+it("blocks a replaced release before fetching its executable and offers a local-path fallback", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-pinned-release-")),
+		tools = new NativeCodeToolchains(root);
+	const fetch = vi.spyOn(tools as any, "fetch").mockResolvedValue(
+		new Response(
+			JSON.stringify({
+				assets: [
+					{
+						name: `rust-analyzer-${process.arch === "arm64" ? "aarch64" : "x86_64"}-${process.platform === "darwin" ? "apple-darwin.gz" : process.platform === "win32" ? "pc-windows-msvc.zip" : "unknown-linux-gnu.gz"}`,
+						url: "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/123",
+						digest: "sha256:" + "0".repeat(64),
+					},
+				],
+			}),
+		),
+	);
+	try {
+		await expect(tools.install("rust")).rejects.toThrow(
+			/committed pin[\s\S]*local server path/,
+		);
+		expect(fetch).toHaveBeenCalledTimes(1);
+		await expect(readFile(join(root, "ready.json"))).rejects.toThrow();
+	} finally {
+		await tools.shutdown();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+it("rejects corrupted bytes even when a download responds successfully", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-pinned-bytes-")),
+		tools = new NativeCodeToolchains(root);
+	vi.spyOn(tools as any, "fetch").mockResolvedValue(
+		new Response("replaced executable"),
+	);
+	try {
+		await expect(
+			(tools as any).download(
+				"https://example.test/file",
+				pinnedNativeAsset("clangd-mac-23.1.0.zip").sha256,
+				join(root, "file.zip"),
+			),
+		).rejects.toThrow(/SHA256 mismatch/);
+	} finally {
+		await tools.shutdown();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+it("includes the official macOS Go location under a GUI PATH and excludes project binaries", async () => {
+	const tools = new NativeCodeToolchains("/tmp/pi-path-fixture");
+	const seen: string[] = [];
+	vi.spyOn(tools as any, "executable").mockImplementation(
+		async (...args: unknown[]) => {
+			seen.push(String(args[0]));
+			return undefined;
+		},
+	);
+	const previous = process.env.PATH;
+	process.env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
+	try {
+		await (tools as any).find("go", "/project");
+		expect(seen).toContain(
+			`/usr/local/go/bin/go${process.platform === "win32" ? ".exe" : ""}`,
+		);
+	} finally {
+		process.env.PATH = previous;
+		await tools.shutdown();
+	}
+});
+it("marks disabled macro expansion as a limitation without hiding real macro definition errors", () => {
+	expect(
+		rustAnalysisLimitation("unresolved-proc-macro", "proc macro not expanded"),
+	).toBe(true);
+	expect(rustAnalysisLimitation("macro-error", "OUT_DIR not available")).toBe(
+		true,
+	);
+	expect(
+		rustAnalysisLimitation(
+			"macro-error",
+			"unexpected token in macro invocation",
+		),
+	).toBe(false);
+	expect(rustAnalysisLimitation("E0308", "type mismatch")).toBe(false);
+});
+it("keeps Go checksum verification enabled even with private module user settings", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-go-sum-")),
+		tools = new NativeCodeToolchains(root);
+	vi.spyOn(tools as any, "find").mockResolvedValue(process.execPath);
+	const run = vi.spyOn(tools as any, "run").mockResolvedValue("");
+	try {
+		await tools.install("go");
+		const options = run.mock.calls[0][2] as { env: Record<string, string> };
+		expect(options.env.GOSUMDB).toBe("sum.golang.org");
+		expect(options.env.GONOSUMDB).toBe("none");
+		expect(options.env.GOPRIVATE).toBe("none");
+	} finally {
+		await tools.shutdown();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+it("explains GitHub rate limiting with a retry, proxy and local server fallback", async () => {
+	const { MockAgent } = await import("undici");
+	const root = await mkdtemp(join(tmpdir(), "pi-gh-quota-")),
+		tools = new NativeCodeToolchains(root),
+		mock = new MockAgent();
+	await (tools as any).dispatcher.close();
+	(tools as any).dispatcher = mock;
+	mock.disableNetConnect();
+	mock
+		.get("https://api.github.com")
+		.intercept({ path: "/rate-test" })
+		.reply(403, { message: "API rate limit exceeded" });
+	try {
+		await expect(
+			(tools as any).fetch("https://api.github.com/rate-test"),
+		).rejects.toThrow(/rate limited[\s\S]*local server path/);
+	} finally {
+		await tools.shutdown();
+		await rm(root, { recursive: true, force: true });
+	}
+});

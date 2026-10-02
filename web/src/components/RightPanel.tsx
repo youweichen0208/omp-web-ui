@@ -1,6 +1,7 @@
+import { CodePanel } from "./CodePanel";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiX } from "react-icons/fi";
-import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, TaskProgress, UiMessage } from "../types";
+import type { ClientMessage, FileEntry, FileListing, ScmFileEntry, ServerMessage, TaskProgress, UiMessage } from "../types";
 import { useT } from "../i18n";
 import { downloadFile } from "../download";
 import { mentionedHiddenDirs } from "../conversation-files";
@@ -20,7 +21,7 @@ interface RightPanelProps {
 	conversationTitle: string;
 	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
-	send: (msg: { type: "list_files"; path?: string }) => boolean;
+	send: (msg: ClientMessage) => boolean;
 	onAttach: (path: string, name: string, mode: AttachMode, isDir?: boolean) => void;
 	onPreview: (path: string, name: string) => void;
 	onNotice: (level: "info" | "warning" | "error", text: string) => void;
@@ -29,6 +30,7 @@ interface RightPanelProps {
 
 export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, taskProgress, conversationTitle, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
 	const t = useT();
+	const [problems,setProblems] = useState(false);
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -150,8 +152,8 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 	</>;
 	const otherDirectories = directoryEntries("").filter(({ entry }) => entry.type === "dir" && !changed.some((change) => change.path === entry.path || change.path.startsWith(`${entry.path}/`)) && (showHidden || !entry.name.startsWith("."))).length;
 	return <aside className={`panel panel-right${taskProgress ? " has-task-progress" : ""}`}>
-		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
-		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
+		<div className="panel-title"><button type="button" className="tree-filter" aria-pressed={!problems} onClick={()=>setProblems(false)}>{t("workspaceFiles")}</button><button type="button" className="tree-filter" aria-pressed={problems} onClick={()=>setProblems(true)}>{t("codeProblems")}</button>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
+		{problems ? <CodePanel cwd={cwd} send={send} onPreview={onPreview} /> : <div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
 			if (!button) return;
 			const path = button.dataset.treeNode!;
@@ -174,6 +176,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 			{compactTree && !onlyChanged && otherDirectories > 0 && <button type="button" className="tree-other-directories" onClick={() => setShowOtherDirectories(true)}>{t("otherDirectories", { n: otherDirectories })}</button>}
 		</div>
+		}
 		{taskProgress && <div className="panel-lower"><TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} conversationTitle={conversationTitle} onPreview={onPreview} onViewChanges={onViewChanges} /></div>}
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (
 				<div className="panel-widgets">

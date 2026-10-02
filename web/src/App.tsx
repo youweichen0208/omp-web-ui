@@ -385,9 +385,9 @@ export function App() {
 	}, [switching, chat.state?.cwd, previewFile]);
 	useEffect(() => {
 		const onToolFile = (event: Event) => {
-			const detail = (event as CustomEvent<{ path?: string; line?: number }>).detail;
+			const detail = (event as CustomEvent<{ cwd?:string; path?: string; line?: number }>).detail;
 			const cwd = chat.state?.cwd?.replaceAll("\\", "/").replace(/\/$/, "");
-			if (!cwd || typeof detail?.path !== "string") return;
+			if (!cwd || typeof detail?.path !== "string" || detail.cwd && detail.cwd.replaceAll("\\", "/").replace(/\/$/, "") !== cwd) return;
 			const path = detail.path.replaceAll("\\", "/");
 			const relative = path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
 			if (relative.startsWith("/") || /^[A-Za-z]:\//.test(relative) || relative.split("/").includes("..")) return;
@@ -426,6 +426,7 @@ export function App() {
 	const [manageModelsOpen, setManageModelsOpen] = useState(false);
 	// Settings panel (system prompt / skills / extensions / presets).
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [settingsInitialTab, setSettingsInitialTab] = useState<"prompt" | "code">("prompt");
 	// Background-task panel (AI-started servers — stop individually or all).
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
 	const [subagentsOpen, setSubagentsOpen] = useState(false);
@@ -810,7 +811,7 @@ export function App() {
 				className={`panel-drawer drawer-left ${drawer === "left" ? "open" : ""}`}
 			>
 				<LeftPanel
-					onOpenSettings={() => setSettingsOpen(true)}
+					onOpenSettings={() => { setSettingsInitialTab("prompt"); setSettingsOpen(true); }}
 					onNewChat={() => { setView("chat"); panelSend({ type: "new_chat" }); }}
 					send={panelSend}
 					active={!isMobile || drawer === "left"}
@@ -861,7 +862,7 @@ export function App() {
 						}
 					}}
 					onManageModels={() => setManageModelsOpen(true)}
-					onOpenSettings={() => setSettingsOpen(true)}
+					onOpenSettings={() => { setSettingsInitialTab("prompt"); setSettingsOpen(true); }}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
 					onOpenSubagents={() => { setSubagentsConfigure(false); setSubagentsOpen(true); }}
 					onOpenGoal={() => { setView("chat"); setGoalOpenRequest((value) => value + 1); }}
@@ -1032,7 +1033,7 @@ export function App() {
 					})}
 				</div>
 			</div>
-			<FooterBar chat={chat} send={send} />
+			<FooterBar chat={chat} send={send} onCodeSettings={() => { setSettingsInitialTab("code"); setSettingsOpen(true); }} />
 
 			{chat.ready &&
 				chat.state &&
@@ -1062,13 +1063,14 @@ export function App() {
 			)}
 			{settingsOpen && (
 				<SettingsModal
+					initialTab={settingsInitialTab}
 					chat={chat}
 					send={send}
 					terminal={terminal}
 					onSwitchToTerminal={() => setView("terminal")}
 					consumeSubagentResponses={consumeSubagentResponses}
 					onOpenSubagents={() => { setSettingsOpen(false); setSubagentsConfigure(true); setSubagentsOpen(true); }}
-					onClose={() => setSettingsOpen(false)}
+					onClose={() => { setSettingsOpen(false); setSettingsInitialTab("prompt"); }}
 				/>
 			)}
 			{subagentsOpen && <SubagentsPanel initialConfigure={subagentsConfigure} consumeResponses={consumeSubagentResponses} chat={chat} send={send} onClose={() => setSubagentsOpen(false)} />}

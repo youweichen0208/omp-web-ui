@@ -17,6 +17,92 @@ const STORAGE_KEY = "pi-web-ui:lang";
 /* ------------------------------------------------------------------ */
 
 const zh = {
+	codeLspMemoryPending: "内存待采样",
+	codeLspMemoryTarget: "配置内存目标 {n} MiB",
+	codeLspStatus: "语言服务状态",
+	codeLspServers: "项目语言服务",
+	codeLspConnected: "已连接",
+	codeLspNotStarted: "尚未启动",
+	codeLspDisabled: "已关闭",
+	codeLspOffline: "连接已断开",
+	codeLspLoading: "正在确认状态",
+	codeLspAttention: "需要处理",
+	codeLspStarting: "启动中",
+	codeLspSummaryReady: "{n} 项已连接",
+	codeLspStandby: "待启动",
+	codeLspChecked: "已检查 {n} 个文件 · {pending} 个待诊断",
+	codeLspDetails: "查看原因",
+	codeLspMissingHint: "未找到语言服务器或所需 SDK，请在代码智能设置中安装或填写本机路径。",
+	codeLspOomHint: "当前内存上限不足，可在设置中调高上限后重启服务。",
+	codeLspFailedHint: "启动或连接失败，请查看原因，检查服务器路径和项目配置后重启。",
+	codeLspStandbyHint: "尚未检测到对应项目或尚未查询此语言；不会为所有语言同时启动服务。",
+	codeLspDisabledHint: "可在代码智能设置中开启。",
+	codeLspStartingHint: "工具链或项目索引正在准备；首次导入可能需要下载依赖。",
+	codeLspConnectedHint: "已连接表示语言服务器启动成功；文件诊断可能仍在准备，也不代表代码没有错误。",
+	codeLspOfflineHint: "应用连接已断开，暂时无法确认语言服务状态；重连后自动刷新。",
+	codeLspOpenSettings: "打开代码智能设置",
+
+	codeIdle: "待启动",
+	codePreparing: "准备工具链",
+	codeInitializing: "初始化",
+	codeReady: "可用",
+	codeQueued: "等待服务名额",
+	codeUntrusted: "项目未信任",
+	codeRetrying: "重试中",
+	codeFailed: "失败",
+	codeOom: "超出堆上限",
+	codeFresh: "最新",
+	codePartialResult: "未确认完整新鲜度",
+	codeStale: "已过期",
+	codePending: "等待诊断",
+	codeUnavailable: "不可用",
+
+	codeFeedback: "自动附加编辑诊断（默认关闭）",
+	codeIntelligence: "代码智能",
+	codeRefresh: "刷新",
+	codeRustCoverage:
+		"Rust 诊断为部分覆盖：不运行 Cargo check、借用检查、build.rs 或过程宏；宏未展开提示不代表已确认的代码错误。",
+	codeAnalysisLimitation: "分析限制",
+	codeNativeResourceHint:
+		"RSS 包含堆外内存。Go 是软内存目标，Rust/C/C++ 无硬上限。大型项目可占用数 GiB。",
+	codeHighMemory: "内存占用较高（{n} MiB），可关闭暂不用的语言服务",
+	codeCoverage: "已检查 {n} 个打开的文件；并非全项目检查",
+	codeProjectTs: "项目 TypeScript",
+	codeTrustRequired:
+		"Python、Java、Go、Rust、C/C++ 需要项目信任。请在原生 MCP 设置中检查并授予 SDK 项目信任。",
+	codeMissing: "缺少本机工具链",
+	codeInstalling: "正在安装工具链",
+	codeNativeHint:
+		"按需安装到应用数据目录。Java 可补齐本地 Java 21；Go 需已安装 Go SDK，Rust 项目需本机 Rust/Cargo，C/C++ 需编译环境。安装时联网下载，分析在本机运行。",
+	codeJdtPath: "JDT LS 安装目录（绝对路径）",
+	codeServerPath: "语言服务器可执行文件（绝对路径）",
+	codeAutoDetect: "自动检测已安装工具",
+	codeInstallTool: "安装本地 {language} 工具链",
+	codeMavenUserSettings: "Maven 用户 settings.xml",
+	codeMavenGlobalSettings: "Maven 全局 settings.xml",
+	codeMavenSettingsOptional: "可选：settings.xml 的绝对路径",
+	codeMavenSettingsHint:
+		"自动检查 ~/.m2/settings.xml 和 MAVEN_HOME/M2_HOME 下的 conf/settings.xml；访达启动或未能发现时可手动填写。只传配置文件路径，不读取或展示凭据。",
+	codeGradleUnsupported: "Gradle 项目暂不支持",
+	codeMavenRequired: "Java 目前仅支持 Maven 项目",
+	codeJavaHome: "语言服务器 JDK 目录（21+）",
+	codeJavaProjectHome: "Java {version} 项目 JDK 目录",
+	codeJavaProjectOptional: "可选：本机已安装的完整 JDK",
+	codeJavaRuntimeHint:
+		"项目版本由 pom.xml 决定；Java 8/17 的 JDK 与语言服务器 JDK 分开配置。不会修改系统 JAVA_HOME 或 Maven 配置。",
+	codeNativeMemory: "Java 堆 / Go 内存目标（MiB；Rust、C/C++ 无硬限制）",
+	codeNotChecked: "尚未检查文件；使用 code 工具打开文件后获取诊断。",
+	codePartial: "文件监听覆盖不完整，结果可能滞后。",
+	codeEnabled: "启用代码智能",
+	codeTs: "TypeScript / JavaScript",
+	codePython: "Python",
+	codePythonPath: "Python 解释器路径",
+	codeHeap: "堆上限（MiB）",
+	codeSave: "保存",
+	codeRestart: "重启语言服务",
+	codeFilter: "过滤文件或诊断",
+	codeProblems: "问题",
+
 	mcpArgs: "参数（JSON 数组）",
 	mcpEnv: "环境变量（JSON 对象）",
 	mcpHeaders: "HTTP headers（JSON 对象）",
@@ -32,7 +118,8 @@ const zh = {
 	mcpScope: "配置范围",
 	mcpGlobal: "全局",
 	mcpProject: "当前项目",
-	mcpExplanation: "原生 MCP 使用 Pi 配置与凭据。旧界面 MCP 桥仍使用应用 data-dir/mcp.json。",
+	mcpExplanation:
+		"原生 MCP 使用 Pi 配置与凭据。旧界面 MCP 桥仍使用应用 data-dir/mcp.json。",
 	mcpUntrusted: "项目尚未信任，保存不会自动加载此配置。",
 	mcpTrust: "信任当前项目",
 	mcpPending: "等待当前任务结束后应用",
@@ -40,7 +127,8 @@ const zh = {
 	mcpCommand: "命令",
 	mcpAdd: "加入配置草稿",
 	mcpConfig: "MCP 配置 JSON",
-	mcpJsonHelp: "JSON 可编辑 args、env、headers、auth.provider、oauth（含 authServerMetadataUrl）、enabled、exposure 及高级字段。•••••••• 保留原敏感值，替换为新值或删除字段以清除。删除 mcpServers 中的条目可移除服务。",
+	mcpJsonHelp:
+		"JSON 可编辑 args、env、headers、auth.provider、oauth（含 authServerMetadataUrl）、enabled、exposure 及高级字段。•••••••• 保留原敏感值，替换为新值或删除字段以清除。删除 mcpServers 中的条目可移除服务。",
 	mcpNameConflict: "名称为空或已存在",
 	mcpRefresh: "刷新配置",
 	mcpStatus: "官方连接状态",
@@ -68,7 +156,8 @@ const zh = {
 	saSessionBusy: "该对话仍有子代理任务，请先停止子任务或使用新对话按钮",
 	saTitle: "子代理",
 	saBuiltinTitle: "子代理 · 内置",
-	saBuiltinDescription: "自动委派、任务过程与角色配置。关闭后不再接受新委派，已有任务继续运行。",
+	saBuiltinDescription:
+		"自动委派、任务过程与角色配置。关闭后不再接受新委派，已有任务继续运行。",
 	saConfigTimeout: "配置请求未收到确认，请检查当前状态后重试。",
 	saRefresh: "刷新过程",
 	saSend: "发送",
@@ -82,7 +171,8 @@ const zh = {
 	sa_interrupted: "已中断",
 	saDisconnected: "连接已断开",
 	saAccepted: "已接收",
-	saIntro: "按需自动委派，遵循用户及技能的等待规则。只读任务可并行，写任务按项目串行。能力列表以逗号分隔；扩展填写已信任的完整路径。此锁约束宿主管理的工具，并非文件系统沙箱。",
+	saIntro:
+		"按需自动委派，遵循用户及技能的等待规则。只读任务可并行，写任务按项目串行。能力列表以逗号分隔；扩展填写已信任的完整路径。此锁约束宿主管理的工具，并非文件系统沙箱。",
 	saEnabled: "启用内置子代理",
 	saTimeout: "任务超时（分钟）",
 	saName: "名称",
@@ -105,7 +195,8 @@ const zh = {
 	saMore: "加载更多",
 	saAwaitingState: "等待任务状态",
 
-	nonChatModelsPreserved: "此处仅编辑聊天模型。另有 {n} 个图片或分类模型，其配置会保留。",
+	nonChatModelsPreserved:
+		"此处仅编辑聊天模型。另有 {n} 个图片或分类模型，其配置会保留。",
 	providerAuthChoose: "请选择",
 	providerLogout: "退出账号",
 	providerLogin: "登录账号",
@@ -119,7 +210,8 @@ const zh = {
 	nodeConnectionTiming: "握手 {ms} ms · 已连接 {duration}",
 	nodeRevealSource: "在本机定位配置",
 	nodeSources: "节点来源",
-	nodeSourceIntro: "连接已有的会话配置。在原工具中新增、修改节点，这里自动更新。",
+	nodeSourceIntro:
+		"连接已有的会话配置。在原工具中新增、修改节点，这里自动更新。",
 	nodeDetect: "检测本机来源",
 	nodeSyncKeep: "同步并保持更新",
 	nodeImportOnce: "只导入一次",
@@ -138,8 +230,10 @@ const zh = {
 	nodeSourceMissing: "来源已移除",
 	nodeUnsupported: "暂不支持此配置",
 	nodeFillSecret: "认证设置",
-	nodeLocalAuthHint: "可切换密码或公钥认证。测试通过后保存在本机，不修改 Xshell 原配置，正常同步不会覆盖；来源的主机、用户或认证资料变化时重置。",
-	nodeCredentialHint: "凭据单独保存，配置同步不会覆盖。Xshell 中修改密码后需在这里更新。",
+	nodeLocalAuthHint:
+		"可切换密码或公钥认证。测试通过后保存在本机，不修改 Xshell 原配置，正常同步不会覆盖；来源的主机、用户或认证资料变化时重置。",
+	nodeCredentialHint:
+		"凭据单独保存，配置同步不会覆盖。Xshell 中修改密码后需在这里更新。",
 	nodePersistSecret: "加密保存在运行服务的机器上",
 	nodeGroupSecret: "同组且认证方式相同的节点使用此凭据",
 	nodeGroupHint: "仅测试当前节点；同组其他节点在连接时验证。",
@@ -158,7 +252,8 @@ const zh = {
 	nodePolicyConfirm: "每次执行需确认",
 	nodePolicyAuto: "允许自动执行",
 	nodePolicyOff: "停用 Agent",
-	nodePolicyHint: "已识别的只读命令自动执行；写入、重启及无法确定的命令需确认。",
+	nodePolicyHint:
+		"已识别的只读命令自动执行；写入、重启及无法确定的命令需确认。",
 	nodeApproval: "需要确认",
 	nodeAllow: "允许执行",
 	nodeDeny: "不执行",
@@ -175,7 +270,8 @@ const zh = {
 	nodeShowFiles: "文件",
 	nodeCloseTab: "关闭终端",
 	nodeAddSource: "添加来源",
-	nodeNoSources: "未检测到默认来源，可手动指定 Xshell 会话目录或 SSH config 文件。",
+	nodeNoSources:
+		"未检测到默认来源，可手动指定 Xshell 会话目录或 SSH config 文件。",
 	nodeWorkingHere: "在 {name} 上",
 	nodeRunFailed: "执行失败",
 	nodeSourceOpenHint: "复制路径，在 Xshell 或文本编辑器中打开原配置。",
@@ -231,7 +327,8 @@ const zh = {
 	nodeKey: "公钥登录（私钥认证）",
 	expandProjects: "展开项目栏",
 	collapseProjects: "收起项目栏",
-	nodePrivateKeyHint: "请选择运行 pi 的电脑上的 OpenSSH 私钥文件，不是 .pub 公钥。Xshell 密钥名称不能作为路径；可在 Xshell 用户密钥管理器中导出 OpenSSH 私钥。私钥口令可留空。",
+	nodePrivateKeyHint:
+		"请选择运行 pi 的电脑上的 OpenSSH 私钥文件，不是 .pub 公钥。Xshell 密钥名称不能作为路径；可在 Xshell 用户密钥管理器中导出 OpenSSH 私钥。私钥口令可留空。",
 	nodeAgentAuth: "SSH Agent",
 	nodeKeyPath: "本机私钥路径",
 	nodePassphrase: "私钥口令",
@@ -261,8 +358,10 @@ const zh = {
 	nodeAgentApproval: "等待你确认操作…",
 	nodeDelete: "删除",
 	nodeForgetHostKey: "清除主机密钥信任",
-	nodeForgetHostKeyConfirm: "确认已核实 {name} 的新主机密钥？清除后下次连接会重新显示指纹。",
-	nodeTrust: "首次连接 {name} ({host})\n主机密钥指纹：{fingerprint}\n确认信任？",
+	nodeForgetHostKeyConfirm:
+		"确认已核实 {name} 的新主机密钥？清除后下次连接会重新显示指纹。",
+	nodeTrust:
+		"首次连接 {name} ({host})\n主机密钥指纹：{fingerprint}\n确认信任？",
 	nodeDeleteConfirm: "删除 {name}？",
 	nodeImported: "已导入 {n} 台节点（凭据请手动设置）",
 	nodeInvalidJson: "节点 JSON 无效",
@@ -335,7 +434,8 @@ const zh = {
 	attachHint: "将随下一条消息发送",
 	uploadFile: "添加文件（图片/文本/任意文件，也可直接拖入或粘贴截图）",
 	dropHereToAttach: "松开以添加文件",
-	imageNotSupported: "当前模型不支持识图：图片将交给视觉桥转写（若未配置视觉模型则可能被忽略）",
+	imageNotSupported:
+		"当前模型不支持识图：图片将交给视觉桥转写（若未配置视觉模型则可能被忽略）",
 	imageLoadFailed: "图片读取失败：{name}",
 	fileLoadFailed: "文件读取失败：{name}",
 	fileTooLarge: "文件过大已跳过（>{size}MB）：{name}",
@@ -363,7 +463,8 @@ const zh = {
 	workDisconnected: "连接已中断，正在重连；运行状态待确认。",
 	stop: "停止",
 	bgTasks: "后台任务",
-	bgTasksTip: "AI 在后台启动的服务（npm run dev & 等）——可逐个停止或全部关闭，对话结束后仍保留",
+	bgTasksTip:
+		"AI 在后台启动的服务（npm run dev & 等）——可逐个停止或全部关闭，对话结束后仍保留",
 	bgTasksEmpty: "暂无后台任务",
 	bgTasksDesc: "AI 运行中启动并仍在监听的进程（按监听端口检测）",
 	bgTaskPort: "端口",
@@ -421,7 +522,8 @@ const zh = {
 	componentCheckFailed: "检查失败，可重试",
 	componentChecking: "正在检查…",
 	componentCheck: "检查更新",
-	componentUpdateIntro: "查看运行中的 pi Agent 与扩展安装版本。检查不会自动安装；用户扩展更新后需重启应用。",
+	componentUpdateIntro:
+		"查看运行中的 pi Agent 与扩展安装版本。检查不会自动安装；用户扩展更新后需重启应用。",
 	componentOffline: "连接恢复后可检查更新。",
 	componentInstalling: "正在更新扩展，请等待完成…",
 	componentRestart: "更新已安装，请重启应用以加载新版本。",
@@ -510,7 +612,8 @@ const zh = {
 	placeholderModelSilent: "模型暂时没有响应，可停止、重试或继续等待…",
 	placeholderToolSilent: "命令或工具仍在运行，输入的消息会排队…",
 	toolSilent: "命令或工具已运行 {duration}，暂时没有新输出",
-	retrySilentUnavailable: "本轮已执行工具或包含附件，为避免重复执行，请停止后检查并手动重试",
+	retrySilentUnavailable:
+		"本轮已执行工具或包含附件，为避免重复执行，请停止后检查并手动重试",
 	continueWaiting: "继续等待",
 	actions: "操作",
 	retry: "重试",
@@ -565,7 +668,8 @@ const zh = {
 	runningConversations: "运行的对话",
 	historySessions: "历史对话",
 	openHistory: "历史对话",
-	openFiles: "文件列表",	streaming: "进行中…",
+	openFiles: "文件列表",
+	streaming: "进行中…",
 	noHistory: "还没有历史对话",
 	current: "当前",
 	messageCount: "{n} 条消息",
@@ -598,7 +702,8 @@ const zh = {
 	reaskFromHere: "从此处重新提问",
 	editPlaceholder: "修改问题内容…",
 	editHint: "⌘/Ctrl+Enter 提交 · Esc 取消",
-	editAttachmentHint: "原附件已保留，可粘贴/拖入新图片或文件 · ⌘/Ctrl+Enter 提交 · Esc 取消",
+	editAttachmentHint:
+		"原附件已保留，可粘贴/拖入新图片或文件 · ⌘/Ctrl+Enter 提交 · Esc 取消",
 
 	/* collapsed old messages */
 	expandMsg: "展开",
@@ -719,7 +824,8 @@ const zh = {
 	previewFile: "预览",
 	downloadFile: "下载文件",
 	downloadFailed: "下载失败：{error}",
-	protocolMismatch: "页面版本与服务器不一致（应用刚更新过），请刷新页面以恢复全部功能。",
+	protocolMismatch:
+		"页面版本与服务器不一致（应用刚更新过），请刷新页面以恢复全部功能。",
 
 	/* file preview */
 	selectLinesHint: "点击选择行；拖拽或 Shift+点击选择范围",
@@ -878,18 +984,28 @@ const zh = {
 	thinkingNow: "思考中",
 	thinkingPreview: "思考：{preview}",
 	toolRecovery: "工具调用恢复",
-	toolRecoveryRetrying: "此前的工具调用未通过正式接口执行。正在请求模型纠正一次；口头说“继续”不代表已经执行。",
-	toolRecoveryResumed: "纠正后已收到目标工具的成功返回。这不代表整个任务已完成，请以任务清单和执行结果为准。",
-	toolRecoveryFailed: "工具调用未能恢复，请检查相关工具结果和未完成步骤；连续无进展时不会重复纠正。",
-	toolRecoveryToolError: "工具已通过正式接口调用，但执行报错或超时。超时不代表操作没有生效，请先核实实际状态。",
-	toolRecoveryExhausted: "本轮格式纠正已达到上限，最后这次正文调用尚未执行。请检查结果后继续。",
-	toolRecoveryUnverified: "纠正后没有确认目标工具执行成功，任务可能尚未完成。请检查结果后手动继续。",
-	toolRecoveryDeferred: "此条旧记录中的工具调用未执行。当时可能有排队消息，或旧版恢复机制要求本轮先启动任务步骤。",
-	toolRecoveryQueued: "正文中的工具调用未执行。已有排队的用户或扩展消息，将优先处理这些消息。",
-	toolRecoveryInterrupted: "新的用户或扩展指令中断了这次纠正，将优先遵循新指令。",
+	toolRecoveryRetrying:
+		"此前的工具调用未通过正式接口执行。正在请求模型纠正一次；口头说“继续”不代表已经执行。",
+	toolRecoveryResumed:
+		"纠正后已收到目标工具的成功返回。这不代表整个任务已完成，请以任务清单和执行结果为准。",
+	toolRecoveryFailed:
+		"工具调用未能恢复，请检查相关工具结果和未完成步骤；连续无进展时不会重复纠正。",
+	toolRecoveryToolError:
+		"工具已通过正式接口调用，但执行报错或超时。超时不代表操作没有生效，请先核实实际状态。",
+	toolRecoveryExhausted:
+		"本轮格式纠正已达到上限，最后这次正文调用尚未执行。请检查结果后继续。",
+	toolRecoveryUnverified:
+		"纠正后没有确认目标工具执行成功，任务可能尚未完成。请检查结果后手动继续。",
+	toolRecoveryDeferred:
+		"此条旧记录中的工具调用未执行。当时可能有排队消息，或旧版恢复机制要求本轮先启动任务步骤。",
+	toolRecoveryQueued:
+		"正文中的工具调用未执行。已有排队的用户或扩展消息，将优先处理这些消息。",
+	toolRecoveryInterrupted:
+		"新的用户或扩展指令中断了这次纠正，将优先遵循新指令。",
 	toolRecoveryCancelled: "已停止工具调用恢复，不会自动继续。",
 	leakedThinking: "模型附加内容",
-	leakedThinkingHint: "正文中检测到思考标记，相关内容已折叠；不代表应用报错或数据泄露。点击查看原文。",
+	leakedThinkingHint:
+		"正文中检测到思考标记，相关内容已折叠；不代表应用报错或数据泄露。点击查看原文。",
 
 	/* terminal panel */
 	commands: "命令",
@@ -933,7 +1049,8 @@ const zh = {
 	scmPull: "拉取",
 	scmPullTip: "在终端中执行 git pull",
 	scmCommit: "提交",
-	scmCommitTip: "在终端中执行 git add -A && git commit -m \"…\"（提交全部更改，含未跟踪）",
+	scmCommitTip:
+		'在终端中执行 git add -A && git commit -m "…"（提交全部更改，含未跟踪）',
 	scmCommitPlaceholder: "输入提交信息…",
 	scmChanges: "更改",
 	scmHistory: "提交树",
@@ -970,11 +1087,13 @@ const zh = {
 	replaceKey: "更换密钥",
 	replaceKeyTitle: "替换已保存的密钥",
 	clearKey: "清空",
-	clearKeyTitle: "清除该服务商保存在 auth.json 的密钥，回到未配置状态（环境变量来源的无法在此清除）",
+	clearKeyTitle:
+		"清除该服务商保存在 auth.json 的密钥，回到未配置状态（环境变量来源的无法在此清除）",
 	clearKeyConfirm: "清空 {id} 已保存的密钥？其模型将从列表消失，直到重新配置。",
 	cloneProvider: "复制为自定义",
 	cloning: "复制中",
-	cloneProviderTitle: "复制该内置供应商（baseUrl + 模型列表）为自定义供应商，填入另一个 API 密钥即可双 key 并存",
+	cloneProviderTitle:
+		"复制该内置供应商（baseUrl + 模型列表）为自定义供应商，填入另一个 API 密钥即可双 key 并存",
 	pasteKey: "粘贴 API 密钥…",
 	savingKey: "保存中",
 	saveKey: "保存密钥",
@@ -1002,7 +1121,8 @@ const zh = {
 	addModel: "添加模型",
 	deleteProviderConfirm: "删除服务商 {id} 及其 {n} 个模型？",
 	fetchModels: "自动获取模型列表",
-	fetchModelsHint: "从 baseUrl 的 /models 接口自动拉取模型 ID（服务端请求，不受 CORS 限制）",
+	fetchModelsHint:
+		"从 baseUrl 的 /models 接口自动拉取模型 ID（服务端请求，不受 CORS 限制）",
 	fetchingModels: "获取中…",
 	fetchModelsOk: "已获取 {n} 个模型",
 	fetchModelsEmpty: "接口未返回任何模型",
@@ -1044,13 +1164,16 @@ const zh = {
 	codeThemeLight: "浅色",
 	codeThemeDark: "深色",
 	codeThemeSystem: "跟随系统",
-	settingsDesc: "修改立即生效：系统提示词、技能与插件开关会重建当前会话；审查提示词与审查技能只影响后续目标审查（回复进行中则主会话变更自动延迟）。",
+	settingsDesc:
+		"修改立即生效：系统提示词、技能与插件开关会重建当前会话；审查提示词与审查技能只影响后续目标审查（回复进行中则主会话变更自动延迟）。",
 	settingsSystemPrompt: "系统提示词",
 	settingsPromptMode: "模式",
 	promptModeAppend: "追加",
 	promptModeReplace: "替换",
-	promptAppendHint: "追加模式：自定义内容拼接到默认系统提示词末尾（推荐，保留默认行为约束）。",
-	promptReplaceHint: "替换模式：完全用自定义内容替换系统提示词（项目上下文与技能段仍会自动附加）。切换后输入框会显示原本的默认提示词，可直接修改；不改动失焦则仍使用默认。",
+	promptAppendHint:
+		"追加模式：自定义内容拼接到默认系统提示词末尾（推荐，保留默认行为约束）。",
+	promptReplaceHint:
+		"替换模式：完全用自定义内容替换系统提示词（项目上下文与技能段仍会自动附加）。切换后输入框会显示原本的默认提示词，可直接修改；不改动失焦则仍使用默认。",
 	promptPlaceholder: "输入自定义系统提示词…（失焦后自动应用）",
 	settingsViewPrompt: "查看当前完整提示词",
 	settingsViewPromptHint:
@@ -1072,15 +1195,15 @@ const zh = {
 	visionBridgeAuto: "自动选择（按顺序）",
 	visionBridgeNoModels:
 		"未找到已配置的视觉模型：在模型配置里添加任意支持图片的模型（如 qwen-vl、GLM-4V、Gemini）即可自动启用",
-	visionBridgeOffHint:
-		"已关闭：图片将原样发送，纯文本模型可能看不到图片内容",
+	visionBridgeOffHint: "已关闭：图片将原样发送，纯文本模型可能看不到图片内容",
 	visionBridgeCurrent: "当前转写模型：{model}",
 	visionBridgePromptMode: "转写提示词",
 	settingsTerminalTools: "终端工具",
 	terminalToolsEnabled: "启用持久终端工具",
 	settingsTerminalToolsDesc:
 		"让 AI 在交互式程序（REPL/vim）、长驻服务、需要持续观察输出或你要求在可见终端操作时，使用内置终端；普通命令仍走一次性 bash 工具",
-	terminalToolsOffHint: "已关闭：AI 无法使用 terminal_* 工具，也不会收到相关使用引导",
+	terminalToolsOffHint:
+		"已关闭：AI 无法使用 terminal_* 工具，也不会收到相关使用引导",
 	settingsMessageDisplay: "消息显示",
 	thinkingWrap: "完整显示思考",
 	thinkingWrapDesc:
@@ -1139,6 +1262,95 @@ const zh = {
 /* ------------------------------------------------------------------ */
 
 const en: Record<keyof typeof zh, string> = {
+	codeLspMemoryPending: "Memory not sampled yet",
+	codeLspMemoryTarget: "Configured memory target: {n} MiB",
+	codeLspStatus: "Language service status",
+	codeLspServers: "Project language services",
+	codeLspConnected: "Connected",
+	codeLspNotStarted: "Not started",
+	codeLspDisabled: "Disabled",
+	codeLspOffline: "Disconnected",
+	codeLspLoading: "Checking status",
+	codeLspAttention: "Needs attention",
+	codeLspStarting: "Starting",
+	codeLspSummaryReady: "{n} connected",
+	codeLspStandby: "Standby",
+	codeLspChecked: "{n} files checked · {pending} pending diagnostics",
+	codeLspDetails: "Show reason",
+	codeLspMissingHint: "Language server or required SDK was not found. Install it or set its local path in Code Intelligence settings.",
+	codeLspOomHint: "The current memory limit is insufficient. Increase it in settings and restart the service.",
+	codeLspFailedHint: "Startup or connection failed. Check the reason, server path and project configuration, then restart.",
+	codeLspStandbyHint: "No matching project has been detected or this language has not been queried. Services are started as needed.",
+	codeLspDisabledHint: "Enable this language in Code Intelligence settings.",
+	codeLspStartingHint: "The toolchain or project index is being prepared. First import may need to download dependencies.",
+	codeLspConnectedHint: "Connected means the language server started successfully. File diagnostics may still be pending, and connection does not mean the code has no errors.",
+	codeLspOfflineHint: "The app is disconnected, so language service status cannot be confirmed. It refreshes after reconnection.",
+	codeLspOpenSettings: "Open Code Intelligence settings",
+
+	codeIdle: "Idle",
+	codePreparing: "Preparing toolchain",
+	codeInitializing: "Initializing",
+	codeReady: "Ready",
+	codeQueued: "Waiting for capacity",
+	codeUntrusted: "Project untrusted",
+	codeRetrying: "Retrying",
+	codeFailed: "Failed",
+	codeOom: "Heap limit exceeded",
+	codeFresh: "Fresh",
+	codePartialResult: "Freshness partly unconfirmed",
+	codeStale: "Stale",
+	codePending: "Diagnostics pending",
+	codeUnavailable: "Unavailable",
+
+	codeFeedback: "Append edit diagnostics (off by default)",
+	codeIntelligence: "Code intelligence",
+	codeRefresh: "Refresh",
+	codeRustCoverage:
+		"Rust diagnostics have partial coverage: no Cargo check, borrow checking, build.rs or proc macros. Unexpanded macros are analysis limitations, not confirmed code errors.",
+	codeAnalysisLimitation: "Analysis limitation",
+	codeNativeResourceHint:
+		"RSS includes non-heap memory. Go has a soft target; Rust/C/C++ have no hard limit. Large projects can consume several GiB.",
+	codeHighMemory:
+		"High memory usage ({n} MiB); disable unused language services",
+	codeCoverage: "Checked {n} opened files; not a full project check",
+	codeProjectTs: "Project TypeScript",
+	codeTrustRequired:
+		"Python, Java, Go, Rust and C/C++ require project trust. Review and grant SDK trust in Native MCP settings.",
+	codeMissing: "Local toolchain missing",
+	codeInstalling: "Installing toolchain",
+	codeNativeHint:
+		"Install on demand into app data. Java can include local Java 21; Go requires Go SDK, Rust projects need Rust/Cargo, and C/C++ needs a compiler environment. Installation downloads online; analysis runs locally.",
+	codeJdtPath: "JDT LS directory (absolute path)",
+	codeServerPath: "Language server executable (absolute path)",
+	codeAutoDetect: "Detect installed tools automatically",
+	codeInstallTool: "Install local {language} toolchain",
+	codeMavenUserSettings: "Maven user settings.xml",
+	codeMavenGlobalSettings: "Maven global settings.xml",
+	codeMavenSettingsOptional: "Optional: absolute settings.xml path",
+	codeMavenSettingsHint:
+		"Checks ~/.m2/settings.xml and conf/settings.xml under MAVEN_HOME/M2_HOME. Set paths manually when launched from Finder or discovery fails. Only file paths are passed; credentials are never read or displayed.",
+	codeGradleUnsupported: "Gradle projects are not supported",
+	codeMavenRequired: "Java currently supports Maven projects only",
+	codeJavaHome: "Language server JDK directory (21+)",
+	codeJavaProjectHome: "Java {version} project JDK directory",
+	codeJavaProjectOptional: "Optional: an existing full local JDK",
+	codeJavaRuntimeHint:
+		"pom.xml determines the project version. Configure Java 8/17 project JDKs separately from the language server JDK. System JAVA_HOME and Maven configuration stay unchanged.",
+	codeNativeMemory:
+		"Java heap / Go memory target (MiB; Rust and C/C++ have no hard limit)",
+	codeNotChecked:
+		"No files checked yet. Open files with the code tool to obtain diagnostics.",
+	codePartial: "File watcher coverage is partial; results may be stale.",
+	codeEnabled: "Enable code intelligence",
+	codeTs: "TypeScript / JavaScript",
+	codePython: "Python",
+	codePythonPath: "Python interpreter path",
+	codeHeap: "Heap limit (MiB)",
+	codeSave: "Save",
+	codeRestart: "Restart language services",
+	codeFilter: "Filter files or diagnostics",
+	codeProblems: "Problems",
+
 	mcpArgs: "Arguments (JSON array)",
 	mcpEnv: "Environment (JSON object)",
 	mcpHeaders: "HTTP headers (JSON object)",
@@ -1154,15 +1366,18 @@ const en: Record<keyof typeof zh, string> = {
 	mcpScope: "Configuration scope",
 	mcpGlobal: "Global",
 	mcpProject: "Current project",
-	mcpExplanation: "Native MCP uses Pi configuration and credentials. The legacy UI bridge uses app data-dir/mcp.json.",
-	mcpUntrusted: "Project is untrusted. Saving does not load this configuration.",
+	mcpExplanation:
+		"Native MCP uses Pi configuration and credentials. The legacy UI bridge uses app data-dir/mcp.json.",
+	mcpUntrusted:
+		"Project is untrusted. Saving does not load this configuration.",
 	mcpTrust: "Trust current project",
 	mcpPending: "Applies after the current task settles",
 	mcpName: "Server name",
 	mcpCommand: "Command",
 	mcpAdd: "Add to draft",
 	mcpConfig: "MCP configuration JSON",
-	mcpJsonHelp: "Edit args, env, headers, auth.provider, oauth (including authServerMetadataUrl), enabled, exposure and advanced fields. Keep •••••••• to preserve secrets; replace it or remove the field to clear. Remove an mcpServers entry to delete a server.",
+	mcpJsonHelp:
+		"Edit args, env, headers, auth.provider, oauth (including authServerMetadataUrl), enabled, exposure and advanced fields. Keep •••••••• to preserve secrets; replace it or remove the field to clear. Remove an mcpServers entry to delete a server.",
 	mcpNameConflict: "Name is empty or already exists",
 	mcpRefresh: "Refresh configuration",
 	mcpStatus: "Official connection status",
@@ -1176,7 +1391,8 @@ const en: Record<keyof typeof zh, string> = {
 	imageModel: "Image model",
 	imageDownload: "Download",
 	imageWorkbench: "Images",
-	imageNoModels: "No image models available. Configure an image provider first.",
+	imageNoModels:
+		"No image models available. Configure an image provider first.",
 	imagePrompt: "Prompt",
 	imageReferences: "Reference images (up to 8)",
 	imageGenerate: "Generate images",
@@ -1187,11 +1403,14 @@ const en: Record<keyof typeof zh, string> = {
 	imageStatus_cancelled: "Cancelled",
 	imageStatus_interrupted: "Interrupted",
 
-	saSessionBusy: "This conversation has active subagents. Stop them first or create another conversation.",
+	saSessionBusy:
+		"This conversation has active subagents. Stop them first or create another conversation.",
 	saTitle: "Subagents",
 	saBuiltinTitle: "Subagents · Built-in",
-	saBuiltinDescription: "Delegation, task activity and role settings. Disabling prevents new delegation; existing tasks continue.",
-	saConfigTimeout: "Configuration request was not acknowledged. Check the current state before retrying.",
+	saBuiltinDescription:
+		"Delegation, task activity and role settings. Disabling prevents new delegation; existing tasks continue.",
+	saConfigTimeout:
+		"Configuration request was not acknowledged. Check the current state before retrying.",
 	saRefresh: "Refresh activity",
 	saSend: "Send",
 	sa_queued: "Queued",
@@ -1204,7 +1423,8 @@ const en: Record<keyof typeof zh, string> = {
 	sa_interrupted: "Interrupted",
 	saDisconnected: "Disconnected",
 	saAccepted: "Accepted",
-	saIntro: "Delegate when useful and permitted by user and skill waiting rules. Read tasks run in parallel; writing tasks serialize per project. Separate capabilities with commas; extensions require trusted full paths. The lock governs host-managed tools and is not a filesystem sandbox.",
+	saIntro:
+		"Delegate when useful and permitted by user and skill waiting rules. Read tasks run in parallel; writing tasks serialize per project. Separate capabilities with commas; extensions require trusted full paths. The lock governs host-managed tools and is not a filesystem sandbox.",
 	saEnabled: "Enable built-in subagents",
 	saTimeout: "Task timeout (minutes)",
 	saName: "Name",
@@ -1227,12 +1447,14 @@ const en: Record<keyof typeof zh, string> = {
 	saMore: "Load more",
 	saAwaitingState: "Awaiting task state",
 
-	nonChatModelsPreserved: "This form edits chat models. Configuration for {n} image or classifier models is preserved.",
+	nonChatModelsPreserved:
+		"This form edits chat models. Configuration for {n} image or classifier models is preserved.",
 	providerAuthChoose: "Choose an option",
 	providerLogout: "Sign out",
 	providerLogin: "Sign in",
 	providerChatGPTLogin: "Sign in with ChatGPT",
-	providerAuthPending: "Waiting for authorization. Complete sign-in in your browser.",
+	providerAuthPending:
+		"Waiting for authorization. Complete sign-in in your browser.",
 	providerAuthSuccess: "Signed in. The model list has been updated.",
 	providerAuthCancelled: "Sign-in cancelled.",
 	providerAuthError: "Sign-in failed.",
@@ -1241,7 +1463,8 @@ const en: Record<keyof typeof zh, string> = {
 	nodeConnectionTiming: "Handshake {ms} ms · Connected {duration}",
 	nodeRevealSource: "Reveal local configuration",
 	nodeSources: "Node sources",
-	nodeSourceIntro: "Connect existing sessions. Changes in the source update here automatically.",
+	nodeSourceIntro:
+		"Connect existing sessions. Changes in the source update here automatically.",
 	nodeDetect: "Detect local sources",
 	nodeSyncKeep: "Sync and keep updated",
 	nodeImportOnce: "Import once",
@@ -1253,22 +1476,29 @@ const en: Record<keyof typeof zh, string> = {
 	nodeSyncInfo: "{n} nodes · {g} groups",
 	nodeSyncTime: "Last synced: {time}",
 	nodeSyncFields: "Names, groups, addresses, ports, usernames and key paths",
-	nodeSyncPassword: "Saved passwords are not imported. Enter credentials before connecting.",
-	nodeSyncUnsupported: "Jump hosts, proxies and unsupported options are flagged and blocked.",
+	nodeSyncPassword:
+		"Saved passwords are not imported. Enter credentials before connecting.",
+	nodeSyncUnsupported:
+		"Jump hosts, proxies and unsupported options are flagged and blocked.",
 	nodeSearch: "Search name or address",
 	nodeMissingSecret: "Needs password",
 	nodeSourceMissing: "Source removed",
 	nodeUnsupported: "Unsupported configuration",
 	nodeFillSecret: "Authentication settings",
-	nodeLocalAuthHint: "Choose password or public-key authentication. Saved locally after a successful test; source files are unchanged. Normal sync preserves this choice; host, user or source authentication changes reset it.",
-	nodeCredentialHint: "Credentials are stored separately. After changing a password in Xshell, update it here too.",
+	nodeLocalAuthHint:
+		"Choose password or public-key authentication. Saved locally after a successful test; source files are unchanged. Normal sync preserves this choice; host, user or source authentication changes reset it.",
+	nodeCredentialHint:
+		"Credentials are stored separately. After changing a password in Xshell, update it here too.",
 	nodePersistSecret: "Save encrypted on the server machine",
-	nodeGroupSecret: "Apply to this group’s nodes using the same authentication method",
-	nodeGroupHint: "Only this node is tested; other nodes are verified when connected.",
+	nodeGroupSecret:
+		"Apply to this group’s nodes using the same authentication method",
+	nodeGroupHint:
+		"Only this node is tested; other nodes are verified when connected.",
 	nodeTestSave: "Test and save",
 	nodeTesting: "Verifying…",
 	nodeCredentialsSaved: "Credentials verified and applied to {n} nodes",
-	nodeSourceReadonly: "Source fields are read-only. Edit them in the original tool.",
+	nodeSourceReadonly:
+		"Source fields are read-only. Edit them in the original tool.",
 	nodeSourceLocation: "Source file",
 	nodeLastConnected: "Last connected",
 	nodeNever: "Never",
@@ -1280,7 +1510,8 @@ const en: Record<keyof typeof zh, string> = {
 	nodePolicyConfirm: "Confirm every command",
 	nodePolicyAuto: "Allow automatic execution",
 	nodePolicyOff: "Disable agent",
-	nodePolicyHint: "Recognized read-only commands run automatically. Writes, restarts and unknown commands require confirmation.",
+	nodePolicyHint:
+		"Recognized read-only commands run automatically. Writes, restarts and unknown commands require confirmation.",
 	nodeApproval: "Approval required",
 	nodeAllow: "Allow",
 	nodeDeny: "Deny",
@@ -1297,17 +1528,21 @@ const en: Record<keyof typeof zh, string> = {
 	nodeShowFiles: "Files",
 	nodeCloseTab: "Close terminal",
 	nodeAddSource: "Add source",
-	nodeNoSources: "No default source found. Specify an Xshell sessions folder or SSH config file.",
+	nodeNoSources:
+		"No default source found. Specify an Xshell sessions folder or SSH config file.",
 	nodeWorkingHere: "On {name}",
 	nodeRunFailed: "Failed",
-	nodeSourceOpenHint: "Copy the path and open the original configuration in Xshell or a text editor.",
+	nodeSourceOpenHint:
+		"Copy the path and open the original configuration in Xshell or a text editor.",
 	nodeQuoteRemove: "Remove quote",
 
 	currentFileLabel: "Current file",
 	currentFileUnsaved: "Unsaved",
 	currentFileDraft: "Current file · Unsaved draft",
-	currentFileUnavailable: "Current file is unavailable. Reopen it or remove the tag.",
-	currentFileTooLarge: "Current file exceeds 512 KiB. Reduce its content or remove the tag.",
+	currentFileUnavailable:
+		"Current file is unavailable. Reopen it or remove the tag.",
+	currentFileTooLarge:
+		"Current file exceeds 512 KiB. Reduce its content or remove the tag.",
 	currentFileSaving: "Current file is still saving — send again in a moment.",
 	switchingProject: "Syncing project…",
 	retryProjectSwitch: "Retry project switch",
@@ -1353,7 +1588,8 @@ const en: Record<keyof typeof zh, string> = {
 	nodeKey: "Public key (private key authentication)",
 	expandProjects: "Expand projects",
 	collapseProjects: "Collapse projects",
-	nodePrivateKeyHint: "Enter the OpenSSH private key path on the computer running pi, not a .pub file. Xshell key names are not file paths; export an OpenSSH private key from its user key manager. Leave the passphrase empty for an unencrypted key.",
+	nodePrivateKeyHint:
+		"Enter the OpenSSH private key path on the computer running pi, not a .pub file. Xshell key names are not file paths; export an OpenSSH private key from its user key manager. Leave the passphrase empty for an unencrypted key.",
 	nodeAgentAuth: "SSH Agent",
 	nodeKeyPath: "Local private key path",
 	nodePassphrase: "Key passphrase",
@@ -1370,7 +1606,8 @@ const en: Record<keyof typeof zh, string> = {
 	nodeTab: "Terminal {n}",
 	nodeTabClosed: "disconnected",
 	nodeTabBusy: "Agent running",
-	nodeOpenHint: "Connect and open a terminal. The Agent uses the selected terminal.",
+	nodeOpenHint:
+		"Connect and open a terminal. The Agent uses the selected terminal.",
 	nodeBrowse: "Browse files",
 	nodeChat: "Node Agent",
 	nodeChatPlaceholder: "Ask this node's Agent…",
@@ -1383,8 +1620,10 @@ const en: Record<keyof typeof zh, string> = {
 	nodeAgentApproval: "Waiting for your approval…",
 	nodeDelete: "Delete",
 	nodeForgetHostKey: "Forget trusted host key",
-	nodeForgetHostKeyConfirm: "Have you verified the new host key for {name}? The fingerprint will appear again on the next connection.",
-	nodeTrust: "First connection to {name} ({host})\nHost key fingerprint: {fingerprint}\nTrust this host?",
+	nodeForgetHostKeyConfirm:
+		"Have you verified the new host key for {name}? The fingerprint will appear again on the next connection.",
+	nodeTrust:
+		"First connection to {name} ({host})\nHost key fingerprint: {fingerprint}\nTrust this host?",
 	nodeDeleteConfirm: "Delete {name}?",
 	nodeImported: "Imported {n} nodes (set credentials manually)",
 	nodeInvalidJson: "Invalid nodes JSON",
@@ -1456,13 +1695,16 @@ const en: Record<keyof typeof zh, string> = {
 	attachFile: "File: {name}",
 	removeAttachment: "Remove attachment",
 	attachHint: "Will be sent with the next message",
-	uploadFile: "Add files (images / text / any file — or drag in / paste a screenshot)",
+	uploadFile:
+		"Add files (images / text / any file — or drag in / paste a screenshot)",
 	dropHereToAttach: "Release to attach file",
-	imageNotSupported: "The current model doesn't support vision — images will be transcribed by the vision bridge (may be ignored if no vision model is configured)",
+	imageNotSupported:
+		"The current model doesn't support vision — images will be transcribed by the vision bridge (may be ignored if no vision model is configured)",
 	imageLoadFailed: "Couldn't read image: {name}",
 	fileLoadFailed: "Couldn't read file: {name}",
 	fileTooLarge: "File too large, skipped (> {size}MB): {name}",
-	foldersNotSupported: "Folders can't be dropped directly — expand and pick files instead",
+	foldersNotSupported:
+		"Folders can't be dropped directly — expand and pick files instead",
 	placeholderStreaming: "Keep typing; send after the current step",
 	stopTask: "Stop task",
 	taskCommitting: "Committing",
@@ -1481,14 +1723,18 @@ const en: Record<keyof typeof zh, string> = {
 	placeholderIdle: "Message pi — Enter to send, / for commands",
 	placeholderConnecting: "Connecting to server…",
 	stopAgent: "Stop agent",
-	stopQueuedAfterReconnect: "Connection lost. The current conversation will be stopped after reconnecting.",
-	stopUnavailable: "Cannot send a stop request yet. Wait for the connection to return.",
+	stopQueuedAfterReconnect:
+		"Connection lost. The current conversation will be stopped after reconnecting.",
+	stopUnavailable:
+		"Cannot send a stop request yet. Wait for the connection to return.",
 	workDisconnected: "Connection lost. Reconnecting; run status is unconfirmed.",
 	stop: "Stop",
 	bgTasks: "Background tasks",
-	bgTasksTip: "Servers the AI started in the background (npm run dev & etc.) — stop them individually or all at once; they survive the conversation",
+	bgTasksTip:
+		"Servers the AI started in the background (npm run dev & etc.) — stop them individually or all at once; they survive the conversation",
 	bgTasksEmpty: "No background tasks",
-	bgTasksDesc: "Processes the AI started that are still listening (detected by port)",
+	bgTasksDesc:
+		"Processes the AI started that are still listening (detected by port)",
 	bgTaskPort: "Port",
 	bgTaskPid: "PID",
 	bgTaskSince: "Started",
@@ -1502,7 +1748,8 @@ const en: Record<keyof typeof zh, string> = {
 	stopBash: "Stop",
 	stopBashTip: "Stop the running bash command (conversation continues)",
 	supplement: "Queue",
-	supplementTip: "Add to queue: sent only after the whole run finishes (no interruption)",
+	supplementTip:
+		"Add to queue: sent only after the whole run finishes (no interruption)",
 	queueSteerTag: "Steer",
 	queueFollowTag: "Queued",
 	sendTip: "Send (Enter)",
@@ -1544,12 +1791,15 @@ const en: Record<keyof typeof zh, string> = {
 	componentCheckFailed: "Check failed; retry available",
 	componentChecking: "Checking\u2026",
 	componentCheck: "Check for updates",
-	componentUpdateIntro: "Running pi Agent and installed extension versions. Checks never install updates. Restart the app after updating user extensions.",
+	componentUpdateIntro:
+		"Running pi Agent and installed extension versions. Checks never install updates. Restart the app after updating user extensions.",
 	componentOffline: "Reconnect to check for updates.",
 	componentInstalling: "Updating extension. Please wait\u2026",
-	componentRestart: "Update installed. Restart the app to load the new version.",
+	componentRestart:
+		"Update installed. Restart the app to load the new version.",
 	componentBundled: "Bundled",
-	componentBundledHint: "Updated with the app. An upstream release may not yet be included in this app.",
+	componentBundledHint:
+		"Updated with the app. An upstream release may not yet be included in this app.",
 	componentProject: "Project",
 	componentUser: "User-installed",
 	componentInstalled: "Installed",
@@ -1574,7 +1824,8 @@ const en: Record<keyof typeof zh, string> = {
 	taskPlanSource: "Task checklist",
 	taskPlanSourceHint: "Steps tracked from the checklist created by the agent",
 	taskObservedSource: "Activity · No plan created",
-	taskObservedSourceHint: "Summarized from tool calls; the agent has not created a task checklist",
+	taskObservedSourceHint:
+		"Summarized from tool calls; the agent has not created a task checklist",
 	taskBlockedBy: "Waiting for steps {steps}",
 	taskCancelled: "Stopped",
 	taskLongTool: "Command running",
@@ -1631,9 +1882,11 @@ const en: Record<keyof typeof zh, string> = {
 	modelSilentShort: "Model unresponsive",
 	toolSilentShort: "Tool running · no new output",
 	placeholderModelSilent: "The model is quiet. Stop, retry, or keep waiting…",
-	placeholderToolSilent: "A command or tool is still running. New messages will queue…",
+	placeholderToolSilent:
+		"A command or tool is still running. New messages will queue…",
 	toolSilent: "Command or tool running for {duration} without new output",
-	retrySilentUnavailable: "This turn used tools or attachments. Stop and review before retrying to avoid duplicate effects.",
+	retrySilentUnavailable:
+		"This turn used tools or attachments. Stop and review before retrying to avoid duplicate effects.",
 	continueWaiting: "Keep waiting",
 	actions: "Actions",
 	retry: "Retry",
@@ -1688,7 +1941,8 @@ const en: Record<keyof typeof zh, string> = {
 	runningConversations: "Running chats",
 	historySessions: "History",
 	openHistory: "History",
-	openFiles: "Files",	streaming: "Streaming…",
+	openFiles: "Files",
+	streaming: "Streaming…",
 	noHistory: "No previous chats",
 	current: "Current",
 	messageCount: "{n} messages",
@@ -1789,7 +2043,8 @@ const en: Record<keyof typeof zh, string> = {
 	dbNext: "Next",
 	dbRowRange: "Rows {start}–{end}",
 	dbSchema: "Show schema",
-	dbCellLimit: "Up to 50 rows per page; text previews show 256 characters and BLOBs show byte counts.",
+	dbCellLimit:
+		"Up to 50 rows per page; text previews show 256 characters and BLOBs show byte counts.",
 	dbStructureLimited: "Showing up to 500 tables and 64 columns per table.",
 	dbLoadFailed: "Unable to read SQLite database:",
 	dbUnavailable: "Connection or workspace is unavailable.",
@@ -1805,7 +2060,8 @@ const en: Record<keyof typeof zh, string> = {
 	richCodeLanguage: "Code language",
 	richPlainText: "Plain text",
 	richImageUploading: "Inserting image…",
-	richImageFailed: "Image insertion failed. Check the connection and file state, then paste again.",
+	richImageFailed:
+		"Image insertion failed. Check the connection and file state, then paste again.",
 	richImageTooLarge: "Images must be at most 5 MB.",
 	richDivider: "Divider",
 	richTaskList: "Task list",
@@ -1833,10 +2089,12 @@ const en: Record<keyof typeof zh, string> = {
 	fileDiskVersion: "Latest disk version",
 	quoteSelection: "Quote selection @{name}:{start}-{end}",
 	fileSaveFailed: "Save failed",
-	fileOffline: "Disconnected or timed out. Your draft is retained. Please retry.",
+	fileOffline:
+		"Disconnected or timed out. Your draft is retained. Please retry.",
 	fileReload: "Reload",
 	fileOverwrite: "Overwrite disk file",
-	fileOverwriteConfirm: "The disk file has changed. Overwrite it with this draft?",
+	fileOverwriteConfirm:
+		"The disk file has changed. Overwrite it with this draft?",
 	fileLeavePrompt: "This file has unsaved changes.",
 	fileSaveContinue: "Save and continue",
 	fileDiscard: "Discard changes",
@@ -1931,7 +2189,8 @@ const en: Record<keyof typeof zh, string> = {
 	inlineLinesRange: "Lines {start}-{end}",
 	image: "🖼 Image",
 	bridgedVision: "👁 Transcribed",
-	bridgedVisionDetail: "Image transcribed by the vision bridge (current model can't see images)",
+	bridgedVisionDetail:
+		"Image transcribed by the vision bridge (current model can't see images)",
 	folderNotExpanded:
 		"Folder — content not expanded, the agent will browse it as needed",
 	fileNotExpanded:
@@ -1961,7 +2220,8 @@ const en: Record<keyof typeof zh, string> = {
 	searchGlobal: "Search",
 	searchGlobalTip: "Global search: sessions / projects / files (Ctrl+K)",
 	gsPlaceholder: "Search projects, past conversations, workspace files…",
-	gsHint: "Type to search session history, recent projects and file names in the current workspace at once",
+	gsHint:
+		"Type to search session history, recent projects and file names in the current workspace at once",
 	gsSessions: "Conversations",
 	gsProjects: "Projects",
 	gsFiles: "Files",
@@ -1977,7 +2237,8 @@ const en: Record<keyof typeof zh, string> = {
 	searchPrev: "Previous (Shift+Enter)",
 	searchNext: "Next (Enter)",
 	searchClose: "Close (Esc)",
-	questionNavTip: "All questions in this conversation — hover to expand, click to jump",
+	questionNavTip:
+		"All questions in this conversation — hover to expand, click to jump",
 	"ex.understand": "Understand this project",
 	"ex.understand.prompt":
 		"Introduce this project: overall structure, main modules, and how to run it?",
@@ -1998,7 +2259,8 @@ const en: Record<keyof typeof zh, string> = {
 	copyArgs: "Copy args",
 	errorOutput: "Error output",
 	nestedToolCalls: "Nested tool calls · {n}",
-	nestedToolCallsIncomplete: "Some call records or arguments were not fully retained.",
+	nestedToolCallsIncomplete:
+		"Some call records or arguments were not fully retained.",
 	toolResultImage: "Image returned by a tool",
 	output: "Output",
 	waitingOutput: "Waiting for output…",
@@ -2009,18 +2271,29 @@ const en: Record<keyof typeof zh, string> = {
 	thinkingNow: "Thinking",
 	thinkingPreview: "Thinking: {preview}",
 	toolRecovery: "Tool-call recovery",
-	toolRecoveryRetrying: "A prior tool invocation was not executed through the native interface. Requesting one correction; a promise to continue is not execution.",
-	toolRecoveryResumed: "The target tool returned successfully after correction. This does not mean the entire task is complete; check the checklist and results.",
-	toolRecoveryFailed: "Tool-call recovery did not succeed. Check tool results and unfinished steps; correction will not repeat without progress.",
-	toolRecoveryToolError: "The tool was called through the native interface, but execution failed or timed out. A timeout does not mean the operation had no effect; inspect its actual state first.",
-	toolRecoveryExhausted: "This run reached its formatting correction limit. The latest invocation printed as text was not executed. Check the results before continuing.",
-	toolRecoveryUnverified: "The target tool has not been confirmed successful after correction. The task may be unfinished; check the results before continuing manually.",
-	toolRecoveryDeferred: "This historical tool invocation did not execute. A message may have been queued, or the older recovery policy required an explicitly started task step.",
-	toolRecoveryQueued: "The tool invocation printed as text did not execute. Queued user or extension messages take priority.",
-	toolRecoveryInterrupted: "A new user or extension instruction interrupted this correction and takes priority.",
-	toolRecoveryCancelled: "Tool-call recovery was stopped. It will not continue automatically.",
+	toolRecoveryRetrying:
+		"A prior tool invocation was not executed through the native interface. Requesting one correction; a promise to continue is not execution.",
+	toolRecoveryResumed:
+		"The target tool returned successfully after correction. This does not mean the entire task is complete; check the checklist and results.",
+	toolRecoveryFailed:
+		"Tool-call recovery did not succeed. Check tool results and unfinished steps; correction will not repeat without progress.",
+	toolRecoveryToolError:
+		"The tool was called through the native interface, but execution failed or timed out. A timeout does not mean the operation had no effect; inspect its actual state first.",
+	toolRecoveryExhausted:
+		"This run reached its formatting correction limit. The latest invocation printed as text was not executed. Check the results before continuing.",
+	toolRecoveryUnverified:
+		"The target tool has not been confirmed successful after correction. The task may be unfinished; check the results before continuing manually.",
+	toolRecoveryDeferred:
+		"This historical tool invocation did not execute. A message may have been queued, or the older recovery policy required an explicitly started task step.",
+	toolRecoveryQueued:
+		"The tool invocation printed as text did not execute. Queued user or extension messages take priority.",
+	toolRecoveryInterrupted:
+		"A new user or extension instruction interrupted this correction and takes priority.",
+	toolRecoveryCancelled:
+		"Tool-call recovery was stopped. It will not continue automatically.",
 	leakedThinking: "Additional model content",
-	leakedThinkingHint: "Reasoning markers were detected in the reply, so this content was collapsed. This does not indicate an application error or data disclosure. Click to view the original.",
+	leakedThinkingHint:
+		"Reasoning markers were detected in the reply, so this content was collapsed. This does not indicate an application error or data disclosure. Click to view the original.",
 
 	/* terminal panel */
 	commands: "Commands",
@@ -2066,7 +2339,7 @@ const en: Record<keyof typeof zh, string> = {
 	scmPullTip: "Runs git pull in the terminal",
 	scmCommit: "Commit",
 	scmCommitTip:
-		"Runs git add -A && git commit -m \"…\" in the terminal (commits all changes incl. untracked)",
+		'Runs git add -A && git commit -m "…" in the terminal (commits all changes incl. untracked)',
 	scmCommitPlaceholder: "Type a commit message…",
 	scmChanges: "Changes",
 	scmHistory: "Commit tree",
@@ -2086,12 +2359,12 @@ const en: Record<keyof typeof zh, string> = {
 	scmUntracked: "Untracked",
 	scmUntrackedBadge: "u",
 	scmUntrackedBinary: "Binary file cannot be previewed here",
-	scmUntrackedDirectory: "Directory cannot be previewed here; select a file inside it",
+	scmUntrackedDirectory:
+		"Directory cannot be previewed here; select a file inside it",
 	scmEmptyFile: "Empty file",
 	scmPreviewTruncated: "Showing only the first 512 KB",
 	scmQueryFailed: "Git query failed: {error}",
-	scmTooManyFailures:
-		"Git queries keep failing — click refresh to retry",
+	scmTooManyFailures: "Git queries keep failing — click refresh to retry",
 	scmRunsInTerminal: "Commit / branch switch / push / pull run in the terminal",
 	scmViewTerminal: "Open terminal",
 
@@ -2104,11 +2377,14 @@ const en: Record<keyof typeof zh, string> = {
 	replaceKey: "Replace key",
 	replaceKeyTitle: "Replace the saved key",
 	clearKey: "Clear",
-	clearKeyTitle: "Remove this provider's key stored in auth.json; it returns to unconfigured (env-var sourced keys can't be cleared here)",
-	clearKeyConfirm: "Clear the stored key for {id}? Its models will leave the list until you configure it again.",
+	clearKeyTitle:
+		"Remove this provider's key stored in auth.json; it returns to unconfigured (env-var sourced keys can't be cleared here)",
+	clearKeyConfirm:
+		"Clear the stored key for {id}? Its models will leave the list until you configure it again.",
 	cloneProvider: "Clone as custom",
 	cloning: "Cloning",
-	cloneProviderTitle: "Copy this built-in provider (baseUrl + model catalog) into a custom provider — paste another API key to run both keys side by side",
+	cloneProviderTitle:
+		"Copy this built-in provider (baseUrl + model catalog) into a custom provider — paste another API key to run both keys side by side",
 	pasteKey: "Paste API key…",
 	savingKey: "Saving",
 	saveKey: "Save key",
@@ -2136,7 +2412,8 @@ const en: Record<keyof typeof zh, string> = {
 	addModel: "Add model",
 	deleteProviderConfirm: "Delete provider {id} and its {n} models?",
 	fetchModels: "Fetch model list",
-	fetchModelsHint: "Pull model IDs from the baseUrl /models endpoint (server-side, no CORS)",
+	fetchModelsHint:
+		"Pull model IDs from the baseUrl /models endpoint (server-side, no CORS)",
 	fetchingModels: "Fetching…",
 	fetchModelsOk: "Fetched {n} models",
 	fetchModelsEmpty: "The endpoint returned no models",
@@ -2153,7 +2430,8 @@ const en: Record<keyof typeof zh, string> = {
 	goalBarReviewModel: "Review model",
 	goalBarUseMainModel: "Use the main model",
 	goalBarMaxRounds: "Max rounds",
-	goalBarMaxRoundsTip: "Max review-revision rounds; 0 or empty = unlimited (keep revising until it passes)",
+	goalBarMaxRoundsTip:
+		"Max review-revision rounds; 0 or empty = unlimited (keep revising until it passes)",
 	goalBarUnlimitedShort: "Unlimited",
 	goalBarReviewing: "Reviewing…",
 	goalBarRound: "Round {n}",
@@ -2177,18 +2455,22 @@ const en: Record<keyof typeof zh, string> = {
 	codeThemeLight: "Light",
 	codeThemeDark: "Dark",
 	codeThemeSystem: "Follow system",
-	settingsDesc: "Changes apply immediately: system prompt, skill and extension toggles rebuild the current session; review instructions and review skills affect later goal reviews (main-session changes are deferred while streaming).",
+	settingsDesc:
+		"Changes apply immediately: system prompt, skill and extension toggles rebuild the current session; review instructions and review skills affect later goal reviews (main-session changes are deferred while streaming).",
 	settingsSystemPrompt: "System prompt",
 	settingsPromptMode: "Mode",
 	promptModeAppend: "Append",
 	promptModeReplace: "Replace",
-	promptAppendHint: "Append mode: your text is appended to the end of the default system prompt (recommended — keeps the default behavior constraints).",
-	promptReplaceHint: "Replace mode: your text fully replaces the system prompt (project context and skills are still appended automatically). After switching, the editor shows the built-in default prompt ready to edit; blurring without changes keeps the default.",
+	promptAppendHint:
+		"Append mode: your text is appended to the end of the default system prompt (recommended — keeps the default behavior constraints).",
+	promptReplaceHint:
+		"Replace mode: your text fully replaces the system prompt (project context and skills are still appended automatically). After switching, the editor shows the built-in default prompt ready to edit; blurring without changes keeps the default.",
 	promptPlaceholder: "Type a custom system prompt… (applied on blur)",
 	settingsViewPrompt: "View the current full prompt",
 	settingsViewPromptHint:
 		"The full system prompt actually in effect for this conversation (custom append/replace text, project context, skills and tool guidance). Read-only.",
-	settingsViewPromptEmpty: "Session not ready yet — no system prompt available.",
+	settingsViewPromptEmpty:
+		"Session not ready yet — no system prompt available.",
 	settingsSkills: "Skills",
 	settingsReview: "Goal review",
 	settingsReviewDesc:
@@ -2236,8 +2518,10 @@ const en: Record<keyof typeof zh, string> = {
 		"Replace mode: custom text replaces the built-in transcription prompt entirely. After switching, the editor shows the built-in default prompt ready to edit; blurring without changes keeps the default.",
 	uninstallExt: "Uninstall",
 	uninstallConfirm: "Confirm?",
-	uninstallConfirmHint: "Click again to confirm — runs pi remove in the terminal",
-	uninstallHint: "Runs pi remove in a visible terminal, then refreshes the list automatically",
+	uninstallConfirmHint:
+		"Click again to confirm — runs pi remove in the terminal",
+	uninstallHint:
+		"Runs pi remove in a visible terminal, then refreshes the list automatically",
 	uninstallTitle: "Uninstall",
 	pluginUpdate: "Update",
 	pluginUpdateHint:
@@ -2247,7 +2531,8 @@ const en: Record<keyof typeof zh, string> = {
 	settingsExtensions: "Extensions",
 	settingsUiPlugins: "UI plugins",
 	noUiPlugins: "No UI plugins installed (<dataDir>/plugins/)",
-	uiPluginNoSource: "Installed manually — no recorded source, online update unavailable",
+	uiPluginNoSource:
+		"Installed manually — no recorded source, online update unavailable",
 	uiPluginPerms: "Permissions",
 	pluginSettingsSave: "Save plugin settings",
 	pluginSettingsSaving: "Saving…",
@@ -2261,7 +2546,8 @@ const en: Record<keyof typeof zh, string> = {
 	deletePreset: "Delete preset",
 	noSkills: "No skills",
 	noExtensions: "No extensions",
-	noPresets: "No presets yet (tune the settings above, then save them as a preset)",
+	noPresets:
+		"No presets yet (tune the settings above, then save them as a preset)",
 
 	/* app */
 	loadingSession: "Loading session…",

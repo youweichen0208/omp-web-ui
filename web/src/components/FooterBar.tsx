@@ -2,22 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { FiFile, FiFolder } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
 import { useT } from "../i18n";
+import type { ClientMessage } from "../types";
+import { CodeStatusIndicator } from "./CodeStatusIndicator";
 
 interface FooterBarProps {
 	chat: ChatState;
-	send: (
-		msg:
-			| { type: "complete_path"; path: string }
-			| { type: "set_cwd"; path: string; source?: "ui" }
-			| { type: "get_git_branch" },
-	) => boolean;
+	send: (msg: ClientMessage) => boolean;
+	onCodeSettings: () => void;
 }
 
 /**
  * Compact status bar: connection, context usage, Git branch, session, queue, and the
  * workspace path — click the path to switch directories (with completion).
  */
-export function FooterBar({ chat, send }: FooterBarProps) {
+export function FooterBar({ chat, send, onCodeSettings }: FooterBarProps) {
 	const t = useT();
 	const state = chat.state;
 	const [editing, setEditing] = useState(false);
@@ -147,6 +145,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 			<span className={`status-dot ${connClass}`} title={connLabel} />
 			<span className="status-item status-connection">{connLabel}</span>
 			{chat.serverVersion && <span className="status-item status-version" title={`pi-web-ui v${chat.serverVersion}`}>v{chat.serverVersion}</span>}
+			<CodeStatusIndicator key={state.cwd} cwd={state.cwd} connected={chat.ready} send={send} onSettings={onCodeSettings} />
 			<span className="status-sep">·</span>
 
 			<span className="status-item status-ctx" title={t("contextUsage")}>

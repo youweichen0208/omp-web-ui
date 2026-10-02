@@ -92,3 +92,7 @@ spawn 后记录 `server.pid`，测试收尾（含异常 catch 路径）用 `proc
 **Playwright 脚本**：headless shell 路径写死在本机，CI/换机需要改 `HEADLESS` 常量。
 
 **测试脚本里禁止在 try 块内直接 `process.exit`**：`process.exit` 会跳过 `finally`，spawn 的 server 永远不会被杀 → 每次运行泄漏一个进程，下次跑同端口测试报 "port busy — abort"（steer-queue-smoke 踩过，已修：设 ok 标志 + finally 里杀进程并等端口释放再 exit）。
+
+## 代码智能验证
+
+架构与边界见 [代码智能](architecture-code-intelligence.md)。`npm run build` 自动生成离线工具链归档并检查 12 / 45 MiB 预算；`build:server` 单独执行不生成归档。真实语言服务回归：`node tests/code-intelligence-test.mjs`，已收进冒烟跑器；浏览器回归：`node tests/code-intelligence-browser-test.mjs`。新增三平台语言服务 CI；完整性能验收待对应真机测量，不以 fixtures 替代。

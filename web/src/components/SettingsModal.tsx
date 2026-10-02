@@ -1,3 +1,4 @@
+import { CodePanel } from "./CodePanel";
 import { NativeMcpPanel } from "./NativeMcpPanel";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -49,6 +50,7 @@ interface SettingsTerminalBridge {
 }
 
 interface SettingsModalProps {
+	initialTab?: "prompt" | "code";
 	chat: {
 		ready: boolean;
 		dialog: { id: number; kind: "select" | "confirm" | "input"; title: string; args: unknown[] } | null;
@@ -162,6 +164,7 @@ type SettingsTab =
 	| "skills"
 	| "extensions"
 	| "updates"
+	| "code"
 	| "native-mcp"
 	| "plugins"
 	| "review"
@@ -169,6 +172,7 @@ type SettingsTab =
 	| "presets";
 
 export function SettingsModal({
+	initialTab = "prompt",
 	chat,
 	send,
 	terminal,
@@ -203,7 +207,7 @@ export function SettingsModal({
 	}
 
 	// 当前左侧导航选中的分组。
-	const [tab, setTab] = useState<SettingsTab>("prompt");
+	const [tab, setTab] = useState<SettingsTab>(initialTab);
 	const [codeTheme, updateCodeTheme] = useState<CodeTheme>(getCodeTheme);
 	// 内容滚动容器：切换分组后回到顶部（各组高度不同，停留旧滚动位置会像没切换）。
 	const bodyRef = useRef<HTMLDivElement>(null);
@@ -276,6 +280,7 @@ export function SettingsModal({
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
 		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length + 1 },
 		{ id: "updates", icon: <FiRefreshCw />, label: t("componentUpdates"), count: chat.componentUpdates?.cwd === chat.state?.cwd ? chat.componentUpdates?.items.filter((item) => item.status === "available").length : undefined },
+		{ id: "code", icon: <FiCpu />, label: t("codeIntelligence") },
 		{ id: "native-mcp", icon: <FiBox />, label: t("nativeMcp") },
 		{ id: "plugins", icon: <FiBox />, label: t("settingsUiPlugins"), count: chat.plugins.length },
 		{ id: "review", icon: <FiZap />, label: t("settingsReview"), count: settings.reviewSkills.length },
@@ -705,6 +710,7 @@ export function SettingsModal({
 				</div>
 				)}
 
+				{tab === "code" && chat.state?.cwd && <CodePanel cwd={chat.state.cwd} send={send} settings />}
 				{tab === "native-mcp" && chat.state?.cwd && <NativeMcpPanel cwd={chat.state.cwd} send={send} dialog={chat.dialog} />}
 				{/* ---- UI plugins（<dataDir>/plugins，纯 UI 隐藏） ----------------- */}
 				{tab === "plugins" && (

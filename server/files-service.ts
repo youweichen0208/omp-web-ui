@@ -1,3 +1,4 @@
+import { subscribeProject } from "./project-watcher.js";
 /**
  * Files service — 从 agent-service.ts 抽出（文件树列目录 / 预览读写 / 路径补全 /
  * SCM 只读查询 / 目录与 git-dir watcher）。
@@ -6,7 +7,13 @@
  * 经 FilesHost 回调与 ClientSession 解耦。
  */
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, statSync, writeFileSync, watch } from "node:fs";
+import {
+	readFileSync,
+	realpathSync,
+	statSync,
+	writeFileSync,
+	watch,
+} from "node:fs";
 import { resolve, relative, sep } from "node:path";
 import type { ServerMessage, FileEntry, FileSearchResult } from "./protocol.js";
 import {
@@ -31,22 +38,48 @@ export const IS_WIN32 = process.platform === "win32";
 export const MAX_PREVIEW_BYTES = 512 * 1024;
 
 /** Confirm history-derived paths exist as files inside this workspace. */
-export function existingConversationFiles(cwd: string, paths: string[]): string[] {
+export function existingConversationFiles(
+	cwd: string,
+	paths: string[],
+): string[] {
 	let root: string;
-	try { root = realpathSync(cwd); } catch { return []; }
+	try {
+		root = realpathSync(cwd);
+	} catch {
+		return [];
+	}
 	const seen = new Set<string>();
 	const found: string[] = [];
 	for (const path of paths.slice(0, 64)) {
-		if (typeof path !== "string" || path.length > 4096 || path.includes("\0") || seen.has(path)) continue;
+		if (
+			typeof path !== "string" ||
+			path.length > 4096 ||
+			path.includes("\0") ||
+			seen.has(path)
+		)
+			continue;
 		seen.add(path);
 		const normalized = path.replaceAll("\\", "/");
-		if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || normalized.split("/").includes("..")) continue;
+		if (
+			normalized.startsWith("/") ||
+			/^[A-Za-z]:\//.test(normalized) ||
+			normalized.split("/").includes("..")
+		)
+			continue;
 		try {
 			const target = realpathSync(resolve(root, normalized));
 			const rel = relative(root, target);
-			if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || resolve(root, rel) !== target) continue;
+			if (
+				rel === "" ||
+				rel === ".." ||
+				rel.startsWith(`..${sep}`) ||
+				resolve(root, rel) !== target
+			)
+				continue;
 			if (statSync(target).isFile()) found.push(path);
-		} catch { /* removed, unreadable, or invalid */ }
+		} catch {
+			/* removed, unreadable, or invalid */
+		}
 	}
 	return found;
 }
@@ -212,7 +245,9 @@ export class FilesService {
 		const key = `${cwd}\0${relPath ?? ""}`;
 		const existing = this.listingRequests.get(key);
 		if (existing) return existing;
-		const pending = this.scanFiles(cwd, relPath).finally(() => this.listingRequests.delete(key));
+		const pending = this.scanFiles(cwd, relPath).finally(() =>
+			this.listingRequests.delete(key),
+		);
 		this.listingRequests.set(key, pending);
 		return pending;
 	}
@@ -280,7 +315,13 @@ export class FilesService {
 		const fsp = await import("node:fs/promises");
 		const q = query.trim().toLowerCase();
 		if (!q) {
-			this.host.emit({ type: "search_files_result", cwd, reqId, ok: true, results: [] });
+			this.host.emit({
+				type: "search_files_result",
+				cwd,
+				reqId,
+				ok: true,
+				results: [],
+			});
 			return;
 		}
 		const root = resolve(cwd);
@@ -335,14 +376,21 @@ export class FilesService {
 		try {
 			await walk(root, "", 0);
 			this.host.emit({
-				type: "search_files_result", cwd,
+				type: "search_files_result",
+				cwd,
 				reqId,
 				ok: true,
 				results,
 				...(truncated ? { truncated: true } : {}),
 			});
 		} catch {
-			this.host.emit({ type: "search_files_result", cwd, reqId, ok: false, results: [] });
+			this.host.emit({
+				type: "search_files_result",
+				cwd,
+				reqId,
+				ok: false,
+				results: [],
+			});
 		}
 	}
 
@@ -376,12 +424,26 @@ export class FilesService {
 		try {
 			if (kind === "status") {
 				const data = await scmStatus(cwd);
-				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, ...data });
+				this.host.emit({
+					type: "scm_data",
+					cwd,
+					reqId,
+					kind,
+					ok: true,
+					...data,
+				});
 				return;
 			}
 			if (kind === "history") {
 				const history = await scmHistory(cwd);
-				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, history });
+				this.host.emit({
+					type: "scm_data",
+					cwd,
+					reqId,
+					kind,
+					ok: true,
+					history,
+				});
 				return;
 			}
 			if (kind === "filediff" && arg?.path) {
@@ -389,11 +451,17 @@ export class FilesService {
 				// from our own listing, and execFile passes args verbatim anyway).
 				const { resolve, relative } = await import("node:path");
 				const rel = relative(resolve(cwd), resolve(cwd, arg.path));
-				if (rel.startsWith("..") || rel === "") throw new Error("路径超出工作区");
+				if (rel.startsWith("..") || rel === "")
+					throw new Error("路径超出工作区");
 				const diff = await scmFileDiff(cwd, arg.path);
 				this.host.emit({
-					type: "scm_data", cwd, reqId, kind, ok: true,
-					stagedText: diff.staged, worktreeText: diff.worktree,
+					type: "scm_data",
+					cwd,
+					reqId,
+					kind,
+					ok: true,
+					stagedText: diff.staged,
+					worktreeText: diff.worktree,
 					untracked: diff.untracked,
 					untrackedText: diff.untrackedText,
 					untrackedKind: diff.untrackedKind,
@@ -401,7 +469,11 @@ export class FilesService {
 				});
 				return;
 			}
-			if (kind === "commit" && arg?.hash && /^[0-9a-f]{7,40}$/i.test(arg.hash)) {
+			if (
+				kind === "commit" &&
+				arg?.hash &&
+				/^[0-9a-f]{7,40}$/i.test(arg.hash)
+			) {
 				const text = await scmCommitDetail(cwd, arg.hash);
 				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, text });
 				return;
@@ -411,16 +483,29 @@ export class FilesService {
 			if (isNotRepoError(err)) {
 				// Not a repo — a valid empty answer so the panel shows its hint.
 				this.host.emit({
-					type: "scm_data", cwd, reqId, kind, ok: true, notRepo: true,
-					branch: "", detached: false, upstream: null,
-					ahead: 0, behind: 0, upstreamGone: false,
-					files: [], branches: [], stats: {}, history: [],
+					type: "scm_data",
+					cwd,
+					reqId,
+					kind,
+					ok: true,
+					notRepo: true,
+					branch: "",
+					detached: false,
+					upstream: null,
+					ahead: 0,
+					behind: 0,
+					upstreamGone: false,
+					files: [],
+					branches: [],
+					stats: {},
+					history: [],
 				});
 				this.unwatchGit();
 				return;
 			}
 			this.host.emit({
-				type: "scm_data", cwd,
+				type: "scm_data",
+				cwd,
 				reqId,
 				kind,
 				ok: false,
@@ -443,7 +528,12 @@ export class FilesService {
 		const generation = this.gitWatchGeneration;
 		try {
 			const gitDir = await gitDirOf(cwd);
-			if (!gitDir || this.host.isDisposed() || this.gitWatchGeneration !== generation) return;
+			if (
+				!gitDir ||
+				this.host.isDisposed() ||
+				this.gitWatchGeneration !== generation
+			)
+				return;
 			this.gitWatcher = watch(gitDir, { persistent: false }, () => {
 				if (this.host.isDisposed() || this.gitDirtyTimer) return;
 				// Debounce: one checkout/commit fires several fs events.
@@ -479,92 +569,63 @@ export class FilesService {
 		}
 	}
 
+	private sharedUnwatch?: () => void;
+	private watchEpoch = 0;
 	private watchDir(absPath: string, rel: string): void {
 		if (this.host.isDisposed()) return;
-		// ---- Recursive mode (native on win32 / darwin): watch the workspace
-		// root once, so deep changes in NOT-listed subdirectories still refresh
-		// the panel (the old per-directory watch only saw the current level).
-		if (process.platform === "win32" || process.platform === "darwin") {
-			const root = resolve(this.host.getCwd());
-			if (this.recursiveWatcher) {
-				if (this.watchRoot === root) {
-					// Same workspace — only retarget the refresh path.
-					this.watchPath = rel;
-					return;
-				}
-				this.unwatchDir(); // cwd switched to another project
-			}
-			try {
-				const w = watch(
-					root,
-					{ persistent: false, recursive: true },
-					(_event, filename) => {
-						// Skip high-churn subtrees (npm install storms); .git has its
-						// own watcher for the SCM panel. filename may be null on some
-						// platforms — let those through (debounce absorbs bursts).
-						if (filename) {
-							const f = String(filename).split("\\").join("/");
-							// Single-segment names (e.g. the dir itself) have no "/" —
-							// slice(0, -1) would corrupt them, so special-case that.
-							const slash = f.indexOf("/");
-							const top = slash === -1 ? f : f.slice(0, slash);
-							if (top === "node_modules" || top === ".git") return;
-						}
-						// Burst events are debounced into a single refresh.
-						if (this.watchTimer) return;
-						this.watchTimer = setTimeout(() => {
-							this.watchTimer = null;
-							this.host.emit({
-								type: "file_changed",
-								path: this.watchPath ?? "",
-							});
-						}, 400);
-					},
+		const root = resolve(this.host.getCwd());
+		const focused =
+			process.platform === "linux" ||
+			rel
+				.split(/[\\/]/)
+				.some((part) =>
+					[
+						"dist",
+						"build",
+						"node_modules",
+						".venv",
+						"venv",
+						".git",
+						".next",
+						".nuxt",
+						".cache",
+						"__pycache__",
+					].includes(part),
 				);
-				w.on("error", () => {
-					// Directory deleted / unsupported — fall back to poll semantics.
-					this.noticeDegraded(root);
-					this.unwatchDir();
-				});
-				this.fsWatcher = w;
-				this.watchRoot = root;
-				this.recursiveWatcher = true;
-				this.watchPath = rel;
+		if (this.watchRoot === root && this.watchPath === rel) return;
+		this.unwatchDir();
+		this.watchRoot = root;
+		this.watchPath = rel;
+		const epoch = ++this.watchEpoch;
+		const changed = () => {
+			if (
+				epoch !== this.watchEpoch ||
+				this.host.isDisposed() ||
+				this.watchTimer
+			)
 				return;
+			this.watchTimer = setTimeout(() => {
+				this.watchTimer = null;
+				this.host.emit({ type: "file_changed", path: this.watchPath ?? "" });
+			}, 400);
+		};
+		if (focused)
+			try {
+				this.fsWatcher = watch(absPath, { persistent: false }, changed);
+				this.fsWatcher.on("error", () => this.noticeDegraded(root));
 			} catch {
-				// recursive unsupported here — fall through to per-directory watch.
-				this.fsWatcher = null;
-				this.recursiveWatcher = false;
-				this.watchRoot = null;
 				this.noticeDegraded(root);
 			}
-		}
-		// ---- Fallback: single non-recursive watch on the LISTED directory.
-		if (!this.recursiveWatcher && this.watchPath === rel && this.fsWatcher) return;
-		this.unwatchDir();
-		this.watchPath = rel;
-		try {
-			// persistent: false — the watcher must not keep the process alive.
-			this.fsWatcher = watch(absPath, { persistent: false }, () => {
-				// Burst events (npm install, git ops, editor save→rename) are
-				// debounced into a single refresh.
-				if (this.watchTimer) return;
-				this.watchTimer = setTimeout(() => {
-					this.watchTimer = null;
-					this.host.emit({ type: "file_changed", path: this.watchPath ?? "" });
-				}, 400);
-			});
-			this.fsWatcher.on("error", () => {
-				// Directory deleted / unsupported fs — stop watching; the poll (or
-				// the next navigation) restores things.
-				this.unwatchDir();
-			});
-		} catch {
-			// fs.watch unsupported (some network mounts, containers) — poll covers it.
-			this.fsWatcher = null;
-			this.watchPath = null;
-			this.noticeDegraded(absPath);
-		}
+		void subscribeProject(root, (event) => {
+			if (epoch !== this.watchEpoch) return;
+			if (event.partial) this.noticeDegraded(root);
+			changed();
+		})
+			.then((unwatch) => {
+				if (epoch !== this.watchEpoch || this.host.isDisposed()) unwatch();
+				else this.sharedUnwatch = unwatch;
+			})
+			.catch(() => this.noticeDegraded(root));
 	}
 
 	/** 实时监听不可用（网络盘/WSL/受限目录）：一次性告知用户已回落 10s 轮询，
@@ -580,6 +641,9 @@ export class FilesService {
 	}
 
 	unwatchDir(): void {
+		this.watchEpoch++;
+		this.sharedUnwatch?.();
+		this.sharedUnwatch = undefined;
 		if (this.watchTimer) {
 			clearTimeout(this.watchTimer);
 			this.watchTimer = null;
@@ -598,10 +662,14 @@ export class FilesService {
 	}
 
 	/** Read a workspace file for the preview panel (size-capped, binary-safe). */
-	async readFile(relPath: string, options: { requestId?: string; cwd?: string } = {}): Promise<void> {
+	async readFile(
+		relPath: string,
+		options: { requestId?: string; cwd?: string } = {},
+	): Promise<void> {
 		const cwd = this.host.getCwd();
 		try {
-			if (options.cwd !== undefined && options.cwd !== cwd) throw new Error("工作区已改变");
+			if (options.cwd !== undefined && options.cwd !== cwd)
+				throw new Error("工作区已改变");
 			const fs = await import("node:fs/promises");
 			const root = cwd;
 			const wp = workspacePath(resolve(root), relPath);
@@ -643,7 +711,19 @@ export class FilesService {
 				const { bytesRead } = await handle.read(buf, 0, buf.length, 0);
 				const data = buf.subarray(0, bytesRead);
 				if (data.subarray(0, 16).toString("utf8") === "SQLite format 3\0") {
-					this.host.emit({ type: "file_content", requestId: options.requestId, cwd, path: rel, name, text: "", truncated: false, binary: true, kind: "sqlite", lines: 0, size: stat.size });
+					this.host.emit({
+						type: "file_content",
+						requestId: options.requestId,
+						cwd,
+						path: rel,
+						name,
+						text: "",
+						truncated: false,
+						binary: true,
+						kind: "sqlite",
+						lines: 0,
+						size: stat.size,
+					});
 				} else if (looksLikeText(data)) {
 					this.host.emit({
 						type: "file_content",
@@ -678,31 +758,66 @@ export class FilesService {
 				await handle.close();
 			}
 		} catch (err) {
-			this.host.emit({ type: "file_result", operation: "read", requestId: options.requestId, cwd, path: relPath, ok: false, error: (err as Error).message });
+			this.host.emit({
+				type: "file_result",
+				operation: "read",
+				requestId: options.requestId,
+				cwd,
+				path: relPath,
+				ok: false,
+				error: (err as Error).message,
+			});
 		}
 	}
 
 	/** Save text from the file preview panel within the active workspace. */
-	async writeFile(relPath: string, text: string, options: { requestId?: string; cwd?: string; expectedVersion?: string; force?: boolean } = {}): Promise<void> {
+	async writeFile(
+		relPath: string,
+		text: string,
+		options: {
+			requestId?: string;
+			cwd?: string;
+			expectedVersion?: string;
+			force?: boolean;
+		} = {},
+	): Promise<void> {
 		const cwd = this.host.getCwd();
-		const result = { type: "file_result" as const, operation: "write" as const, requestId: options.requestId, cwd, path: relPath };
+		const result = {
+			type: "file_result" as const,
+			operation: "write" as const,
+			requestId: options.requestId,
+			cwd,
+			path: relPath,
+		};
 		try {
-			if (options.cwd !== undefined && options.cwd !== cwd) throw new Error("工作区已改变");
+			if (options.cwd !== undefined && options.cwd !== cwd)
+				throw new Error("工作区已改变");
 			const wp = workspacePath(resolve(cwd), relPath);
 			if (!wp) throw new Error("路径超出工作区");
-			if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024) throw new Error("文件内容过大（上限 2MB）");
+			if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024)
+				throw new Error("文件内容过大（上限 2MB）");
 			const stat = statSync(wp.abs);
-			if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES) throw new Error("文件不是可编辑的完整文本");
+			if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES)
+				throw new Error("文件不是可编辑的完整文本");
 			const data = readFileSync(wp.abs);
 			if (!looksLikeText(data)) throw new Error("二进制文件不可编辑");
 			const version = createHash("sha256").update(data).digest("hex");
 			if (!options.force && options.expectedVersion !== version) {
-				this.host.emit({ ...result, ok: false, conflict: true, error: "磁盘内容已改变，请重新加载或明确覆盖" });
+				this.host.emit({
+					...result,
+					ok: false,
+					conflict: true,
+					error: "磁盘内容已改变，请重新加载或明确覆盖",
+				});
 				return;
 			}
 			// No await between checking the version and writing: concurrent UI saves serialize.
 			writeFileSync(wp.abs, text, "utf8");
-			this.host.emit({ ...result, ok: true, version: createHash("sha256").update(text).digest("hex") });
+			this.host.emit({
+				...result,
+				ok: true,
+				version: createHash("sha256").update(text).digest("hex"),
+			});
 		} catch (err) {
 			this.host.emit({ ...result, ok: false, error: (err as Error).message });
 		}

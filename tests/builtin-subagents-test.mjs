@@ -17,7 +17,7 @@ const port = Number(process.env.PI_BUILTIN_SUBAGENT_PORT || 9191);
 for (const candidate of [port, port + 1]) { assert(candidate >= 8900); assert.equal(await portUp(candidate), false, `Port ${candidate} occupied`); }
 const root = mkdtempSync(join(tmpdir(), 'pi-built-in-subagents-'));
 const agentDir = join(root, 'agent'), cwd = join(root, 'work');
-mkdirSync(agentDir); mkdirSync(cwd); mkdirSync(join(agentDir, 'extensions')); writeFileSync(join(agentDir, 'extensions/pi-subagents.ts'), `export default pi => pi.registerTool({ name: 'legacy_delegate', label: 'Legacy fixture', description: 'Test only', parameters: { type: 'object', properties: {} }, async execute() { return { content: [{ type: 'text', text: 'legacy' }] }; } });`); writeFileSync(join(cwd, 'probe.txt'), 'READ_FIXTURE');
+mkdirSync(agentDir); mkdirSync(cwd); mkdirSync(join(agentDir, 'extensions')); writeFileSync(join(agentDir, 'extensions/pi-subagents.ts'), `export default pi => pi.registerTool({ name: 'legacy_delegate', label: 'Legacy fixture', description: 'Test only', parameters: { type: 'object', properties: {} }, async execute() { return { content: [{ type: 'text', text: 'legacy' }] }; } });`); writeFileSync(join(cwd, 'probe.txt'), 'READ_FIXTURE');writeFileSync(join(cwd,'code.ts'),'export function greet(name: string) { return name.length; }');
 const model = { provider: 'fixture', id: 'local' };
 writeFileSync(join(agentDir, 'models.json'), JSON.stringify({ providers: { fixture: { api: 'openai-completions', baseUrl: `http://127.0.0.1:${port + 1}/v1`, apiKey: 'isolated', models: [{ id: 'local', name: 'Local fixture', input: ['text'], contextWindow: 32000, maxTokens: 4096 }] } } }));
 writeFileSync(join(agentDir, 'auth.json'), JSON.stringify({ fixture: { type: 'api_key', key: 'isolated' } }));
@@ -46,6 +46,7 @@ const mock = createServer(async (req, res) => {
 			const userIndex = payload.messages.findLastIndex(m => m.role === 'user');
 			const userText = JSON.stringify(payload.messages[userIndex]);
 			const results = payload.messages.slice(userIndex + 1).filter(m => m.role === 'tool');
+			if(userText.includes('CODE_PARENT')){respond(res,payload,results.length?{content:'CODE_PARENT_DONE'}:call('web_subagent',{action:'spawn',role:'analysis',task:'CODE_QUERY'}),results.length?'stop':'tool_calls');return;}
 			if (userText.includes('AUTO_QUOTA')) { respond(res, payload, results.length ? { content: 'AUTO_ROUND_DONE' } : call('web_subagent', { action: 'spawn', role: 'analysis', task: `AUTO_CHILD_${parentCalls}` }), results.length ? 'stop' : 'tool_calls'); return; }
 			if (userText.includes('BOUNDED_WAIT')) { if (!results.length) respond(res, payload, call('web_subagent', { action: 'spawn', role: 'analysis', task: 'WAIT_CHILD_HOLD' }), 'tool_calls'); else if (results.length < 4) { const id = JSON.parse(results[0].content).id; respond(res, payload, call('web_subagent', { action: 'wait', taskId: id }), 'tool_calls'); } else respond(res, payload, { content: 'BOUNDED_PARENT_IDLE' }); return; }
 			if (userText.includes('FINAL_WAIT')) { if (!results.length) respond(res, payload, call('web_subagent', { action: 'spawn', role: 'analysis', task: 'READ_STEPS' }), 'tool_calls'); else if (results.length === 1 || JSON.parse(results.at(-1).content).status === 'running') respond(res, payload, call('web_subagent', { action: 'wait', taskId: JSON.parse(results[0].content).id }), 'tool_calls'); else respond(res, payload, { content: 'FINAL_PARENT_IDLE' }); return; }
@@ -55,6 +56,7 @@ const mock = createServer(async (req, res) => {
 			else respond(res, payload, { content: 'PARENT_IDLE' });
 		} else {
 			assert(!tools.some(t => /subagent|spawn_agent|delegate_agent/.test(t)));
+			if(text.includes('CODE_QUERY')){assert(tools.includes('code'));if(!payload.messages.some(m=>m.role==='tool'))respond(res,payload,call('code',{action:'read_symbol',path:'code.ts',line:1,symbol:'greet'}),'tool_calls');else {assert(text.includes('function greet'));respond(res,payload,{content:'CODE_QUERY_DONE'});}return;}
 			const marker = ['WAIT_CHILD_HOLD', 'CAPABILITY', 'WRITE_HOST_HOLD', 'SECOND_LOOP', 'STUCK', 'SLOT_0', 'SLOT_1', 'SLOT_2', 'SLOT_3', 'SLOT_4', 'HOST_CHILD_HOLD', 'HOLD_A', 'HOLD_B', 'WRITE_HOLD', 'WRITE_NEXT', 'READ_STEPS', 'TIMEOUT', 'SKILL_BOUNDARY'].find(m => text.includes(m));
 			if (text.includes('LONG_RECORD')) { respond(res, payload, { content: 'Long Unicode result 😀'.repeat(7000) }); return; }
 			if (marker === 'CAPABILITY' && !payload.messages.some(m => m.role === 'tool')) respond(res, payload, call('write', { path: 'unauthorized.txt', content: 'must not be written' }), 'tool_calls');
@@ -158,6 +160,7 @@ try {
 	const request = (action, extra = {}) => { const requestId = `request-${Math.random()}`; send({ type: 'subagent_request', conversationId: first.conversationId, requestId, action, ...extra }); return requestId; };
 	assert.equal(received.findLast(m => m.type === 'subagent_state').config.enabled, true);
 	const configId = request('configure', { config: { ...defaultSubagentConfig(), enabled: true, roles: [...defaultSubagentConfig().roles, { ...defaultSubagentConfig().roles[0], id: 'native-host', extensions: ['builtin:mcp', 'builtin:tool-search', 'builtin:codemode'] }] } }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === configId && m.accepted));
+
 	send({ type: 'prompt', text: 'BOUNDED_WAIT: wait longer than the host watchdog without cancelling the child.' });
 	const bounded = await snapshot(s => !s.isStreaming && s.messages.some(m => JSON.stringify(m).includes('BOUNDED_PARENT_IDLE')));
 	const waited = taskState.tasks.find(t => t.task === 'WAIT_CHILD_HOLD'); assert.equal(waited.status, 'running');
@@ -218,6 +221,7 @@ try {
 	const recoveredDetail = request('detail', { taskId: rerun.id }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === recoveredDetail && !m.error));
 	console.log('PASS rerun creates new identity and actual service crash marks unfinished task interrupted');
 
+	send({type:'prompt',text:'CODE_PARENT'});await snapshot(s=>!s.isStreaming&&s.messages.some(m=>JSON.stringify(m).includes('CODE_PARENT_DONE')));await wait(()=>taskState.tasks.find(t=>t.task==='CODE_QUERY')?.status==='completed','subagent code IPC');const codeDetailId=request('detail',{taskId:taskState.tasks.find(t=>t.task==='CODE_QUERY').id});await wait(()=>received.some(m=>m.type==='subagent_response'&&m.requestId===codeDetailId&&m.task));assert.match(received.find(m=>m.type==='subagent_response'&&m.requestId===codeDetailId).task.result,/CODE_QUERY_DONE/);console.log('PASS subagent code tool queries the shared host language service over IPC');
 	const offId = request('configure', { config: { ...defaultSubagentConfig(), enabled: false } }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === offId && m.accepted));
 	send({ type: 'prompt', text: 'LEGACY_CHECK: confirm the original extension is available.' }); await snapshot(s => !s.isStreaming && s.messages.some(m => JSON.stringify(m).includes('LEGACY_VISIBLE')));
 	console.log('PASS project-switch ownership and upstream extension exclusion/restoration');

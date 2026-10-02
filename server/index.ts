@@ -1,5 +1,6 @@
+import { initializeCode, codeManager } from "./code-intelligence.js";
 import { ImageService } from "./image-service.js";
-import { subagents } from "./subagents.js";
+import { subagents, unfinished } from "./subagents.js";
 /**
  * pi-web-ui server entry.
  *
@@ -50,7 +51,9 @@ import type { ClientMessage, ServerMessage } from "./protocol.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const CWD = resolve(process.env.PI_WEB_CWD ?? process.cwd());
-const DATA_DIR = resolve(process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"));
+const DATA_DIR = resolve(
+	process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"),
+);
 
 /** Bind address. Default is loopback ONLY — the service is a local personal
  *  tool and should not be reachable from the network unless explicitly asked
@@ -91,14 +94,20 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 
 /** 从请求中提取候选 token：头 / 查询参数 / cookie（浏览器导航场景靠 cookie 续命）。 */
-function requestTokens(req: { headers: IncomingMessage["headers"]; url?: string }): string[] {
+function requestTokens(req: {
+	headers: IncomingMessage["headers"];
+	url?: string;
+}): string[] {
 	const out: string[] = [];
 	const auth = req.headers.authorization;
-	if (typeof auth === "string" && auth.startsWith("Bearer ")) out.push(auth.slice(7).trim());
+	if (typeof auth === "string" && auth.startsWith("Bearer "))
+		out.push(auth.slice(7).trim());
 	const header = req.headers["x-pi-token"];
 	if (typeof header === "string") out.push(header.trim());
 	try {
-		const q = new URL(req.url ?? "/", "http://localhost").searchParams.get("token");
+		const q = new URL(req.url ?? "/", "http://localhost").searchParams.get(
+			"token",
+		);
 		if (q) out.push(q.trim());
 	} catch {
 		/* ignore malformed url */
@@ -138,12 +147,27 @@ if (AUTH_TOKEN) {
 app.get("/api/generated-image", (req, res) => {
 	try {
 		const { clientId, cwd, id, index } = req.query;
-		if (![clientId, cwd, id, index].every(v => typeof v === "string") || !originAllowed(req)) { res.sendStatus(400); return; }
-		if (!service.get(clientId as string)) { res.sendStatus(403); return; }
+		if (
+			![clientId, cwd, id, index].every((v) => typeof v === "string") ||
+			!originAllowed(req)
+		) {
+			res.sendStatus(400);
+			return;
+		}
+		if (!service.get(clientId as string)) {
+			res.sendStatus(403);
+			return;
+		}
 		const file = images.file(cwd as string, id as string, Number(index));
-		if (!file) { res.sendStatus(404); return; }
-		res.setHeader("Cache-Control", "no-store"); res.sendFile(file);
-	} catch { res.sendStatus(404); }
+		if (!file) {
+			res.sendStatus(404);
+			return;
+		}
+		res.setHeader("Cache-Control", "no-store");
+		res.sendFile(file);
+	} catch {
+		res.sendStatus(404);
+	}
 });
 
 app.get("/api/health", (_req, res) => {
@@ -152,34 +176,77 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/sqlite", async (req, res) => {
 	res.setHeader("Cache-Control", "no-store");
-	if (!originAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+	if (!originAllowed(req)) {
+		res.status(403).json({ error: "Forbidden" });
+		return;
+	}
 	const { clientId, cwd, path, requestId, table, offset = "0" } = req.query;
-	if (![clientId, cwd, path, requestId, offset].every((value) => typeof value === "string") || (table !== undefined && typeof table !== "string")) {
-		res.status(400).json({ error: "Invalid request" }); return;
+	if (
+		![clientId, cwd, path, requestId, offset].every(
+			(value) => typeof value === "string",
+		) ||
+		(table !== undefined && typeof table !== "string")
+	) {
+		res.status(400).json({ error: "Invalid request" });
+		return;
 	}
 	const cs = service.get(clientId as string);
 	const identity = { requestId, cwd, path };
-	if (!cs || cs.switchingWorkspace || cs.cwd !== cwd) { res.status(409).json({ ...identity, error: "Workspace unavailable" }); return; }
+	if (!cs || cs.switchingWorkspace || cs.cwd !== cwd) {
+		res.status(409).json({ ...identity, error: "Workspace unavailable" });
+		return;
+	}
 	const controller = new AbortController();
 	res.once("close", () => controller.abort());
 	try {
-		const data = await readSqlitePreview({ cwd: cwd as string, path: path as string, table: table as string | undefined, offset: Number(offset) }, controller.signal);
+		const data = await readSqlitePreview(
+			{
+				cwd: cwd as string,
+				path: path as string,
+				table: table as string | undefined,
+				offset: Number(offset),
+			},
+			controller.signal,
+		);
 		if (controller.signal.aborted) return;
-		if (cs.switchingWorkspace || cs.cwd !== cwd) { res.status(409).json({ ...identity, error: "Workspace changed" }); return; }
+		if (cs.switchingWorkspace || cs.cwd !== cwd) {
+			res.status(409).json({ ...identity, error: "Workspace changed" });
+			return;
+		}
 		res.json({ ...identity, data });
 	} catch (error) {
-		if (!controller.signal.aborted) res.status(400).json({ ...identity, error: (error as Error).message });
+		if (!controller.signal.aborted)
+			res.status(400).json({ ...identity, error: (error as Error).message });
 	}
 });
 
 app.post("/api/markdown-image", (req, res) => {
-	if (!originAllowed(req) || !req.is("application/json")) { res.status(403).json({ error: "Forbidden" }); return; }
+	if (!originAllowed(req) || !req.is("application/json")) {
+		res.status(403).json({ error: "Forbidden" });
+		return;
+	}
 	const { clientId, cwd, path, data } = req.body ?? {};
-	if (![clientId, cwd, path, data].every((value) => typeof value === "string")) { res.status(400).json({ error: "Invalid request" }); return; }
+	if (
+		![clientId, cwd, path, data].every((value) => typeof value === "string")
+	) {
+		res.status(400).json({ error: "Invalid request" });
+		return;
+	}
 	const cs = service.get(clientId);
-	if (!cs || cs.switchingWorkspace || cs.cwd !== cwd || service.quiesceInfo().quiesced) { res.status(409).json({ error: "Workspace unavailable" }); return; }
-	try { res.json({ path: saveMarkdownImage(cwd, path, data) }); }
-	catch (error) { res.status(400).json({ error: (error as Error).message }); }
+	if (
+		!cs ||
+		cs.switchingWorkspace ||
+		cs.cwd !== cwd ||
+		service.quiesceInfo().quiesced
+	) {
+		res.status(409).json({ error: "Workspace unavailable" });
+		return;
+	}
+	try {
+		res.json({ path: saveMarkdownImage(cwd, path, data) });
+	} catch (error) {
+		res.status(400).json({ error: (error as Error).message });
+	}
 });
 
 /**
@@ -203,7 +270,13 @@ app.get("/api/file", async (req, res) => {
 		const cid =
 			typeof req.query.clientId === "string" ? req.query.clientId : "";
 		const cs = cid ? service.get(cid) : undefined;
-		if (req.query.cwd && (!cs || cs.switchingWorkspace || req.query.cwd !== cs.cwd)) { res.status(409).end("workspace changed"); return; }
+		if (
+			req.query.cwd &&
+			(!cs || cs.switchingWorkspace || req.query.cwd !== cs.cwd)
+		) {
+			res.status(409).end("workspace changed");
+			return;
+		}
 		const wp = workspacePath(cs?.cwd ?? CWD, raw);
 		if (!wp) {
 			res.status(400).end("path outside workspace");
@@ -267,12 +340,16 @@ const PLUGINS_DIR = join(DATA_DIR, "plugins");
 // /plugins-api/<id>/inbox。PI_WEB_TOKEN 鉴权（上方 app.use）自动覆盖；
 // 响应已在前面过了 express.json。注意不要在此 catch-all 里消费 body。
 app.all(["/plugins-api/:id/*", "/plugins-api/:id"], (req, res) => {
-	const rest = String((req.params as unknown as Record<string, string | undefined>)[0] ?? "");
+	const rest = String(
+		(req.params as unknown as Record<string, string | undefined>)[0] ?? "",
+	);
 	pluginMgr.handleHttp(String(req.params.id ?? ""), req.method, rest, req, res);
 });
 app.get("/plugins/:id/client/*", (req, res) => {
 	// express 4 的通配参数在运行时落在 params[0]，但类型声明里没有 —— 显式取
-	const rest = String((req.params as unknown as Record<string, string | undefined>)[0] ?? "");
+	const rest = String(
+		(req.params as unknown as Record<string, string | undefined>)[0] ?? "",
+	);
 	const abs = resolvePluginClientFile(PLUGINS_DIR, req.params.id, rest);
 	if (!abs) {
 		res.status(404).end("plugin not found");
@@ -285,7 +362,14 @@ app.get("/plugins/:id/client/*", (req, res) => {
 	res.setHeader("Cache-Control", "no-cache"); // 开发期改文件即生效
 	res.sendFile(abs, (err) => {
 		if (err && !res.headersSent)
-			res.status((err as NodeJS.ErrnoException & { statusCode?: number }).statusCode === 404 ? 404 : 500).end("not found");
+			res
+				.status(
+					(err as NodeJS.ErrnoException & { statusCode?: number })
+						.statusCode === 404
+						? 404
+						: 500,
+				)
+				.end("not found");
 	});
 });
 /** Set in the env of the replacement child spawned by a self-update restart. */
@@ -425,11 +509,19 @@ const heartbeatTimer = setInterval(() => {
 }, 10_000);
 
 subagents.initialize(DATA_DIR);
+initializeCode(DATA_DIR);
 const service = new AgentService(
 	CWD,
 	// Per-client persisted UI state: last-used workspace + recent projects.
 	join(DATA_DIR, "client-state.json"),
 );
+codeManager().subscribe((state) => service.emitCodeState(state));
+subagents.subscribe((task) => {
+	if (task)
+		void codeManager()
+			.busy(task.cwd, task.id, unfinished(task))
+			.catch(() => {});
+});
 subagents.isQuiesced = () => service.isQuiesced();
 const nodeWorkbench = new NodeWorkbench(DATA_DIR);
 
@@ -446,7 +538,10 @@ void mcpBridge.load().then(() => {
 service.onToolEvent = (ev) => pluginMgr.emitToolEvent(ev);
 // 插件扩展点：插件注册的 AI 工具（registerAgentTool）+ MCP 桥工具 → 会话创建时
 // 带上 + 变化时动态注入/移除已有会话。
-service.pluginToolsProvider = () => [...pluginMgr.getAgentTools(), ...mcpBridge.getTools()];
+service.pluginToolsProvider = () => [
+	...pluginMgr.getAgentTools(),
+	...mcpBridge.getTools(),
+];
 pluginMgr.onAgentToolsChanged = () => service.applyPluginAgentTools();
 // 插件扩展点：插件斜杠命令（registerCommand）→ 命令选择器目录 + prompt 拦截执行。
 pluginMgr.onCommandsChanged = () => service.applyPluginCommandCatalog();
@@ -531,7 +626,10 @@ wss.on("connection", (ws) => {
 	// 协议层错误（非法帧/未 masked 帧等）：不注册 handler 会作为 uncaught
 	// exception 打崩整个进程（issue #11 附带发现）。记日志并按坏连接关闭。
 	ws.on("error", (err) => {
-		console.error(`[ws] socket error${clientId ? ` (${clientId})` : ""}:`, err.message);
+		console.error(
+			`[ws] socket error${clientId ? ` (${clientId})` : ""}:`,
+			err.message,
+		);
 		try {
 			ws.close();
 		} catch {
@@ -555,7 +653,11 @@ wss.on("connection", (ws) => {
 		if (
 			(msg.type === "snapshot" || msg.type === "snapshot_delta") &&
 			lastSnapshotBytes > 0 &&
-			ws.bufferedAmount > Math.max(SNAPSHOT_BACKPRESSURE_MIN_BYTES, SNAPSHOT_BACKPRESSURE_FACTOR * lastSnapshotBytes)
+			ws.bufferedAmount >
+				Math.max(
+					SNAPSHOT_BACKPRESSURE_MIN_BYTES,
+					SNAPSHOT_BACKPRESSURE_FACTOR * lastSnapshotBytes,
+				)
 		) {
 			// 真正的慢客户端：丢弃是安全的，但不能「丢完就没了」——安排一次延迟
 			// 重发，等缓冲排空后快照最终必达（否则若此后再无事件，客户端将永久
@@ -590,13 +692,23 @@ wss.on("connection", (ws) => {
 			pending.push(msg);
 			return;
 		}
-		if (cs.switchingWorkspace && msg.type !== "set_cwd" && msg.type !== "get_state") {
-			if (msg.type === "prompt" && msg.requestId) send({ type: "prompt_result", requestId: msg.requestId, ok: false });
-			if (msg.type === "read_file" || msg.type === "write_file") send({
-				type: "file_result", operation: msg.type === "read_file" ? "read" : "write",
-				requestId: msg.requestId, cwd: msg.cwd ?? cs.cwd, path: msg.path,
-				ok: false, error: "工作区切换中，请稍后重试",
-			});
+		if (
+			cs.switchingWorkspace &&
+			msg.type !== "set_cwd" &&
+			msg.type !== "get_state"
+		) {
+			if (msg.type === "prompt" && msg.requestId)
+				send({ type: "prompt_result", requestId: msg.requestId, ok: false });
+			if (msg.type === "read_file" || msg.type === "write_file")
+				send({
+					type: "file_result",
+					operation: msg.type === "read_file" ? "read" : "write",
+					requestId: msg.requestId,
+					cwd: msg.cwd ?? cs.cwd,
+					path: msg.path,
+					ok: false,
+					error: "工作区切换中，请稍后重试",
+				});
 			return;
 		}
 		switch (msg.type) {
@@ -720,11 +832,24 @@ wss.on("connection", (ws) => {
 				void cs.checkComponentUpdates(msg.requestId);
 				break;
 			case "update_component":
-				if (service.quiesceInfo().quiesced || service.activeConversations() || service.pendingMessages()) {
-					send({ type: "component_updates", requestId: msg.requestId, cwd: cs.cwd, phase: "error", items: [], error: "请等待所有任务结束后再更新扩展" });
+				if (
+					service.quiesceInfo().quiesced ||
+					service.activeConversations() ||
+					service.pendingMessages()
+				) {
+					send({
+						type: "component_updates",
+						requestId: msg.requestId,
+						cwd: cs.cwd,
+						phase: "error",
+						items: [],
+						error: "请等待所有任务结束后再更新扩展",
+					});
 				} else {
 					service.quiesce();
-					void cs.updateComponent(msg.requestId, msg.id).finally(() => service.unquiesce());
+					void cs
+						.updateComponent(msg.requestId, msg.id)
+						.finally(() => service.unquiesce());
 				}
 				break;
 			case "check_update":
@@ -739,12 +864,70 @@ wss.on("connection", (ws) => {
 			case "logout_provider":
 				void cs.providerAuth.logout(msg.provider);
 				break;
+			case "code_request":
+				if (
+					cs.cwd !== msg.cwd ||
+					cs.switchingWorkspace ||
+					service.isQuiesced()
+				) {
+					cs.sendImageMessage({
+						type: "code_result",
+						requestId: msg.requestId,
+						cwd: msg.cwd,
+						error: "Workspace unavailable",
+					});
+					break;
+				}
+				void (async () => {
+					try {
+						await codeManager().foreground(cs.clientId, msg.cwd);
+						const result =
+							msg.action === "query"
+								? await codeManager().query(msg.cwd, msg.query!)
+								: undefined;
+						if (msg.action === "settings") {
+							await codeManager().configure(msg.cwd, msg.settings!);
+							await cs.codeConfigurationChanged(msg.cwd);
+						}
+						if (msg.action === "restart") await codeManager().restart(msg.cwd);
+						if(msg.action==="install")await codeManager().install(msg.cwd,msg.language!);
+						cs.sendImageMessage({
+							type: "code_result",
+							requestId: msg.requestId,
+							cwd: msg.cwd,
+							state: await codeManager().state(msg.cwd),
+							result,
+						});
+					} catch (error) {
+						cs.sendImageMessage({
+							type: "code_result",
+							requestId: msg.requestId,
+							cwd: msg.cwd,
+							error: String(error),
+						});
+					}
+				})();
+				break;
 			case "native_mcp_request":
 				void cs.nativeMcpRequest(msg);
 				break;
 			case "image_request":
-				if (cs.cwd !== msg.cwd || cs.switchingWorkspace || service.isQuiesced()) { cs.sendImageMessage({ type: "image_result", requestId: msg.requestId, cwd: msg.cwd, error: "Workspace unavailable" }); break; }
-				void images.handle(cs.clientId, cs.imageModelRuntime, msg, message => cs.sendImageMessage(message));
+				if (
+					cs.cwd !== msg.cwd ||
+					cs.switchingWorkspace ||
+					service.isQuiesced()
+				) {
+					cs.sendImageMessage({
+						type: "image_result",
+						requestId: msg.requestId,
+						cwd: msg.cwd,
+						error: "Workspace unavailable",
+					});
+					break;
+				}
+				void images.handle(cs.clientId, cs.imageModelRuntime, msg, (message) =>
+					cs.sendImageMessage(message),
+				);
 				break;
 			case "login_provider":
 				void cs.providerAuth.login(msg.provider);
@@ -790,14 +973,28 @@ wss.on("connection", (ws) => {
 				break;
 			case "terminal_create": {
 				const tm = cs.getTerminalManager(msg.conversationId);
-				if (tm) tm.create(msg.terminalId, msg.cwd, msg.cols, msg.rows, cs.getTerminalCwd(msg.conversationId));
+				if (tm)
+					tm.create(
+						msg.terminalId,
+						msg.cwd,
+						msg.cols,
+						msg.rows,
+						cs.getTerminalCwd(msg.conversationId),
+					);
 				break;
 			}
 			case "terminal_input":
-				cs.getTerminalManager(msg.conversationId)?.input(msg.terminalId, msg.data);
+				cs.getTerminalManager(msg.conversationId)?.input(
+					msg.terminalId,
+					msg.data,
+				);
 				break;
 			case "terminal_resize":
-				cs.getTerminalManager(msg.conversationId)?.resize(msg.terminalId, msg.cols, msg.rows);
+				cs.getTerminalManager(msg.conversationId)?.resize(
+					msg.terminalId,
+					msg.cols,
+					msg.rows,
+				);
 				break;
 			case "terminal_kill":
 				cs.getTerminalManager(msg.conversationId)?.kill(msg.terminalId);
@@ -868,7 +1065,11 @@ wss.on("connection", (ws) => {
 				void cs.reloadExtensions();
 				break;
 			case "plugin_message":
-				pluginMgr.handleMessage(msg.pluginId, msg.payload, clientId ?? undefined);
+				pluginMgr.handleMessage(
+					msg.pluginId,
+					msg.payload,
+					clientId ?? undefined,
+				);
 				break;
 			case "plugin_settings": {
 				const r = pluginMgr.savePluginSettings(msg.pluginId, msg.values ?? {});
@@ -1019,7 +1220,11 @@ scheduleUploadCleanup();
 
 // Local control socket (status / quiesce / unquiesce) — same data dir the
 // CLI uses, so `pi-web-ui server status|quiesce|unquiesce` just works.
-const stopControl = startControlServer({ service, dataDir: DATA_DIR, port: PORT });
+const stopControl = startControlServer({
+	service,
+	dataDir: DATA_DIR,
+	port: PORT,
+});
 
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
@@ -1032,6 +1237,7 @@ async function shutdown(): Promise<void> {
 	pluginMgr.dispose();
 	mcpBridge.dispose();
 	images.shutdown();
+	await codeManager().shutdown();
 	await subagents.shutdown();
 	await service.disposeAll();
 	wss.close();

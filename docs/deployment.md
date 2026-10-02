@@ -126,3 +126,9 @@ Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使
 ### Pi 1.0.0 resume 兼容补丁
 
 `scripts/patch-pi-sdk.mjs` 在 postinstall/prebuild 对精确 1.0.0 的 `dist/core/sdk.js` 应用有界修正：恢复已有会话且未显式指定 tools/noTools 时，将 initialActiveToolNames 留空，触发官方 transcript 工具恢复与待注册工具机制。补丁不修改全局 Pi CLI；重复执行幂等，源代码不匹配则构建失败。升级 SDK 时应以 `tests/native-tools-desktop-test.mjs` 的真实本地模型、deferred reload/resume 回归决定是否移除。afterPack 在所有平台检查补丁、SDK 版本和 codemode.md，再允许出安装包。
+
+## 代码智能工具链
+
+0.10.0 的 npm / Desktop 包含 `resources/code-toolchain/` 离线归档，首次使用解压到应用 data-dir，不写项目目录。TS/Pyright 为构建依赖，安装运行版无需下载整套散文件。工具链准备与 LSP 初始化分别计时；缓存有哈希校验、进程锁和活实例 lease。Windows 绿色版的 `portable.unpackDirName: true` 保持不变。资源与验收范围见 [代码智能](architecture-code-intelligence.md)。
+
+Java、Go、Rust、C/C++ 在「设置 → 代码智能」配置本机服务器或按需安装到 data-dir，桌面包不包含这些大体积工具链。Java 安装可包含独立 Java 21，用来运行语言服务器；Java 8/17 Maven 项目可另填本机对应完整 JDK 目录，项目版本由 pom.xml 决定，不会切换系统 JDK。Maven 工程可位于三层以内子目录；用户和全局 settings.xml 路径可手动填写，默认检查 ~/.m2/settings.xml 与 MAVEN_HOME/M2_HOME 的 conf/settings.xml，访达启动不依赖 shell 变量才能配置；Go、Rust 和 C/C++ 使用本机开发环境。下载匹配随代码固定的 SHA256，JDK 固定 21.0.12.1+1；支持 HTTP(S) 代理环境变量及 Go 的 GOPROXY，失败时可改用本机服务器路径。Finder / Dock 的精简 PATH 也检查官方 Go `/usr/local/go/bin`、Homebrew 与 Cargo SDK 路径。原生服务不继承 ELECTRON_RUN_AS_NODE。安装进程在关闭应用时终止。Java 的项目索引通过租约避免 Web 与 Desktop 同时使用同一 JDT workspace。跨平台实际语言服务回归由 CI 的 native-code-intelligence 矩阵执行。

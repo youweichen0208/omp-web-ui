@@ -1117,6 +1117,10 @@ export function useChat() {
 				case "models_config":
 					dispatch({ type: "models_config", providers: msg.providers });
 					break;
+				case "code_result":
+				case "code_state":
+					window.dispatchEvent(new CustomEvent("pi-code-event", {detail:msg}));
+					break;
 				case "native_mcp_result":
 					window.dispatchEvent(new CustomEvent("pi-native-mcp-event", { detail: msg }));
 					break;

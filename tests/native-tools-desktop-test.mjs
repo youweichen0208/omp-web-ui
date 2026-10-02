@@ -8,7 +8,7 @@ import { fork } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { agentRuntimeEnvironment } from '../electron/agent-runtime-env.mjs';
-const codeFixture = 'const found = await searchTools("add"); text(found); const result = await tools.mcp__echo__add({a: 2, b: 3}); text(result); text(await tools.mcp__http__add({a: 4, b: 5})); const painter = await models.getModelOfType("image", "image-fixture", "fixture"); const generated = await models.generateImages(painter, {input:[{type:"text",text:"Fixture image"}]}); for(const block of generated.output) if(block.type === "image") image(block);';
+const codeFixture = 'const found = await searchTools("add"); text(found); const result = await tools.mcp__echo__add({a: 2, b: 3}); text(result); text(await tools.mcp__http__add({a: 4, b: 5})); await tools.write({path:"fixture.ts",content:"const answer: number = String(1);"}); const painter = await models.getModelOfType("image", "image-fixture", "fixture"); const generated = await models.generateImages(painter, {input:[{type:"text",text:"Fixture image"}]}); for(const block of generated.output) if(block.type === "image") image(block);';
 const [executable = process.execPath, root = process.cwd()] = process.argv.slice(2).map(p => resolve(p));
 if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 	const directory = mkdtempSync(join(tmpdir(), 'pi-native-tools-'));
@@ -52,8 +52,11 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 	const { nativeToolExtensions } = await import(pathToFileURL(join(root, 'dist/server/native-tools.js')));
 	assert.match(readFileSync(join(root, 'node_modules/@earendil-works/pi-coding-agent/docs/codemode.md'), 'utf8'), /generateImages/);
 	const cwd = process.env.PI_NATIVE_TOOLS_WORKER, agentDir = process.env.PI_CODING_AGENT_DIR;
+	const {initializeCode,codeDefaults}=await import(pathToFileURL(join(root,"dist/server/code-intelligence.js")));
+	const {codeFeedback}=await import(pathToFileURL(join(root,"dist/server/code-feedback.js")));
+	const codeManager=initializeCode(join(cwd,"code-data"));writeFileSync(join(cwd,"tsconfig.json"),JSON.stringify({compilerOptions:{strict:true},include:["fixture.ts"]}));writeFileSync(join(cwd,"fixture.ts"),"const answer: number = 1;");await codeManager.configure(cwd,{...codeDefaults(),feedback:true,python:false});await codeManager.query(cwd,{action:"diagnostics",path:"fixture.ts"});
 	const settingsManager = SettingsManager.create(cwd, agentDir);
-	const resourceLoader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, extensionFactories: nativeToolExtensions() });
+	const resourceLoader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, extensionFactories: [...nativeToolExtensions(),codeFeedback(cwd,"fixture")] });
 	await resourceLoader.reload(); assert.deepEqual(resourceLoader.getExtensions().errors, []);
 	const { session } = await createAgentSession({ cwd, agentDir, settingsManager, resourceLoader, sessionManager: SessionManager.create(cwd, join(agentDir,"sessions")) });
 	const errors = [], events = [];
@@ -67,6 +70,7 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 		await session.prompt('Run the local fixture.');
 		const result = session.messages.find(message => message.role === 'toolResult' && message.toolName === 'codemode');
 		assert(result && !result.isError, JSON.stringify(result));
+		assert(result.content.some(block=>block.type==="text"&&block.text.includes("Code diagnostics")),"nested write feedback persists on outer codemode result without script output");
 		assert(result.content.some(block => block.type === "image"), "codemode generation returns an image block");
 		assert(result.nestedCalls?.calls.some(call => call.name === 'mcp__echo__add' && call.status === 'ok'), JSON.stringify(result));
 		assert(result.nestedCalls?.calls.some(call => call.name === 'mcp__http__add' && call.status === 'ok'), JSON.stringify(result));
@@ -86,7 +90,7 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 		assert(session.getActiveToolNames().includes('mcp__echo__add'), 'reload restores discovered deferred MCP tools');
 		assert.deepEqual(resourceLoader.getExtensions().errors, []);
 		const saved = session.sessionFile; assert(saved);
-		const resumedLoader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, extensionFactories: nativeToolExtensions() }); await resumedLoader.reload();
+		const resumedLoader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, extensionFactories: [...nativeToolExtensions(),codeFeedback(cwd,"fixture")] }); await resumedLoader.reload();
 		const { session: resumed } = await createAgentSession({ cwd, agentDir, settingsManager, resourceLoader: resumedLoader, sessionManager: SessionManager.open(saved) });
 		try {
 			await resumed.bindExtensions({mode:"rpc"});
@@ -94,6 +98,6 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 			assert(resumed.getActiveToolNames().includes("mcp__echo__add"), "resume restores discovered deferred MCP tools");
 		} finally { resumed.dispose(); }
 		console.log('PASS native MCP discovery, codemode worker, nested calls and deferred reload/resume');
-	} finally { session.dispose(); }
+	} finally { session.dispose(); await codeManager.shutdown(); }
 	process.exit(0);
 }

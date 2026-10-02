@@ -1,3 +1,10 @@
+export type CodeLanguage = "typescript" | "python" | "java" | "go" | "rust" | "cpp";
+export interface CodeSettings { java?: boolean; go?: boolean; rust?: boolean; cpp?: boolean; nativePaths?: Partial<Record<"java" | "go" | "rust" | "cpp", string>>; javaHome?: string; mavenUserSettings?: string; mavenGlobalSettings?: string; javaProjectHomes?: Partial<Record<"8" | "17", string>>; nativeMemoryMiB?: number; enabled: boolean; typescript: boolean; python: boolean; feedback: boolean; pythonPath: string; tsMemoryMiB: number; pythonMemoryMiB: number }
+export type CodeFreshness = "fresh" | "pending" | "stale" | "partial" | "unavailable";
+export interface CodeDiagnostic { path: string; line: number; column: number; endLine: number; severity: number; message: string; code?: string; analysisLimitation?: boolean; freshness: CodeFreshness }
+export interface CodeServiceState { language: CodeLanguage; status: string; error?: string; rssMiB: number; restarts: number; heapMiB: number; checkedFiles: number; pendingFiles: number; unconfirmedFiles: number }
+export interface CodeState { cwd: string; settings: CodeSettings; trusted: boolean; services: CodeServiceState[]; diagnostics: CodeDiagnostic[]; watcherPartial: boolean; toolchainVersion: string; projectTsVersion?: string; feedbackWaits: number[] }
+export interface CodeQuery { action: "symbols" | "navigate" | "read_symbol" | "diagnostics"; path?: string; query?: string; line?: number; column?: number; symbol?: string; operation?: "definition" | "references" | "hover"; expectedVersion?: string }
 /**
  * Wire protocol between the browser client and the pi-web-ui server.
  * Pure JSON over WebSocket. The web frontend mirrors these types in
@@ -318,6 +325,7 @@ export interface ImageRecord {
 export interface NativeMcpConfigState { path: string; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; }
 
 export type ClientMessage =
+	| { type: "code_request"; requestId: string; cwd: string; action: "state" | "settings" | "restart" | "query" | "install"; language?: CodeLanguage; settings?: CodeSettings; query?: CodeQuery; conversationId?: string }
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius"; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
 	| { type: "image_request"; requestId: string; cwd: string; action: "models" | "create" | "list" | "detail" | "cancel" | "delete"; id?: string; prompt?: string; provider?: string; model?: string; references?: { data: string; mimeType: string }[] }
 	| { type: "node_request"; requestId: string; action: string; nodeId?: string; terminalId?: string; conversationId?: string; payload?: Record<string, unknown> }
@@ -1032,6 +1040,8 @@ export interface UiSettingsState {
 	presets: UiSettingsPreset[];
 }
 export type ServerMessage =
+	| { type: "code_result"; requestId: string; cwd: string; state?: CodeState; result?: unknown; error?: string }
+	| { type: "code_state"; cwd: string; state: CodeState }
 	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[] }
 	| { type: "image_result"; requestId: string; cwd: string; error?: string; record?: ImageRecord; records?: ImageRecord[]; models?: { id: string; provider: string; name: string }[] }
 	| { type: "node_event"; requestId?: string; event: string; nodeId?: string; terminalId?: string; conversationId?: string; data?: Record<string, unknown>; error?: string }
