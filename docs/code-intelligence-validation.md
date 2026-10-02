@@ -122,3 +122,11 @@ Windows beta.4 的并发冷解压 fixture 超过 60 秒被测试子进程计时�
 `beta.7` 三平台 CI 与 Mac/Linux 安装包全部通过，Windows 的子代理 LSP 也通过；旧桌面工具栏 fixture 使用唯一 `.tree-filter` 定位，在新增文件/问题/改动标签后产生多元素歧义。`beta.8` 按按钮文案定位改动视图，并同步相关工作区 fixture；本机 Windows/macOS 模拟外壳的 900/1000/1500px 工具栏、任务工作态与工作区折叠回归通过。
 
 补充本机浏览器回归：完整工作区设计、折叠视图、任务工作态和三种窗口宽度的 Windows/macOS 工具栏均通过；旧 bash 卡片测试改为先打开操作菜单并通过 aria-expanded 验证完整命令。
+
+## GitHub 预发布完成（2026-10-02）
+
+[`v1.0.0-beta.8`](https://github.com/youweichen0208/omp-web-ui/releases/tag/v1.0.0-beta.8) 已公开为 prerelease，稳定版 `v0.9.0` 仍为 Latest，未发布 npm。
+
+[发布流程 37004975935](https://github.com/youweichen0208/omp-web-ui/actions/runs/37004975935) 全部成功：协议、类型、427 单测、47 项冒烟，Mac/Windows/Linux 真实语言服务与 Java 8/17 回归，三平台包内 Electron 的语言服务、嵌套 Maven、SQLite、MCP/codemode、OAuth、生图和子代理，以及 Windows 终端和绿色版重复启动。已核对 7 个桌面安装/归档产物、3 个 beta 更新元数据和 3 个 blockmap 附件。
+
+上文 Windows/Linux 未运行及草稿失败记录属于发布前的历史检查，当前三平台结果以本次成功流程为准。真实公司 Maven 私服、首次外部依赖下载的 pending、导入耗时/大项目峰值内存、冷启动性能和付费模型缓存命中率仍未完成，不以 fixture 或本次成功打包替代。
