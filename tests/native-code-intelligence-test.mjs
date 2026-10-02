@@ -194,5 +194,5 @@ try {
 	}
 } finally {
 	await manager.shutdown();
-	await rm(root, { recursive: true, force: true });
+	await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

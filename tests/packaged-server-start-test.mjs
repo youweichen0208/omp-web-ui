@@ -128,5 +128,5 @@ try {
 		child.kill();
 		await exited;
 	}
-	rmSync(temp, { recursive: true, force: true });
+	rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

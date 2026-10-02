@@ -221,7 +221,18 @@ try {
 	const recoveredDetail = request('detail', { taskId: rerun.id }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === recoveredDetail && !m.error));
 	console.log('PASS rerun creates new identity and actual service crash marks unfinished task interrupted');
 
-	send({type:'prompt',text:'CODE_PARENT'});await snapshot(s=>!s.isStreaming&&s.messages.some(m=>JSON.stringify(m).includes('CODE_PARENT_DONE')));await wait(()=>taskState.tasks.find(t=>t.task==='CODE_QUERY')?.status==='completed','subagent code IPC', process.platform === 'win32' ? 180000 : 10000);const codeDetailId=request('detail',{taskId:taskState.tasks.find(t=>t.task==='CODE_QUERY').id});await wait(()=>received.some(m=>m.type==='subagent_response'&&m.requestId===codeDetailId&&m.task));assert.match(received.find(m=>m.type==='subagent_response'&&m.requestId===codeDetailId).task.result,/CODE_QUERY_DONE/);console.log('PASS subagent code tool queries the shared host language service over IPC');
+	send({ type: 'prompt', text: 'CODE_PARENT' });
+	await snapshot(s => !s.isStreaming && s.messages.some(m => JSON.stringify(m).includes('CODE_PARENT_DONE')));
+	const codeTask = await wait(() => {
+		const task = taskState.tasks.find(t => t.task === 'CODE_QUERY');
+		return task && done(task) ? task : undefined;
+	}, 'subagent code IPC', process.platform === 'win32' ? 180000 : 45000);
+	const codeDetailId = request('detail', { taskId: codeTask.id });
+	await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === codeDetailId && m.task));
+	const codeDetail = received.find(m => m.type === 'subagent_response' && m.requestId === codeDetailId).task;
+	assert.equal(codeDetail.status, 'completed', JSON.stringify({ status: codeDetail.status, error: codeDetail.error }));
+	assert.match(codeDetail.result, /CODE_QUERY_DONE/);
+	console.log('PASS subagent code tool queries the shared host language service over IPC');
 	const offId = request('configure', { config: { ...defaultSubagentConfig(), enabled: false } }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === offId && m.accepted));
 	send({ type: 'prompt', text: 'LEGACY_CHECK: confirm the original extension is available.' }); await snapshot(s => !s.isStreaming && s.messages.some(m => JSON.stringify(m).includes('LEGACY_VISIBLE')));
 	console.log('PASS project-switch ownership and upstream extension exclusion/restoration');
@@ -229,5 +240,5 @@ try {
 } finally {
 	for (const socket of sockets) socket.terminate();
 	if (server && server.exitCode === null && server.signalCode === null) { const exit = once(server, 'exit'); server.kill('SIGTERM'); await exit; }
-	await mgr.shutdown(); mock.closeAllConnections(); await new Promise(r => mock.close(r)); rmSync(root, { recursive: true, force: true });
+	await mgr.shutdown(); mock.closeAllConnections(); await new Promise(r => mock.close(r)); rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

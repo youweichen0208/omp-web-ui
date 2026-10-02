@@ -79,7 +79,7 @@
 - `release/pi-0.10.0-mac-arm64.zip`，约 245 MiB。
   SHA256：`ab98f7456bfc31b9a0d7cd93a5de6ee1786be15150531c828e4fc20b00a26f2f`
 
-包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.6 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
+包采用现有 ad-hoc 签名方式。以上是 0.10.0 开发期间的本机产物记录。1.0.0-beta.7 由 GitHub 标签工作流发布预发布，跨平台实际结果见对应 Actions；本轮不发布 npm。
 
 ## 尚未完成的专项验收
 
@@ -116,3 +116,5 @@ Mac arm64 beta 包内 Electron 实测 TS/Python、Java/Go/Rust/C++、嵌套 Mave
 Windows beta.4 的并发冷解压 fixture 超过 60 秒被测试子进程计时器终止；生产锁等待上限原为 120 秒。beta.5 将 Windows 的单次解压 fixture 预算设为 180 秒、包内整项 LSP fixture 为 300 秒，保留生产初始化从解压完成后计时及服务启动/终端门槛；冷启动性能仍是正式版专项验收。
 
 `beta.5` 的全部三平台 CI 及 Mac/Linux 安装包通过，Windows 在新增子代理 LSP IPC fixture 的 10 秒等待失败。`beta.6` 为 Windows 保留冷解压的 180 秒子代理 IPC / fixture 预算，可随时取消；其他平台仍使用 30 秒 IPC 和原测试预算。三平台安装包最终结果以新标签 Actions 为准。
+
+`beta.6` 的 Linux 子代理 LSP fixture 在首次冷启动的 10 秒等待失败，Windows Java 17 功能通过但测试目录清理收到 EBUSY。`beta.7` 将非 Windows 首次 LSP fixture 预算设为 45 秒（实际 IPC 仍为 30 秒），终态失败即时报告；服务关闭后临时目录清理使用最多 10 次、200 ms 递增重试，不忽略永久占用，不改变服务关闭门槛。
