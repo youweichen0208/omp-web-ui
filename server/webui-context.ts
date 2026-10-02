@@ -153,7 +153,8 @@ export class WebUIContext {
 
 	// -- notifications --------------------------------------------------------
 
-	notify(message: string, type?: "info" | "warning" | "error"): void {
+	// Pi wraps this context with object spread: UI callbacks are own properties.
+	notify = (message: string, type?: "info" | "warning" | "error"): void => {
 		this.emit({ type: "notice", level: type ?? "info", text: message });
 	}
 
@@ -161,7 +162,7 @@ export class WebUIContext {
 
 	private statuses = new Map<string, string>();
 
-	setStatus(key: string, text: string | undefined): void {
+	setStatus = (key: string, text: string | undefined): void => {
 		if (text === undefined || text === "") {
 			this.statuses.delete(key);
 		} else {
@@ -191,6 +192,8 @@ export class WebUIContext {
 	// -- dialogs (select/confirm/input bridged to the browser) ---------------
 
 	private dialogSeq = 0;
+	private dialogMessages = new Map<number, Extract<ServerMessage, { type: "dialog" }>>();
+	replayDialogs(send: (message: ServerMessage) => void): void { for (const message of this.dialogMessages.values()) send(message); }
 	private pendingDialogs = new Map<
 		number,
 		(value: string | boolean | null) => void
@@ -200,8 +203,8 @@ export class WebUIContext {
 		this.openDialog("select", title, [options]) as Promise<string | undefined>;
 	confirm = (title: string, message: string): Promise<boolean> =>
 		this.openDialog("confirm", title, [message]) as Promise<boolean>;
-	input = (title: string, placeholder?: string): Promise<string | undefined> =>
-		this.openDialog("input", title, [placeholder ?? ""]) as Promise<
+	input = (title: string, placeholder?: string, options?: { signal?: AbortSignal }): Promise<string | undefined> =>
+		this.openDialog("input", title, [placeholder ?? ""], options?.signal) as Promise<
 			string | undefined
 		>;
 
@@ -209,11 +212,16 @@ export class WebUIContext {
 		kind: "select" | "confirm" | "input",
 		title: string,
 		args: unknown[],
+		signal?: AbortSignal,
 	): Promise<string | boolean | null> {
 		return new Promise((resolve) => {
 			const id = ++this.dialogSeq;
-			this.pendingDialogs.set(id, resolve);
-			this.emit({ type: "dialog", id, kind, title, args });
+			if (signal?.aborted) { resolve(null); return; }
+			const abort = () => this.resolveDialog(id, null);
+			this.pendingDialogs.set(id, value => { signal?.removeEventListener("abort", abort); resolve(value); });
+			signal?.addEventListener("abort", abort, { once: true });
+			const message = { type: "dialog" as const, id, kind, title, args };
+			this.dialogMessages.set(id, message); this.emit(message);
 		});
 	}
 
@@ -222,6 +230,7 @@ export class WebUIContext {
 		const resolve = this.pendingDialogs.get(id);
 		if (resolve) {
 			this.pendingDialogs.delete(id);
+			this.dialogMessages.delete(id);
 			resolve(value);
 			this.emit({ type: "dialog_closed", id });
 		}
@@ -232,6 +241,7 @@ export class WebUIContext {
 	cancelPendingDialogs(): void {
 		for (const [id, resolve] of this.pendingDialogs) {
 			this.pendingDialogs.delete(id);
+			this.dialogMessages.delete(id);
 			resolve(null);
 			this.emit({ type: "dialog_closed", id });
 		}

@@ -8,3 +8,8 @@ export function nativeToolExtensions(): InlineExtension[] {
 		{ name: "mcp", builtin: true, factory: createMcpExtension() },
 	];
 }
+
+/** Stable settings aliases for the SDK's named inline extension paths. */
+export function nativeExtensionPath(path: string): string {
+	return /^builtin:(mcp|tool-search|codemode)$/.test(path) ? `<inline:${path.slice(8)}>` : path;
+}

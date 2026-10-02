@@ -1,3 +1,4 @@
+import { NativeMcpPanel } from "./NativeMcpPanel";
 import { useEffect, useRef, useState } from "react";
 import {
 	FiBox,
@@ -50,6 +51,9 @@ interface SettingsTerminalBridge {
 interface SettingsModalProps {
 	chat: {
 		ready: boolean;
+		dialog: { id: number; kind: "select" | "confirm" | "input"; title: string; args: unknown[] } | null;
+		subagents: Extract<ServerMessage, { type: "subagent_state" }> | null;
+		subagentResponses: Record<string, Extract<ServerMessage, { type: "subagent_response" }>>;
 		componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 		settings: UiSettingsState | null;
 		plugins: UiPluginInfo[];
@@ -69,6 +73,8 @@ interface SettingsModalProps {
 	/** Switch the top-level view to the terminal (uninstall runs there). */
 	onSwitchToTerminal: () => void;
 	onClose: () => void;
+	onOpenSubagents: () => void;
+	consumeSubagentResponses: (ids: string[]) => void;
 }
 
 /** A row with an enable/disable switch (skill / extension). */
@@ -109,12 +115,14 @@ function ToggleRow({
 	enabled,
 	onToggle,
 	action,
+	disabled = false,
 }: {
 	title: string;
 	subtitle?: string;
 	/** 长解释走「？」悬浮提示，不再平铺（subtitle 与 tip 二选一）。 */
 	tip?: string;
 	enabled: boolean;
+	disabled?: boolean;
 	onToggle: () => void;
 	/** Optional extra control rendered left of the switch (e.g. uninstall). */
 	action?: React.ReactNode;
@@ -136,6 +144,7 @@ function ToggleRow({
 				role="switch"
 				aria-checked={enabled}
 				title={enabled ? t("settingsEnabled") : t("settingsDisabled")}
+				disabled={disabled}
 				onClick={onToggle}
 			>
 				<span className="set-switch-knob" />
@@ -153,6 +162,7 @@ type SettingsTab =
 	| "skills"
 	| "extensions"
 	| "updates"
+	| "native-mcp"
 	| "plugins"
 	| "review"
 	| "vision"
@@ -164,9 +174,34 @@ export function SettingsModal({
 	terminal,
 	onSwitchToTerminal,
 	onClose,
+	onOpenSubagents,
+	consumeSubagentResponses,
 }: SettingsModalProps) {
 	const t = useT();
 	const settings = chat.settings;
+	const [subagentPending, setSubagentPending] = useState<{ id: string; conversationId: string }>();
+	const [subagentError, setSubagentError] = useState("");
+	useEffect(() => {
+		if (!subagentPending) return;
+		const response = chat.subagentResponses[subagentPending.id];
+		if (!response || response.conversationId !== subagentPending.conversationId) return;
+		setSubagentError(response.error ?? ""); setSubagentPending(undefined);
+		consumeSubagentResponses([response.requestId]);
+	}, [chat.subagentResponses, subagentPending, consumeSubagentResponses]);
+	useEffect(() => {
+		if (!subagentPending) return;
+		const timer = setTimeout(() => { setSubagentPending(undefined); setSubagentError(t("saConfigTimeout")); }, 30_000);
+		return () => clearTimeout(timer);
+	}, [subagentPending, t]);
+	function toggleSubagents() {
+		const config = chat.subagents?.config;
+		const conversationId = chat.activeConversationId ?? chat.state?.conversationId;
+		if (!config || !conversationId || subagentPending) return;
+		const requestId = randomUuid(); setSubagentError("");
+		if (send({ type: "subagent_request", action: "configure", requestId, conversationId, config: { ...config, enabled: !config.enabled } })) setSubagentPending({ id: requestId, conversationId });
+		else setSubagentError(t("saDisconnected"));
+	}
+
 	// 当前左侧导航选中的分组。
 	const [tab, setTab] = useState<SettingsTab>("prompt");
 	const [codeTheme, updateCodeTheme] = useState<CodeTheme>(getCodeTheme);
@@ -239,8 +274,9 @@ export function SettingsModal({
 		{ id: "display", icon: <FiMessageSquare />, label: t("settingsMessageDisplay") },
 		{ id: "appearance", icon: <FiEye />, label: t("settingsAppearance") },
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
-		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length },
+		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length + 1 },
 		{ id: "updates", icon: <FiRefreshCw />, label: t("componentUpdates"), count: chat.componentUpdates?.cwd === chat.state?.cwd ? chat.componentUpdates?.items.filter((item) => item.status === "available").length : undefined },
+		{ id: "native-mcp", icon: <FiBox />, label: t("nativeMcp") },
 		{ id: "plugins", icon: <FiBox />, label: t("settingsUiPlugins"), count: chat.plugins.length },
 		{ id: "review", icon: <FiZap />, label: t("settingsReview"), count: settings.reviewSkills.length },
 		{ id: "vision", icon: <FiEye />, label: t("settingsVisionBridge") },
@@ -402,6 +438,7 @@ export function SettingsModal({
 				    fixed; only these sections scroll. */}
 				<div className="settings-layout">
 				<nav className="settings-rail" aria-label={t("settingsTitle")}>
+					<button className="settings-tab" onClick={onOpenSubagents}><FiCpu /><span>{t("saTitle")}</span></button>
 					{tabs.map((tb) => (
 						<button
 							key={tb.id}
@@ -616,53 +653,59 @@ export function SettingsModal({
 					<div className="set-section-title">
 						<FiPackage className="set-section-icon" />
 						{t("settingsExtensions")}
-						<span className="set-count">{settings.extensions.length}</span>
+						<span className="set-count">{settings.extensions.length + 1}</span>
 					</div>
-					{settings.extensions.length === 0 ? (
-						<p className="set-empty">{t("noExtensions")}</p>
-					) : (
-						<div className="set-list">
-							{settings.extensions.map((e) => {
-								const pkgName = !e.builtin && e.id.startsWith("npm:") ? e.id.slice(4) : null;
-								return (
-									<ToggleRow
-										key={e.id}
-										title={e.builtin === "todo" ? `${e.name} · ${t("builtinTaskList")}` : e.name}
-										subtitle={e.path}
-										enabled={e.enabled}
-										onToggle={() => toggleExtension(e)}
-										action={
-											pkgName ? (
-												confirmUninstall === e.id ? (
-													<button
-														type="button"
-														className="set-uninstall confirm"
-														title={t("uninstallConfirmHint")}
-														onClick={() => runUninstall(pkgName)}
-													>
-														{t("uninstallConfirm")}
-													</button>
-												) : (
-													<button
-														type="button"
-														className="set-uninstall"
-														title={t("uninstallHint")}
-														onClick={() => setConfirmUninstall(e.id)}
-													>
-														<FiTrash2 />
-														{t("uninstallExt")}
-													</button>
-												)
-											) : undefined
-										}
-									/>
-								);
-							})}
-						</div>
-					)}
+					<div className="set-list">
+						<ToggleRow
+							title={t("saBuiltinTitle")}
+							subtitle={t("saBuiltinDescription")}
+							enabled={chat.subagents?.config.enabled ?? false}
+							disabled={!chat.ready || !chat.subagents || !(chat.activeConversationId ?? chat.state?.conversationId) || !!subagentPending}
+							onToggle={toggleSubagents}
+							action={<button type="button" className="set-uninstall" disabled={!chat.subagents} onClick={onOpenSubagents}><FiSettings />{t("settings")}</button>}
+						/>
+						{subagentError && <p role="alert">{subagentError}</p>}
+						{settings.extensions.map((e) => {
+							const pkgName = !e.builtin && e.id.startsWith("npm:") ? e.id.slice(4) : null;
+							return (
+								<ToggleRow
+									key={e.id}
+									title={e.builtin === "todo" ? `${e.name} · ${t("builtinTaskList")}` : e.name}
+									subtitle={e.path}
+									enabled={e.enabled}
+									onToggle={() => toggleExtension(e)}
+									action={
+										pkgName ? (
+											confirmUninstall === e.id ? (
+												<button
+													type="button"
+													className="set-uninstall confirm"
+													title={t("uninstallConfirmHint")}
+													onClick={() => runUninstall(pkgName)}
+												>
+													{t("uninstallConfirm")}
+												</button>
+											) : (
+												<button
+													type="button"
+													className="set-uninstall"
+													title={t("uninstallHint")}
+													onClick={() => setConfirmUninstall(e.id)}
+												>
+													<FiTrash2 />
+													{t("uninstallExt")}
+												</button>
+											)
+										) : undefined
+									}
+								/>
+							);
+						})}
+					</div>
 				</div>
 				)}
 
+				{tab === "native-mcp" && chat.state?.cwd && <NativeMcpPanel cwd={chat.state.cwd} send={send} dialog={chat.dialog} />}
 				{/* ---- UI plugins（<dataDir>/plugins，纯 UI 隐藏） ----------------- */}
 				{tab === "plugins" && (
 				<div className="set-section">

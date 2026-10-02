@@ -4,7 +4,7 @@
 
 ## 快照驱动
 
-Pi 0.99 工具结果的 `nestedCalls` 投影为独立子调用记录（参数、状态、耗时与错误），不会伪造成顶层助手调用。工具返回的 image 块作为图片保留；工具执行增量和结束事件传递 `parentToolCallId`。虚拟模型快照保留用户选择的 `model` 并附带 SDK `session.routedModel`，模型控件显示实际路由。
+Pi 1.0 工具结果的 `nestedCalls` 投影为独立子调用记录（参数、状态、耗时与错误），不会伪造成顶层助手调用。工具返回的 image 块作为图片保留；工具执行增量和结束事件传递 `parentToolCallId`。虚拟模型快照保留用户选择的 `model` 并附带 SDK `session.routedModel`，模型控件显示实际路由。
 
 模型编辑器只修改聊天模型和表单拥有的字段；保存时保留 image/classifier 条目、operations、headers、采样及其他未知字段。不同 operation 可以使用相同模型 ID。已保存的密钥不回传表单，留空表示保留服务器上的密钥。`model-config-preservation-test.mjs` 覆盖实际读写路径。
 
@@ -166,3 +166,13 @@ bash 工具卡片运行中显示「停止」→ 发 `{ type: "abort_bash" }` →
 `server/component-updates.ts` 汇总运行中的 pi Agent、内置 rpiv-todo、SDK 配置的 npm/Git 包和本地扩展。设置“组件更新”通过 `check_component_updates` 获取结果；npm 查询稳定 latest（5 分钟缓存、8 秒超时、最多 4 个并发），Git 只读比较当前分支远端提交。错误与未知版本独立显示，固定版本与本地源不自动升级。检查不会执行安装。
 
 `update_component` 只接受服务端目录中的 ID，由 SDK 包管理器按原来源更新；内置依赖随应用发布，同包多安装范围需手动处理。更新前拒绝正在运行或排队的任务，期间暂停新任务准入；Git 目录有本地改动时拒绝覆盖。更新不热替换运行中模块，安装完成后提示重启应用生效。响应携带 requestId/cwd，浏览器丢弃旧请求，项目切换后不展示旧项目结果。协议版本 25。
+
+## 内置子代理
+
+修改委派工具、并发锁、结果归属、停止或任务抽屉时，阅读 [内置子代理](architecture-subagents.md)。服务级调度器默认开启；任务完成依据为 agent_settled 和子进程退出。后台子任务保护父对话生命周期，结果回传不唤醒空闲父代理。协议版本 26。
+
+## 生图工作台（Pi 1.0）
+
+`server/image-service.ts` 使用客户端共享 ModelRuntime 查询 image 模型并 generateImages。记录和图片保存在 `<dataDir>/images/<id>/`，cwd 取真实路径；不会写入工作区。历史由用户主动删除。每客户端最多一个任务，全服务最多四个；断线与切项目保留原任务。取消丢弃迟到图片，启动把 running 记录改为 interrupted。独立费用取 SDK 实际 usage，不计入聊天费用。shutdown 发出取消信号。
+
+`image_request` 包含 requestId/cwd 和 models/create/list/detail/cancel/delete 操作；`image_result` 只传元数据。受既有 token/Origin 校验的 `/api/generated-image` 读取记录中的固定图片路径。Web 工作台按 cwd 过滤回执，定期刷新历史；下载使用 fetch/blob，附加图片沿用聊天缩放链路。Codemode 工具结果保留 SDK image blocks，并提供预览和下载。

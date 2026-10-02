@@ -16,6 +16,9 @@ try {
 	const wire = [];
 	runtime.registerNativeProvider({ ...base, id: 'desktop-auth-fixture', name: 'Fixture', auth: { oauth: { ...base.auth.oauth, login: async (interaction, options) => {
 		assert.match(options.getDeviceId(), /^[0-9a-f-]{36}$/);
+		const method = await interaction.prompt({ type: 'select', message: 'Fixture login method', options: [{id:'copy-code',label:'Copy code'},{id:'browser',label:'Browser'}], signal: interaction.signal });
+		assert.equal(method, 'copy-code');
+		interaction.notify({ type: 'device_code', verificationUri: 'https://example.invalid/device', userCode: 'FIXTURE-DEVICE-CODE' });
 		interaction.notify({ type: 'auth_url', url: 'https://example.invalid/fixture-authorize' });
 		const value = await interaction.prompt({ type: 'manual_code', message: 'Fixture code', signal: interaction.signal });
 		assert.equal(value, 'fixture-code');
@@ -26,7 +29,7 @@ try {
 		const state = message.state;
 		if (state.prompt) {
 			response = state;
-			if (scenario === 'success') queueMicrotask(() => service.respond(state.requestId, state.prompt.id, 'fixture-code'));
+			if (scenario === 'success') queueMicrotask(() => service.respond(state.requestId, state.prompt.id, state.prompt.kind === 'select' ? 'copy-code' : 'fixture-code'));
 			else queueMicrotask(() => service.cancel(state.requestId));
 		}
 	}, async () => { changed++; }, () => settings.getOrCreateDeviceId());

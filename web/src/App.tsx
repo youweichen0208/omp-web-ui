@@ -1,3 +1,7 @@
+import { LinkedText } from "./components/LinkedText";
+import { ImageWorkbench } from "./components/ImageWorkbench";
+import { SubagentsPanel } from "./components/SubagentsPanel";
+import { SubagentContext } from "./subagent-context";
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
 import { WorkspacePathContext } from "./workspace-context";
 import {
@@ -120,7 +124,7 @@ function NoticeToast({
 			onMouseLeave={() => setPaused(false)}
 		>
 			<Icon className="notice-icon" />
-			<span className="notice-text">{notice.text}</span>
+			<span className="notice-text">{notice.code ? t(notice.code) : <LinkedText text={notice.text} />}</span>
 			<button
 				type="button"
 				className="notice-close"
@@ -201,12 +205,12 @@ function ResizeHandle({
 }
 
 /** 顶栏视图：内置三个 + 每个已装插件一个 `plugin:<id>`。 */
-type ViewName = "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
+type ViewName = "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
 
 export function App() {
 	const t = useT();
 	const { locale } = useI18n();
-	const { chat, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
+	const { chat, consumeSubagentResponses, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
 	// Conversation selection can arrive before its snapshot. Never present the
 	// previous conversation's transcript or usage under the new selection.
 	const conversationState = chat.state?.conversationId === chat.activeConversationId ? chat.state : null;
@@ -270,6 +274,11 @@ export function App() {
 	 *  drop overlay; drop anywhere attaches, the input bar keeps priority via
 	 *  its own stopPropagation handlers. */
 	const [appDragOver, setAppDragOver] = useState(false);
+	useEffect(() => {
+		const configure = () => { if (chat.state?.cwd) send({ type: "native_mcp_request", action: "radius", scope: "global", cwd: chat.state.cwd, requestId: randomUuid() }); };
+		window.addEventListener("pi-configure-radius", configure);
+		return () => window.removeEventListener("pi-configure-radius", configure);
+	}, [chat.state?.cwd, send]);
 	const [view, setView] = useState<ViewName>("chat");
 	const [commitJump, setCommitJump] = useState<{ hash: string; token: number } | null>(null);
 	const visited = useRef(new Set<ViewName>(["chat"]));
@@ -419,6 +428,8 @@ export function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	// Background-task panel (AI-started servers — stop individually or all).
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
+	const [subagentsOpen, setSubagentsOpen] = useState(false);
+	const [subagentsConfigure, setSubagentsConfigure] = useState(false);
 	// Global search panel (sessions / projects / workspace files).
 	const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
@@ -852,6 +863,7 @@ export function App() {
 					onManageModels={() => setManageModelsOpen(true)}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
+					onOpenSubagents={() => { setSubagentsConfigure(false); setSubagentsOpen(true); }}
 					onOpenGoal={() => { setView("chat"); setGoalOpenRequest((value) => value + 1); }}
 					onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 					sound={sound}
@@ -878,7 +890,7 @@ export function App() {
 					<div className={`view-pane ${previewFile ? "preview-open" : ""} ${view === "chat" ? "" : "hidden"}`}>
 						<main className="main">
 							{conversationState ? (
-								<WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
+								<SubagentContext.Provider value={chat.subagents?.tasks ?? []}><WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
 									active={view === "chat"}
 									connected={chat.ready}
 									silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"}
@@ -892,7 +904,7 @@ export function App() {
 								toolsWrap={chat.settings?.toolsWrap ?? true}
 								pendingEcho={chat.pendingEcho}
 								reloadEvents={chat.reloadEvents}
-								/></WorkspacePathContext.Provider>
+								/></WorkspacePathContext.Provider></SubagentContext.Provider>
 							) : (
 								<div className="boot-wait">
 									{chat.ready ? t("loadingSession") : t("connectingServer")}
@@ -996,6 +1008,7 @@ export function App() {
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}
 						</Suspense>
 					</div>
+					<div className={`view-pane ${view === "images" ? "" : "hidden"}`}>{view === "images" && chat.state?.cwd && <ImageWorkbench cwd={chat.state.cwd} send={send} attach={(files) => addImageFiles(files, chat.activeConversationId)} />}</div>
 					<div className={`view-pane ${view === "nodes" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>{visited.current.has("nodes") && <NodeWorkbench active={view === "nodes"} send={send} />}</Suspense>
 					</div>
@@ -1053,9 +1066,12 @@ export function App() {
 					send={send}
 					terminal={terminal}
 					onSwitchToTerminal={() => setView("terminal")}
+					consumeSubagentResponses={consumeSubagentResponses}
+					onOpenSubagents={() => { setSettingsOpen(false); setSubagentsConfigure(true); setSubagentsOpen(true); }}
 					onClose={() => setSettingsOpen(false)}
 				/>
 			)}
+			{subagentsOpen && <SubagentsPanel initialConfigure={subagentsConfigure} consumeResponses={consumeSubagentResponses} chat={chat} send={send} onClose={() => setSubagentsOpen(false)} />}
 			{bgTasksOpen && (
 				<BgTasksModal
 					servers={chat.bgServers}

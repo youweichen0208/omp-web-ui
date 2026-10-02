@@ -3484,7 +3484,7 @@ body.panel-resizing {
 	line-height: 1.5;
 	padding: 6px 10px;
 	border-radius: 6px;
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 	border: 1px solid var(--border-soft);
 	color: var(--text-dim);
 }
@@ -3510,7 +3510,7 @@ body.panel-resizing {
 	margin-top: 0;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 }
 .dd-refresh.accent {
 	color: var(--accent);
@@ -3832,7 +3832,7 @@ body.panel-resizing {
 	border-radius: 8px;
 	overflow: hidden;
 	border: 1px solid var(--border);
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 }
 .msg-editor-img img {
 	width: 100%;
@@ -3933,7 +3933,7 @@ span.msg-editor-hint svg {
 	padding: 10px 12px;
 	border: 1px solid var(--border);
 	border-radius: 8px;
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 	color: var(--text);
 	font-family: inherit;
 	font-size: 13px;
@@ -5418,7 +5418,7 @@ span.msg-editor-hint svg {
 	margin: 0 auto 8px;
 	border: 1px solid var(--border);
 	border-radius: 12px;
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 	padding: 8px 10px;
 	display: flex;
 	flex-direction: column;
@@ -5569,7 +5569,7 @@ span.msg-editor-hint svg {
 /* Active (goal set) state */
 .goalbar-active {
 	border-color: var(--amber);
-	background: color-mix(in srgb, var(--amber) 8%, var(--bg-elev1));
+	background: color-mix(in srgb, var(--amber) 8%, var(--bg-elev));
 }
 
 .goalbar-active.reviewing {
@@ -5669,7 +5669,7 @@ span.msg-editor-hint svg {
 	align-items: center;
 	gap: 7px;
 	border: 1px dashed var(--border);
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 	transition: border-color 0.15s, color 0.15s;
 }
 
@@ -6020,7 +6020,7 @@ span.msg-editor-hint svg {
 	border-radius: 8px;
 }
 .slash-help-row:hover {
-	background: var(--bg-elev1);
+	background: var(--bg-elev);
 }
 .slash-help-cmd {
 	font-family: var(--mono);
@@ -6566,6 +6566,11 @@ span.msg-editor-hint svg {
 	background: var(--bg-elev2);
 	border: 1px solid var(--border-soft);
 	border-radius: 8px;
+}
+
+.set-switch:disabled {
+	opacity: 0.5;
+	cursor: wait;
 }
 
 .set-row-info {
@@ -9781,3 +9786,47 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .provider-auth-message { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .chip-routed-model { color: var(--muted); font-size: 0.9em; }
+
+/* ---- Subagents ---- */
+.subagent-backdrop { position: fixed; inset: 0; background: #0004; z-index: 1200; display: flex; justify-content: flex-end; }
+.subagent-drawer { width: min(680px, 100vw); height: 100%; overflow: auto; padding: 20px; background: var(--bg); color: var(--text); box-shadow: -8px 0 30px #0002; }
+.subagent-drawer header { display: flex; align-items: center; gap: 12px; }
+.subagent-drawer h2 { flex: 1; }
+.subagent-drawer button { cursor: pointer; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: inherit; padding: 8px; }
+.subagent-config label { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.subagent-config input, .subagent-config textarea, .subagent-config select, .subagent-message textarea { padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: inherit; background: var(--bg-elev); }
+.subagent-config fieldset { border: 1px solid var(--border); margin: 16px 0; }
+.subagent-list { display: grid; gap: 10px; margin: 16px 0; }
+.subagent-list button { display: grid; grid-template-columns: 1fr auto; gap: 8px; text-align: left; }
+.subagent-list button.selected { border-color: var(--accent); }
+.subagent-list span:not(.subagent-status), .subagent-list small { grid-column: 1 / -1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.subagent-status { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.subagent-status.running { color: var(--accent); }
+.subagent-status.completed { color: var(--green); }
+.subagent-status.failed { color: var(--red); }
+.subagent-detail { border-top: 1px solid var(--border); padding-top: 12px; overflow-wrap: anywhere; }
+.subagent-detail p { white-space: pre-wrap; }
+.subagent-controls { display: flex; gap: 8px; }
+.subagent-message { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 16px 0; }
+.subagent-message textarea { grid-column: 1 / -1; min-height: 80px; }
+.subagent-records details { margin: 12px 0; }
+.subagent-records pre { white-space: pre-wrap; max-height: 400px; overflow: auto; font-size: 12px; }
+.subagent-feedback { color: var(--accent); }
+
+.workspace-subagents { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+@media (max-width: 1100px) { .workspace-subagents > span { display: none; } }
+
+/* ---- Image workbench ---- */
+.image-workbench { overflow: auto; padding: 24px; width: 100%; color: var(--text); }
+.image-workbench label { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.image-workbench textarea, .image-workbench select { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); padding: 10px; border-radius: 8px; }
+.image-history { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; margin-top: 24px; }
+.image-history article { border: 1px solid var(--border); border-radius: 12px; padding: 16px; overflow-wrap: anywhere; }
+.image-history img { display: block; max-width: 100%; max-height: 500px; object-fit: contain; margin: 12px 0; }
+.image-history button { margin: 6px; }
+
+/* ---- Native MCP configuration ---- */
+.native-mcp-panel textarea { width: 100%; font-family: var(--mono); background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.native-mcp-panel label { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.native-mcp-panel code { overflow-wrap: anywhere; }
+.native-mcp-panel button { margin: 6px; }

@@ -28,6 +28,7 @@ export function ProviderAuthModal({ state, send }: { state: ProviderAuthState | 
 			<p>{t(state.phase === "pending" ? "providerAuthPending" : state.phase === "success" ? "providerAuthSuccess" : state.phase === "cancelled" ? "providerAuthCancelled" : "providerAuthError")}</p>
 			{state.message && <p className="provider-auth-message">{state.message}</p>}
 			{url && <a className="btn" href={url} target="_blank" rel="noreferrer">{t("providerAuthOpenBrowser")}</a>}
+			{state.phase === "success" && state.provider === "radius" && <button className="btn" onClick={() => window.dispatchEvent(new Event("pi-configure-radius"))}>{t("mcpConfigureRadius")}</button>}
 			{state.code && <p>{t("providerAuthDeviceCode")} <code>{state.code}</code></p>}
 			{state.prompt && <form key={state.prompt.id} onSubmit={event => { event.preventDefault(); if (state.prompt) send({ type: "provider_auth_response", requestId: state.requestId, promptId: state.prompt.id, value }); setValue(""); }}>
 				<label>{state.prompt.message}{state.prompt.kind === "select" ? <select value={value} onChange={event => setValue(event.target.value)}><option value="">{t("providerAuthChoose")}</option>{state.prompt.options?.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select> : <input autoFocus type={state.prompt.kind === "secret" ? "password" : "text"} value={value} onChange={event => setValue(event.target.value)} placeholder={state.prompt.placeholder} autoComplete="off" />}</label>

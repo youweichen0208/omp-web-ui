@@ -19,6 +19,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 module.exports = async function afterPack(context) {
+	const product = context.packager.appInfo.productFilename;
+	const packagedRoot = context.electronPlatformName === "darwin"
+		? path.join(context.appOutDir, `${product}.app`, "Contents/Resources/app")
+		: path.join(context.appOutDir, "resources/app");
+	const sdkRoot = path.join(packagedRoot, "node_modules/@earendil-works/pi-coding-agent");
+	if (JSON.parse(fs.readFileSync(path.join(sdkRoot, "package.json"), "utf8")).version !== "1.0.0") throw new Error("Unexpected packaged Pi SDK version");
+	if (!fs.readFileSync(path.join(sdkRoot, "dist/core/sdk.js"), "utf8").includes("pi-web-ui: restored sessions")) throw new Error("Packaged SDK is missing resume compatibility patch");
+	if (!fs.readFileSync(path.join(sdkRoot, "docs/codemode.md"), "utf8").includes("generateImages")) throw new Error("Packaged codemode reference is missing");
 	if (context.electronPlatformName !== "darwin") return;
 
 	const appName = context.packager.appInfo.productFilename;

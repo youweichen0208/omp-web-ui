@@ -1,3 +1,5 @@
+import { SubagentContext } from "../subagent-context";
+import { SubagentState } from "./SubagentsPanel";
 import { commandPresentation, gitStatusLine, gitStatusSummary, numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
 import { WorkspacePathContext } from "../workspace-context";
 import { Fragment, memo, useContext, useEffect, useRef, useState } from "react";
@@ -296,8 +298,19 @@ type ToolCallBlockProps = {
 };
 
 export const ToolCallBlock = memo(function ToolCallBlock(props: ToolCallBlockProps) {
-	return props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
+	let builtinTask = props.block.name === "web_subagent";
+	if (builtinTask) { try { const args = JSON.parse(props.block.argumentsText ?? "{}"); builtinTask = args.action === "spawn" || typeof args.taskId === "string"; } catch { /* incomplete arguments */ } }
+	return builtinTask ? <BuiltinSubagentCard block={props.block} view={props.view} /> : props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
 });
+
+function BuiltinSubagentCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
+	const t = useT(); const tasks = useContext(SubagentContext); const [open, setOpen] = useState(false);
+	let id: string | undefined; let title = "web_subagent";
+	const result = view.result?.content.filter(part => part.type === "text").map(part => (part as { text: string }).text).join("\n") ?? "";
+	try { const args = JSON.parse(block.argumentsText ?? "{}"); id = args.taskId; title = args.task ?? args.action; const parsed = JSON.parse(result); id = parsed.id ?? parsed.taskId ?? id; } catch { /* streaming or error result */ }
+	const task = tasks.find(task => task.id === id);
+	return <div className="task-plan-card" data-subagent-id={id}><button className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen(!open)}><FiChevronRight className={open ? "open" : ""} /><strong>{task?.role.name ?? t("saTitle")} · {task?.task ?? title}</strong>{task ? <SubagentState status={task.status} queueReason={task.queueReason} /> : <span>{view.result?.isError ? t("error") : t("saAwaitingState")}</span>}</button>{open && <pre className="task-todo-details">{task ? `${task.id}\n${result || task.task}` : result || block.argumentsText}</pre>}</div>;
+}
 
 function TodoCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
 	const t = useT();
@@ -486,7 +499,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				</details>)}
 				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
 			</details>}
-			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <a key={index} href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a>)}
+			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("imageDownload")}</a></div>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">

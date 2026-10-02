@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import {
+	FiImage,
 	FiSidebar,
 	FiGitBranch,
 	FiGlobe,
@@ -49,8 +50,8 @@ interface TopBarProps {
 		}) => void;
 		restart: (id: string) => void;
 	};
-	view: "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
-	onViewChange: (view: "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`) => void;
+	view: "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
+	onViewChange: (view: "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`) => void;
 	/** Installed optional plugins (<dataDir>/plugins) — one view tab each. */
 	plugins: { id: string; name: string; icon?: string; description?: string; error?: string }[];
 	/** Open a side panel as a mobile drawer ("left" = history, "right" = files). */
@@ -61,6 +62,7 @@ interface TopBarProps {
 	onOpenSettings: () => void;
 	/** Open the background-task panel (AI-started servers — stop individually or all). */
 	onOpenBgTasks: () => void;
+	onOpenSubagents: () => void;
 	onOpenGoal: () => void;
 	/** Open the global search panel (sessions / projects / workspace files). */
 	onOpenGlobalSearch: () => void;
@@ -84,6 +86,7 @@ export function TopBar({
 	onManageModels,
 	onOpenSettings,
 	onOpenBgTasks,
+	onOpenSubagents,
 	onOpenGoal,
 	onOpenGlobalSearch,
 	sound,
@@ -214,6 +217,7 @@ export function TopBar({
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
 			<div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
+				<button type="button" className="workspace-subagents" onClick={onOpenSubagents} title={t("saTitle")}><FiLayers /><span>{t("saTitle")}</span><em className="bg-task-badge">{chat.subagents?.tasks.filter(task => ["queued", "running", "stopping"].includes(task.status)).length ?? 0}</em></button>
 				<div
 					className="view-switch"
 					role="tablist"
@@ -243,6 +247,7 @@ export function TopBar({
 						<FiTerminal />
 						<span>{t("terminal")}</span>
 					</button>
+					<button type="button" role="tab" aria-label={t("imageWorkbench")} title={t("imageWorkbench")} aria-selected={view === "images"} className={view === "images" ? "active" : ""} onClick={() => onViewChange("images")}><FiImage /><span>{t("imageWorkbench")}</span></button>
 					<button
 						type="button"
 						role="tab"

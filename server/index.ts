@@ -1,3 +1,5 @@
+import { ImageService } from "./image-service.js";
+import { subagents } from "./subagents.js";
 /**
  * pi-web-ui server entry.
  *
@@ -84,6 +86,7 @@ if (process.platform === "win32") {
 	void ensureWindowsBash();
 }
 
+const images = new ImageService(join(DATA_DIR, "images"));
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 
@@ -131,6 +134,17 @@ if (AUTH_TOKEN) {
 		res.status(401).send("unauthorized: PI_WEB_TOKEN required (?token=…)");
 	});
 }
+
+app.get("/api/generated-image", (req, res) => {
+	try {
+		const { clientId, cwd, id, index } = req.query;
+		if (![clientId, cwd, id, index].every(v => typeof v === "string") || !originAllowed(req)) { res.sendStatus(400); return; }
+		if (!service.get(clientId as string)) { res.sendStatus(403); return; }
+		const file = images.file(cwd as string, id as string, Number(index));
+		if (!file) { res.sendStatus(404); return; }
+		res.setHeader("Cache-Control", "no-store"); res.sendFile(file);
+	} catch { res.sendStatus(404); }
+});
 
 app.get("/api/health", (_req, res) => {
 	res.json({ ok: true, piVersion: VERSION, cwd: CWD, pid: process.pid });
@@ -410,11 +424,13 @@ const heartbeatTimer = setInterval(() => {
 	}
 }, 10_000);
 
+subagents.initialize(DATA_DIR);
 const service = new AgentService(
 	CWD,
 	// Per-client persisted UI state: last-used workspace + recent projects.
 	join(DATA_DIR, "client-state.json"),
 );
+subagents.isQuiesced = () => service.isQuiesced();
 const nodeWorkbench = new NodeWorkbench(DATA_DIR);
 
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
@@ -605,6 +621,9 @@ wss.on("connection", (ws) => {
 			case "kill_background_servers":
 				void cs.killAllBackgroundServers();
 				break;
+			case "subagent_request":
+				void cs.subagentRequest(msg);
+				break;
 			case "list_bg_servers":
 				void cs.listBgServers();
 				break;
@@ -719,6 +738,13 @@ wss.on("connection", (ws) => {
 				break;
 			case "logout_provider":
 				void cs.providerAuth.logout(msg.provider);
+				break;
+			case "native_mcp_request":
+				void cs.nativeMcpRequest(msg);
+				break;
+			case "image_request":
+				if (cs.cwd !== msg.cwd || cs.switchingWorkspace || service.isQuiesced()) { cs.sendImageMessage({ type: "image_result", requestId: msg.requestId, cwd: msg.cwd, error: "Workspace unavailable" }); break; }
+				void images.handle(cs.clientId, cs.imageModelRuntime, msg, message => cs.sendImageMessage(message));
 				break;
 			case "login_provider":
 				void cs.providerAuth.login(msg.provider);
@@ -1005,6 +1031,8 @@ async function shutdown(): Promise<void> {
 	nodeWorkbench.dispose();
 	pluginMgr.dispose();
 	mcpBridge.dispose();
+	images.shutdown();
+	await subagents.shutdown();
 	await service.disposeAll();
 	wss.close();
 	httpServer.close();

@@ -45,6 +45,7 @@ files:
   - "!server/**"
   - "!tests/**"
   - "!scripts/**"
+  - "scripts/patch-pi-sdk.mjs"
   - "!docs/**"
   - "!web/src/**"
   - "!web/public/**"

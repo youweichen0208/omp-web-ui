@@ -73,7 +73,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ## MCP 工具桥（server/mcp-bridge.ts）
 
-Pi 0.99 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独立。新配置优先使用 `<agentDir>/mcp.json` 的 `mcpServers`（项目配置需获得 Pi 信任），由 `server/native-tools.ts` 注册官方 `mcp`、`codemode`、`tool-search` factories，支持 stdio、streamable HTTP 和 SDK 原生认证。工具启用遵循 Pi 的 `defaultTools` 与 `-builtin:<name>` 设置；不强制开启所有工具。`/mcp` 在 RPC 模式输出状态并通过现有扩展 UI 桥处理交互。
+Pi 1.0 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独立。新配置优先使用 `<agentDir>/mcp.json` 的 `mcpServers`（项目配置需获得 Pi 信任），由 `server/native-tools.ts` 注册官方 `mcp`、`codemode`、`tool-search` factories，支持 stdio、streamable HTTP 和 SDK 原生认证。工具启用遵循 Pi 的 `defaultTools` 与 `-builtin:<name>` 设置；不强制开启所有工具。`/mcp` 在 RPC 模式输出状态并通过现有扩展 UI 桥处理交互。
 
 旧 `<dataDir>/mcp.json` 的 `servers` 配置继续工作，不自动迁移。迁移时先移除旧桥中的同一服务，再加入原生配置并重启，避免重复连接。原生内置扩展不作为用户可更新组件列出。回归：`native-tools-desktop-test.mjs` 使用本地 stdio/HTTP 服务运行实际 Codemode worker，并检查嵌套调用记录；可传入 Electron 可执行文件和打包 app 根目录验证产物。
 
@@ -106,3 +106,9 @@ Pi 0.99 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独�
 | 单测 `plugin-settings.test.ts` | — | schema 解析/校验/持久化 |
 | 单测 `mcp-bridge.test.ts` | — | 握手/工具列表/调用/超时 |
 | 单测 `plugin-updater.test.ts` | — | 备份/回滚/prune/资源解析 |
+
+## 原生 MCP 管理
+
+设置页「原生 MCP」编辑 `<agentDir>/mcp.json` 或 `<cwd>/.pi/mcp.json`，保留未知字段，按文件 SHA-256 校验版本后原子保存。headers、env、secret/token 字段以掩码下发；原掩码保留，替换字符串或删除字段修改/清除。项目 provider auth 被拒绝；项目保存不授予信任，「信任当前项目」调用官方 ProjectTrustStore，并在 reload 时更新 SettingsManager 信任状态。
+
+配置变化对所有已加载会话应用：空闲会话立即 reload，运行会话按 conversationId 延迟到 agent_settled。连接状态、登录、退出、重连执行 sourceInfo 属于 builtin:mcp 的官方命令；替换命令明确不可用。OAuth 链接以 HTTP(S) 链接显示，回调输入/取消走扩展 dialog；重连重放待答 dialog。旧桥保持 data-dir/mcp.json 独立配置。
