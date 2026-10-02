@@ -30,7 +30,7 @@ Electron 保留 `ELECTRON_RUN_AS_NODE=1`；不搜索 PATH 中的 pi 或 Node。
 worker 的最终结算只发送一次；agent_settled 已发出结果后，prompt 的迟到异常不再发送第二次 settled。worker 等待最终 IPC 发送完成才退出，避免大结果包丢失；宿主在 close 而非 exit 回调结算。工具返回与进程退出均不能单独证明任务成功。
 默认超时 20 分钟，设置范围为 1 秒至 24 小时；排队不消耗执行超时。
 
-写角色包含任何 read/grep/find/ls/web_subagent/todo/task_plan/tool_search 之外的工具时，按 realpath(cwd) 持有服务级写入锁。
+写角色包含任何 read/grep/find/ls/code/web_subagent/todo/task_plan/tool_search 之外的工具时，按 realpath(cwd) 持有服务级写入锁。
 宿主扩展的 tool_call 在执行前登记修改工具，tool_result 清理当前调用的登记，agent_settled 清理整轮登记。主代理首次修改后在本轮保有写入优先权，防止连续编辑中途被子任务抢锁；主动 wait 时让出优先权，但正在执行的修改工具仍须结束才可启动写子任务。
 写子任务等待已有修改工具结束；锁占用期间其他宿主管理代理的修改工具被拒绝并说明任务 ID。排队摘要携带 queueReason：write_lock 表示等待修改工具、父轮次优先权或已有子任务写锁，capacity 表示等待全局运行名额；抽屉和聊天卡片对 write_lock 显示「等待项目写锁」。
 只读角色允许并行。todo/task_plan/tool_search 及严格白名单中的 `git --no-optional-locks status` bash 调用可在写锁期间执行；包含重定向、命令组合、未知选项的 bash 仍视为修改工具。未知工具（包括终端、MCP 和自定义工具）保守视为修改工具。
@@ -67,3 +67,5 @@ SDK 会话消息不放入主聊天快照。详情通过关联请求按 UTF-8 字
 `tests/unit/subagent-regressions.test.ts` 另覆盖有界排队等待、停止原因、关闭守卫、目录失效、会话 rebind、紧凑结果、UTF-8 字节分页、写入/rename 失败后的恢复、交付确认失败和未交付历史保护。
 `node tests/builtin-subagents-ui-test.mjs` 验证中英文抽屉、配置及真实状态驱动卡片；也模拟 Electron 窗口布局，覆盖详情丢包重试、快速切换后的迟到回执和写锁等待提示。
 跨平台安装包验证仍须在对应平台执行；Node 本机测试不替代 Windows/Linux 安装包验证。
+
+内置 `code` 工具通过授权 IPC 复用宿主项目语言服务，单任务最多 8 个未完成查询；Windows 冷工具链首次查询预算 180 秒，其他平台 30 秒，均支持取消并在 worker 关闭后清理宿主请求。

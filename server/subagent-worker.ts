@@ -30,7 +30,8 @@ async function queryCode(
 			send({ type: "code_cancel", requestId });
 			reject(new Error("Code query cancelled"));
 		};
-		const timer = setTimeout(abort, 30000);
+		// Windows first-use toolchain extraction can be slowed by Defender.
+		const timer = setTimeout(abort, process.platform === "win32" ? 180000 : 30000);
 		const finish = (callback: () => void) => {
 			clearTimeout(timer);
 			signal?.removeEventListener("abort", abort);

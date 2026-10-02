@@ -75,3 +75,5 @@ RSS 统计包含子进程。物理内存 20%（最多 2 GiB）的总预算只约
 本轮本机验证与安装包校验见 [验证记录](code-intelligence-validation.md)。
 
 Maven 多模块回归使用 `tests/maven-code-intelligence-test.mjs`，验证 reactor 中依赖解析、跨模块源码定义跳转和错误修复。macOS 用精简 PATH 下的包内 Electron 验证 Go/Rust，不能用 shell 继承 PATH 代替该场景。
+
+Windows 子代理首次代码 IPC 查询预算为 180 秒，以包含 Defender 下的冷工具链解压；其他平台保留 30 秒。两者都支持立即取消，语言服务初始化仍在解压后单独计时。

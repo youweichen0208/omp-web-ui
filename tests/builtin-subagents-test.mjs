@@ -68,7 +68,7 @@ const mock = createServer(async (req, res) => {
 		}
 	} catch (e) { fail = e; if (!res.headersSent) res.writeHead(500); res.end(String(e)); }
 });
-async function wait(fn, label = 'condition') { for (let n = 0; n < 400; n++) { if (fail) throw fail; const value = await fn(); if (value) return value; await sleep(25); } throw Error(`Timeout: ${label}\n${log}`); }
+async function wait(fn, label = 'condition', timeoutMs = 10000) { for (let n = 0; n < Math.ceil(timeoutMs / 25); n++) { if (fail) throw fail; const value = await fn(); if (value) return value; await sleep(25); } throw Error(`Timeout: ${label}\n${log}`); }
 const mgr = new SubagentManager(); mgr.initialize(join(root, 'manager')); mgr.configure({ ...defaultSubagentConfig(), enabled: true });
 const base = { clientId: 'one', conversationId: 'c1', parentSessionId: 'parent', parentRound: 'round1', cwd, agentDir, model, thinking: 'off', roleId: 'analysis', task: '' };
 const done = task => !['queued', 'running', 'stopping'].includes(task.status);
@@ -221,7 +221,7 @@ try {
 	const recoveredDetail = request('detail', { taskId: rerun.id }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === recoveredDetail && !m.error));
 	console.log('PASS rerun creates new identity and actual service crash marks unfinished task interrupted');
 
-	send({type:'prompt',text:'CODE_PARENT'});await snapshot(s=>!s.isStreaming&&s.messages.some(m=>JSON.stringify(m).includes('CODE_PARENT_DONE')));await wait(()=>taskState.tasks.find(t=>t.task==='CODE_QUERY')?.status==='completed','subagent code IPC');const codeDetailId=request('detail',{taskId:taskState.tasks.find(t=>t.task==='CODE_QUERY').id});await wait(()=>received.some(m=>m.type==='subagent_response'&&m.requestId===codeDetailId&&m.task));assert.match(received.find(m=>m.type==='subagent_response'&&m.requestId===codeDetailId).task.result,/CODE_QUERY_DONE/);console.log('PASS subagent code tool queries the shared host language service over IPC');
+	send({type:'prompt',text:'CODE_PARENT'});await snapshot(s=>!s.isStreaming&&s.messages.some(m=>JSON.stringify(m).includes('CODE_PARENT_DONE')));await wait(()=>taskState.tasks.find(t=>t.task==='CODE_QUERY')?.status==='completed','subagent code IPC', process.platform === 'win32' ? 180000 : 10000);const codeDetailId=request('detail',{taskId:taskState.tasks.find(t=>t.task==='CODE_QUERY').id});await wait(()=>received.some(m=>m.type==='subagent_response'&&m.requestId===codeDetailId&&m.task));assert.match(received.find(m=>m.type==='subagent_response'&&m.requestId===codeDetailId).task.result,/CODE_QUERY_DONE/);console.log('PASS subagent code tool queries the shared host language service over IPC');
 	const offId = request('configure', { config: { ...defaultSubagentConfig(), enabled: false } }); await wait(() => received.some(m => m.type === 'subagent_response' && m.requestId === offId && m.accepted));
 	send({ type: 'prompt', text: 'LEGACY_CHECK: confirm the original extension is available.' }); await snapshot(s => !s.isStreaming && s.messages.some(m => JSON.stringify(m).includes('LEGACY_VISIBLE')));
 	console.log('PASS project-switch ownership and upstream extension exclusion/restoration');
