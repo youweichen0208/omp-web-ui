@@ -130,11 +130,8 @@ async function main() {
 	});
 	console.log("ready received");
 	await sleep(300);
-	check(
-		"agent exposes persistent terminal tools",
-		["terminal_create", "terminal_list", "terminal_close", "terminal_input", "terminal_key", "terminal_read"].every((name) => snapshotReply?.tools?.includes(name)),
-	);
-	check("agent exposes native todo instead of task_plan", snapshotReply?.tools?.includes("todo") && !snapshotReply?.tools?.includes("task_plan"));
+	check("agent has no WebUI terminal tools", !snapshotReply?.tools?.some(name => name.startsWith("terminal_")));
+	check("agent has no bundled todo", !snapshotReply?.tools?.includes("todo") && !snapshotReply?.tools?.includes("task_plan"));
 
 	// -- commands: list (fresh dir -> empty), save, list again -----------------
 	send({ type: "list_commands" });
@@ -436,47 +433,6 @@ async function main() {
 		send({ type: "terminal_kill", terminalId: "hist-fill" });
 	}
 
-	// Invoke the real agent-facing definitions as well as the WebSocket protocol.
-	// The SDK normally calls these from a model turn; this local tool harness keeps
-	// the smoke test deterministic while exercising create/list/read(wait)/key/close.
-	{
-		const { TerminalManager, makePersistentTerminalTools } = await import("../dist/server/terminals.js");
-		const toolManager = new TerminalManager(() => {}, workdir);
-		const tools = new Map(makePersistentTerminalTools(toolManager, workdir).map((tool) => [tool.name, tool]));
-		const invoke = async (name, params) => tools.get(name).execute("tool-smoke", params, undefined, undefined, undefined);
-		const readUntil = async (terminalId, cursor, needle) => {
-			const deadline = Date.now() + 8000;
-			let output = "";
-			while (Date.now() < deadline && !output.includes(needle)) {
-				const reply = await invoke("terminal_read", { terminalId, cursor, waitMs: 2000, maxBytes: 4000 });
-				const chunk = JSON.parse(reply.content[0].text);
-				output += chunk.data;
-				cursor = chunk.cursor;
-			}
-			return { output, cursor };
-		};
-		try {
-			await invoke("terminal_create", { terminalId: "agent-smoke", cwd: ".", cols: 40, rows: 12 });
-			const listed = await invoke("terminal_list", {});
-			check("agent terminal_create/list works", JSON.parse(listed.content[0].text).some((t) => t.id === "agent-smoke"));
-			const initial = await invoke("terminal_read", { terminalId: "agent-smoke", cursor: 0, maxBytes: 2000 });
-			const initialRead = JSON.parse(initial.content[0].text);
-			await invoke("terminal_input", { terminalId: "agent-smoke", data: "printf 'TOOL_%s_OK' WAIT\r" });
-			const waited = await readUntil("agent-smoke", initialRead.cursor, "TOOL_WAIT_OK");
-			check("agent terminal_read waits for incremental output", waited.output.includes("TOOL_WAIT_OK"));
-			await invoke("terminal_input", { terminalId: "agent-smoke", data: "printf 'TOOL_%s_OK' KEY" });
-			await invoke("terminal_key", { terminalId: "agent-smoke", key: "Enter" });
-			const keyed = await readUntil("agent-smoke", waited.cursor, "TOOL_KEY_OK");
-			check("agent terminal_key sends named keys", keyed.output.includes("TOOL_KEY_OK"));
-			await invoke("terminal_close", { terminalId: "agent-smoke" });
-			const afterClose = await invoke("terminal_list", {});
-			check("agent terminal_close releases the PTY", JSON.parse(afterClose.content[0].text).length === 0);
-		} finally {
-			toolManager.killAll();
-		}
-	}
-
-	// unknown terminal input must not crash
 	send({ type: "terminal_input", terminalId: "nope", data: "x" });
 	send({ type: "terminal_resize", terminalId: "nope", cols: 10, rows: 10 });
 	await sleep(200);

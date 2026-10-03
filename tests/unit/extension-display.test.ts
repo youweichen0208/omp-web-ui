@@ -14,9 +14,3 @@ test.each([
 ])("extension entry %s has a recognizable label", (path, source, name) => {
 	expect(extensionDisplay(path, source)).toEqual({ name });
 });
-
-test("only the bundled todo entry gets a built-in label, including after disabled restart", () => {
-	const bundled = "/desktop/node_modules/@juicesharp/rpiv-todo/index.ts";
-	expect(extensionDisplay(bundled, undefined, bundled)).toEqual({ name: "rpiv-todo", builtin: "todo" });
-	expect(extensionDisplay("/user/node_modules/@juicesharp/rpiv-todo/index.ts", undefined, bundled)).toEqual({ name: "@juicesharp/rpiv-todo" });
-});

@@ -371,7 +371,7 @@ const zh = {
 	taskSteps: "步",
 	taskCompletedHidden: "已完成 {n} 步 · 展开",
 	taskJumpToChat: "在对话中定位",
-	builtinTaskList: "内置任务清单",
+	builtinTaskList: "任务清单",
 	componentUpdates: "组件更新",
 	componentNewVersion: "有新版本",
 	componentCurrent: "已是最新稳定版",
@@ -837,17 +837,7 @@ const zh = {
 	/* thinking block */
 	thinkingNow: "思考中",
 	thinkingPreview: "思考：{preview}",
-	toolRecovery: "工具调用恢复",
-	toolRecoveryRetrying: "此前的工具调用未通过正式接口执行。正在请求模型纠正一次；口头说“继续”不代表已经执行。",
-	toolRecoveryResumed: "纠正后已收到目标工具的成功返回。这不代表整个任务已完成，请以任务清单和执行结果为准。",
-	toolRecoveryFailed: "工具调用未能恢复，请检查相关工具结果和未完成步骤；连续无进展时不会重复纠正。",
-	toolRecoveryToolError: "工具已通过正式接口调用，但执行报错或超时。超时不代表操作没有生效，请先核实实际状态。",
-	toolRecoveryExhausted: "本轮格式纠正已达到上限，最后这次正文调用尚未执行。请检查结果后继续。",
-	toolRecoveryUnverified: "纠正后没有确认目标工具执行成功，任务可能尚未完成。请检查结果后手动继续。",
-	toolRecoveryDeferred: "此条旧记录中的工具调用未执行。当时可能有排队消息，或旧版恢复机制要求本轮先启动任务步骤。",
-	toolRecoveryQueued: "正文中的工具调用未执行。已有排队的用户或扩展消息，将优先处理这些消息。",
-	toolRecoveryInterrupted: "新的用户或扩展指令中断了这次纠正，将优先遵循新指令。",
-	toolRecoveryCancelled: "已停止工具调用恢复，不会自动继续。",
+
 	leakedThinking: "模型附加内容",
 	leakedThinkingHint: "正文中检测到思考标记，相关内容已折叠；不代表应用报错或数据泄露。点击查看原文。",
 
@@ -971,31 +961,13 @@ const zh = {
 
 	/* goal / review */
 	goalBarTitle: "目标",
-	goalBarPlaceholder: "设定一个目标，agent 完成后自动审查…",
-	goalBarSet: "开始",
-	goalBarClear: "取消",
-	goalBarLocked: "锁定：应用到后续所有回合",
-	goalBarUnlocked: "仅本回合（改完自动清除）",
-	goalBarReviewModel: "审查模型",
-	goalBarUseMainModel: "使用主模型",
-	goalBarMaxRounds: "最大轮数",
-	goalBarMaxRoundsTip: "最大审查重改轮数；0 或不填 = 不限（持续改到通过）",
-	goalBarUnlimitedShort: "不限",
 
-	goalBarReviewing: "审查中…",
-	goalBarRound: "第 {n} 轮",
-	goalBarActive: "目标生效中",
-	goalBarPassed: "已通过",
-	goalBarFailed: "未通过",
-	goalBarStatusPending: "等待生成…",
-	goalWizardBtn: "AI 提炼",
-	goalWizardTip: "让 AI 通过问卷调研细化需求，收敛为目标",
-	goalWizardRunning: "目标调研中",
-	goalWizardAnswer: "回答",
 	goalWizardCard: "目标调研",
 
 	/* settings modal */
 	settings: "设置",
+	nativeContextOnly: "使用 pi 原生上下文，WebUI 不追加提示词或注册自定义代理工具。",
+	nativeResourcesManaged: "技能和扩展由 pi 原生配置管理，这里仅展示已加载的资源。",
 	settingsTitle: "设置",
 	allSettings: "所有设置",
 	quickActions: "快捷操作",
@@ -1006,7 +978,7 @@ const zh = {
 	codeThemeSystem: "跟随系统",
 	settingsDesc: "修改立即生效：系统提示词、技能与插件开关会重建当前会话；审查提示词与审查技能只影响后续目标审查（回复进行中则主会话变更自动延迟）。",
 	settingsSystemPrompt: "系统提示词",
-	settingsPromptMode: "模式",
+
 	promptModeAppend: "追加",
 	promptModeReplace: "替换",
 	promptAppendHint: "追加模式：自定义内容拼接到默认系统提示词末尾（推荐，保留默认行为约束）。",
@@ -1027,20 +999,12 @@ const zh = {
 	settingsVisionBridge: "视觉桥",
 	settingsVisionBridgeDesc:
 		"当前模型不支持识图时，把图片交给已配置的视觉模型转写为文字证据，再让模型回答",
-	visionBridgeEnabled: "启用视觉桥",
-	visionBridgeModel: "转写模型",
-	visionBridgeAuto: "自动选择（按顺序）",
-	visionBridgeNoModels:
-		"未找到已配置的视觉模型：在模型配置里添加任意支持图片的模型（如 qwen-vl、GLM-4V、Gemini）即可自动启用",
-	visionBridgeOffHint:
-		"已关闭：图片将原样发送，纯文本模型可能看不到图片内容",
-	visionBridgeCurrent: "当前转写模型：{model}",
-	visionBridgePromptMode: "转写提示词",
+
 	settingsTerminalTools: "终端工具",
-	terminalToolsEnabled: "启用持久终端工具",
+
 	settingsTerminalToolsDesc:
 		"让 AI 在交互式程序（REPL/vim）、长驻服务、需要持续观察输出或你要求在可见终端操作时，使用内置终端；普通命令仍走一次性 bash 工具",
-	terminalToolsOffHint: "已关闭：AI 无法使用 terminal_* 工具，也不会收到相关使用引导",
+
 	settingsMessageDisplay: "消息显示",
 	thinkingWrap: "完整显示思考",
 	thinkingWrapDesc:
@@ -1048,18 +1012,7 @@ const zh = {
 	toolsWrap: "完整显示工具",
 	toolsWrapDesc:
 		"开启：工具调用始终完整展开显示参数和输出；关闭：默认折叠，点击展开",
-	terminalBashTakeover: "终端接管 bash",
-	terminalBashTakeoverDesc:
-		"bash 命令改在持久可见终端里执行：完整输出自动返回、shell 状态跨调用保留（cd/venv/ssh）；命令静默超时自动转后台并在结束后主动通知 AI",
-	terminalBashIdleMs: "静默转后台阈值（毫秒）",
-	terminalBashIdleMsDesc:
-		"命令连续无输出达到该时长即不再阻塞等待，转入后台继续运行并通知 AI；0 = 一直等到命令结束（默认 15000）",
-	visionBridgePromptPlaceholder:
-		"输入自定义转写提示词…（留空 = 使用内置默认提示词，失焦后自动应用）",
-	visionBridgePromptAppendHint:
-		"追加模式：自定义内容拼接到内置转写提示词末尾（推荐，保留默认的逐字转写约束）。",
-	visionBridgePromptReplaceHint:
-		"替换模式：完全用自定义内容替换内置转写提示词。切换后输入框会显示内置默认提示词，可直接修改；不改动失焦则仍使用默认。",
+
 	uninstallExt: "卸载",
 	uninstallConfirm: "确认卸载？",
 	uninstallConfirmHint: "再次点击确认，将在终端执行 pi remove",
@@ -1078,10 +1031,10 @@ const zh = {
 	pluginSettingsSave: "保存插件设置",
 	pluginSettingsSaving: "保存中…",
 	pluginSettingsReset: "恢复默认",
-	settingsPresets: "预设",
+
 	settingsEnabled: "已启用",
 	settingsDisabled: "已禁用",
-	presetNamePlaceholder: "预设名称…",
+
 	saveAsPreset: "保存为预设",
 	applyPreset: "应用",
 	deletePreset: "删除预设",
@@ -1454,7 +1407,7 @@ const en: Record<keyof typeof zh, string> = {
 	taskSteps: "steps",
 	taskCompletedHidden: "{n} completed steps · Show",
 	taskJumpToChat: "Find in chat",
-	builtinTaskList: "Built-in task list",
+	builtinTaskList: "Task list",
 	componentUpdates: "Component updates",
 	componentNewVersion: "Update available",
 	componentCurrent: "Latest stable version installed",
@@ -1928,17 +1881,7 @@ const en: Record<keyof typeof zh, string> = {
 	/* thinking block */
 	thinkingNow: "Thinking",
 	thinkingPreview: "Thinking: {preview}",
-	toolRecovery: "Tool-call recovery",
-	toolRecoveryRetrying: "A prior tool invocation was not executed through the native interface. Requesting one correction; a promise to continue is not execution.",
-	toolRecoveryResumed: "The target tool returned successfully after correction. This does not mean the entire task is complete; check the checklist and results.",
-	toolRecoveryFailed: "Tool-call recovery did not succeed. Check tool results and unfinished steps; correction will not repeat without progress.",
-	toolRecoveryToolError: "The tool was called through the native interface, but execution failed or timed out. A timeout does not mean the operation had no effect; inspect its actual state first.",
-	toolRecoveryExhausted: "This run reached its formatting correction limit. The latest invocation printed as text was not executed. Check the results before continuing.",
-	toolRecoveryUnverified: "The target tool has not been confirmed successful after correction. The task may be unfinished; check the results before continuing manually.",
-	toolRecoveryDeferred: "This historical tool invocation did not execute. A message may have been queued, or the older recovery policy required an explicitly started task step.",
-	toolRecoveryQueued: "The tool invocation printed as text did not execute. Queued user or extension messages take priority.",
-	toolRecoveryInterrupted: "A new user or extension instruction interrupted this correction and takes priority.",
-	toolRecoveryCancelled: "Tool-call recovery was stopped. It will not continue automatically.",
+
 	leakedThinking: "Additional model content",
 	leakedThinkingHint: "Reasoning markers were detected in the reply, so this content was collapsed. This does not indicate an application error or data disclosure. Click to view the original.",
 
@@ -2065,30 +2008,13 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* goal / review */
 	goalBarTitle: "Goal",
-	goalBarPlaceholder: "Set a goal; the agent's output is auto-reviewed…",
-	goalBarSet: "Start",
-	goalBarClear: "Cancel",
-	goalBarLocked: "Locked: applies to every later turn",
-	goalBarUnlocked: "This turn only (cleared afterwards)",
-	goalBarReviewModel: "Review model",
-	goalBarUseMainModel: "Use the main model",
-	goalBarMaxRounds: "Max rounds",
-	goalBarMaxRoundsTip: "Max review-revision rounds; 0 or empty = unlimited (keep revising until it passes)",
-	goalBarUnlimitedShort: "Unlimited",
-	goalBarReviewing: "Reviewing…",
-	goalBarRound: "Round {n}",
-	goalBarActive: "Goal active",
-	goalBarPassed: "Passed",
-	goalBarFailed: "Failed",
-	goalBarStatusPending: "Waiting to generate…",
-	goalWizardBtn: "AI Scrape",
-	goalWizardTip: "Let AI refine the requirement into a goal via a Q&A survey",
-	goalWizardRunning: "Scoping the goal",
-	goalWizardAnswer: "Answer",
+
 	goalWizardCard: "Goal survey",
 
 	/* settings modal */
 	settings: "Settings",
+	nativeContextOnly: "Uses the native pi context. WebUI does not append prompts or register custom agent tools.",
+	nativeResourcesManaged: "Skills and extensions are managed by native pi configuration. Loaded resources are shown here.",
 	settingsTitle: "Settings",
 	allSettings: "All settings",
 	quickActions: "Quick actions",
@@ -2099,7 +2025,7 @@ const en: Record<keyof typeof zh, string> = {
 	codeThemeSystem: "Follow system",
 	settingsDesc: "Changes apply immediately: system prompt, skill and extension toggles rebuild the current session; review instructions and review skills affect later goal reviews (main-session changes are deferred while streaming).",
 	settingsSystemPrompt: "System prompt",
-	settingsPromptMode: "Mode",
+
 	promptModeAppend: "Append",
 	promptModeReplace: "Replace",
 	promptAppendHint: "Append mode: your text is appended to the end of the default system prompt (recommended — keeps the default behavior constraints).",
@@ -2120,21 +2046,12 @@ const en: Record<keyof typeof zh, string> = {
 	settingsVisionBridge: "Vision bridge",
 	settingsVisionBridgeDesc:
 		"When the current model can't see images, send them to a configured vision model and transcribe into text evidence first",
-	visionBridgeEnabled: "Enable vision bridge",
-	visionBridgeModel: "Transcription model",
-	visionBridgeAuto: "Auto (in order)",
-	visionBridgeNoModels:
-		"No configured vision model found: add any image-capable model (e.g. qwen-vl, GLM-4V, Gemini) in Model config to enable automatically",
-	visionBridgeOffHint:
-		"Disabled: images are sent as-is, a text-only model may not see them",
-	visionBridgeCurrent: "Current transcription model: {model}",
-	visionBridgePromptMode: "Transcription prompt",
+
 	settingsTerminalTools: "Terminal tools",
-	terminalToolsEnabled: "Enable persistent terminal tools",
+
 	settingsTerminalToolsDesc:
 		"Let the AI use the built-in terminal for interactive programs (REPLs/vim), long-running servers, continuous output watching, or when you ask it to work in the visible terminal; ordinary commands still go through the one-shot bash tool",
-	terminalToolsOffHint:
-		"Disabled: the AI has no terminal_* tools and receives no usage guidance",
+
 	settingsMessageDisplay: "Message display",
 	thinkingWrap: "Show full thinking",
 	thinkingWrapDesc:
@@ -2142,18 +2059,7 @@ const en: Record<keyof typeof zh, string> = {
 	toolsWrap: "Show full tools",
 	toolsWrapDesc:
 		"On: tool calls always expand fully showing arguments and output; Off: collapsed by default, click to expand",
-	terminalBashTakeover: "Terminal-backed bash",
-	terminalBashTakeoverDesc:
-		"Run bash commands inside the persistent visible terminal: full output returned automatically, shell state retained across calls (cd/venv/ssh); silent commands move to the background and notify the AI when they finish",
-	terminalBashIdleMs: "Silence-to-background threshold (ms)",
-	terminalBashIdleMsDesc:
-		"When a command produces no output for this long, stop blocking and let it keep running in the background; the AI is notified when it finishes. 0 = always wait until completion (default 15000)",
-	visionBridgePromptPlaceholder:
-		"Type a custom transcription prompt… (empty = built-in default, applied on blur)",
-	visionBridgePromptAppendHint:
-		"Append mode: custom text is appended after the built-in transcription prompt (recommended — keeps the verbatim-transcription contract).",
-	visionBridgePromptReplaceHint:
-		"Replace mode: custom text replaces the built-in transcription prompt entirely. After switching, the editor shows the built-in default prompt ready to edit; blurring without changes keeps the default.",
+
 	uninstallExt: "Uninstall",
 	uninstallConfirm: "Confirm?",
 	uninstallConfirmHint: "Click again to confirm — runs pi remove in the terminal",
@@ -2172,10 +2078,10 @@ const en: Record<keyof typeof zh, string> = {
 	pluginSettingsSave: "Save plugin settings",
 	pluginSettingsSaving: "Saving…",
 	pluginSettingsReset: "Reset defaults",
-	settingsPresets: "Presets",
+
 	settingsEnabled: "Enabled",
 	settingsDisabled: "Disabled",
-	presetNamePlaceholder: "Preset name…",
+
 	saveAsPreset: "Save as preset",
 	applyPreset: "Apply",
 	deletePreset: "Delete preset",

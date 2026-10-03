@@ -1,15 +1,4 @@
-// Settings feature — protocol smoke test (no model calls).
-//
-// Verifies the full wire path for the settings panel: settings_state pushed on
-// attach / get_settings / set_settings (prompt append+replace, skill and
-// extension toggles) / save_preset / apply_preset / delete_preset, plus
-// per-client persistence across a reconnect.
-//
-// Runs against the compiled server on a dedicated port (8931). With an
-// isolated fake agent dir (PI_CODING_AGENT_DIR → temp) it exercises the
-// protocol only; point it at a real agent dir to also exercise the
-// skill/extension toggle round-trip (see settings-live flow in git history).
-// Usage: npm run build && node settings-test.mjs [port]
+// Native resource views and display-only preferences; zero model calls.
 import WebSocket from "ws";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,7 +12,6 @@ const extensionRoot = join(DATA_DIR, "agent", "extensions");
 mkdirSync(join(extensionRoot, "sample-directory"), { recursive: true });
 writeFileSync(join(extensionRoot, "sample-directory", "index.ts"), "export default function () {}\n");
 writeFileSync(join(extensionRoot, "custom-footer.ts"), "export default function () {}\n");
-
 
 const server = spawn(process.execPath, ["dist/server/index.js"], {
 	env: {
@@ -110,117 +98,16 @@ try {
 	check("settings_state pushed on attach", !!st0.settings);
 	check("has skills array", Array.isArray(st0.settings.skills));
 	check("has extensions array", Array.isArray(st0.settings.extensions));
-	const builtinTodo = st0.settings.extensions.find((e) => e.builtin === "todo");
-	check("bundled todo has a recognizable built-in label", builtinTodo?.name === "rpiv-todo");
-	check("directory entry uses its extension name", st0.settings.extensions.some((e) => e.name === "sample-directory"));
-	check("standalone extension uses its own name", st0.settings.extensions.some((e) => e.name === "custom-footer"));
-
-	check("has presets array", Array.isArray(st0.settings.presets));
-	check("default promptMode=append", st0.settings.promptMode === "append");
-	check(
-		"settings_state carries built-in default prompts",
-		typeof st0.settings.defaultSystemPrompt === "string" &&
-			typeof st0.settings.visionBridgeDefaultPrompt === "string" &&
-			st0.settings.visionBridgeDefaultPrompt.length > 0,
-	);
-	console.log(`  skills=${st0.settings.skills.length} extensions=${st0.settings.extensions.length}`);
-
-	c.send({ type: "get_settings" });
-	const st1 = await c.waitFor("settings_state");
-	check("get_settings echoes state", st1.settings.promptMode === "append");
-
-	// append prompt, then save it as a preset
-	c.send({ type: "set_settings", promptMode: "append", customSystemPrompt: "你是一个测试助手。" });
-	const st2 = await c.waitFor("settings_state", 8000, (m) => m.settings.customSystemPrompt === "你是一个测试助手。");
-	check("append prompt persisted", st2.settings.customSystemPrompt === "你是一个测试助手。");
-
-	c.send({ type: "save_preset", name: "测试预设" });
-	const st6 = await c.waitFor("settings_state", 8000, (m) => m.settings.presets.some((p) => p.name === "测试预设"));
-	check("preset saved", st6.settings.presets.some((p) => p.name === "测试预设"));
-
-	// replace prompt
-	c.send({ type: "set_settings", promptMode: "replace", customSystemPrompt: "你是替换提示词。" });
-	const st2b = await c.waitFor("settings_state", 8000, (m) => m.settings.promptMode === "replace");
-	check("promptMode replace persisted", st2b.settings.promptMode === "replace");
-	c.send({ type: "set_settings", promptMode: "append" });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.promptMode === "append");
-
-	// terminal tools toggle：默认开 → 关 → 重连后仍记住；预设捕获该开关
-	check("terminalToolsEnabled defaults on", st0.settings.terminalToolsEnabled === true);
-	c.send({ type: "set_settings", terminalToolsEnabled: false });
-	const stT = await c.waitFor("settings_state", 8000, (m) => m.settings.terminalToolsEnabled === false);
-	check("terminalToolsEnabled off persisted", stT.settings.terminalToolsEnabled === false);
-	// 终端接管 bash：开关 + 阈值往返（回归：dispatch 曾漏转发导致点击无效）
-	check("terminalBash defaults off", st0.settings.terminalBash === false);
-	check("terminalBashIdleMs defaults 15000", st0.settings.terminalBashIdleMs === 15000);
-	c.send({ type: "set_settings", terminalBash: true, terminalBashIdleMs: 5000 });
-	const stTB = await c.waitFor("settings_state", 8000, (m) => m.settings.terminalBash === true);
-	check("terminalBash on round-trips", stTB.settings.terminalBash === true);
-	check("terminalBashIdleMs round-trips", stTB.settings.terminalBashIdleMs === 5000);
-	c.send({ type: "set_settings", terminalBash: false });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.promptMode === "append");
-	// 思考折叠开关：默认关（折叠）→ 开 → 再关（纯 UI 偏好，持久化即可）
-	check("thinkingWrap defaults off", st0.settings.thinkingWrap === false);
-	c.send({ type: "set_settings", thinkingWrap: false });
-	const stTW = await c.waitFor(
-		"settings_state",
-		8000,
-		(m) => m.settings.thinkingWrap === false,
-	);
-	check("thinkingWrap off round-trips", stTW.settings.thinkingWrap === false);
-	c.send({ type: "set_settings", thinkingWrap: true });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.thinkingWrap === true);
-
-	// skill toggle
-	const skillName = st0.settings.skills[0]?.name;
-	if (skillName) {
-		c.send({ type: "set_settings", disabledSkills: [skillName] });
-		const st3 = await c.waitFor("settings_state", 8000, (m) => m.settings.disabledSkills.includes(skillName));
-		check("skill disabled", st3.settings.disabledSkills.includes(skillName));
-		const s = st3.settings.skills.find((x) => x.name === skillName);
-		check("disabled skill still listed (re-enableable)", s && !s.enabled);
-		c.send({ type: "set_settings", disabledSkills: [] });
-		// The immediate settings push precedes SDK reload; wait for the refreshed catalog.
-		const st4 = await c.waitFor("settings_state", 8000, (m) =>
-			m.settings.disabledSkills.length === 0 && m.settings.skills.find((x) => x.name === skillName)?.enabled === true);
-		check("skill re-enabled", st4.settings.skills.find((x) => x.name === skillName)?.enabled === true);
-	} else {
-		console.log("  (no skills loaded — skipping)");
-	}
-
-	// extension toggle
-	const extId = builtinTodo?.id;
-	if (extId) {
-		c.send({ type: "set_settings", disabledExtensions: [extId] });
-		const st5 = await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.includes(extId));
-		check("extension disabled", st5.settings.disabledExtensions.includes(extId));
-		const e = st5.settings.extensions.find((x) => x.id === extId);
-		check("disabled extension still listed", e && !e.enabled);
-		check("disabled builtin retains its label", e?.name === "rpiv-todo" && e?.builtin === "todo");
-		c.send({ type: "set_settings", disabledExtensions: [] });
-		await c.waitFor("settings_state", 8000, (m) => m.settings.disabledExtensions.length === 0);
-		check("extension re-enabled", true);
-	} else {
-		console.log("  (no extensions loaded — skipping)");
-	}
-
-	// apply preset → restores append/你好
-	c.send({ type: "set_settings", customSystemPrompt: "临时内容" });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.customSystemPrompt === "临时内容");
-	c.send({ type: "apply_preset", name: "测试预设" });
-	const st7 = await c.waitFor("settings_state", 8000, (m) => m.settings.customSystemPrompt === "你是一个测试助手。");
-	check("preset applied (prompt restored)", st7.settings.customSystemPrompt === "你是一个测试助手。");
-	check("preset applied (mode restored)", st7.settings.promptMode === "append");
-	// 预设保存时开关是开 → 应用预设把它恢复为 true（验证预设捕获该开关）
-	check("preset applied (terminal toggle restored to captured value)", st7.settings.terminalToolsEnabled === true);
-
-	c.send({ type: "delete_preset", name: "测试预设" });
-	const st8 = await c.waitFor("settings_state", 8000, (m) => !m.settings.presets.some((p) => p.name === "测试预设"));
-	check("preset deleted", !st8.settings.presets.some((p) => p.name === "测试预设"));
-
-	// persistence across reconnect：重新关掉终端工具再断线，重连后应记住
-	c.send({ type: "set_settings", terminalToolsEnabled: false });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.terminalToolsEnabled === false);
+	check("no bundled todo", !st0.settings.extensions.some(e => e.builtin === "todo"));
+	check("native directory extension loaded", st0.settings.extensions.some(e => e.name === "sample-directory"));
+	check("native standalone extension loaded", st0.settings.extensions.some(e => e.name === "custom-footer"));
+	check("native prompt available", typeof st0.settings.effectiveSystemPrompt === "string" && st0.settings.effectiveSystemPrompt.length > 0);
+	for (const field of ["promptMode", "customSystemPrompt", "terminalToolsEnabled", "visionBridgeEnabled", "presets"]) check(`${field} removed`, !(field in st0.settings));
+	const originalPrompt = st0.settings.effectiveSystemPrompt;
+	c.send({ type: "set_settings", thinkingWrap: true, toolsWrap: false, promptMode: "replace", customSystemPrompt: "HOST_OVERRIDE_SENTINEL" });
+	const st1 = await c.waitFor("settings_state", 8000, m => m.settings.thinkingWrap === true);
+	check("display preferences round-trip", st1.settings.toolsWrap === false);
+	check("legacy prompt override ignored", st1.settings.effectiveSystemPrompt === originalPrompt);
 	c.ws.close();
 	await sleep(300);
 	c = await connect();
@@ -228,11 +115,8 @@ try {
 	await c.waitFor("ready");
 	await c.waitFor(["snapshot", "snapshot_delta"]);
 	const st9 = await c.waitFor("settings_state");
-	check("prompt survives reconnect", st9.settings.customSystemPrompt === "你是一个测试助手。");
-	check("terminalToolsEnabled survives reconnect (off)", st9.settings.terminalToolsEnabled === false);
-	// 恢复默认开，避免影响后续断言
-	c.send({ type: "set_settings", terminalToolsEnabled: true });
-	await c.waitFor("settings_state", 8000, (m) => m.settings.terminalToolsEnabled === true);
+	check("display preferences survive reconnect", st9.settings.thinkingWrap === true && st9.settings.toolsWrap === false);
+	check("native prompt survives reconnect", st9.settings.effectiveSystemPrompt === originalPrompt);
 
 	// extensions_reload：外部变更（如终端里 pi remove 完成）后重发现扩展
 	c.send({ type: "extensions_reload" });

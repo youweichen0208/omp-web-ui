@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DefaultPackageManager, VERSION, type AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ComponentUpdate } from "./protocol.js";
-import { TODO_EXTENSION_PATH } from "./todo-extension.js";
+
 import { extensionDisplay } from "./extension-display.js";
 
 let restartRequired = false;
@@ -22,10 +22,10 @@ export function packageManagerFor(session: AgentSession, cwd: string, agentDir: 
 	return new DefaultPackageManager({ cwd, agentDir, settingsManager: session.settingsManager });
 }
 export function updateTargets(session: AgentSession, manager: DefaultPackageManager): UpdateTarget[] {
-	const todo = packageInfo(dirname(TODO_EXTENSION_PATH));
+
 	const targets: UpdateTarget[] = [
 		{ id: "builtin:agent", name: "pi Agent", current: VERSION, kind: "bundled", packageName: "@earendil-works/pi-coding-agent" },
-		{ id: "builtin:todo", name: "rpiv-todo", current: todo.version ?? null, kind: "bundled", packageName: "@juicesharp/rpiv-todo" },
+
 	];
 	const packages = manager.listConfiguredPackages();
 	for (const pkg of packages) {
@@ -38,7 +38,7 @@ export function updateTargets(session: AgentSession, manager: DefaultPackageMana
 	for (const extension of session.resourceLoader.getExtensions().extensions) {
 		if (extension.hidden || extension.resolvedPath.startsWith("builtin:")) continue;
 		const path = extension.resolvedPath;
-		if (path === TODO_EXTENSION_PATH || roots.some((root) => path.replaceAll("\\", "/").startsWith(root))) continue;
+		if (roots.some((root) => path.replaceAll("\\", "/").startsWith(root))) continue;
 		targets.push({ id: `local:${path}`, name: extensionDisplay(path).name, current: null, kind: "local" });
 	}
 	return targets;

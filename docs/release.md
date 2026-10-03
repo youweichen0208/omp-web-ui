@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.10.0 正式版
+
+`0.10.0` 移除 WebUI 自定义代理与上下文接管，保留文件和手动节点工作台，使用原版 pi 1.0.0。Codemode 和工具搜索使用原生配置默认开启。协议版本升至 30；旧历史保留。发布说明见 `.github/release-notes/v0.10.0.md`。npm 使用 `latest`，GitHub 使用 `v0.10.0` 标签，桌面附件全部构建验证后公开。
+
 ## 0.8.8 正式版
 
 `0.8.8` 将内置 Pi SDK 升级至 0.99.2，接入原生 MCP/Codemode、官方账号授权、嵌套调用和图片展示，并保护模型编辑/刷新中的类型与额外配置。说明见 `.github/release-notes/v0.8.8.md`。npm 使用 `latest`；GitHub 标签使用 `v0.8.8`。

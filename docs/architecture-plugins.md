@@ -28,9 +28,7 @@
 | `host.notify(level, text)` | 发系统通知条（notice，前端 toast） |
 | `host.sendTo(clientId, payload)` | 定向发给单个 socket |
 | `host.onToolEvent(h)` | 订阅 SDK 工具执行事件（phase:start\|end, toolName, conversationId?, durationMs?, isError?） |
-| `host.registerAgentTool(tool)` | 注册供 AI 调用的工具，返回注销函数 |
 | `host.onAttach(h)` | 注册「新客户端接入」钩子（每次浏览器 attach，含 plugins_reload 后的重接入） |
-| `host.registerCommand(cmd)` | 注册斜杠命令（SlashCommandInfo source=plugin → 选择器 + prompt 拦截执行） |
 | `host.route(method, path, handler)` | 挂载 HTTP 路由（`/plugins-api/:id/*`） |
 | `host.fs` | 受限工作区文件访问（WorkspaceFS，路径锚定活 cwd 根，越界拒绝） |
 | `host.getSettings()` | 读取声明式设置（manifest.settings schema） |
@@ -47,8 +45,6 @@
 | `ensureDeps` | npm 自动补装单飞 |
 
 ### 能力声明与强制（manifest.permissions）
-
-写了=严格模式，宿主自控 API（registerAgentTool→tools / route→http / host.fs→fs）按声明族强制拦截，未声明的族拒绝并报「缺哪族」；未写且 apiVersion<2=旧全权（放行但每激活期警告一次，v2 起默认拒绝已预埋）。
 
 ## manifest 可选字段
 
@@ -71,14 +67,6 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 `GET /plugins/:id/client/*` 映射到插件目录的 client/ 子树（**只暴露这个子树**——manifest 与服务端 index.mjs 可能含凭据，绝不下载；id 校验 + resolve 前缀防穿越）。dev 模式 vite 已代理 /plugins。
 
-## MCP 工具桥（server/mcp-bridge.ts）
-
-Pi 1.0 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独立。新配置优先使用 `<agentDir>/mcp.json` 的 `mcpServers`（项目配置需获得 Pi 信任），由 `server/native-tools.ts` 注册官方 `mcp`、`codemode`、`tool-search` factories，支持 stdio、streamable HTTP 和 SDK 原生认证。工具启用遵循 Pi 的 `defaultTools` 与 `-builtin:<name>` 设置；不强制开启所有工具。`/mcp` 在 RPC 模式输出状态并通过现有扩展 UI 桥处理交互。
-
-旧 `<dataDir>/mcp.json` 的 `servers` 配置继续工作，不自动迁移。迁移时先移除旧桥中的同一服务，再加入原生配置并重启，避免重复连接。原生内置扩展不作为用户可更新组件列出。回归：`native-tools-desktop-test.mjs` 使用本地 stdio/HTTP 服务运行实际 Codemode worker，并检查嵌套调用记录；可传入 Electron 可执行文件和打包 app 根目录验证产物。
-
-读取 `<dataDir>/mcp.json` 启动外部 MCP 服务器（stdio、换行分隔 JSON-RPC，零三方依赖；`{servers:{名:{command,args,cwd,env}}}`），握手 initialize→initialized→tools/list→tools/call 后把每个远端工具适配成 PluginAgentTool（名字归一化 sanitizeToolName），并入 plugin.d.ts 的 pluginToolsProvider（与插件工具同一 customTools 管线）。单服务器失败隔离（rejectAll + 日志，不炸进程）；dispose 时 kill 子进程；请求按 id 匹配 + 超时看门狗。
-
 ## 真实插件
 
 | 插件 | 目录 | 说明 |
@@ -93,18 +81,15 @@ Pi 1.0 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独�
 | 测试文件 | 端口 | 说明 |
 | --- | --- | --- |
 | `plugin-test.mjs` | 8978 | 清单推送 / message 回环 / 静默丢弃 / 静态服务 / 路径穿越拒绝 |
-| `plugin-command-test.mjs` | 8979 | 插件命令全链路 |
 | `plugin-http-test.mjs` | 8981 | host.route 全链路（GET/POST/404/500） |
 | `plugin-bgtask-test.mjs` | 8982 | registerBackgroundTask 全链路 |
 | `plugin-settings-test.mjs` | 8983 | 声明式设置 schema 校验/持久化/回显 |
 | `plugin-cwd-test.mjs` | 8989 | set_cwd→notifyCwd→广播全链路 |
-| `mcp-bridge-test.mjs` | 8990 | MCP 服务器握手/工具调用/失败隔离 |
 | `plugin-update-test.mjs` | — | install/check-updates/rollback 全链路 |
 | `ssh-plugin-test.mjs` | 8964 | SSH 远程文件/终端全链路（mock SSH 服务端） |
 | `db-client-test.mjs` | 8968 | SQLite 全链路协议冒烟 |
 | 单测 `plugin-facilities.test.ts` | — | storage/secrets/deps/apiVersion 门控 |
 | 单测 `plugin-settings.test.ts` | — | schema 解析/校验/持久化 |
-| 单测 `mcp-bridge.test.ts` | — | 握手/工具列表/调用/超时 |
 | 单测 `plugin-updater.test.ts` | — | 备份/回滚/prune/资源解析 |
 
 ## 原生 MCP 管理
@@ -112,3 +97,5 @@ Pi 1.0 的原生 MCP 与下面的旧桥共存，配置和生命周期彼此独�
 设置页「原生 MCP」编辑 `<agentDir>/mcp.json` 或 `<cwd>/.pi/mcp.json`，保留未知字段，按文件 SHA-256 校验版本后原子保存。headers、env、secret/token 字段以掩码下发；原掩码保留，替换字符串或删除字段修改/清除。项目 provider auth 被拒绝；项目保存不授予信任，「信任当前项目」调用官方 ProjectTrustStore，并在 reload 时更新 SettingsManager 信任状态。
 
 配置变化对所有已加载会话应用：空闲会话立即 reload，运行会话按 conversationId 延迟到 agent_settled。连接状态、登录、退出、重连执行 sourceInfo 属于 builtin:mcp 的官方命令；替换命令明确不可用。OAuth 链接以 HTTP(S) 链接显示，回调输入/取消走扩展 dialog；重连重放待答 dialog。旧桥保持 data-dir/mcp.json 独立配置。
+
+界面插件只提供 Web 展示及用户交互，不向代理注册工具、斜杠命令或提示词。代理扩展和 MCP 由 pi 原生配置加载。

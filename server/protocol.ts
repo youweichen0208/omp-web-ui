@@ -8,14 +8,6 @@
 // Serialized messages (server -> client snapshot)
 // ---------------------------------------------------------------------------
 
-/** Details for the visible tool-call-recovery custom message. */
-export interface ToolCallRecoveryDetails {
-	status: "retrying" | "resumed" | "failed" | "tool-error" | "exhausted" | "unverified" | "deferred" | "cancelled";
-	toolName: string;
-	/** Why correction yielded; absent on older persisted notices. */
-	reason?: "queued-message" | "new-instruction";
-}
-
 export interface UiTextBlock {
 	type: "text";
 	text: string;
@@ -370,9 +362,7 @@ export type ClientMessage =
 	| { type: "save_commands"; commands: CommandDef[] }
 	| { type: "abort" }
 	| { type: "retry_silent_prompt"; conversationId: string; text: string }
-	/** Kill only the running bash command(s) — the agent run itself continues. */
-	| { type: "abort_bash" }
-	// -- background tasks (AI-started servers) ------------------------------
+		// -- background tasks (AI-started servers) ------------------------------
 	/** Kill ONE background server the agent started (by listening port). */
 	| { type: "kill_background_server"; port?: number; taskId?: string }
 	/** Kill EVERY background server the agent started (frees all ports). */
@@ -481,33 +471,7 @@ export type ClientMessage =
 	 *  until save_model_config; the draft comes back in clone_provider_result
 	 *  with a fresh provider id and an EMPTY apiKey for the user to fill. */
 	| { type: "clone_provider"; provider: string; reqId: number }
-	// -- goal / review -------------------------------------------------------
-	/** Set (or clear) the active goal. When set, each finished agent run is
-	 *  reviewed by an isolated reviewer agent; a failing review steers the main
-	 *  session to revise until `maxRounds` runs out. `locked: true` keeps the
-	 *  goal active across every subsequent turn; `false` clears it after the
-	 *  next turn (single-shot). `reviewModel` ("provider/id", optional) selects
-	 *  a different model for the reviewer. */
-	| { type: "set_goal"; goal: string; reviewModel?: string; maxRounds: number; locked: boolean }
-	| { type: "clear_goal" }
-	/** Start the collaborative target wizard: a user requirement goes into an
-	 *  ISOLATED wizard session which questions the user (multiple-choice + free
-	 *  text bridges) to scope details, then AUTO-SETS the refined goal. `text` is
-	 *  the user's raw requirement. `wizardModel` ("provider/id", optional) picks
-	 *  a different model for the wizard; default is the main conversation model.
-	 *  Mutually exclusive with an active review and with a running wizard. */
-	| { type: "start_goal_wizard"; text: string; wizardModel?: string; maxRounds?: number; locked?: boolean }
-	/** Persist the client's goal/review preference defaults (model choice, review
-	 *  rounds cap, locked) so they survive reload. maxRounds 0 = unlimited.
-	 *  Sent by the goal bar whenever a preference changes (model picker, rounds,
-	 *  lock toggle). */
-	| {
-			type: "set_goal_prefs";
-			reviewModel?: string;
-			maxRounds?: number;
-			locked?: boolean;
-	  }
-	// -- settings (system prompt / skills / extensions / presets) ------------
+	// -- display preferences and native resource views ------------
 	/** Request the current settings state (also pushed automatically on attach). */
 	| { type: "get_settings" }
 	/** Apply a partial settings update: main-session prompt/toggles or isolated
@@ -515,34 +479,16 @@ export type ClientMessage =
 	 *  session changes reload the runtime, while review changes affect the next review. */
 	| {
 			type: "set_settings";
-			promptMode?: "append" | "replace";
-			customSystemPrompt?: string;
-			disabledSkills?: string[];
-			disabledExtensions?: string[];
+
 			/** Installed UI plugins hidden in the settings panel (UI-only toggle,
 			 *  never triggers a runtime reload). */
 			disabledPlugins?: string[];
-			/** Persistent-terminal tools on/off (default on). Off → terminal_* tools
-			 *  are removed from the active tool set and the built-in usage guidance
-			 *  disappears from the system prompt. */
-			terminalToolsEnabled?: boolean;
-			/** 终端接管 bash 开关 + 静默解阻阈值毫秒（0 = 一直等到命令结束）。 */
-			terminalBash?: boolean;
-			terminalBashIdleMs?: number;
+
 			/** 思考文本是否换行（默认开）。纯 UI 偏好，不需要 reload runtime。 */
 			thinkingWrap?: boolean;
 			/** 工具调用是否默认展开（默认开）。纯 UI 偏好，不需要 reload runtime。 */
 			toolsWrap?: boolean;
-			/** Vision bridge on/off + preferred "provider/id" model (null = auto). */
-			visionBridgeEnabled?: boolean;
-			visionBridgeModel?: string | null;
-			/** Vision-bridge transcription prompt: mode (append/replace, same
-			 *  semantics as promptMode) + custom text (empty = built-in default). */
-			visionBridgePromptMode?: "append" | "replace";
-			visionBridgePrompt?: string;
-			/** Extra instructions and independently disabled skills for review. */
-			reviewPrompt?: string;
-			reviewDisabledSkills?: string[];
+
 	  }
 	// -- plugins (<dataDir>/plugins) -----------------------------------------
 	/** App-level message from a plugin's client bundle to its server side.
@@ -552,16 +498,15 @@ export type ClientMessage =
 	 *  ones, bump the epoch and re-push the catalog. Same spirit as
 	 *  extensions_reload but for pi-web-ui's own UI plugins. */
 	| { type: "plugins_reload" }
-	/** Save the CURRENT settings as a named preset (overwrites if it exists). */
-	| { type: "save_preset"; name: string }
+
 	/** Save a UI plugin's declarative settings (manifest "settings" schema).
 	 *  The host validates against the schema, persists to storage.json and
 	 *  notifies the plugin (host.onSettingsChanged). */
 	| { type: "plugin_settings"; pluginId: string; values: Record<string, unknown> }
 	/** Replace the current settings with the named preset and apply it. */
-	| { type: "apply_preset"; name: string }
+
 	/** Remove the named preset. */
-	| { type: "delete_preset"; name: string }
+
 	/** Drop one workspace from this client's recent-project list (UI state
 	 *  only — nothing on disk is touched). */
 	| { type: "remove_project"; path: string }
@@ -742,52 +687,7 @@ export interface ModelInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Goal / review status (server -> client snapshot)
 // ---------------------------------------------------------------------------
-
-/** Current state of the goal-review loop, shown in the goal bar UI. */
-export interface GoalStatus {
-	/** Conversation that owns this goal; null when no goal is set. */
-	conversationId: string | null;
-	/** Active goal text; null when no goal is set. */
-	goal: string | null;
-	/** Reviewer model id ("provider/id"), or null to use the main model. */
-	reviewModel: string | null;
-	/** Maximum number of review rounds per goal run. */
-	maxRounds: number;
-	/** Whether the goal persists across turns (locked) or just the next one. */
-	locked: boolean;
-	/** True while a review is running right now. */
-	reviewing: boolean;
-	/** 1-based round counter for the current goal (review rounds). */
-	round: number;
-	/** Human-readable status line (e.g. "审查中", "已通过", "本轮不通过"). */
-	status: string;
-	/** Latest review verdict: "pending" | "pass" | "fail". */
-	verdict: "pending" | "pass" | "fail";
-	/** Latest review feedback text (reviewer's verdict reason, pass or fail). */
-	feedback?: string;
-	/** Collaborative target-wizard progress (null when no wizard is running).
-	 *  The wizard turns a raw user requirement into a refined goal by asking
-	 *  questions, then auto-sets the goal. */
-	wizard: WizardStatus;
-}
-
-/** Progress of the collaborative target wizard (see GoalStatus.wizard). */
-export interface WizardStatus {
-	/** True while the wizard session is asking the user questions. */
-	active: boolean;
-	/** The user's raw requirement being scoped. */
-	draft: string;
-	/** Wizard model id ("provider/id"), or null for the main model default. */
-	model: string | null;
-	/** Question count asked so far (UI shows the step). */
-	step: number;
-	/** Max questions the wizard may ask before forcing a conclusion. */
-	maxSteps: number;
-	/** Short status line for the goal bar (e.g. "调研中：请回答第 2 题"). */
-	status: string;
-}
 
 // ---------------------------------------------------------------------------
 // Custom model configuration (agentDir/models.json) — browser-editable shape
@@ -952,7 +852,7 @@ export interface UiExtensionInfo {
 	/** Human-readable package, directory or standalone extension name. */
 	name: string;
 	/** Bundled functionality, labeled by the browser in the active language. */
-	builtin?: "todo";
+
 	/** Resolved entry path. */
 	path: string;
 	enabled: boolean;
@@ -960,76 +860,17 @@ export interface UiExtensionInfo {
 
 /** A named combination of prompt mode/text + disabled skills/extensions that
  *  the user can re-apply in one click. Persisted per client. */
-export interface UiSettingsPreset {
-	name: string;
-	promptMode: "append" | "replace";
-	customSystemPrompt: string;
-	disabledSkills: string[];
-	disabledExtensions: string[];
-	/** Extra instructions and skill toggles for the isolated goal-reviewer. */
-	reviewPrompt: string;
-	reviewDisabledSkills: string[];
-}
 
 /** One vision-capable model the vision bridge can use (picker option). */
-export interface UiVisionBridgeModel {
-	provider: string;
-	id: string;
-	/** Human-readable label: "qwen3-vl-plus (dashscope)". */
-	label: string;
-}
 
 /** Full settings state pushed to the browser (settings_state). */
 export interface UiSettingsState {
-	promptMode: "append" | "replace";
-	customSystemPrompt: string;
-	disabledSkills: string[];
-	disabledExtensions: string[];
-	/** Persistent-terminal tools on/off (default on). Off → terminal_* tools are
-	 *  removed from the active set and the guidance prompt is not injected. */
-	terminalToolsEnabled: boolean;
-	/** 终端接管 bash（默认关）：bash 执行体改为持久终端（可见/保留状态/静默转后台）。 */
-	terminalBash: boolean;
-	/** 接管模式下 bash 的静默解阻阈值毫秒数（0 = 一直等到命令结束）。 */
-	terminalBashIdleMs: number;
-	/** 思考文本是否换行（默认开 = pre-wrap；关 = 长行横向滚动）。 */
 	thinkingWrap: boolean;
-	/** 工具调用是否默认展开（默认开 = 展开；关 = 折叠）。 */
 	toolsWrap: boolean;
-	/** Vision bridge on/off (default on). Off → images are sent as-is. */
-	visionBridgeEnabled: boolean;
-	/** Preferred vision model as "provider/id", or null = auto-detect first. */
-	visionBridgeModel: string | null;
-	/** Vision-bridge transcription prompt mode: append to the built-in default
-	 *  prompt, or replace it entirely (empty text = built-in default). */
-	visionBridgePromptMode: "append" | "replace";
-	/** Custom vision-bridge transcription prompt text. */
-	visionBridgePrompt: string;
-	/** Extra instructions appended to the built-in goal-review prompt. */
-	reviewPrompt: string;
-	/** Skills disabled only for the isolated goal-reviewer. */
-	reviewDisabledSkills: string[];
-	/** Installed UI plugins the user hid in the settings panel (UI-only:
-	 *  hidden tabs/views; server-side handlers stay reachable). */
 	disabledPlugins: string[];
-	/** The built-in default system prompt (what replace mode would otherwise
-	 *  replace) — prefill source for the replace-mode editor. Empty until the
-	 *  resource-loader has run at least once. */
-	defaultSystemPrompt: string;
-	/** The FULL system prompt actually in effect for the active conversation
-	 *  (custom append/replace text + project context + skills + tool guidance).
-	 *  Read-only view source for the settings panel; empty until the session
-	 *  is ready. */
 	effectiveSystemPrompt: string;
-	/** The built-in default vision-bridge transcription prompt. */
-	visionBridgeDefaultPrompt: string;
-	/** Vision-capable configured models available on this machine. */
-	visionModels: UiVisionBridgeModel[];
 	skills: UiSkillInfo[];
-	/** Same skill catalog with enabled flags evaluated for the reviewer. */
-	reviewSkills: UiSkillInfo[];
 	extensions: UiExtensionInfo[];
-	presets: UiSettingsPreset[];
 }
 export type ServerMessage =
 	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[] }
@@ -1296,7 +1137,7 @@ export type ServerMessage =
 	 *  Review result CARDS are inserted into the main conversation flow as real
 	 *  custom messages (rendered like an attachment card), so they persist across
 	 *  snapshots/reconnects — this only drives the goal bar status. */
-	| { type: "goal_status"; status: GoalStatus }
+
 	/** Current settings state (system prompt mode/text, enabled skills &
 	 *  extensions, saved presets). Pushed on attach and after every settings
 	 *  change. */
@@ -1332,11 +1173,4 @@ export interface NodeProfile {
 export interface NodeSource {
 	id: string; kind: "xshell" | "ssh"; path: string; enabled: boolean;
 	lastSync?: number; error?: string; count: number; groups: number; changes?: string[];
-}
-export interface NodeRun {
-	id: string; nodeId: string; terminalId?: string; command: string;
-	status: "running" | "done" | "error"; output?: string;
-}
-export interface NodeApproval {
-	id: string; nodeId: string; terminalId?: string; command: string; kind: "command" | "write" | "read";
 }

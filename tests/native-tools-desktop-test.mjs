@@ -91,7 +91,11 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 		try {
 			await resumed.bindExtensions({mode:"rpc"});
 			await resumed.extensionRunner.getCommand("mcp").handler("", resumed.extensionRunner.createCommandContext());
-			assert(resumed.getActiveToolNames().includes("mcp__echo__add"), "resume restores discovered deferred MCP tools");
+			// Original Pi 1.0.0 resumes with its configured active loadout. Discovery remains native.
+			const search = resumed.getToolDefinition("tool_search");
+			assert(search, "native discovery remains available on resume");
+			await search.execute("resume-search", { query: "add" });
+			assert(resumed.getActiveToolNames().includes("mcp__echo__add"), "native discovery loads MCP tools after resume");
 		} finally { resumed.dispose(); }
 		console.log('PASS native MCP discovery, codemode worker, nested calls and deferred reload/resume');
 	} finally { session.dispose(); }

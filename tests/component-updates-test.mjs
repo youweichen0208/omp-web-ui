@@ -38,11 +38,11 @@ try {
 	ws.send(JSON.stringify({ type: 'check_component_updates', requestId: 'check-1' }));
 	const report = await wait(m => m.type === 'component_updates' && m.requestId === 'check-1' && m.phase === 'ready');
 	assert.equal(report.items.find(item => item.id === 'builtin:agent').canUpdate, false);
-	assert.equal(report.items.find(item => item.id === 'builtin:todo').status, 'available');
+	assert.equal(report.items.some(item => item.id === 'builtin:todo'), false);
 	assert.equal(report.items.find(item => item.name === 'sample').canUpdate, true);
 	assert.equal(report.items.find(item => item.name === 'pinned').status, 'pinned');
 	assert.equal(report.items.find(item => item.name === 'broken').status, 'error');
-	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-builtin', id: 'builtin:todo' }));
+	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-builtin', id: 'builtin:agent' }));
 	await wait(m => m.type === 'component_updates' && m.requestId === 'reject-builtin' && m.phase === 'error');
 	ws.send(JSON.stringify({ type: 'update_component', requestId: 'reject-arbitrary', id: 'npm:injected' }));
 	await wait(m => m.type === 'component_updates' && m.requestId === 'reject-arbitrary' && m.phase === 'error');
@@ -68,11 +68,19 @@ try {
 		await page.keyboard.press('Escape');
 		await page.locator('.topbar-more .chip').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
-		await page.locator('.settings-tab[title="组件更新"]').click();
+		assert.equal(await page.getByRole('button', { name: /目标审查|视觉桥|预设/ }).count(), 0);
+		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
+		await page.locator('.set-prompt-preview').waitFor();
+		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'native prompt must be read-only');
+		assert((await page.locator('.set-prompt-preview').textContent()).length > 0);
+		await page.getByRole('button', { name: '消息显示', exact: true }).click();
+		const thinking = page.locator('.settings-modal label', { hasText: '完整显示思考' }).locator('input');
+		await thinking.click();
+		await page.waitForFunction(() => [...document.querySelectorAll(".settings-modal label")].find(label => label.textContent.includes("完整显示思考"))?.querySelector("input")?.checked);
+		assert(await thinking.isChecked(), 'display preference should persist');
+		await page.getByRole('button', { name: '组件更新', exact: true }).click();
 		await page.locator('.component-update-row', { hasText: 'pi Agent' }).waitFor();
-		const builtin = page.locator('.component-update-row', { hasText: 'rpiv-todo' });
-		assert.equal(await builtin.getByRole('button', { name: '更新扩展' }).count(), 0);
-		await builtin.getByText('有新版本', { exact: true }).waitFor();
+
 		await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).waitFor();
 		await page.locator('.component-update-row', { hasText: 'broken' }).getByText('检查失败，可重试', { exact: true }).waitFor();
 		await page.screenshot({ path: '/tmp/pi-component-updates.png' });

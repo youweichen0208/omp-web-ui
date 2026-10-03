@@ -11,7 +11,6 @@ import {
 	roleLabel,
 } from "./Message";
 
-import { toolRecoveryKey } from "../tool-call-recovery";
 import { collapsedPreview } from "../collapsed-groups";
 
 interface CollapsedGroupProps {
@@ -41,8 +40,6 @@ export const CollapsedGroup = memo(function CollapsedGroup({
 	// instead of the raw SKILL.md dump.
 	let preview = "";
 	outer: for (const m of messages) {
-		const recoveryKey = toolRecoveryKey(m);
-		if (recoveryKey) { preview = t(recoveryKey); break; }
 		for (const b of m.content) {
 			const text = asText(b);
 			if (text && text.text.trim()) {
@@ -110,9 +107,7 @@ export const CollapsedGroup = memo(function CollapsedGroup({
 			kind: "meta",
 		});
 
-	const label = toolRecoveryKey(head)
-		? t("toolRecovery")
-		: head.role === "custom" && head.customType === "file"
+		const label = head.role === "custom" && head.customType === "file"
 			? t("attachment")
 			: roleLabel(head.role, t);
 	const ids = messages.map((m) => m.id);

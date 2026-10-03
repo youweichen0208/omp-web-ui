@@ -1,5 +1,9 @@
 # 核心架构
 
+## 原生上下文边界
+
+会话由 pi 1.0.0 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置仅保留显示偏好和界面插件可见性。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
+
 > 改代码前必读。本文档覆盖快照驱动、协议单源、安全边界、多对话并发等全局架构决策。
 
 ## 快照驱动
@@ -46,7 +50,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 - **默认只绑 loopback**（`PI_WEB_HOST`，默认 `127.0.0.1`）：本地个人工具不暴露到网络；局域网/容器需显式 `PI_WEB_HOST=0.0.0.0`（docker-compose.yml 已内置，Docker 端口映射才能工作）。
 - **WS 升级做 Origin/Host 同权威校验**（`server/index.ts` 的 `originAllowed`，`WebSocketServer({ noServer: true })` + 手动 `handleUpgrade`）：Origin 存在时其 hostname+**有效端口**必须与请求 Host 一致（浏览器里 `example-host:8445` 与 `example-host:9443` 是不同源）；非浏览器客户端（无 Origin）放行；`PI_WEB_ALLOW_ORIGINS` 白名单绕过（dev:server 已内置 `http://localhost:5173,http://127.0.0.1:5173`，反代场景自配）；`PI_WEB_ALLOW_HOSTS` 可选严格 hostname 白名单。**不要**加回「本地任意端口放行」——那正是提案要修的洞。
-- **quiesce 准入控制**（`AgentService.quiesce/unquiesce`）：进入排空后**拒绝一切新工作**——新 prompt（native slash 命令例外，纯配置无 token）、new_chat、edit_message fork、switch_session、goal wizard；存量运行继续跑完。已知 clientId 仍可 attach 看存量（发 notice 提示），**全新客户端 attach 抛 `QuiesceRejectedError` → index.ts 以 4403 关 WS**，浏览器重连循环在 unquiesce 后自动恢复。
+- **quiesce 准入控制**（`AgentService.quiesce/unquiesce`）：进入排空后**拒绝一切新工作**——新 prompt（native slash 命令例外，纯配置无 token）、new_chat、edit_message fork、switch_session；存量运行继续跑完。已知 clientId 仍可 attach 看存量（发 notice 提示），**全新客户端 attach 抛 `QuiesceRejectedError` → index.ts 以 4403 关 WS**，浏览器重连循环在 unquiesce 后自动恢复。
 - **控制 socket**（`server/control-socket.ts`）：CLI 的 `server status|quiesce|unquiesce` 经本地 mode-0600 unix socket / Windows 命名管道（`\\.\pipe\pi-web-ui-<port>`）与运行中进程通信，`status` 报告真实 socket 数（`noteSocketOpen/Close`，index.ts 维护）、active/pending 计数、quiesce 状态；无鉴权 HTTP 端点。
 - **provider headers 不下发浏览器**（`models_config` 不再携带 `headers` 字段，可能含 Authorization/API key）：`saveModelConfig` 保存时若 config 无 headers 则保留旧值（`prevHeaders`）。`UiProviderConfig.headers` 已从 protocol.ts / types.ts 删除，前端没有任何地方编辑 headers（仅 apiKey 经独立消息 `set_provider_api_key` 走浏览器）。
 - **dev 兼容**：vite :5173 代理 /ws 到 :8788 时 Origin(:5173) ≠ Host(:8788)，靠 `PI_WEB_ALLOW_ORIGINS`（dev:server 内置）放行，勿删。
@@ -84,25 +88,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 服务端只在当前用户轮次至少调用一次工具后，从权威 transcript 推断当前任务；纯聊天没有任务卡。相邻工具调用组成步骤，工具结果决定完成或失败；流式回复期间工具已完成但模型尚未继续时保留“正在分析请求”步骤。短句“继续”等沿用上一条实际任务请求作标题。任务耗时从用户消息时间算到 `agent_settled`；恢复历史时用消息时间回退。`taskProgress` 随全量和增量快照传递，ID 来源于原消息 ID，切换对话不会串进度。前端将连续步骤合并为语义阶段；只有一个阶段时直接列出文件和命令，多个阶段时显示阶段列表，原始步骤展开区只保留短摘要与工具记录，不展示整段助手回复。完成结果卡只取本轮记录里实际出现的提交、测试和改动数值。文件栏不再显示“本次对话涉及”区域。
 
-任务清单由随包固定版本的 `@juicesharp/rpiv-todo` 原生扩展提供。`server/todo-extension.ts` 通过资源加载器追加包入口，保留上游 `todo` 工具、`/todos` 命令和会话恢复；替换引导词以遵循用户与 skill 的澄清/等待流程，禁用 TUI overlay 和快捷键，由 Web 任务区统一展示。重复安装的同包扩展只保留首份。`task_plan` 不再注册，旧 transcript 的计划解析仍保留。
-
-`server/todo-progress.ts` 从 SessionManager 当前分支读取 `todo` 工具结果的 `details.tasks`，按分支末端缓存，跨轮次及压缩后仍可恢复。任务状态以成功快照为准，`details.error` 的拒绝更新不改变状态；一轮结束不会自动完成未完成项，界面显示“等待继续”。`/new` 更换 SDK 会话，任务随之清空。`clear` 开始新的清单并隔离重复使用的数字 ID。步骤的执行记录按工具调用顺序关联，保留文件和命令入口。上游负责修改与校验，本地只读投影，不维护第二份可修改清单。
-
-Pi SDK 的 `agent_end` 是单次代理循环结束，后续扩展消息仍可能触发继续执行。宿主保存该事件的消息，在整个活动的 `agent_settled` 才结束任务计时、生成标题、触发目标审查并应用延迟设置；附件队列模式也在此时恢复。
-
-`server/tool-call-recovery.ts` 处理模型把完整 `<invoke name="工具">` 写进正文却返回 `stop` 的情况。宿主在扩展事件处理之后识别候选，但不立即入队。运行时通过 `resourceLoaderOptions.extensionFactories` 注册官方 `agent_before_settle` 处理器，`bindSession` 只启用当前会话的纠正状态。边界在原生重试、压缩与扩展 `agent_end` 处理之后执行；已有边界条目、继续请求、真实消息队列和取消信号优先。原生队列已消费的新指令同样会使候选失效。解绑只停用纠正状态，保留其他扩展处理器；reload 会重新注册工厂。格式纠正不依赖 todo 是否存在、是否在当前轮设置 in_progress：任务清单是进度记录，不是工具协议恢复的前置条件。每个 SDK run 最多追加 3 次纠正提示，用户插队不会重置计数。一次纠正后，只有出现成功的原生工具结果，才能为后续新的格式错误再申请纠正；连续伪调用、单纯口头承诺、工具报错（包括 todo 的 details.error）不会补充机会。有排队消息或用户停止时让出执行权。提示要求模型遵守当前用户与 skill 的等待、确认和停止要求，由模型通过正式工具接口决定下一步，宿主绝不解析执行正文参数。
-
-检测保留 Markdown 边界，排除围栏、缩进、行内代码、引用和列表中的示例；真正工具调用、错误、取消、普通等待回复均不触发。补充一种严格限定的继续场景：最近未解决的对话含可识别的伪调用，用户发出短句“继续”等明确继续指令，而模型只以短句承诺继续核实等工作并返回 stop，本轮没有真正调用过工具时，可请求一次纠正。该判断从当前分支 transcript 读取，恢复历史后同样有效；不跨越其他用户指令、扩展消息、真实工具结果、成功恢复或取消记录。不会仅凭未完成 todo 或任意普通文本启动新一轮。识别范围有意限定，不能保证所有模型输出都能被纠正。
-
-纠正状态作为带结构化 `details` 的 custom message 持久化，前端按语言渲染。目标工具成功返回才标记“工具已恢复”（不代表参数语义正确或整个任务完成）；连续无进展的伪调用记录失败，单纯口头说继续记录未确认，停止记录已停止。正式工具已调用但执行报错或超时单独记录 `tool-error`，提示先核实操作是否生效；随后出现成功的工具结果可为新的伪调用重新申请纠正，但不会直接重放超时命令。达到整轮 3 次上限记录 `exhausted`，最后的正文调用保持未执行。未自动继续的提示通过 `reason` 区分已有排队消息和新指令打断；旧版没有 reason 的记录使用历史说明，不误报为当前有排队消息。相同毫秒的 custom 消息缓存同时区分字符串正文、customType、display 与 details，避免覆盖扩展消息。回归 `tests/tool-call-recovery-test.mjs` 用本地模拟模型驱动真实 SDK 和原生 todo，覆盖无 todo、首个伪调用、历史恢复后的继续、真实 bash 超时后检查成功再纠正、连续工具失败、整轮预算、等待确认、新话题、重复失败、扩展排队、用户插队及取消；端口占用直接失败，连接前验证测试子进程 PID。
-
-`tests/tool-call-recovery-boundary-test.mjs` 补充真实 SDK 的异步准备边界：迟到的用户插队、follow-up、扩展消息、原停止 hook、解绑及工具禁用。超时回归还检查已产生的文件副作用未被宿主重复执行；这不保证真实模型不会自行重复命令，执行前核实状态仍由模型负责。
-
-每项使用 subject/description/status/blockedBy；首项 metadata.title 和 metadata.completionCriteria 对应整体标题与完成标准，修改项 metadata.changeSummary 用于变更说明。建议 3–7 个实际步骤，按任务调整；问答、小修改和澄清不强制建实施清单。正在执行任务保持一项 in_progress，等待用户回答不自动 completed。已完成项按上游状态机不能重开，追加后续项；开始不同任务时 clear。依赖关系用于显示等待项，执行许可仍由用户与 skill 决定。
-
-没有 todo 的旧会话继续使用当前轮次工具阶段推断；旧 task_plan 完整提纲仍可展示。todo 的完整原始 details 不经消息序列化发送浏览器；右栏使用结构化 taskProgress，聊天使用 `UiMessage.todoSnapshot` 的精简投影（action/error、任务 id/subject/status，不含 metadata、params 或 description）。该字段为可选增量能力，旧结果缺失时保持普通工具行。协议版本 24 增加 waiting 状态与 todo 来源、清单标识和依赖字段。
-
-`web/src/todo-presentation.ts` 按工具调用顺序投影聊天清单：跨 assistant/toolResult 消息边界合并连续成功更新，正文、其他工具、用户消息及失败/未结束调用切开更新段；思考块保留，但不切开清单更新段。首个非空快照建立展开卡片，卡片反映该清单最新的成功状态，之后每段只记录相对段首的变化，未变化的 list/get 隐藏。clear 冻结旧卡片并重置身份，新清单即使复用数字 ID 也使用新卡片。失败调用保留原始错误展示。右栏依旧使用服务端权威清单；前端仅做展示，不修改 transcript 或执行状态。`TodoChecklist` 的“查看”沿用 `pi:jump-tool`，携带变化项 ID；MessageList 先展开并固定历史消息，再定位、聚焦并短暂高亮具体任务项。回归：`todo-presentation.test.ts`、`todo-chat-browser-test.mjs`。
+任务展示只读解析 transcript，不注册 todo 或 task_plan，不追加任务管理规则。用户通过 pi 原生配置加载的 todo 扩展可以继续显示；已有历史记录也保留只读展示。
 
 ### 工具挂死看门狗
 
@@ -113,12 +99,6 @@ Pi SDK 的 `agent_end` 是单次代理循环结束，后续扩展消息仍可能
 bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Windows netstat / POSIX lsof），diff 出的新增 LISTENING 进程记入 `bgServers`（端口→pid→since→name，name 经 `lookupProcessName` tasklist/ps 尽力获取），启动后 notice 提示「可在顶栏「后台任务」里单独停止或全部关闭」；**列表按客户端持久**（ClientSession 字段，非对话级）——对话结束/切换/断线重连都不消失（attachSink 重推 `bg_servers`），只有任务被停或进程自行退出才移除（30s 定时器 `refreshBgServers` 重新对端口快照，port+pid 都匹配才算还活着，静默剔除死项）。
 
 协议：`bg_servers`（ServerMessage，推送全量列表）/ `kill_background_server`（按端口停单个）/ `kill_background_servers`（全部关闭，`killAllBackgroundServers` 对每个 pid `killPidTree`，Windows `taskkill /F /T`）/ `list_bg_servers`（面板打开时请求刷新）；前端 `BgTasksModal`（每个任务行「停止」+ 底部「全部关闭」「刷新」，空列表有占位文案）。
-
-### 只停止 bash 命令（对话继续）
-
-bash 工具卡片运行中显示「停止」→ 发 `{ type: "abort_bash" }` → `ClientSession.abortBash()`。服务端用 **killable bash 工具**（`makeKillableBashTool`，经 `customTools` 按 name 覆盖 SDK 内置 bash）：执行时把自己的 AbortController 注册进客户端级 `bashKills` 集合，abort 只杀这些 controller → bash 子进程进程树被杀（工具抛 "Command aborted"，被 agent-loop 捕获成工具错误结果）→ **agent run 与对话继续**；与 SDK `session.abortBash()`（只对扩展 `executeBash` 路径有效，agent 工具路径无效）不同，这里对对话中的 bash 工具调用真实生效。
-
-命令被中止时 SDK 会把**终止前已输出的内容拼接进工具错误结果**（AI 能看到输出 + "Command aborted"）；随后 `abortBash()` 再 `sendUserMessage` 注入「用户手动停止」提示，让 AI 明确知道是用户手动而非失败。
 
 ### 扩展 UI 桥
 
@@ -152,20 +132,6 @@ bash 工具卡片运行中显示「停止」→ 发 `{ type: "abort_bash" }` →
 回归：`tests/project-switch-test.mjs`（隔离真实服务及 Chrome，固定短/长会话、延迟确认、
 缓存内容首帧、草稿与视图保留），`tests/project-switch-electron-test.mjs`（隔离桌面壳），
 `tests/unit/project-cache.test.ts`（LRU、预算、扫描合并及失效）。
-
-## 会话自动标题
-
-新对话发送消息时先显示截断的临时标题；在 `agent_settled` 收到成功完成的用户问答后，使用当前会话模型概括首条用户需求和助手回答。单独的 `hello`／`你好` 等寒暄保留原题，不发起标题请求。生成标题须与首条用户消息同语言、至多 12 个字符；服务端再校验语言并裁剪长度，模型输出语言不符时用首条需求作回退。工具输出和思考内容不送入标题请求；输入两侧各限 4000 字符。命名请求绑定原会话，不随前台项目切换而改变归属。
-
-`ConversationTitleJob` 每会话只允许一个并发请求，20 秒超时，失败或模型判定应延后时最多尝试三次；成功后停止自动更新。手动改名（包括清空名字）、会话移除、强制重置和客户端释放均取消并锁定命名任务。已有 `session_info` 的历史会话不会再次自动命名。正式标题沿用 SDK 的 `appendSessionInfo` 保存，不改变持久化格式；失败保留临时标题。标题请求是额外的短模型调用，不阻塞聊天。
-
-删除历史会话时，非当前且无后台任务/终端的缓存运行时会先取消标题请求并释放，再删除会话文件、刷新历史和运行列表；缓存命中本身不代表会话正在使用。当前会话、流式生成、排队消息、目标审查、调研向导及保留终端仍受删除保护。回归：`left-panel-delete-test`、`switch-session-background-test`。
-
-### 组件更新
-
-`server/component-updates.ts` 汇总运行中的 pi Agent、内置 rpiv-todo、SDK 配置的 npm/Git 包和本地扩展。设置“组件更新”通过 `check_component_updates` 获取结果；npm 查询稳定 latest（5 分钟缓存、8 秒超时、最多 4 个并发），Git 只读比较当前分支远端提交。错误与未知版本独立显示，固定版本与本地源不自动升级。检查不会执行安装。
-
-`update_component` 只接受服务端目录中的 ID，由 SDK 包管理器按原来源更新；内置依赖随应用发布，同包多安装范围需手动处理。更新前拒绝正在运行或排队的任务，期间暂停新任务准入；Git 目录有本地改动时拒绝覆盖。更新不热替换运行中模块，安装完成后提示重启应用生效。响应携带 requestId/cwd，浏览器丢弃旧请求，项目切换后不展示旧项目结果。协议版本 25。
 
 ## 生图工作台（Pi 1.0）
 

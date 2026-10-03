@@ -62,7 +62,6 @@ interface TopBarProps {
 	onOpenSettings: () => void;
 	/** Open the background-task panel (AI-started servers — stop individually or all). */
 	onOpenBgTasks: () => void;
-	onOpenGoal: () => void;
 	/** Open the global search panel (sessions / projects / workspace files). */
 	onOpenGlobalSearch: () => void;
 	/** Sound notification settings + change handler (owned by App). */
@@ -85,7 +84,6 @@ export function TopBar({
 	onManageModels,
 	onOpenSettings,
 	onOpenBgTasks,
-	onOpenGoal,
 	onOpenGlobalSearch,
 	sound,
 	onSoundChange,
@@ -152,7 +150,6 @@ export function TopBar({
 							<FiSettings aria-hidden="true" /><span className="workspace-menu-label">{t("allSettings")}</span>
 						</DropdownItem>
 						<div className="dd-header workspace-menu-section">{t("quickActions")}</div>
-						<DropdownItem onClick={() => { setMoreOpen(false); onOpenGoal(); }}><FiTarget aria-hidden="true" /><span className="workspace-menu-label">{t("goalBarTitle")}</span></DropdownItem>
 						<DropdownItem
 							onClick={() => {
 								setMoreOpen(false);

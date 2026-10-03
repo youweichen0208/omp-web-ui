@@ -34,10 +34,7 @@ export default {
 			status: "每 1h",
 			stop: () => { host.notify("info", "task-stopped"); },
 		});
-		host.registerCommand({
-			name: "bgtask-update",
-			run: () => { task.update({ status: "每 30m" }); return "updated"; },
-		});
+		host.onMessage(() => { task.update({ status: "每 30m" }); host.notify("info", "updated"); });
 	},
 };`,
 );
@@ -127,10 +124,10 @@ try {
 	}
 
 	// -- 2. update 刷新状态 ------------------------------------------------------------
-	sock.send(JSON.stringify({ type: "prompt", text: "/bgtask-update" }));
+	sock.send(JSON.stringify({ type: "plugin_message", pluginId: "worker", payload: { action: "update" } }));
 	await waitFor(sock, (m) => m.type === "notice" && m.text === "updated", "update notice");
 	// 命令返回的 notice 可能受会话就绪时序影响——直接等任务状态刷新的实际效果。
-	sock.send(JSON.stringify({ type: "prompt", text: "/bgtask-update" }));
+	sock.send(JSON.stringify({ type: "plugin_message", pluginId: "worker", payload: { action: "update" } }));
 	let status2 = null;
 	for (let i = 0; i < 40 && status2 !== "每 30m"; i++) {
 		status2 = latestBg.find((s) => s.taskId === "nightly")?.status;

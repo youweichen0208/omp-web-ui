@@ -50,30 +50,6 @@ afterEach(() => {
 });
 
 describe("tools 能力门控", () => {
-	it("声明了 tools → registerAgentTool 成功进全局表", async () => {
-		const h = await activate("declared", { permissions: ["tools"] });
-		expect(h.registerAgentTool(TOOL)).toBeTypeOf("function");
-		expect(mgr.getAgentTools().map((t) => t.name)).toContain("probe_tool");
-	});
-
-	it("严格模式缺 tools（只声明 net）→ 拒绝注册并报缺哪族", async () => {
-		const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-		await activate("netonly", { permissions: ["net"] });
-		hostOf("netonly").registerAgentTool(TOOL);
-		expect(mgr.getAgentTools()).toHaveLength(0);
-		expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('缺少能力声明 "tools"'));
-	});
-
-	it("旧格式全权模式（v1 无 permissions）→ 放行且只警告一次", async () => {
-		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-		const h = await activate("legacy");
-		h.registerAgentTool(TOOL); // 第一次受控调用 → 警告一次
-		expect(mgr.getAgentTools().map((t) => t.name)).toContain("probe_tool");
-		const off2 = h.registerAgentTool({ ...TOOL, name: "probe_tool_2" }); // 第二次不再警告
-		off2();
-		const warns = warnSpy.mock.calls.filter((c) => String(c[0]).includes("未声明 permissions"));
-		expect(warns).toHaveLength(1);
-	});
 
 	it("apiVersion 高于宿主 → 拒绝激活（升级提示在 facilities 套件已覆盖）；v2 默认拒绝语义待宿主升 v2 后启用", async () => {
 		// 说明：manifest apiVersion>1 会先被版本协商门拦下（提示升级宿主），

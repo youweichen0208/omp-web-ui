@@ -26,7 +26,7 @@ Windows 计划任务部署。
 | 终端 | node-pty（服务端 PTY）+ `@xterm/xterm`（浏览器渲染，经 terminal bridge 转发） |
 | 样式 | 单文件 `web/src/styles.css`（固定浅色主题，CSS 变量） |
 
-SDK 精确锁定 1.0.0；resume 工具恢复补丁由 postinstall/prebuild 应用，升级或打包时阅读 `docs/deployment.md`。
+SDK 与 pi-ai 精确锁定 1.0.0，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
 
 SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` 只表示一次循环结束。修改队列、纠正或延迟设置前读 `docs/architecture-core.md`；修改桌面扩展子进程或打包前读 `docs/deployment.md`。
 
@@ -46,12 +46,9 @@ pi-web-ui/
 │   ├── uploads.ts              # 文件对话上传 + 保留期清理
 │   ├── bg-servers.ts           # 后台任务跟踪（bash 前后端口快照 diff + 存活刷新）
 │   ├── component-updates.ts    # pi Agent / 扩展版本检查、来源校验与包更新
-│   ├── settings-service.ts     # 设置面板状态机（扩展命名见 extension-display.ts）
-│   ├── goal-service.ts         # 目标/审查循环/调研向导
+│   ├── settings-service.ts     # 界面偏好与原生资源只读视图（扩展命名见 extension-display.ts）
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
-│   ├── todo-extension.ts       # 原生 rpiv-todo 加载适配、Web 展示及工作流引导
 │   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
-│   ├── tool-call-recovery.ts   # 伪调用的有界纠正；官方 agent_before_settle 边界才入队，修改时读 docs/architecture-core.md
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── model-config-merge.ts   # 聊天模型表单合并；保留 typed models 和未知字段
@@ -59,10 +56,9 @@ pi-web-ui/
 │   ├── native-mcp-config.ts    # 原生 MCP 配置版本校验与敏感值；修改时读 docs/architecture-plugins.md
 │   ├── provider-auth.ts        # 官方 OAuth 登录桥；凭据由 SDK 保存，不下发浏览器
 │   ├── native-tools.ts         # 原生 MCP/codemode/tool_search factories；见 docs/architecture-plugins.md
-│   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData + 视觉桥）
+│   ├── attachments.ts          # 附件构建（inline/reference/lines/imageData/fileData）
 │   ├── webui-context.ts        # 扩展 UI 桥（WebUIContext：widgets/statuses/dialog → 浏览器）
 │   ├── plugins.ts              # 可选界面组件插件（扫描 <dataDir>/plugins/<id>/）
-│   ├── vision-bridge.ts        # 视觉桥：纯文本主模型看图转写
 │   ├── files-service.ts        # 文件服务（readDirForUI/readFile/searchFiles/watcher）
 │   ├── sqlite-preview.ts       # SQLite 只读预览调度（sqlite-worker/query：隔离进程与分页查询）
 │   ├── scm.ts                  # SCM 只读 git 查询（execFile git status/branches/history/filediff/commit）
@@ -71,7 +67,7 @@ pi-web-ui/
 │   ├── control-socket.ts       # 本地控制 socket（status / quiesce / unquiesce）
 │   ├── terminals.ts            # TerminalManager（PTY 管理 + 增量输出/按键工具）
 │   ├── node-sources.ts         # Xshell / SSH config 元数据解析与只读命令判定
-│   └── node-workbench.ts       # 内置 SSH 节点：来源同步/凭据/确认/PTY/SFTP/独立 Agent
+│   └── node-workbench.ts       # 内置 SSH 节点：来源同步/凭据/确认/PTY/SFTP/手动终端和文件操作
 ├── web/                        # 前端（React + Vite，编译到 web/dist/）
 │   ├── vite.config.ts          # dev 端口 5173，/ws 代理到后端
 │   ├── src/
@@ -112,8 +108,8 @@ pi-web-ui/
 ├── Dockerfile / docker-compose.yml
 ├── docs/                       # 详细文档（本文件的分拆）
 │   ├── architecture-core.md    # 核心架构：快照驱动、协议单源、安全边界、多对话并发
-│   ├── architecture-attachments.md  # 附件、图片、视觉桥、文件上传/预览/下载
-│   ├── architecture-terminal.md    # 终端架构：PTY 管理、SCM 查询、活力检测、终端接管 bash
+│   ├── architecture-attachments.md  # 附件、图片、文件上传/预览/下载
+│   ├── architecture-terminal.md    # 终端架构：PTY 管理、SCM 查询
 │   ├── architecture-plugins.md     # 插件系统：形态、协议、宿主扩展点、MCP 桥
 │   ├── development.md          # 开发工作流、CI、编码约定、测试规范
 │   ├── release.md              # 发布流程（GitHub + npm）
@@ -138,8 +134,7 @@ pi-web-ui/
 | `TopBar.tsx` / `FooterBar.tsx` | 顶栏（项目／会话标题、后台任务、视图切换、文件栏开关）、状态栏（版本／分支／消息／工作目录）；模型与思考强度在 `ChatInput.tsx` 底部 |
 | `Dialog.tsx` | 扩展 `ui.select/confirm/input` → 浏览器弹窗 |
 | `ModelConfigModal.tsx` / `PiSetupModal.tsx` | models.json 管理 / 首次配置引导 |
-| `SettingsModal.tsx` | 设置面板（侧边栏分页：提示词/终端/消息显示/技能/插件/界面插件/目标审查/视觉桥/预设） |
-| `GoalBar.tsx` | 输入框上方目标条：设目标/清除/AI 提炼/轮数下拉 |
+| `SettingsModal.tsx` | 设置面板（侧边栏分页：消息显示/原生提示词/技能/扩展/MCP/更新/界面插件） |
 | `BgTasksModal.tsx` | 后台任务弹窗：AI 启动的监听端口进程列表 |
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
@@ -149,6 +144,10 @@ pi-web-ui/
 | `CollapsedMessage.tsx` / `LazyMount.tsx` | 消息折叠摘要行 / 消息级惰性挂载包装 |
 | `SearchBar.tsx` | 会话内搜索栏（Ctrl+F，CSS Custom Highlight API 高亮） |
 | `Markdown.tsx` / `Dropdown.tsx` / `copy-button.tsx` / `SoundSettings.tsx` | 通用件 |
+
+## 原生代理边界
+
+pi SDK 和 pi-ai 精确锁定 1.0.0，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词、技能和扩展仅供查看；界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 
@@ -160,18 +159,16 @@ pi-web-ui/
 | **项目切换缓存** | `docs/architecture-core.md` | 修改切换、缓存或异步归属时阅读：请求确认、权威状态与展示分离、3 项目/32MiB LRU、隐藏视图刷新策略；界面切换不弹成功通知，命令切换在目标会话保留事件 |
 | **协议单源** | `docs/architecture-core.md` | `server/protocol.ts` 是唯一事实源；`web/src/types.ts` 是 `export type *` shim；新增消息只改 protocol.ts，两端 switch 各加分支 |
 | **安全边界** | `docs/architecture-core.md` | 默认只绑 loopback；WS Origin/Host 同权威校验；quiesce 准入控制；控制 socket；provider headers 不下发浏览器 |
-| **多对话并发** | `docs/architecture-core.md` | 每对话独立 AgentSessionRuntime；对话按项目归属；set_cwd 切到目标项目对话；8 个上限/项目；共享同一个 ModelRuntime |
-| **附件** | `docs/architecture-attachments.md` | 三种模式（inline/reference/lines）；图片问答（base64 + 缩放）；文件上传（fileData 落盘）；视觉桥（纯文本模型看图转写） |
+| **多对话并发** | `docs/architecture-core.md` | 每对话手动终端和文件操作SessionRuntime；对话按项目归属；set_cwd 切到目标项目对话；8 个上限/项目；共享同一个 ModelRuntime |
+| **附件** | `docs/architecture-attachments.md` | 三种模式（inline/reference/lines）；图片问答（base64 + 缩放）；文件上传（fileData 落盘） |
 | **文件预览** | `docs/architecture-attachments.md` | 修改右栏编辑、保存冲突或草稿离开保护时阅读；512KB 预览、媒体 HTTP Range、下载 |
 | **终端** | `docs/architecture-terminal.md` | 每 Conversation 一个 TerminalManager；spawn 统一准入；按键编码纯函数；输出微批合并；node-pty × --watch 兼容自愈 |
 | **SCM** | `docs/architecture-terminal.md` | 只读 git 查询走 execFile；未跟踪文件显示限量内容；git-dir watcher；写操作走可见终端 tab |
-| **终端接管 bash** | `docs/architecture-terminal.md` | 设置开关（默认关）；哨兵行技术；静默解阻；shell 状态跨调用保留 |
 | **插件** | `docs/architecture-plugins.md` | <dataDir>/plugins/<id>/ 目录（manifest.json + index.mjs + client/entry.mjs）；attach 时热重扫；MCP 工具桥 |
 | **SSH 节点** | `docs/architecture-nodes.md` | 修改 Xshell/SSH config 同步、凭据、执行确认或终端引用时阅读；本机 ssh2 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
 | **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：原生 `rpiv-todo` 管理跨轮次清单，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
-| **工具挂死看门狗** | `docs/architecture-core.md` | 20 分钟超时自动 abort 会话；只停止运行不碰后台服务 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 
@@ -220,7 +217,6 @@ Windows job 的终端冒烟测试必须通过才能上传安装包；`AttachCons
 | `PI_WEB_CWD` | `process.cwd()` | 智能体工作区 |
 | `PI_WEB_DATA_DIR` | `~/.pi-web` | 数据目录（client-state / uploads / plugins） |
 | `PI_WEB_TOKEN` | 空 | 可选共享口令鉴权 |
-| `PI_WEB_TOOL_TIMEOUT_MS` | 20 分钟 | 工具挂死看门狗超时 |
 
 ## 8. 部署
 

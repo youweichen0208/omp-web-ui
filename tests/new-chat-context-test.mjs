@@ -10,6 +10,7 @@ import WebSocket from "ws";
 import { chromium } from "playwright-core";
 import { CHROME_PATH } from "./lib/chrome.mjs";
 import { portUp } from "./lib/port-utils.mjs";
+import { createAgentSessionServices, createAgentSessionFromServices, SessionManager, createCodemodeExtension, createToolSearchExtension, createMcpExtension } from "@earendil-works/pi-coding-agent";
 
 const PROTOCOL_ONLY = process.argv.includes("--protocol-only");
 const PORT = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) || 8967);
@@ -91,6 +92,18 @@ writeFileSync(
 		},
 	}),
 );
+
+writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultTools: ["+codemode", "+tool_search"] }));
+// Independent native SDK reference, with the same official extensions as Pi CLI.
+const nativeServices = await createAgentSessionServices({ cwd: workdir, agentDir, resourceLoaderOptions: { extensionFactories: [
+ { name: "codemode", builtin: true, factory: createCodemodeExtension() },
+ { name: "tool-search", builtin: true, factory: createToolSearchExtension() },
+ { name: "mcp", builtin: true, factory: createMcpExtension() },
+] } });
+const nativeReference = await createAgentSessionFromServices({ services: nativeServices, sessionManager: SessionManager.inMemory(workdir) });
+const nativePrompt = nativeReference.session.systemPrompt;
+const nativeTools = nativeReference.session.getActiveToolNames().sort();
+nativeReference.session.dispose();
 
 const repoRoot = realpathSync(new URL("../", import.meta.url));
 const server = spawn(process.execPath, ["dist/server/index.js"], {
@@ -280,7 +293,15 @@ try {
 	const chatRequests = requests.filter((request) => request.messages.some((message) => Array.isArray(message.content) && message.content.some((part) => part.text === "OLD_CONTEXT_SENTINEL" || part.text === "NEW_CONTEXT_SENTINEL")));
 	if (chatRequests.length !== 2) throw new Error("Expected two chat requests");
 	const tools = chatRequests[0].tools.map((tool) => tool.function.name);
-	if (!tools.includes("todo") || tools.includes("task_plan")) throw new Error("Expected native todo instead of task_plan");
+	if (tools.some(name => ["todo", "task_plan", "web_subagent", "submit_result"].includes(name) || name.startsWith("terminal_"))) throw new Error("Host agent tools leaked into native context");
+	if (JSON.stringify(tools.sort()) !== JSON.stringify(nativeTools)) throw new Error("WebUI tool list differs from native SDK");
+	for (const request of chatRequests) {
+		const system = request.messages.find(message => message.role === "system" || message.role === "developer");
+		const content = typeof system?.content === "string" ? system.content : system?.content?.map(part => part.text ?? "").join("\n");
+		if (content !== nativePrompt) throw new Error("WebUI system prompt differs from native SDK");
+	}
+	console.log("✓ model requests have the same system prompt and active tools as an independent native pi 1.0.0 session");
+
 	if (requests.some((request) => request.messages.some((message) => message.content === "/new" || (Array.isArray(message.content) && message.content.some((part) => part.text === "/new"))))) throw new Error("/new was sent to the model");
 	if (JSON.stringify(chatRequests[1]).includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new leaked previous context into model request");
 	if (client.state.stats.tokens.total !== 132) throw new Error("New session usage must count only its own response");

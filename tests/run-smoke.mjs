@@ -34,14 +34,10 @@ const ALL = [
 	"global-search-test",
 	"file-editor-protocol-test",
 	"current-file-protocol-test",
-	"goal-prefs-test",
-	"goal-test",
 	"left-panel-delete-test",
 	"plugin-bgtask-test",
-	"plugin-command-test",
 	"plugin-cwd-test",
 	"plugin-http-test",
-	"mcp-bridge-test",
 	"native-tools-desktop-test",
 	"provider-auth-test",
 	"pi-one-images-test",
@@ -64,10 +60,6 @@ const ALL = [
 	"steer-queue-smoke",
 	"switch-session-background-test",
 	"terminal-smoke-test",
-	"todo-extension-test",
-	"tool-call-recovery-test",
-	"tool-call-recovery-boundary-test",
-	"vision-bridge-test",
 	"version-handshake-test",
 	"vscode-editor-plugin-test",
 ];
@@ -83,7 +75,6 @@ const ALL = [
 //     terminal-smoke / restart-handoff 自动跳过（见 WIN32_KNOWN_ENV_FAIL）；
 //   - title-jsonl-test：已修复（原 lsof/URL.pathname 的 Windows 兼容问题），本地可跑；
 //   - 浏览器 E2E 见文件头注释（headless Chrome 路径写死本机）。
-
 
 const targets = process.argv.length > 2 ? process.argv.slice(2) : ALL;
 const results = [];

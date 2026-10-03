@@ -48,28 +48,6 @@ Windows ConPTY 关闭终端时还有一个 node-pty 1.1.0 竞态：console-list 
 
 曾用隐藏 PTY + shell 变量拼接 sentinel 切分文本，踩过 xterm writer 覆盖解析器、zsh 提示符无尾换行粘行吞掉 `## main` 状态头、全局队列被流式期间的慢查询阻塞等三个坑。
 
-## 终端活力检测（liveness watchdog）
-
-`terminals.ts` 的 `noteAgentActivity` / `armIdleWatch` + agent-service 的 `notifyTerminalIdle`：agent 工具路径的 terminal_create/input/key 会启动一个「静默纪元」——该终端连续 `PI_WEB_TERMINAL_IDLE_MS`（默认 15s）无输出且**该对话正在流式运行**时，经 onAgentIdle 回调由宿主 `sendUserMessage` 注入一条 steer 提醒唤醒 AI 去检查（等输入/已挂起）。
-
-防骚扰设计：①用户手开的终端永不参与（只有工具包装层调 noteAgentActivity，浏览器路径不调）；②一次性——触发后解除武装，agent 再次触碰才重新计时；③纪元内任何输出/输入都重置倒计时；④退出/关闭即拆钟。系统提示词引导 TERMINAL_TOOLS_GUIDANCE 已告知模型该机制。回归：`tests/terminal-idle-test.mjs`（直接实例化 TerminalManager + 小阈值，零 token 不起 server；win32 未验证）。
-
-## 终端接管 bash（terminal-backed bash）
-
-输出因预览或结构化上限而缩短时，`full_output_path` 指向权限为 0600 的临时文件，供后续 read 工具读取完整输出；后台结果中的文件只包含截至解阻时已有的输出。
-
-Pi 0.99 的 Codemode 调用需要结构化结果。一次性 bash 保留官方工具定义的 `outputSchema`、提示贡献和返回值；动态分流使用涵盖两种实现的输出 schema。终端接管结果提供 `structuredContent.output/truncated/exit_code/wall_time_seconds`，完成时非零退出设置 `isError`；静默解阻时 `running:true`、`exit_code:null` 与 `terminal_id` 明确表示尚未完成。`tail` 和聊天预览截断只影响模型可见文本，脚本可读输出最多保留 1 MiB（超限保留头尾）。`tests/terminal-bash-test.mjs` 使用真实 PTY 验证成功、失败、空输出、tail、后台完成和中断。
-
-设置面板开关 `terminalBash`（默认关）。`terminals.ts` 的 `makeTerminalBashTool` + agent-service 的 `makeAdaptiveBashTool` 动态分流：开启后 bash 工具的执行体改为往持久可见终端 `ai-bash` 写命令（单行哨兵技术：`{cmd}; __pi_rc=$?; printf '\\n[pi-exit:%s]\\n' "$__pi_rc"`，多行脚本经 `$'...'` 转义 eval，避免被交互 shell 的 stdin/bracketed-paste 吃掉），等哨兵行拿到**真实退出码**后返回完整输出（`stripAnsi` 清理 ANSI/OSC/孤立 CR、截掉回显与新提示符）。
-
-行为语义：
-- ①默认阻塞到命令结束
-- ②连续 `terminalBashIdleMs`（默认 15s，0=一直等）无输出 → **静默解阻**：立即返回「仍在后台运行」+ 已有输出，同时注册 `watchOutput` 完成观察器，命令真正结束后由宿主 `notifyTerminalBashDone` 通知 AI（流式中 sendUserMessage steer / 空闲时 sendCustomMessage nextTurn 排队不唤醒）
-- ③shell 状态跨调用保留（cd/venv/ssh）
-- ④abort_bash 复用同一 kills 集合，abort 时向 PTY 发 Ctrl+C 杀前台进程、终端保留
-
-开关经 makeAdaptiveBashTool 在每次调用时读取设置 → 即时生效（customTools 固定于 runtime 创建，不能创建时二选一）；阈值随预设存取。回归：`tests/terminal-bash-test.mjs`（直接实例化 + 小阈值注入，零 token 不起 server；win32 未验证）。
-
 ## macOS launchd / TCC 问题
 
 macOS 下若服务由 launchd 拉起（`process.ppid === 1`，LaunchAgent/孤儿进程），TCC 会把相机/麦克风权限归因到 node 本身（无 App Bundle、无 Info.plist）而静默拒绝——ffmpeg 取流会卡死在取帧。`terminals.ts` 检测该场景，在客户端首次创建终端时输出提示（改 url/文件源，或在自己已授权的终端里前台运行）。

@@ -44,7 +44,7 @@ import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
-import { McpBridge } from "./mcp-bridge.js";
+
 import { NodeWorkbench } from "./node-workbench.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 
@@ -435,21 +435,10 @@ const nodeWorkbench = new NodeWorkbench(DATA_DIR);
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
 // attach so freshly dropped plugins appear without a server restart.
 const pluginMgr = new PluginManager(DATA_DIR, CWD);
-// MCP 工具桥：读取 <dataDir>/mcp.json 启动外部 MCP 服务器（stdio），把它们的
-// 工具并入与插件工具相同的 customTools 管线；单服务器失败不炸进程。
-const mcpBridge = new McpBridge(DATA_DIR, (...a) => console.log("[mcp]", ...a));
-void mcpBridge.load().then(() => {
-	if (mcpBridge.getTools().length) service.applyPluginAgentTools();
-});
+
 // 插件扩展点：SDK 工具执行事件（bash/读文件等 start+end）转发给已注册的插件。
 service.onToolEvent = (ev) => pluginMgr.emitToolEvent(ev);
-// 插件扩展点：插件注册的 AI 工具（registerAgentTool）+ MCP 桥工具 → 会话创建时
-// 带上 + 变化时动态注入/移除已有会话。
-service.pluginToolsProvider = () => [...pluginMgr.getAgentTools(), ...mcpBridge.getTools()];
-pluginMgr.onAgentToolsChanged = () => service.applyPluginAgentTools();
-// 插件扩展点：插件斜杠命令（registerCommand）→ 命令选择器目录 + prompt 拦截执行。
-pluginMgr.onCommandsChanged = () => service.applyPluginCommandCatalog();
-service.pluginCommandsProvider = () => pluginMgr.listCommands();
+
 // 插件扩展点：插件常驻后台任务（registerBackgroundTask）→ 并入「后台任务」面板。
 pluginMgr.onBgTasksChanged = () => service.refreshBackgroundServers();
 service.pluginBgTasksProvider = () => pluginMgr.bgTasks();
@@ -611,9 +600,7 @@ wss.on("connection", (ws) => {
 			case "retry_silent_prompt":
 				void cs.retrySilentPrompt(msg.conversationId, msg.text);
 				break;
-			case "abort_bash":
-				void cs.abortBash();
-				break;
+
 			case "kill_background_server":
 				void cs.killBackgroundServer(msg.port, msg.taskId);
 				break;
@@ -814,51 +801,18 @@ wss.on("connection", (ws) => {
 			case "save_commands":
 				void cs.saveCommands(msg.commands);
 				break;
-			case "set_goal":
-				void cs.setGoal(msg.goal, {
-					reviewModel: msg.reviewModel,
-					maxRounds: msg.maxRounds,
-					locked: msg.locked,
-				});
-				break;
-			case "clear_goal":
-				void cs.clearGoal();
-				break;
-			case "start_goal_wizard":
-				void cs.startGoalWizard(msg.text, {
-					wizardModel: msg.wizardModel,
-					maxRounds: msg.maxRounds,
-					locked: msg.locked,
-				});
-				break;
-			case "set_goal_prefs":
-				void cs.setGoalPrefs({
-					reviewModel: msg.reviewModel,
-					maxRounds: msg.maxRounds,
-					locked: msg.locked,
-				});
-				break;
+
 			case "get_settings":
 				cs.pushSettings();
 				break;
 			case "set_settings":
 				void cs.setSettings({
-					promptMode: msg.promptMode,
-					customSystemPrompt: msg.customSystemPrompt,
-					disabledSkills: msg.disabledSkills,
-					disabledExtensions: msg.disabledExtensions,
+
 					disabledPlugins: msg.disabledPlugins,
-					terminalToolsEnabled: msg.terminalToolsEnabled,
-					terminalBash: msg.terminalBash,
-					terminalBashIdleMs: msg.terminalBashIdleMs,
+
 					thinkingWrap: msg.thinkingWrap,
 					toolsWrap: msg.toolsWrap,
-					visionBridgeEnabled: msg.visionBridgeEnabled,
-					visionBridgeModel: msg.visionBridgeModel,
-					visionBridgePromptMode: msg.visionBridgePromptMode,
-					visionBridgePrompt: msg.visionBridgePrompt,
-					reviewPrompt: msg.reviewPrompt,
-					reviewDisabledSkills: msg.reviewDisabledSkills,
+
 				});
 				break;
 			case "extensions_reload":
@@ -879,15 +833,7 @@ wss.on("connection", (ws) => {
 			case "plugins_reload":
 				void pluginMgr.reload().then(() => pluginMgr.pushToAll());
 				break;
-			case "save_preset":
-				void cs.savePreset(msg.name);
-				break;
-			case "apply_preset":
-				void cs.applyPreset(msg.name);
-				break;
-			case "delete_preset":
-				void cs.deletePreset(msg.name);
-				break;
+
 			default:
 				break;
 		}
@@ -928,7 +874,7 @@ wss.on("connection", (ws) => {
 							pluginMgr.notifyAttach(cid);
 							// 插件命令可能在本客户端 attach 过程中才注册（首载竞态）——
 							// 重推一次目录，保证选择器完整。
-							service.applyPluginCommandCatalog();
+
 						})
 						.catch(() => {});
 					// Replay anything that arrived while the session was starting.
@@ -1027,7 +973,7 @@ async function shutdown(): Promise<void> {
 	stopControl();
 	nodeWorkbench.dispose();
 	pluginMgr.dispose();
-	mcpBridge.dispose();
+
 	images.shutdown();
 
 	await service.disposeAll();

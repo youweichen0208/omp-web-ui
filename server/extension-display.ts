@@ -1,9 +1,7 @@
 /** Display-only metadata. Toggle/uninstall identities remain owned by the loader. */
-export function extensionDisplay(path: string, source?: string, bundledTodoPath?: string): { name: string; builtin?: "todo" } {
+export function extensionDisplay(path: string, source?: string): { name: string } {
 	const normalized = path.replaceAll("\\", "/").replace(/\/$/, "");
-	if (bundledTodoPath && normalized === bundledTodoPath.replaceAll("\\", "/")) {
-		return { name: "rpiv-todo", builtin: "todo" };
-	}
+
 	if (source?.startsWith("npm:")) return { name: source.slice(4) };
 	const marker = "/node_modules/";
 	const packagePath = normalized.slice(normalized.lastIndexOf(marker) + marker.length);

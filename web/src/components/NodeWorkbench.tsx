@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUuid } from "../uuid";
 import { useT } from "../i18n";
 import { RemoteTerminal } from "./node-terminal";
-import { Markdown } from "./Markdown";
-import type { NodeProfile, NodeSource, NodeRun, NodeApproval, ClientMessage, ServerMessage } from "../types";
+
+import type { NodeProfile, NodeSource,   ClientMessage, ServerMessage } from "../types";
 
 type Event = Extract<ServerMessage, { type: "node_event" }>;
 type Node = NodeProfile;
 type Tab = { id: string; conversationId: string; busy: boolean; closed?: boolean; output?: string };
-type Chat = { model?: string; models?: { provider: string; id: string; name: string }[]; conversationId: string; messages: { role: string; text: string }[]; busy: boolean };
-const emptyChat: Chat = { conversationId: "", messages: [], busy: false };
+
 const draftNode = (): Partial<Node> => ({ name: "", group: "默认", host: "", port: 22, username: "root", auth: "password", defaultDir: "/" });
 
 export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => boolean; active: boolean }) {
@@ -22,11 +21,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 	const [search, setSearch] = useState("");
 	const [workspace, setWorkspace] = useState(false);
 	const [showFiles, setShowFiles] = useState(false);
-	const [quotes, setQuotes] = useState<Record<string, string>>({});
-	const [messages, setMessages] = useState<Record<string, string>>({});
-	const [approvals, setApprovals] = useState<NodeApproval[]>([]);
-	const [runs, setRuns] = useState<NodeRun[]>([]);
-	const [runOutput, setRunOutput] = useState<NodeRun | null>(null);
+
 	const [credentialAuth, setCredentialAuth] = useState<"password" | "key">("password");
 	const [credentialKeyPath, setCredentialKeyPath] = useState("");
 	const [credential, setCredential] = useState<string | null>(null);
@@ -44,9 +39,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 	const [tabs, setTabs] = useState<Record<string, Tab[]>>({});
 	const [selected, setSelected] = useState<string>(localStorage.getItem("pi-node-selected") ?? "");
 	const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
-	const pendingPrompts = useRef(new Map<string, string>());
-	const [promptPending, setPromptPending] = useState<Record<string, boolean>>({});
-	const [chats, setChats] = useState<Record<string, Chat>>({});
+
 	const [draft, setDraft] = useState<Partial<Node> | null>(null);
 	const [secret, setSecret] = useState("");
 	const [error, setError] = useState("");
@@ -66,33 +59,25 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 	const node = nodes.find((n) => n.id === selected);
 	const currentTabs = tabs[selected] ?? [];
 	const activeTab = currentTabs.find((t) => t.id === activeTabs[selected]) ?? currentTabs.at(-1);
-	const chat = chats[selected] ?? emptyChat;
-	const agentBusy = chat.busy || Boolean(promptPending[selected]);
-	const message = messages[selected] ?? "";
-	const setMessage = (value: string) => setMessages((all) => ({ ...all, [selected]: value }));
-	const quote = quotes[selected] ?? "";
+
 	const credentialNode = nodes.find((n) => n.id === credential);
 	const source = sources.find((s) => s.id === node?.sourceId);
 	const entries = listings[selected]?.path === path ? listings[selected].entries : [];
-	useEffect(() => { if (selected && activeTab && !activeTab.closed) request("terminal_select", selected, {}, activeTab.id, activeTab.conversationId); }, [selected, activeTab?.id, activeTab?.closed, request]);
+
 	useEffect(() => { if (active) { request("state"); request("source_detect"); } }, [active, request]);
-	useEffect(() => { if (selected) { localStorage.setItem("pi-node-selected", selected); request("chat_state", selected); } }, [selected, request]);
+
 	useEffect(() => { if (node) setPath(node.defaultDir); }, [selected, node?.defaultDir]);
 	useEffect(() => {
 		const listener = (e: globalThis.Event) => {
 			const msg = (e as CustomEvent<Event>).detail;
 			const id = msg.nodeId ?? "";
-			if ((msg.event === "result" || msg.event === "failure") && msg.requestId === pendingPrompts.current.get(id)) {
-				pendingPrompts.current.delete(id);
-				setPromptPending((all) => ({ ...all, [id]: false }));
-			}
+
 			if (msg.event === "state") {
 				const list = (msg.data?.nodes ?? []) as Node[];
 				setNodes(list);
 				setTimings(Object.fromEntries(((msg.data?.connections ?? []) as { nodeId: string; connectedAt?: number; latencyMs?: number }[]).map((c) => [c.nodeId, c])));
 				setSources((msg.data?.sources ?? []) as NodeSource[]);
-				setApprovals((msg.data?.approvals ?? []) as NodeApproval[]);
-				setRuns((msg.data?.runs ?? []) as NodeRun[]);
+
 				setConnections(Object.fromEntries(((msg.data?.connections ?? []) as { nodeId: string; status: string }[]).map((c) => [c.nodeId, c.status])));
 				for (const c of (msg.data?.connections ?? []) as { nodeId: string; terminals: Tab[] }[]) for (const tab of c.terminals) terminalHistory.current.set(`${c.nodeId}:${tab.id}`, tab.output ?? "");
 				setTabs((before) => {
@@ -121,16 +106,12 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 				} else { opening.current.delete(id); credentialAttempt.current = null; setTesting(false); }
 				return;
 			}
-			if (msg.event === "approval_required") { setApprovals((all) => [...all.filter((a) => a.id !== (msg.data?.approval as NodeApproval).id), msg.data?.approval as NodeApproval]); return; }
-			if (msg.event === "approval_closed") { setApprovals((all) => all.filter((a) => a.id !== msg.data?.id)); return; }
-			if (msg.event === "run") { const run = msg.data?.run as NodeRun; setRuns((all) => [...all.filter((r) => r.id !== run.id), run].slice(-100)); return; }
 
 			if (msg.event === "failure") { if (msg.requestId === pendingWrite.current) pendingWrite.current = null; const text = String(msg.data?.message ?? "");
 				if (!(msg.requestId && awaitingTrust.current.delete(msg.requestId))) { setError(text); setTesting(false); if (msg.data?.action === "credential_test") credentialAttempt.current = null; opening.current.delete(id); }
 				return; }
-			if (msg.event === "chat") { setChats((c) => ({ ...c, [id]: { conversationId: msg.conversationId ?? "", messages: (msg.data?.messages ?? []) as Chat["messages"], busy: Boolean(msg.data?.busy), model: String(msg.data?.model ?? ""), models: msg.data?.models as Chat["models"] } })); return; }
-			if (msg.event === "chat_error") { setError(String(msg.data?.message ?? "Agent 出错")); return; }
-			if (msg.event === "terminal_busy") { setTabs((all) => ({ ...all, [id]: (all[id] ?? []).map((t) => t.id === msg.terminalId ? { ...t, busy: Boolean(msg.data?.busy), model: String(msg.data?.model ?? ""), models: msg.data?.models as Chat["models"] } : t) })); return; }
+
+			if (msg.event === "terminal_busy") { setTabs((all) => ({ ...all, [id]: (all[id] ?? []).map((t) => t.id === msg.terminalId ? { ...t, busy: Boolean(msg.data?.busy) } : t) })); return; }
 			if (msg.event === "terminal_exit") { const key = `${id}:${msg.terminalId}`; terminalHistory.current.set(key, (terminalHistory.current.get(key) ?? "") + "\r\n[SSH 已断开]\r\n"); setTabs((all) => ({ ...all, [id]: (all[id] ?? []).map((t) => t.id === msg.terminalId ? { ...t, closed: true } : t) })); return; }
 			if (msg.event !== "result") return;
 			const action = msg.data?.action;
@@ -142,7 +123,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 			if (action === "list" && msg.requestId === latestList.current.get(id)) setListings((all) => ({ ...all, [id]: { path: String(msg.data?.path ?? ""), entries: (msg.data?.entries ?? []) as { name: string; type: string }[] } }));
 			if (action === "read" && msg.requestId === latestRead.current.get(id)) setFile({ nodeId: id, path: String(msg.data?.path ?? ""), text: String(msg.data?.text ?? "") });
 			if (action === "write" && msg.requestId === pendingWrite.current) { pendingWrite.current = null; setFile((current) => current?.nodeId === id && current.path === msg.data?.path ? null : current); }
-			if (action === "chat_state") setChats((all) => ({ ...all, [id]: { ...all[id] ?? emptyChat, conversationId: String(msg.data?.conversationId ?? "") } }));
+
 			if (action === "save") { setDraft(null); setSecret(""); if (msg.data?.id) setSelected(String(msg.data.id)); }
 			if (action === "import_legacy" || action === "import") setNotice(t("nodeImported", { n: Number(msg.data?.count ?? 0) }));
 		};
@@ -154,16 +135,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 	const listFiles = (target: string) => { const id = request("list", selected, { path: target }, activeTab?.id, activeTab?.conversationId); if (id) latestList.current.set(selected, id); };
 	const openFile = (target: string) => { const id = request("read", selected, { path: target }, activeTab?.id, activeTab?.conversationId); if (id) latestRead.current.set(selected, id); };
 	const saveFile = () => { if (!file || file.nodeId !== selected) return; pendingWrite.current = request("write", file.nodeId, { path: file.path, text: file.text }, activeTab?.id, activeTab?.conversationId); };
-	const submit = () => {
-		if (!message.trim() || !activeTab || !chat.conversationId || activeTab.closed || agentBusy || pendingPrompts.current.has(selected) || node?.policy === "off") return;
-		const id = request("chat_prompt", selected, { text: quote ? `${message}\n\n<quoted-terminal-output>\n${quote}\n</quoted-terminal-output>` : message }, activeTab.id, chat.conversationId);
-		if (id) {
-			pendingPrompts.current.set(selected, id);
-			setPromptPending((all) => ({ ...all, [selected]: true }));
-			setMessage("");
-			setQuotes((all) => ({ ...all, [selected]: "" }));
-		}
-	};
+
 	const openNode = (target: Node) => {
 		setSelected(target.id); setError("");
 		if ((target.auth === "password" && !target.hasSecret) || (target.auth === "key" && (!target.keyPath || target.unsupported?.includes("key")) && !target.localKeyPath)) { setCredentialAuth(target.auth === "key" ? "key" : "password"); setCredentialKeyPath(target.localKeyPath || target.keyPath || ""); setCredential(target.id); setSecret(""); setSameGroup(false); opening.current.add(target.id); return; }
@@ -171,7 +143,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 		if (connections[target.id] === "connected") { if (!(tabs[target.id] ?? []).some((tab) => !tab.closed)) request("terminal_open", target.id, {}, randomUuid()); }
 		else { opening.current.add(target.id); request("connect", target.id); }
 	};
-	const policies = (target: Node) => <select aria-label={t("nodePolicy")} value={target.policy ?? "readonly"} onChange={(e) => request("policy", target.id, { policy: e.target.value })}><option value="readonly">{t("nodePolicyReadonly")}</option><option value="confirm">{t("nodePolicyConfirm")}</option><option value="auto">{t("nodePolicyAuto")}</option><option value="off">{t("nodePolicyOff")}</option></select>;
+
 	const addButton = <button onClick={() => { setDraft(draftNode()); setSecret(""); }} aria-label={t("nodeAdd")}>＋</button>;
 	const importButton = <label className="node-secondary">{t("nodeImportJson")}<input type="file" accept="application/json,.json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const data = JSON.parse(await f.text()); request("import", undefined, { nodes: data.nodes }); } catch { setError(t("nodeInvalidJson")); } e.target.value = ""; }} /></label>;
 	const sourceCards = <div className="node-source-page"><div className="node-eyebrow">{t("nodeSources")}</div><h2>{t("nodeAdd")}</h2><p className="node-muted">{t("nodeSourceIntro")}</p>
@@ -197,27 +169,19 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 			{node.sourceMissing && <p className="node-warning">{t("nodeSourceMissing")}</p>}{!!node.unsupported?.length && <p className="node-warning">{t("nodeUnsupported")}: {node.unsupported.join(", ")}</p>}
 			{<div className={node.hasSecret ? "node-credential-note" : "node-warning"}><div><strong>{t(node.auth === "agent" ? "nodeAgentAuth" : node.auth === "password" ? "nodePassword" : "nodePassphrase")}{!node.hasSecret && node.auth === "password" && ` · ${t("nodeMissingSecret")}`}</strong><p>{t("nodeCredentialHint")}</p></div><button onClick={() => { setCredentialAuth(node.auth === "key" ? "key" : "password"); setCredentialKeyPath(node.localKeyPath || node.keyPath || ""); setCredential(node.id); setSecret(""); setSameGroup(false); }}>{t("nodeFillSecret")}</button></div>}
 			<dl><dt>{t("nodeAuth")}</dt><dd>{t(node.auth === "key" ? "nodeKey" : node.auth === "agent" ? "nodeAgentAuth" : "nodePassword")}</dd>{(node.localKeyPath || node.keyPath) && <><dt>{t("nodeKeyPath")}</dt><dd><code>{node.localKeyPath || node.keyPath}</code></dd></>}{source && <><dt>{t("nodeSourceLocation")}</dt><dd><code>{source.path}{source.kind === "xshell" ? `/${node.sourceKey}` : ` · ${node.sourceKey}`}</code><small>{t("nodeSourceReadonly")}</small><button title={t("nodeSourceOpenHint")} onClick={() => void navigator.clipboard.writeText(source.kind === "xshell" ? `${source.path}/${node.sourceKey}` : source.path).then(() => setNotice(t("nodeCopied"))).catch((e) => setError(String(e)))}>{t("nodeCopy")}</button></dd></>}<dt>{t("nodeLastConnected")}</dt><dd>{node.lastConnected ? new Date(node.lastConnected).toLocaleString() : t("nodeNever")}</dd><dt>{t("nodeDefaultDir")}</dt><dd><code>{node.defaultDir}</code></dd></dl>
-			<div className="node-policy-card"><div><strong>{t("nodePolicy")}</strong><p className="node-muted">{t("nodePolicyHint")}</p></div>{policies(node)}</div>
+
 		</section>)}
 		{workspace && node && <div className="node-connected"><nav className="node-connection-tabs"><button onClick={() => setWorkspace(false)}>{t("nodeBackList")}</button>{nodes.filter((n) => n.id === selected || connections[n.id] || tabs[n.id]?.length).map((n) => <button key={n.id} className={n.id === selected ? "active" : ""} onClick={() => setSelected(n.id)}><span className={`node-dot ${connections[n.id] ?? "offline"}`} />{n.name}</button>)}<button onClick={() => { setWorkspace(false); setSourceView(true); }} aria-label={t("nodeAdd")}>＋</button>{timings[selected]?.connectedAt && <span className="node-connection-timing">{t("nodeConnectionTiming", { ms: timings[selected].latencyMs ?? 0, duration: `${Math.floor(Math.max(0, now - timings[selected].connectedAt!) / 60000)}:${String(Math.floor(Math.max(0, now - timings[selected].connectedAt!) / 1000) % 60).padStart(2, "0")}` })}</span>}</nav>
 			<div className="node-connected-body"><section className="node-main"><header className="node-main-head"><strong>{node.name}</strong><span>{node.username}@{node.host}:{node.port}</span><em>{t(connections[selected] === "connected" ? "nodeConnected" : "nodeDisconnected")}</em><button onClick={() => connections[selected] === "connected" ? request("disconnect", selected) : openNode(node)}>{t(connections[selected] === "connected" ? "nodeDisconnect" : "nodeConnect")}</button></header>
 			<div className="node-tabs">{currentTabs.map((tab, i) => <div key={tab.id} className={activeTab?.id === tab.id ? "active" : ""}><button onClick={() => setActiveTabs((a) => ({ ...a, [selected]: tab.id }))}>{t("nodeTab", { n: i + 1 })}{tab.closed ? ` · ${t("nodeTabClosed")}` : tab.busy ? ` · ${t("nodeTabBusy")}` : ""}</button><button aria-label={t("nodeCloseTab")} onClick={() => { if (!tab.closed) request("terminal_close", selected, {}, tab.id, tab.conversationId); terminalHistory.current.delete(`${selected}:${tab.id}`); setTabs((all) => ({ ...all, [selected]: (all[selected] ?? []).filter((x) => x.id !== tab.id) })); }}>×</button></div>)}<button disabled={connections[selected] !== "connected"} onClick={() => request("terminal_open", selected, {}, randomUuid())}>＋</button></div>
-			<div className="node-terminals">{currentTabs.map((tab) => <RemoteTerminal key={`${selected}:${tab.id}`} nodeId={selected} tab={tab} active={active && activeTab?.id === tab.id} send={send} initialOutput={terminalHistory.current.get(`${selected}:${tab.id}`) ?? tab.output} onQuote={(text) => setQuotes((all) => ({ ...all, [selected]: text }))} />)}{!currentTabs.length && <div className="node-empty">{t("nodeOpenHint")}</div>}</div>
+			<div className="node-terminals">{currentTabs.map((tab) => <RemoteTerminal key={`${selected}:${tab.id}`} nodeId={selected} tab={tab} active={active && activeTab?.id === tab.id} send={send} initialOutput={terminalHistory.current.get(`${selected}:${tab.id}`) ?? tab.output}  />)}{!currentTabs.length && <div className="node-empty">{t("nodeOpenHint")}</div>}</div>
 			<div className="node-terminal-footer"><span>{t("nodeTerminalHint")}</span><button onClick={() => setShowFiles(!showFiles)}>{t("nodeShowFiles")}</button></div>
 			{showFiles && <><div className="node-filebar"><input value={path} onChange={(e) => setPath(e.target.value)} aria-label={t("nodeDefaultDir")} /><button disabled={connections[selected] !== "connected"} onClick={() => listFiles(path)}>{t("nodeBrowse")}</button></div><div className="node-files">{entries.map((entry) => { const target = `${path.replace(/\/$/, "")}/${entry.name}`; return <button key={entry.name} onClick={() => entry.type === "dir" ? (setPath(target), listFiles(target)) : openFile(target)}>{entry.type === "dir" ? "▸" : "·"} {entry.name}</button>; })}</div></>}
 			{file?.nodeId === selected && <div className="node-file-editor"><span>{file.path}</span><button onClick={saveFile}>{t("save")}</button><button onClick={() => setFile(null)}>{t("close")}</button><textarea value={file.text} onChange={(e) => setFile({ ...file, text: e.target.value })} /></div>}
-		</section><aside className="node-agent"><header><strong>pi</strong><span>{t("nodeWorkingHere", { name: node.name })}</span>{policies(node)}</header><div className="node-agent-messages">{chat.messages.filter((m) => m.text).map((m, i) => <div className={`node-agent-message ${m.role}`} key={i}><small>{m.role === "user" ? node.username : m.role === "assistant" ? "pi" : m.role}</small><Markdown text={m.text.replace(/\n\n<terminal-context>[\s\S]*?<\/terminal-context>$/, "")} /></div>)}
-			{runs.filter((r) => r.nodeId === selected).map((run) => <div className="node-run" key={run.id}><span>{run.status === "running" ? "◌" : run.status === "done" ? "✓" : "!"}</span><code>{run.command}</code><button onClick={() => { if (run.terminalId) setActiveTabs((a) => ({ ...a, [selected]: run.terminalId! })); setRunOutput(run); requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("pi-node-locate", { detail: run }))); }}>{t("nodeLocate")}</button></div>)}
-			{runOutput?.nodeId === selected && <div className="node-run-output"><strong>{t("nodeRunOutput")}</strong><button onClick={() => setRunOutput(null)}>{t("close")}</button><pre>{runOutput.output ?? "…"}</pre></div>}
-			{approvals.filter((a) => a.nodeId === selected).map((a) => <ApprovalCard key={a.id} approval={a} onDecide={(allow, command) => request("approval", a.nodeId, { id: a.id, allow, command }, a.terminalId)} />)}
-		</div>{agentBusy && <div className="node-agent-status" role="status"><span className="node-agent-spinner" aria-hidden="true" /><span>{t(approvals.some((a) => a.nodeId === selected) ? "nodeAgentApproval" : runs.some((r) => r.nodeId === selected && r.status === "running") ? "nodeAgentExecuting" : "nodeAgentWaiting")}</span></div>}<div className="node-agent-input">{quote && <div className="node-quote"><span title={quote}>{t("nodeSelection", { n: quote.split("\n").length })}</span><button aria-label={t("nodeQuoteRemove")} onClick={() => setQuotes((all) => ({ ...all, [selected]: "" }))}>×</button></div>}<textarea value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} placeholder={t("nodeChatPlaceholder")} /><div><select aria-label={t("nodeModel")} disabled={agentBusy} value={chat.model ?? ""} onChange={(e) => { const model = chat.models?.find((m) => `${m.provider}/${m.id}` === e.target.value); if (model) request("chat_model", selected, { provider: model.provider, model: model.id }); }}>{!chat.models?.some((m) => `${m.provider}/${m.id}` === chat.model) && <option value={chat.model ?? ""}>{chat.model || t("nodeNoModel")}</option>}{chat.models?.map((m) => <option key={`${m.provider}/${m.id}`} value={`${m.provider}/${m.id}`}>{m.name} · {m.provider}</option>)}</select>{activeTab && <button onClick={() => request("interrupt", selected, {}, activeTab.id, activeTab.conversationId)}>{t("nodeInterrupt")}</button>}{agentBusy && <button onClick={() => request("chat_abort", selected)}>{t("nodeStopAgent")}</button>}<button className="node-primary" disabled={!activeTab || activeTab.closed || !chat.conversationId || agentBusy || node.policy === "off" || !message.trim()} onClick={submit}>{t("nodeSend")}</button></div></div></aside></div>
+		</section></div>
 		</div>}
 		{sourceDraft && <div className="node-modal-backdrop"><form className="node-modal" onSubmit={(e) => { e.preventDefault(); request("source_add", undefined, { ...sourceDraft, enabled: true }); }}><h2>{t("nodeAddSource")}</h2><label>{t("nodeSources")}<select value={sourceDraft.kind} onChange={(e) => setSourceDraft({ ...sourceDraft, kind: e.target.value as "xshell" | "ssh" })}><option value="xshell">Xshell 8</option><option value="ssh">SSH config</option></select></label><label>{t("nodeSourcePath")}<input required autoFocus value={sourceDraft.path} onChange={(e) => setSourceDraft({ ...sourceDraft, path: e.target.value })} /></label><div className="node-modal-actions"><button type="button" onClick={() => setSourceDraft(null)}>{t("cancel")}</button><button type="submit">{t("nodeSyncKeep")}</button><button type="button" disabled={!sourceDraft.path.trim()} onClick={() => request("source_add", undefined, { ...sourceDraft, enabled: false })}>{t("nodeImportOnce")}</button></div></form></div>}
 		{credentialNode && <div className="node-modal-backdrop"><form className="node-modal" onSubmit={(e) => { e.preventDefault(); const payload = { auth: credentialAuth, secret, persist: persistSecret, sameGroup, ...(credentialAuth === "key" ? { keyPath: credentialKeyPath } : {}) }; credentialAttempt.current = { nodeId: credentialNode.id, payload }; setTesting(true); request("credential_test", credentialNode.id, payload); }}><h2>{credentialNode.name}</h2><code>{credentialNode.username}@{credentialNode.host}:{credentialNode.port}</code><label>{t("nodeAuth")}<select disabled={testing} value={credentialAuth} onChange={(e) => { setCredentialAuth(e.target.value as "password" | "key"); setSecret(""); setSameGroup(false); }}><option value="password">{t("nodePassword")}</option><option value="key">{t("nodeKey")}</option></select></label><p className="node-muted">{t("nodeLocalAuthHint")}</p><>{credentialAuth === "key" && <><label>{t("nodeKeyPath")}<input required value={credentialKeyPath} onChange={(e) => setCredentialKeyPath(e.target.value)} /></label><p className="node-muted">{t("nodePrivateKeyHint")}</p></>}</><label>{t(credentialAuth === "key" ? "nodePassphrase" : "nodePassword")}<input autoFocus type="password" autoComplete="new-password" required={credentialAuth === "password"} value={secret} onChange={(e) => setSecret(e.target.value)} /></label><label className="node-checkbox"><input type="checkbox" checked={persistSecret} onChange={(e) => setPersistSecret(e.target.checked)} />{t("nodePersistSecret")}</label>{credentialAuth === "password" && <label className="node-checkbox"><input type="checkbox" checked={sameGroup} onChange={(e) => setSameGroup(e.target.checked)} />{t("nodeGroupSecret")}</label>}{sameGroup && <p className="node-muted">{t("nodeGroupHint")}</p>}<p className="node-muted">{t("nodeCredentialHint")}</p><div className="node-modal-actions"><button type="button" disabled={testing} onClick={() => { opening.current.delete(credentialNode.id); setCredential(null); setSecret(""); credentialAttempt.current = null; }}>{t("cancel")}</button><button disabled={testing} className="node-primary">{t(testing ? "nodeTesting" : "nodeTestSave")}</button></div></form></div>}
 
 		{draft && <div className="node-modal-backdrop"><form className="node-modal" onSubmit={(e) => { e.preventDefault(); request("save", draft.id, { ...draft, secret: secret || undefined }); }}><h2>{draft.id ? t("nodeEdit") : t("nodeAdd")}</h2>{([ ["group", t("nodeGroup")], ["name", t("nodeName")], ["host", t("nodeAddress")], ["port", t("nodePort")], ["username", t("nodeUsername")], ["defaultDir", t("nodeDefaultDir")] ] as const).map(([key, label]) => <label key={key}>{label}<input required={key !== "group"} value={String(draft[key] ?? "")} onChange={(e) => setDraft({ ...draft, [key]: key === "port" ? Number(e.target.value) : e.target.value })} /></label>)}<label>{t("nodeAuth")}<select value={draft.auth} onChange={(e) => setDraft({ ...draft, auth: e.target.value as Node["auth"] })}><option value="password">{t("nodePassword")}</option><option value="key">{t("nodeKey")}</option><option value="agent">{t("nodeAgentAuth")}</option></select></label>{draft.auth === "key" && <label>{t("nodeKeyPath")}<input value={draft.keyPath ?? ""} onChange={(e) => setDraft({ ...draft, keyPath: e.target.value })} /></label>}{draft.auth !== "agent" && <label>{draft.auth === "key" ? t("nodePassphrase") : t("nodePassword")}<input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={draft.hasSecret ? t("nodeKeepSecret") : ""} /></label>}<div className="node-modal-actions">{draft.id && draft.fingerprint && <button type="button" onClick={() => { if (window.confirm(t("nodeForgetHostKeyConfirm", { name: draft.name ?? "" }))) request("forget_host_key", draft.id); }}>{t("nodeForgetHostKey")}</button>}{draft.id && <button type="button" onClick={() => { if (window.confirm(t("nodeDeleteConfirm", { name: draft.name ?? "" }))) { request("delete", draft.id); setDraft(null); } }}>{t("nodeDelete")}</button>}<button type="button" onClick={() => setDraft(null)}>{t("cancel")}</button><button type="submit">{t("save")}</button></div></form></div>}	</div>;
-}
-function ApprovalCard({ approval, onDecide }: { approval: NodeApproval; onDecide: (allow: boolean, command?: string) => void }) {
-	const t = useT(); const [editing, setEditing] = useState(false); const [command, setCommand] = useState(approval.command);
-	return <div className="node-approval"><strong>{t("nodeApproval")}</strong>{editing ? <textarea aria-label={t("nodeEditCommand")} value={command} onChange={(e) => setCommand(e.target.value)} /> : <pre>{approval.command}</pre>}<div className="node-actions"><button className="node-primary" disabled={!command.trim()} onClick={() => onDecide(true, command)}>{t("nodeAllow")}</button>{approval.kind === "command" && <button onClick={() => setEditing(!editing)}>{t("nodeEditCommand")}</button>}<button onClick={() => onDecide(false)}>{t("nodeDeny")}</button></div></div>;
 }

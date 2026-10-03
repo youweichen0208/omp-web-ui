@@ -1,7 +1,6 @@
 import { LinkedText } from "./components/LinkedText";
 import { ImageWorkbench } from "./components/ImageWorkbench";
 
-
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
 import { WorkspacePathContext } from "./workspace-context";
 import {
@@ -25,7 +24,7 @@ import { MessageList } from "./components/MessageList";
 import { ChatInput } from "./components/ChatInput";
 import { AgentSilenceStatus } from "./components/AgentSilenceStatus";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "./current-file";
-import { GoalBar } from "./components/GoalBar";
+
 import { FooterBar } from "./components/FooterBar";
 import { Dialog } from "./components/Dialog";
 // 终端视图懒加载：xterm.js 体积大且只在切到终端时才需要，拆出主包
@@ -87,7 +86,6 @@ export interface PendingAttachment {
 	/** Stable dedupe/removal key for pasted images. */
 	key?: string;
 }
-
 
 /** A single notice toast. Auto-dismisses after a level-dependent delay, but
  *  hovering PAUSES the timer (stays visible as long as the pointer is over it),
@@ -325,7 +323,7 @@ export function App() {
 	}, []);
 	// Mobile: which side panel is open as a drawer (null = both closed).
 	const [filesCollapsed, setFilesCollapsed] = useState(false);
-	const [goalOpenRequest, setGoalOpenRequest] = useState(0);
+
 	const [drawer, setDrawer] = useState<"left" | "right" | null>(null);
 	// Viewport class: ≤768px turns the side panels into sliding drawers
 	// (matches the CSS breakpoint) — used to lazy-load panel data only when
@@ -861,7 +859,6 @@ export function App() {
 					onManageModels={() => setManageModelsOpen(true)}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
-					onOpenGoal={() => { setView("chat"); setGoalOpenRequest((value) => value + 1); }}
 					onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 					sound={sound}
 					onSoundChange={setSound}
@@ -896,7 +893,6 @@ export function App() {
 									liveOutputs={chat.liveOutputs}
 									toolStatuses={chat.toolStatuses}
 									onEdit={onEditMessage}
-									onKillBash={() => send({ type: "abort_bash" })}
 									thinkingWrap={chat.settings?.thinkingWrap ?? false}
 								toolsWrap={chat.settings?.toolsWrap ?? true}
 								pendingEcho={chat.pendingEcho}
@@ -907,14 +903,7 @@ export function App() {
 									{chat.ready ? t("loadingSession") : t("connectingServer")}
 								</div>
 							)}
-							<GoalBar
-								openRequest={goalOpenRequest}
-								send={send}
-								goal={chat.goal}
-								models={chat.models}
-								modelsLoading={chat.modelsLoading}
-								activeConversationId={chat.activeConversationId}
-							/>
+
 							<AgentSilenceStatus chat={chat} send={send} />
 							{/* 扩展问卷：非模态内联面板，插在输入框上方，对话内容保持可见 */}
 							{chat.dialog && <Dialog dialog={chat.dialog} send={send} />}

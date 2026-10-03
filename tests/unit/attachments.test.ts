@@ -53,23 +53,7 @@ function makeCtx(opts: {
 		clientId: opts.clientId ?? "test-client",
 		emit: (m: { level?: string; text?: string; [k: string]: unknown }) =>
 			notices.push({ level: m.level ?? "", text: m.text ?? "" }),
-		settings: {
-			promptMode: "append" as const,
-			customSystemPrompt: "",
-			disabledSkills: [],
-			disabledExtensions: [],
-			terminalToolsEnabled: true,
-			terminalBash: false,
-			terminalBashIdleMs: 15000,
-			visionBridgeEnabled: true,
-			visionBridgeModel: null,
-			visionBridgePromptMode: "append" as const,
-			visionBridgePrompt: "",
-			reviewPrompt: "",
-			reviewDisabledSkills: [],
-			thinkingWrap: true,
-			toolsWrap: true,
-		},
+
 		// 非视觉路径下只用得到 session.model / modelRuntime 的占位（不触 SDK）。
 		session: { model: null, modelRuntime: null } as unknown as AttachmentContext["session"],
 	};

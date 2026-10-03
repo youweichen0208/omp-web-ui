@@ -18,7 +18,7 @@ import type {
 	UiThinkingBlock,
 	UiToolCallBlock,
 } from "../types";
-import { toolRecoveryKey } from "../tool-call-recovery";
+
 import { LeakedThinkingBlock } from "./LeakedThinkingBlock";
 import { Markdown } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
@@ -326,9 +326,9 @@ export const Message = memo(function Message({
 		message.role === "custom" &&
 		(message.customType === "goal-review" || message.customType === "goal-wizard");
 	const isGoalWizard = message.role === "custom" && message.customType === "goal-wizard";
-	const recoveryKey = toolRecoveryKey(message);
+
 	const renderContentBlocks = (skipText: boolean): ReactNode[] => {
-		if (recoveryKey) return skipText ? [] : [<p key="recovery">{t(recoveryKey)}</p>];
+
 		const elements: ReactNode[] = [];
 		const viewFor = (item: UiToolCallBlock): ToolView => ({ result: toolResults.get(item.id), nestedCalls: liveNestedCalls(item.id, toolStatuses), liveOutput: liveOutputs.get(item.id)?.text, status: toolStatuses.get(item.id), streaming });
 		for (let i = 0; i < message.content.length; i++) {
@@ -381,7 +381,7 @@ export const Message = memo(function Message({
 		>
 			<div className="msg-meta">
 				<span className="msg-role">
-					{recoveryKey ? t("toolRecovery") : message.role === "custom"
+					{message.role === "custom"
 						? isGoalWizard
 							? t("goalWizardCard")
 							: isGoalReview

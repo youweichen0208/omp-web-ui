@@ -68,33 +68,8 @@ try {
 	await page.locator(".node-main-head em", { hasText: "已连接" }).waitFor({ timeout: 10000 });
 
 	await page.locator(".node-tabs .active").waitFor();
-	const input = page.locator(".node-agent-input textarea");
-	const sendButton = page.locator(".node-agent-input").getByRole("button", { name: "发送", exact: true });
-	await input.fill("Check this node");
-	await sendButton.click();
-	await page.locator(".node-agent-status", { hasText: "等待响应" }).waitFor();
-	assert(await sendButton.isDisabled(), "send stays enabled while waiting for acknowledgment");
-	await input.fill("Do not send twice");
-	await input.press("Enter");
-	await page.waitForTimeout(100);
-	assert(prompts.length === 1, "Enter sent a duplicate prompt");
-	const emit = (event) => page.evaluate((detail) => window.dispatchEvent(new CustomEvent("pi-node-event", { detail })), event);
-	const prompt = prompts[0];
-	const chatEvent = (busy) => ({ type: "node_event", event: "chat", nodeId: prompt.nodeId, conversationId: prompt.conversationId, data: { busy, messages: [] } });
-	await emit(chatEvent(true));
-	await emit({ ...prompt, type: "node_event", event: "result", data: { action: "chat_prompt" } });
-	await page.locator(".node-agent-status").waitFor();
-	await emit({ type: "node_event", event: "run", nodeId: prompt.nodeId, data: { run: { id: "status-test", nodeId: prompt.nodeId, command: "hostname", status: "running" } } });
-	await page.locator(".node-agent-status", { hasText: "正在执行命令" }).waitFor();
-	await emit(chatEvent(false));
-	await page.locator(".node-agent-status").waitFor({ state: "hidden" });
-	assert(await sendButton.isEnabled(), "send did not recover after completion");
-	await sendButton.click();
-	await page.locator(".node-agent-status").waitFor();
-	await page.waitForTimeout(100);
-	await emit({ ...prompts[1], type: "node_event", event: "failure", data: { action: "chat_prompt", message: "Mock rejection" } });
-	await page.locator(".node-agent-status").waitFor({ state: "hidden" });
-	await input.fill("");
+	assert(await page.locator(".node-agent").count() === 0, "custom node agent still visible");
+	assert(prompts.length === 0, "opening nodes created an agent prompt");
 
 	await page.locator(".node-xterm").first().click();
 	await page.keyboard.type("hello"); await page.keyboard.press("Enter");
@@ -127,14 +102,7 @@ try {
 	assert(!(await page.locator(".node-xterm:visible").innerText()).includes("beta-command"), "terminal output leaked across nodes");
 	await page.locator(".node-file-editor").getByRole("button", { name: "关闭", exact: true }).click();
 	await page.screenshot({ path: join(root, "tests/scratch/node-workspace.png") });
-	// Terminal selection becomes a node-scoped input attachment.
-	const screen = await page.locator(".node-xterm:visible .xterm-screen").boundingBox();
-	await page.mouse.move(screen.x + 2, screen.y + 8);
-	await page.mouse.down(); await page.mouse.move(screen.x + 120, screen.y + 25); await page.mouse.up();
-	await page.getByRole("button", { name: /发给 pi/ }).click();
-	await page.locator(".node-quote").waitFor();
-	await page.locator(".node-connection-tabs button", { hasText: "beta" }).click();
-	assert(await page.locator(".node-quote").count() === 0, "quote leaked to another node");
+
 	await page.getByRole("button", { name: "‹ 节点", exact: true }).click();
 	await page.getByRole("button", { name: "节点来源", exact: true }).click();
 	await page.getByRole("button", { name: "添加来源", exact: true }).click();

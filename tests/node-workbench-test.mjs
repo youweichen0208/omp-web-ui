@@ -42,10 +42,9 @@ try {
 	const opened = await call("terminal_open", nodeId, {}, "term-a");
 	assert.equal(opened.event, "result");
 	const conversationId = opened.data.conversationId;
-	const chatState = await call("chat_state", nodeId);
-	assert.equal(chatState.event, "result");
-	assert.equal(chatState.data.conversationId, conversationId);
-	assert.deepEqual(service.chats.get(JSON.stringify(["client-a", nodeId])).session.getActiveToolNames().sort(), ["remote_command", "remote_read", "remote_write"]);
+	assert.equal((await call("chat_state", nodeId)).event, "failure");
+	assert.equal((await call("chat_prompt", nodeId, { text: "test" })).event, "failure");
+
 	assert.equal((await call("terminal_input", nodeId, { data: "hello\r" }, "term-a", conversationId)).event, "result");
 	await new Promise((r) => setTimeout(r, 50));
 	assert(events.some((e) => e.event === "terminal_output" && e.nodeId === nodeId && e.terminalId === "term-a" && e.data.text.includes("echo:hello")));
@@ -57,50 +56,7 @@ try {
 	assert(truncated.length < 66000);
 	const secondTerminal = await call("terminal_open", nodeId, {}, "term-b", conversationId);
 	assert.equal(secondTerminal.event, "result");
-	await call("terminal_select", nodeId, {}, "term-b", conversationId);
-	const remoteCommand = service.chats.get(JSON.stringify(["client-a", nodeId])).session.getToolDefinition("remote_command");
-	const before = events.length;
-	const toolResult = await remoteCommand.execute("tool-test", { command: "whoami" });
-	assert.match(toolResult.content[0].text, /echo:whoami/);
-	assert(events.slice(before).some((e) => e.event === "terminal_output" && e.terminalId === "term-b" && e.data.text.includes("echo:whoami")));
-	assert(!events.slice(before).some((e) => e.event === "terminal_output" && e.terminalId === "term-a" && e.data.text.includes("echo:whoami")));
 
-	// A pending write cannot execute before a matching client/node/terminal approval.
-	const pendingCommand = remoteCommand.execute("write-test", { command: "touch /tmp/approved" });
-	await new Promise((r) => setTimeout(r, 20));
-	const approval = events.findLast((e) => e.event === "approval_required").data.approval;
-	assert(!events.some((e) => e.event === "terminal_output" && e.data.text.includes("echo:touch /tmp/approved")));
-	assert.equal((await call("approval", nodeId, { id: approval.id, allow: true }, "term-a")).event, "failure");
-	assert.equal((await call("approval", nodeId, { id: approval.id, allow: true, command: "echo approved" }, "term-b")).event, "result");
-	assert.match((await pendingCommand).content[0].text, /echo:echo approved/);
-	const denied = remoteCommand.execute("deny-test", { command: "rm /tmp/no" });
-	const deniedCheck = assert.rejects(denied, /用户拒绝/);
-	await new Promise((r) => setTimeout(r, 20));
-	const denyApproval = events.findLast((e) => e.event === "approval_required").data.approval;
-	await call("approval", nodeId, { id: denyApproval.id, allow: false }, "term-b");
-	await deniedCheck;
-	const canceled = remoteCommand.execute("cancel-test", { command: "restart something" });
-	const cancelCheck = assert.rejects(canceled, /确认已取消/);
-	await new Promise((r) => setTimeout(r, 20));
-	await call("policy", nodeId, { policy: "off" });
-	await cancelCheck;
-	await assert.rejects(remoteCommand.execute("off-test", { command: "whoami" }), /停用 Agent/);
-	await call("policy", nodeId, { policy: "readonly" });
-
-	const remoteWrite = service.chats.get(JSON.stringify(["client-a", nodeId])).session.getToolDefinition("remote_write");
-	const pendingWrite = remoteWrite.execute("write-file", { path: "/home/test/approved.txt", text: "approved content" });
-	await new Promise((r) => setTimeout(r, 20));
-	const writeApproval = events.findLast((e) => e.event === "approval_required").data.approval;
-	assert.equal(writeApproval.kind, "write");
-	assert.match(writeApproval.command, /approved content/);
-	await call("approval", nodeId, { id: writeApproval.id, allow: true });
-	await pendingWrite;
-	assert.equal((await call("read", nodeId, { path: "/home/test/approved.txt" })).data.text, "approved content");
-	const aborter = new AbortController();
-	const waiting = remoteCommand.execute("abort-confirm", { command: "sudo restart app" }, aborter.signal);
-	const waitingCheck = assert.rejects(waiting, /操作已中断/);
-	aborter.abort(); await waitingCheck;
-	assert.equal(service.approvals.size, 0);
 	await call("terminal_open", nodeId, {}, "term-trap", conversationId);
 	await call("terminal_input", nodeId, { data: "trap_foreground\r" }, "term-trap", conversationId);
 	await assert.rejects(service.execute("client-a", nodeId, "term-trap", "must_not_run"), /无法确认 shell 提示符/);

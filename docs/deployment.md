@@ -118,6 +118,6 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使用打包后的 Electron 加载懒加载 provider 并启动包内服务端）及 `tests/portable-relaunch-test.ps1`（首次启动、重复打开、原进程存活及模块保留），通过后才上传安装包；这些检查失败会阻断 Windows 发布。手动运行 `Verify Windows desktop build` 时传入 `release_tag`，可直接验证已发布的 ZIP、NSIS 和便携 EXE，无需重新构建。
 
-### Pi 1.0.0 resume 兼容补丁
+### Pi 1.0.0 原版 SDK
 
-`scripts/patch-pi-sdk.mjs` 在 postinstall/prebuild 对精确 1.0.0 的 `dist/core/sdk.js` 应用有界修正：恢复已有会话且未显式指定 tools/noTools 时，将 initialActiveToolNames 留空，触发官方 transcript 工具恢复与待注册工具机制。补丁不修改全局 Pi CLI；重复执行幂等，源代码不匹配则构建失败。升级 SDK 时应以 `tests/native-tools-desktop-test.mjs` 的真实本地模型、deferred reload/resume 回归决定是否移除。afterPack 在所有平台检查补丁、SDK 版本和 codemode.md，再允许出安装包。
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.0。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。

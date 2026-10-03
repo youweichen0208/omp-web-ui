@@ -18,28 +18,6 @@ import {
 	sniffImageMime,
 } from "./text-sniff.js";
 import { saveUpload, uploadsRoot } from "./uploads.js";
-import {
-	buildVisionBridgePrompt,
-	findVisionModels,
-	transcribeImages,
-} from "./vision-bridge.js";
-import type { ClientSettings } from "./client-state.js";
-
-/** 跨快照的视觉转写缓存：批次 hash（名称 + base64 头 + 提示词）→ 转写文本。
- *  编辑重问重发相同图片不再重复耗视觉 token。进程级共享即可。 */
-const visionBridgeCache = new Map<string, string>();
-
-/** "provider/id" 解析；非法格式返回 null。 */
-export function parseModelSpec(spec?: string | null): {
-	provider: string;
-	id: string;
-	spec: string;
-} | null {
-	if (!spec) return null;
-	const slash = spec.indexOf("/");
-	if (slash <= 0 || slash === spec.length - 1) return null;
-	return { provider: spec.slice(0, slash), id: spec.slice(slash + 1), spec };
-}
 
 /** buildAttachmentMessages 所需的会话侧上下文。 */
 export interface AttachmentContext {
@@ -48,7 +26,7 @@ export interface AttachmentContext {
 	/** 上传文件归属的浏览器客户端。 */
 	clientId: string;
 	emit: (msg: ServerMessage) => void;
-	settings: ClientSettings;
+
 	session: AgentSession;
 }
 
@@ -146,22 +124,6 @@ export async function buildAttachmentMessages(
 		}
 	};
 
-	// -- Vision bridge ------------------------------------------------------
-	// When the active model can't accept images (DeepSeek, GLM, …), pasted
-	// images are transcribed by a configured vision model first and the
-	// transcript is fed to the text-only model as text evidence (see
-	// vision-bridge.ts — any model in models.json whose input includes
-	// "image" works, zero extra config). Vision-capable main models keep
-	// the raw image-content path untouched.
-	const mainModel = ctx.session.model;
-	const mainSupportsVision = mainModel?.input?.includes("image") ?? false;
-	const bridgedImages: {
-		idx: number;
-		att: (typeof attachments)[number];
-		raw: string;
-		mimeType: string;
-		bytes: number;
-	}[] = [];
 	/** Raw image bytes for path-referenced image files (idx → info), pre-read
 	 *  so the loop below doesn't re-read them. SVG stays a plain text file —
 	 *  the model reads its source, far more useful than a rasterized blob. */
@@ -181,9 +143,7 @@ export async function buildAttachmentMessages(
 			const bytes = Buffer.byteLength(raw, "base64");
 			// Only images that would actually be sent (non-empty, under the cap).
 			if (bytes > 0 && bytes <= 2 * 1024 * 1024) {
-				if (!mainSupportsVision) {
-					bridgedImages.push({ idx, att, raw, mimeType, bytes });
-				}
+
 			}
 			continue;
 		}
@@ -207,106 +167,10 @@ export async function buildAttachmentMessages(
 		if (!mime) continue;
 		const raw = buf.toString("base64");
 		pathImageData.set(idx, { raw, mimeType: mime, bytes: st.size });
-		if (!mainSupportsVision) {
-			bridgedImages.push({ idx, att, raw, mimeType: mime, bytes: st.size });
-		}
+
 	}
 	/** Transcript per attachment index (filled below, keyed by bridgedImages idx). */
-	const bridgeTranscripts = new Map<number, string>();
-	if (bridgedImages.length > 0) {
-		if (!ctx.settings.visionBridgeEnabled) {
-			ctx.emit({
-				type: "notice",
-				level: "warning",
-				text: `当前模型（${mainModel?.name ?? mainModel?.id ?? "未知"}）不支持识图，且视觉桥已在设置中关闭：图片将原样发送、可能被忽略。`,
-			});
-		} else {
-			const visionModels = findVisionModels(ctx.session.modelRuntime);
-			// Preferred model from settings ("provider/id") — validated to exist
-			// and actually accept images; falls back to the first auto-detected.
-			let chosen = visionModels[0] ?? null;
-			const pref = ctx.settings.visionBridgeModel;
-			if (pref) {
-				const spec = parseModelSpec(pref);
-				if (spec) {
-					const pm = ctx.session.modelRuntime.getModel(spec.provider, spec.id);
-					if (pm?.input?.includes("image")) {
-						chosen = {
-							provider: spec.provider,
-							id: spec.id,
-							label: `${pm.name ?? pm.id} (${spec.provider})`,
-						};
-					}
-				}
-			}
-			if (!chosen) {
-				ctx.emit({
-					type: "notice",
-					level: "warning",
-					text: `当前模型（${mainModel?.name ?? mainModel?.id ?? "未知"}）不支持识图，且未找到可用的视觉模型：图片将原样发送、可能被忽略。在模型配置里添加任意支持图片的模型（如 qwen-vl、GLM-4V、Gemini）即可自动启用视觉桥转写。`,
-				});
-			} else {
-				// Batch hash so re-sending identical images (edit & re-ask) reuses
-				// the transcript instead of re-burning tokens on the vision API.
-				// The active transcription prompt is part of the key: changing
-				// the custom prompt must invalidate cached transcripts made with
-				// the old prompt.
-				const batchHash =
-					bridgedImages
-						.map((b) => `${b.att.name ?? "img"}:${b.raw.slice(0, 48)}`)
-						.join("|") +
-					"::" +
-					buildVisionBridgePrompt(
-						ctx.settings.visionBridgePromptMode,
-						ctx.settings.visionBridgePrompt,
-					);
-				let transcript = visionBridgeCache.get(batchHash);
-				if (transcript === undefined) {
-					ctx.emit({
-						type: "notice",
-						level: "info",
-						text: `当前模型不支持识图，正在用视觉桥（${chosen.label}）转写 ${bridgedImages.length} 张图片…`,
-					});
-					try {
-						const chosenModel = ctx.session.modelRuntime.getModel(
-							chosen.provider,
-							chosen.id,
-						);
-						transcript = await transcribeImages(
-							ctx.session.modelRuntime,
-							bridgedImages.map((b) => ({
-								data: b.raw,
-								mimeType: b.mimeType,
-								name: b.att.name,
-							})),
-							{
-								model: chosenModel ?? undefined,
-								systemPrompt: buildVisionBridgePrompt(
-									ctx.settings.visionBridgePromptMode,
-									ctx.settings.visionBridgePrompt,
-								),
-							},
-						);
-						visionBridgeCache.set(batchHash, transcript);
-						ctx.emit({
-							type: "notice",
-							level: "info",
-							text: `✅ 图片已由视觉桥转写完成（${chosen.label}）`,
-						});
-					} catch (err) {
-						transcript = "";
-						ctx.emit({
-							type: "notice",
-							level: "error",
-							text: `图片转写失败（${chosen.label}）：${(err as Error).message}。图片将原样发送、可能被忽略。`,
-						});
-					}
-				}
-				for (const b of bridgedImages)
-					bridgeTranscripts.set(b.idx, transcript ?? "");
-			}
-		}
-	}
+
 	/** Cap for reading a file in "lines" mode (selected slice is inlined). */
 	const MAX_LINES_READ_BYTES = 2 * 1024 * 1024;
 
@@ -344,32 +208,7 @@ export async function buildAttachmentMessages(
 				});
 				continue;
 			}
-			const transcript = bridgeTranscripts.get(idx);
-			if (transcript) {
-				// Bridged: the text-only main model can't see images, so it gets the
-				// vision model's transcript as text evidence; the image block is
-				// kept so the card still shows the original thumbnail.
-				out.push({
-					message: {
-						customType: "file",
-						content: [
-							{
-								type: "text",
-								text: `\n<vision-bridge>\n${transcript}\n</vision-bridge>`,
-							},
-							{ type: "image", data: raw, mimeType },
-						],
-						display: true,
-						details: {
-							name: att.name ?? "image.png",
-							path: undefined,
-							mode: "bridged",
-							size: bytes,
-						},
-					},
-				});
-				continue;
-			}
+
 			out.push({
 				message: {
 					customType: "file",
@@ -532,40 +371,7 @@ export async function buildAttachmentMessages(
 		const ext = extname(att.path).toLowerCase();
 		if (IMAGE_EXT.has(ext) && ext !== ".svg") {
 			const pathImg = pathImageData.get(idx);
-			const transcript = bridgeTranscripts.get(idx);
-			if (transcript) {
-				// Text-only main model: the vision bridge transcribed this image —
-				// the model gets the transcript as text evidence (+ thumbnail).
-				out.push({
-					message: {
-						customType: "file",
-						content: [
-							{
-								type: "text",
-								text: `
-<vision-bridge>
-${transcript}
-</vision-bridge>`,
-							},
-							...(pathImg
-								? ([{
-										type: "image",
-										data: pathImg.raw,
-										mimeType: pathImg.mimeType,
-									}]) as const
-								: []),
-						],
-						display: true,
-						details: {
-							name,
-							path: rel,
-							mode: "bridged",
-							size: stat.size,
-						},
-					},
-				});
-				continue;
-			}
+
 			if (pathImg) {
 				// Vision-capable main model (or bridge failed): send the raw image
 				// content straight from the pre-read bytes.
