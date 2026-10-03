@@ -94,14 +94,12 @@ try {
 		await page.locator('.sound-menu-summary').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="插件"]').click();
-		const builtin = page.locator('.set-row', { hasText: 'rpiv-todo · 内置任务清单' });
-		await builtin.waitFor();
-		assert.equal(await builtin.locator('.set-uninstall').count(), 0);
-		assert.equal(await builtin.getByRole('switch').getAttribute('aria-checked'), 'true');
-		await builtin.getByRole('switch').click();
-		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('rpiv-todo · 内置任务清单') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'false'));
-		await builtin.getByRole('switch').click();
-		await page.waitForFunction(() => [...document.querySelectorAll('.set-row')].some(el => el.textContent.includes('rpiv-todo · 内置任务清单') && el.querySelector('[role="switch"]')?.getAttribute('aria-checked') === 'true'));
+		assert.equal(await page.locator('.set-row', { hasText: 'rpiv-todo' }).count(), 0, 'removed bundled todo must not return');
+		assert.equal(await page.locator('.settings-modal [role="switch"]').count(), 0, 'native extensions are read-only');
+		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
+		await page.locator('.set-prompt-preview').waitFor();
+		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'native system prompt is read-only');
+
 		await page.close();
 	}
 	console.log('PASS Windows/macOS toolbar bounds and settings at 900/1000/1500px');
