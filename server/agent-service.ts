@@ -1,9 +1,7 @@
 import { NativeMcpConfigService } from "./native-mcp-config.js";
 import { toolWatchdogTimeout } from "./tool-timeout.js";
-import { nativeExtensionPath } from "./native-tools.js";
-import { subagents } from "./subagents.js";
-import { subagentGuard, webSubagentTool, upstreamSubagent, SUBAGENT_GUIDANCE } from "./subagent-tools.js";
-import type { SubagentSummary, ClientMessage } from "./protocol.js";
+
+import type { ClientMessage } from "./protocol.js";
 import { nativeToolExtensions } from "./native-tools.js";
 import { ProviderAuthService } from "./provider-auth.js";
 import { packageManagerFor, updateTargets, checkComponents, componentRestartRequired, updateComponentPackage } from "./component-updates.js";
@@ -174,7 +172,6 @@ export class QuiesceRejectedError extends Error {
 // here but never read into the snapshot path.
 // ---------------------------------------------------------------------------
 
-
 const BASH_BACKGROUND_GUIDANCE = `One-shot bash commands default to a 120 second timeout when omitted. Set an explicit timeout in seconds for tasks that need longer. For persistent services, detach all standard streams and use bounded readiness checks (curl --connect-timeout 5 --max-time 15).
 For POSIX shells, including remote SSH commands, use: cd /path || exit; nohup command </dev/null > /tmp/service.log 2>&1 & pid=$!; printf 'PID: %s\\n' "$pid"
 Never use cd /path && nohup command >log 2>&1 & to detach a service: & backgrounds the entire && list, whose wrapper shell can retain SSH stdout/stderr pipes until the service exits. Redirect the entire background group if grouping is needed. nohup alone does not close inherited pipes. Do not run persistent servers in the foreground of the bash tool.`;
@@ -304,16 +301,12 @@ function pluginToolToDefinition(tool: PluginAgentTool): ToolDefinition {
 	} as unknown as ToolDefinition;
 }
 
-
 // ---------------------------------------------------------------------------
 // Web UI context adapter — bridges extension UI calls (setWidget/notify) to the
 // browser. Extensions like rpiv-todo render a TUI widget via
 // `ui.setWidget(key, (tui, theme) => comp)`; we capture the component, render it
 // with a mock theme to plain text lines, and push them to the client.
 // ---------------------------------------------------------------------------
-
-
-
 
 export { workspacePath };
 // ---------------------------------------------------------------------------
@@ -434,7 +427,6 @@ function skillAwareTitleText(text: string): string {
 	return `skill:${name}` + (args ? ` · ${args}` : "");
 }
 
-
 /** First user text in a session, truncated for the conversation list. */
 function conversationTitle(session: AgentSession): string {
 	try {
@@ -552,10 +544,8 @@ async function generateAiTitle(
 
 export class ClientSession {
 	readonly clientId: string;
-	private static subagentClients = new Map<string, ClientSession>();
-	private offSubagents?: () => void;
-	private deliveringSubagents = new Set<string>();
-	private subagentRounds = new WeakMap<AgentSession, string>();
+	private static liveClients = new Map<string, ClientSession>();
+
 	/** Set by AgentService.attach: reflects the SERVICE-wide quiesce flag
 	 *  (server draining — new work rejected). Default false for direct use. */
 	isQuiesced: () => boolean = () => false;
@@ -838,7 +828,7 @@ export class ClientSession {
 				await command.handler(msg.command === "status" ? "" : `${msg.command ?? ""} ${msg.name ?? ""}`, runner!.createCommandContext());
 			}
 			if (["save","trust","radius"].includes(msg.action)) {
-				for (const cs of ClientSession.subagentClients.values()) {
+				for (const cs of ClientSession.liveClients.values()) {
 					for (const conv of cs.convs.values()) {
 						if (msg.scope === "project" && msg.action !== "radius" && conv.cwd !== msg.cwd) continue;
 						if (conv.session.isStreaming) cs.pendingMcpReload.add(conv.id);
@@ -846,7 +836,7 @@ export class ClientSession {
 					}
 				}
 			}
-			this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, state: config.get(msg.cwd,msg.scope), pending: [...ClientSession.subagentClients.values()].some(cs => cs.pendingMcpReload.size > 0), tools: this.session.getAllTools().map(tool => tool.name).filter(n => n.startsWith("mcp__")) });
+			this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, state: config.get(msg.cwd,msg.scope), pending: [...ClientSession.liveClients.values()].some(cs => cs.pendingMcpReload.size > 0), tools: this.session.getAllTools().map(tool => tool.name).filter(n => n.startsWith("mcp__")) });
 		} catch (error) { this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, error: (error as Error).message }); }
 	}
 	get imageModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
@@ -910,13 +900,8 @@ export class ClientSession {
 		thinkingDurationStore: ThinkingDurationStore,
 	) {
 		this.clientId = clientId;
-		ClientSession.subagentClients.set(clientId, this);
-		const offUpdates = subagents.subscribe((task, removed = []) => {
-			const state = subagents.state(clientId);
-			this.emit({ type: "subagent_delta", version: state.version, config: task ? undefined : state.config, tasks: task?.clientId === clientId ? [subagents.listItem(task)] : [], removed });
-		});
-		const offResults = subagents.registerReceiver(clientId, task => this.deliverSubagent(task));
-		this.offSubagents = () => { offUpdates(); offResults(); };
+		ClientSession.liveClients.set(clientId, this);
+
 		this.cwd = cwd;
 		this.agentDir = agentDir;
 		this.stateStore = stateStore;
@@ -1019,7 +1004,7 @@ export class ClientSession {
 	private makeRuntimeFactory(terminals: TerminalManager): CreateAgentSessionRuntimeFactory {
 		return async ({ cwd: effectiveCwd, sessionManager }) => {
 			let recoverySession: AgentSession | undefined;
-			const toolOwner = `${this.clientId}:${Math.random()}`;
+
 			const services = await createAgentSessionServices({
 				cwd: effectiveCwd,
 				modelRuntime: this.sharedModelRuntime,
@@ -1031,7 +1016,7 @@ export class ClientSession {
 					additionalExtensionPaths: [TODO_EXTENSION_PATH],
 					extensionFactories: [
 						...nativeToolExtensions(),
-						{ name: "web-subagent-guard", hidden: true, factory: subagentGuard(effectiveCwd, toolOwner) },
+
 						{ name: "web-tool-call-recovery", hidden: true, factory: toolCallRecoveryExtension(() => recoverySession) },
 					],
 					// 系统提示词：replace 模式整体替换；append 模式追加到提示词末尾。
@@ -1048,7 +1033,7 @@ export class ClientSession {
 					},
 					appendSystemPromptOverride: (base: string[]) => {
 						const out = [...base, BASH_BACKGROUND_GUIDANCE];
-						if (subagents.config.enabled) out.push(SUBAGENT_GUIDANCE, `Available roles: ${JSON.stringify(subagents.config.roles.map(({ id, name, description, tools }) => ({ id, name, description, tools })))}`);
+
 						const custom = this.settingsSvc.current.customSystemPrompt.trim();
 						if (this.settingsSvc.current.promptMode === "append" && custom) {
 							out.push(custom);
@@ -1079,7 +1064,7 @@ export class ClientSession {
 					extensionsOverride: (res) => ({
 						...res,
 						extensions: adaptTodoExtensions(res.extensions).filter(
-							(e) => !isExtensionDisabled(e, this.settingsSvc.current.disabledExtensions) && !(subagents.config.enabled && upstreamSubagent(e.path)),
+							(e) => !isExtensionDisabled(e, this.settingsSvc.current.disabledExtensions),
 						),
 					}),
 				},
@@ -1091,12 +1076,7 @@ export class ClientSession {
 				// 覆盖），执行时把自己的 AbortController 注册进客户端集合——
 				// abortBash() 只杀这些命令，agent run 与对话继续。
 				customTools: [
-					webSubagentTool(() => {
-						const session = recoverySession!;
-						const conv = [...this.convs.values()].find(c => c.session === session);
-						if (!conv || !session.model) throw new Error("Parent conversation unavailable");
-						return { clientId: this.clientId, conversationId: conv.id, parentSessionId: session.sessionId, parentRound: this.subagentRounds.get(session) ?? String(conv.createdAt), cwd: effectiveCwd, agentDir: this.agentDir, model: { provider: session.model.provider, id: session.model.id }, thinking: session.thinkingLevel, roleId: "analysis", task: "" };
-					}),
+
 					// bash 双实现动态分流：「终端接管」开启时命令跑进持久可见终端
 					// （保留 shell 状态、静默自动转后台），关闭时是原生 killable bash。
 					makeAdaptiveBashTool(
@@ -1136,43 +1116,6 @@ export class ClientSession {
 
 	/** Create independent goal state for one conversation. Preferences are
 	 * client-wide defaults, while goal text/review progress is not shared. */
-	private async deliverSubagent(task: SubagentSummary): Promise<void> {
-		const conv = [...this.convs.values()].find(c => c.session.sessionId === task.parentSessionId);
-		if (!conv || conv.session.isStreaming) throw new Error("Original parent session is not idle");
-		if (this.deliveringSubagents.has(task.id)) throw new Error("Result delivery already in progress");
-		this.deliveringSubagents.add(task.id);
-		try {
-			if (conv.session.sessionManager.getEntries().some(e => e.type === "message" && ((e.message.role === "custom" && e.message.customType === "web-subagent-result") || (e.message.role === "toolResult" && e.message.toolName === "web_subagent" && !e.message.isError && (e.message.details as { resultDelivered?: boolean } | undefined)?.resultDelivered === true)) && (e.message.details as { taskId?: string } | undefined)?.taskId === task.id)) { await subagents.markDelivered(task); return; }
-			await conv.session.sendCustomMessage({ customType: "web-subagent-result", content: `Subagent ${task.id} (${task.role.name}): ${task.status}\n${task.error ?? task.result ?? ""}`, display: true, details: { taskId: task.id, usage: task.usage } }, { triggerTurn: false });
-			await subagents.markDelivered(task);
-			if (conv.id === this.activeId) this.flushSnapshot();
-		} finally { this.deliveringSubagents.delete(task.id); }
-	}
-	async subagentRequest(msg: Extract<ClientMessage, { type: "subagent_request" }>): Promise<void> {
-		const response = { type: "subagent_response" as const, requestId: msg.requestId, conversationId: msg.conversationId, taskId: msg.taskId };
-		try {
-			if (msg.action === "detail") { this.emit({ ...response, ...await subagents.detail(msg.taskId ?? "", this.clientId, msg.conversationId, msg.offset) }); return; }
-			const conv = this.convs.get(msg.conversationId); if (!conv) throw new Error("Unknown parent conversation");
-			if (msg.action === "configure") {
-				if (subagents.configuring) throw new Error("Subagent configuration is being applied");
-				if ([...ClientSession.subagentClients.values()].some(cs => [...cs.convs.values()].some(c => c.session.isStreaming))) throw new Error("Wait for running parent conversations before changing configuration");
-				if (!msg.config) throw new Error("Missing configuration");
-				for (const role of msg.config.roles) for (const path of role.extensions) if (![...ClientSession.subagentClients.values()].some(cs => [...cs.convs.values()].some(c => c.session.resourceLoader.getExtensions().extensions.some(e => nativeExtensionPath(e.path) === nativeExtensionPath(path) && !upstreamSubagent(path))))) throw new Error(`Extension is not loaded in a trusted host session: ${path}`);
-				subagents.configuring = true;
-				try {
-					subagents.configure(msg.config);
-					await Promise.all([...ClientSession.subagentClients.values()].flatMap(cs => [...cs.convs.values()].map(async c => { await c.session.reload(); cs.applyTerminalToolGating(c.session); })));
-				} finally { subagents.configuring = false; }
-			} else if (msg.action !== "list") {
-				const task = subagents.get(msg.taskId ?? "", this.clientId, conv.id);
-				if (task.parentSessionId !== conv.session.sessionId) throw new Error("Original parent session is no longer active");
-				if (msg.action === "stop") subagents.stop(task.id, this.clientId);
-				if (msg.action === "message") await subagents.message(task.id, this.clientId, conv.id, msg.text ?? "", msg.mode ?? "followUp");
-				if (msg.action === "rerun") { if (this.isQuiesced()) throw new Error("Service draining"); subagents.rerun(task.id, this.clientId, conv.id, conv.session.sessionId, `${Date.now()}`); }
-			}
-			if (msg.action === "list") this.emit(subagents.state(this.clientId)); this.emit({ ...response, accepted: true });
-		} catch (e) { this.emit({ ...response, error: String(e) }); }
-	}
 
 	private makeGoalStatus(): GoalStatus {
 		return this.goalSvc.makeGoalStatus();
@@ -1255,8 +1198,7 @@ export class ClientSession {
 	/** Add a socket to this client's broadcast set; flushes buffered startup notices. */
 	attachSink(send: (msg: ServerMessage) => void): void {
 		this.sinks.add(send);
-		send(subagents.state(this.clientId));
-		void subagents.replay(this.clientId);
+
 		this.providerAuth.replay();
 		this.webUi.replayDialogs(send);
 		for (const conv of this.convs.values()) if (conv.stallNoticed && conv.session.isStreaming) send({ type: "agent_silence", conversationId: conv.id, phase: "silent", since: conv.lastSdkEventAt, activity: conv.runningToolNames.size ? "tool" : "model" });
@@ -1308,7 +1250,7 @@ export class ClientSession {
 	private async bindSession(conv = this.conv): Promise<void> {
 		conv.unsubscribe?.();
 		conv.session = conv.runtime.session;
-		subagents.rebind(this.clientId, conv.session.sessionId, conv.id);
+
 		await conv.session.bindExtensions({
 			mode: "rpc",
 			uiContext: this.webUi,
@@ -1325,7 +1267,7 @@ export class ClientSession {
 		this.webUi.refresh();
 		this.startWidgetsTimer();
 		this.startStallTimer();
-		void subagents.replay(this.clientId);
+
 	}
 
 	/** Poll extension widgets so TUI-only overlays (e.g. rpiv-todo) stay live. */
@@ -1519,15 +1461,10 @@ export class ClientSession {
 			case "agent_end":
 				conv.lastRunMessages = event.messages;
 				break;
-			case "agent_start":
-				if (!this.subagentRounds.has(conv.session)) { const round = `${Date.now()}:${Math.random()}`; this.subagentRounds.set(conv.session, round); subagents.beginRound(this.clientId, conv.session.sessionId, round); }
-				break;
+
 			case "agent_settled": {
 				if (this.pendingMcpReload.delete(conv.id)) void this.reloadMcpConversation(conv).catch(error => this.emit({ type: "notice", level: "error", text: `MCP reload failed: ${error.message}` }));
-				const round = this.subagentRounds.get(conv.session);
-				if (round) subagents.endRound(this.clientId, conv.session.sessionId, round);
-				this.subagentRounds.delete(conv.session);
-				void subagents.replay(this.clientId);
+
 				const messages = conv.lastRunMessages ?? [];
 				conv.lastRunMessages = undefined;
 				conv.lastTaskEndedAt = Date.now();
@@ -2283,7 +2220,7 @@ export class ClientSession {
 				if (enabled) names.add(n);
 				else names.delete(n);
 			}
-			if (subagents.config.enabled) names.add("web_subagent"); else names.delete("web_subagent");
+
 			session.setActiveToolsByName([...names]);
 		} catch {
 			// Session 未就绪——下次创建/reload 会再应用。
@@ -2326,7 +2263,7 @@ export class ClientSession {
 	 *  Called BEFORE any LLM/token work starts so quiesce is a hard admission
 	 *  gate, not a best-effort hint. */
 	private quiesceBlocked(): boolean {
-		if (subagents.configuring) { this.emit({ type: "notice", level: "warning", text: "Applying subagent configuration, please retry shortly" }); return true; }
+
 		if (!this.isQuiesced()) return false;
 		this.emit({
 			type: "notice",
@@ -2342,7 +2279,7 @@ export class ClientSession {
 		let n = 0;
 		for (const c of this.convs.values()) {
 			try {
-				if (c.session.isStreaming || subagents.has(this.clientId, c.id)) n += 1;
+				if (c.session.isStreaming) n += 1;
 			} catch {
 				// session being replaced — not running
 			}
@@ -2555,7 +2492,7 @@ export class ClientSession {
 
 	/** Interrupt a run: abort, with a force-reset fallback on timeout. */
 	private async interruptRun(conv: Conversation, reason: string): Promise<void> {
-		subagents.cancel(this.clientId, conv.id);
+
 		// The run is only truly stopped when its agent_settled event arrives:
 		// session.abort() can return without stopping anything when the run is
 		// stuck before the agent even started (e.g. a model stream that never
@@ -2643,7 +2580,7 @@ export class ClientSession {
 		const previous = this.conv;
 		const model = previous.session.model;
 		const thinking = previous.session.thinkingLevel;
-		if (subagents.has(this.clientId, previous.id)) { this.emit({ type: "notice", level: "warning", text: "saSessionBusy", code: "saSessionBusy" }); return; }
+
 		const result = await previous.runtime.newSession();
 		if (result.cancelled) return;
 		if (this.conv === previous) await this.goalSvc.clearGoal();
@@ -2786,7 +2723,7 @@ export class ClientSession {
 		// An isolated reviewer can keep working while the main session is idle;
 		// retain that conversation so its review is not disposed when the user
 		// switches away without sending another prompt.
-		if (conv.goal.reviewing || conv.wizardRunning || subagents.has(this.clientId, conv.id)) {
+		if (conv.goal.reviewing || conv.wizardRunning) {
 			conv.listed = true;
 			return null;
 		}
@@ -2819,7 +2756,7 @@ export class ClientSession {
 	 *  history list. Never removes the active conversation. */
 	private removeConversation(id: string): Promise<void> {
 		const conv = this.convs.get(id);
-		if (!conv || id === this.activeId || subagents.has(this.clientId, id)) return Promise.resolve();
+		if (!conv || id === this.activeId) return Promise.resolve();
 		conv.titleJob.lock();
 		this.convs.delete(id);
 		this.clearAllToolWatchdogs(conv);
@@ -2962,7 +2899,7 @@ export class ClientSession {
 				conv.session.sessionFile && resolve(conv.session.sessionFile) === abs);
 			for (const conv of owners) {
 				if (conv.id === this.activeId || conv.session.isStreaming ||
-					conv.goal.reviewing || conv.wizardRunning || subagents.has(this.clientId, conv.id) ||
+					conv.goal.reviewing || conv.wizardRunning ||
 					conv.queueSteering.length > 0 || conv.queueFollowUp.length > 0 ||
 					conv.terminals.list().length > 0) {
 					this.emit({
@@ -3676,9 +3613,8 @@ export class ClientSession {
 	}
 
 	async dispose(): Promise<void> {
-		subagents.cancel(this.clientId);
-		this.offSubagents?.();
-		ClientSession.subagentClients.delete(this.clientId);
+
+		ClientSession.liveClients.delete(this.clientId);
 		this.disposed = true;
 		for (const conv of this.convs.values()) {
 			conv.titleJob.lock();

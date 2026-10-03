@@ -1,5 +1,5 @@
-import { SubagentContext } from "../subagent-context";
-import { SubagentState } from "./SubagentsPanel";
+
+
 import { commandPresentation, gitStatusLine, gitStatusSummary, numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
 import { WorkspacePathContext } from "../workspace-context";
 import { Fragment, memo, useContext, useEffect, useRef, useState } from "react";
@@ -99,41 +99,6 @@ export function GrepSummary({ block, view, wrap }: { block: UiToolCallBlock; vie
 		</button>
 		{open && <div className="grep-summary-body"><ToolCallBlock block={block} view={view} wrap={wrap} /></div>}
 	</div>;
-}
-
-export function isSubagentCall(block: UiToolCallBlock): boolean {
-	if (/^(?:spawn_agent|subagent|sub_agent|delegate_agent)$/i.test(block.name)) return true;
-	if (block.name !== "task") return false;
-	try {
-		const args = JSON.parse(block.argumentsText ?? "{}") as Record<string, unknown>;
-		return typeof args.subagent_type === "string" || typeof args.agent === "string";
-	} catch { return false; }
-}
-
-export function SubagentGroup({ items, wrap, startedAt }: { items: { block: UiToolCallBlock; view: ToolView }[]; wrap?: boolean; startedAt?: number }) {
-	const t = useT();
-	const [open, setOpen] = useState(false);
-	const allDone = items.every(({ view }) => view.result || view.status);
-	const anyFailed = items.some(({ view }) => view.result?.isError || view.status?.isError);
-	const finishedAt = Math.max(0, ...items.map(({ view }) => view.result?.timestamp ?? 0));
-	const totalMs = startedAt && finishedAt >= startedAt ? finishedAt - startedAt : 0;
-	return <div className="subagent-group">
-		<button type="button" className="subagent-group-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><strong>{t("subagentsCount", { n: items.length })}</strong><span className={allDone ? anyFailed ? "failed" : "done" : "running"}>{allDone ? anyFailed ? t("subagentsPartial") : t("allDone") : t("running")}</span><span className="subagent-group-time">{totalMs ? formatDuration(totalMs) : ""}</span><FiChevronDown className={open ? "open" : ""} /></button>
-		{open && <div className="subagent-rows">{items.map(({ block, view }) => <SubagentRow key={block.id} block={block} view={view} wrap={wrap} />)}</div>}
-	</div>;
-}
-
-function SubagentRow({ block, view, wrap }: { block: UiToolCallBlock; view: ToolView; wrap?: boolean }) {
-	const [open, setOpen] = useState(false);
-	let title = block.name;
-	try {
-		const args = JSON.parse(block.argumentsText ?? "{}") as Record<string, unknown>;
-		const candidate = args.task_name ?? args.description ?? args.prompt;
-		if (typeof candidate === "string") title = candidate.split("\n")[0].slice(0, 100);
-	} catch { /* use tool name */ }
-	const result = view.result?.content.map((part) => part.type === "text" && typeof part.text === "string" ? part.text : "").join("").trim() ?? "";
-	const summary = result.split("\n").find((line) => line.trim())?.slice(0, 180) ?? "";
-	return <div className="subagent-row"><button type="button" className="subagent-row-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}><FiChevronRight className={open ? "open" : ""} /><strong>{title}</strong><span>{view.result?.isError ? "✕" : view.result || view.status ? "✓" : "⋯"} {view.status?.durationMs !== undefined ? formatDuration(view.status.durationMs) : ""}</span></button>{summary && <div className="subagent-row-summary">{summary}</div>}{open && <div className="subagent-row-body"><ToolCallBlock block={block} view={view} wrap={wrap} /></div>}</div>;
 }
 
 const TOOL_ICONS: Record<string, string> = {
@@ -298,19 +263,9 @@ type ToolCallBlockProps = {
 };
 
 export const ToolCallBlock = memo(function ToolCallBlock(props: ToolCallBlockProps) {
-	let builtinTask = props.block.name === "web_subagent";
-	if (builtinTask) { try { const args = JSON.parse(props.block.argumentsText ?? "{}"); builtinTask = args.action === "spawn" || typeof args.taskId === "string"; } catch { /* incomplete arguments */ } }
-	return builtinTask ? <BuiltinSubagentCard block={props.block} view={props.view} /> : props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
-});
 
-function BuiltinSubagentCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
-	const t = useT(); const tasks = useContext(SubagentContext); const [open, setOpen] = useState(false);
-	let id: string | undefined; let title = "web_subagent";
-	const result = view.result?.content.filter(part => part.type === "text").map(part => (part as { text: string }).text).join("\n") ?? "";
-	try { const args = JSON.parse(block.argumentsText ?? "{}"); id = args.taskId; title = args.task ?? args.action; const parsed = JSON.parse(result); id = parsed.id ?? parsed.taskId ?? id; } catch { /* streaming or error result */ }
-	const task = tasks.find(task => task.id === id);
-	return <div className="task-plan-card" data-subagent-id={id}><button className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen(!open)}><FiChevronRight className={open ? "open" : ""} /><strong>{task?.role.name ?? t("saTitle")} · {task?.task ?? title}</strong>{task ? <SubagentState status={task.status} queueReason={task.queueReason} /> : <span>{view.result?.isError ? t("error") : t("saAwaitingState")}</span>}</button>{open && <pre className="task-todo-details">{task ? `${task.id}\n${result || task.task}` : result || block.argumentsText}</pre>}</div>;
-}
+	return props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
+});
 
 function TodoCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
 	const t = useT();

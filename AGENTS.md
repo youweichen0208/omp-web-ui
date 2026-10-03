@@ -38,7 +38,6 @@ pi-web-ui/
 │   ├── index.ts                # 入口：express 静态 + /ws 端点、消息分发、心跳、优雅停机
 │   ├── app-version.ts          # 运行中 pi-web-ui 包版本（区别于 pi SDK VERSION）
 │   ├── protocol.ts             # ★ 唯一事实源：wire 协议类型（client↔server 消息）
-│   ├── subagents.ts             # 服务级子代理调度、写锁与持久化；worker/tools 负责 SDK 子进程及主工具
 │   ├── agent-service.ts        # 核心：ClientSession（每客户端一个会话组，可并行多个对话）+ AgentService
 │   ├── serialize.ts            # SDK 消息 → UiMessage 序列化
 │   ├── text-sniff.ts           # 文件预览纯函数（previewKind/looksLikeText/decodeText/sniffImageMime/hexDump/countLines）
@@ -173,7 +172,6 @@ pi-web-ui/
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
 | **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：原生 `rpiv-todo` 管理跨轮次清单，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
 | **工具挂死看门狗** | `docs/architecture-core.md` | 20 分钟超时自动 abort 会话；只停止运行不碰后台服务 |
-| **内置子代理** | `docs/architecture-subagents.md` | 修改委派、写锁、任务生命周期、持久化故障、历史保留或结果回传时阅读；默认开启，有界 wait，agent_settled + 进程退出完成，结果不唤醒父代理 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 

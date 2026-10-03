@@ -23,7 +23,7 @@ import { LeakedThinkingBlock } from "./LeakedThinkingBlock";
 import { Markdown } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
-import { GrepSummary, isSubagentCall, liveNestedCalls, ReadGroup, SubagentGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
+import { GrepSummary, liveNestedCalls, ReadGroup, ToolCallBlock, type ToolView } from "./ToolCallBlock";
 import { EditWriteCard, EditWriteGroup } from "./EditWriteCard";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
@@ -363,17 +363,7 @@ export const Message = memo(function Message({
 				elements.push(<ReadGroup key={`${message.id}-${first.id}`} items={reads.map((item) => ({ block: item, view: viewFor(item) }))} wrap={toolsWrap} />);
 				continue;
 			}
-			if (first && isSubagentCall(first)) {
-				const agents: UiToolCallBlock[] = [first];
-				while (i + 1 < message.content.length) {
-					const next = asToolCall(message.content[i + 1]);
-					if (!next || !isSubagentCall(next)) break;
-					agents.push(next);
-					i++;
-				}
-				elements.push(<SubagentGroup key={`${message.id}-${first.id}`} items={agents.map((item) => ({ block: item, view: viewFor(item) }))} wrap={toolsWrap} startedAt={message.timestamp} />);
-				continue;
-			}
+
 			if (first?.name === "grep") {
 				elements.push(<GrepSummary key={`${message.id}-${first.id}`} block={first} view={viewFor(first)} wrap={toolsWrap} />);
 				continue;

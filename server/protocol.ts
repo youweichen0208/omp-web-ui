@@ -380,7 +380,7 @@ export type ClientMessage =
 	/** Re-push the current background-server list (the server also refreshes it
 	 *  on its own and prunes entries whose process exited). */
 	| { type: "list_bg_servers" }
-	| { type: "subagent_request"; requestId: string; conversationId: string; action: "list" | "detail" | "message" | "stop" | "rerun" | "configure"; taskId?: string; offset?: number; text?: string; mode?: "steer" | "followUp"; config?: SubagentConfig }
+
 	/** Global-search recursive filename match across the active workspace.
 	 *  Server-side bounded walk; reqId echoes back in search_files_result. */
 	| { type: "search_files"; reqId: number; query: string }
@@ -1131,7 +1131,7 @@ export type ServerMessage =
 	 *  and on request (get_commands). */
 	| { type: "slash_commands"; commands: SlashCommandInfo[] }
 	| { type: "reload_status"; conversationId: string; requestId: string; phase: "running" | "done"; timestamp: number; durationMs?: number; extensions?: number; skills?: number; prompts?: number; resources?: { extensions: string[]; skills: string[]; prompts: string[] }; errors?: { path: string; message: string }[] }
-	| { type: "notice"; level: "info" | "warning" | "error"; code?: "saSessionBusy"; text: string }
+	| { type: "notice"; level: "info" | "warning" | "error"; text: string }
 	/** The watched git dir changed outside the panel (terminal commit,
 	 *  CLI, IDE) — the client should re-run its scm_status query. */
 	| { type: "scm_changed" }
@@ -1320,9 +1320,6 @@ export type ServerMessage =
 	 *  empties when the tasks are stopped (individually or all at once) or the
 	 *  process exits on its own. Pushed on change, on attach and on request. */
 	| { type: "bg_servers"; servers: BgServer[] }
-	| { type: "subagent_state"; version: number; config: SubagentConfig; tasks: SubagentListItem[] }
-	| { type: "subagent_delta"; version: number; config?: SubagentConfig; tasks: SubagentListItem[]; removed: string[] }
-	| { type: "subagent_response"; requestId: string; conversationId: string; taskId?: string; error?: string; accepted?: boolean; records?: SubagentRecord[]; nextOffset?: number; hasMore?: boolean; task?: SubagentSummary }
 
 /** Node workbench profiles contain metadata only; credentials never enter state snapshots. */
 export type NodePolicy = "readonly" | "confirm" | "auto" | "off";
@@ -1343,44 +1340,3 @@ export interface NodeRun {
 export interface NodeApproval {
 	id: string; nodeId: string; terminalId?: string; command: string; kind: "command" | "write" | "read";
 }
-
-export type SubagentStatus = "queued" | "running" | "stopping" | "completed" | "failed" | "cancelled" | "interrupted";
-export interface SubagentRole {
-	id: string;
-	name: string;
-	description: string;
-	prompt: string;
-	model?: { provider: string; id: string };
-	thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-	tools: string[];
-	skills: string[];
-	extensions: string[];
-}
-export interface SubagentConfig { enabled: boolean; timeoutMs: number; roles: SubagentRole[] }
-export interface SubagentSummary {
-	id: string;
-	clientId: string;
-	conversationId: string;
-	parentSessionId: string;
-	parentRound: string;
-	cwd: string;
-	role: SubagentRole;
-	model: { provider: string; id: string };
-	thinking: string;
-	timeoutMs: number;
-	task: string;
-	background: string;
-	status: SubagentStatus;
-	queueReason?: "write_lock" | "capacity";
-	createdAt: number;
-	startedAt?: number;
-	endedAt?: number;
-	version: number;
-	result?: string;
-	error?: string;
-	usage?: { tokens: number; cost: number | null };
-	delivered?: boolean;
-}
-export interface SubagentRecord { type: string; timestamp: number; text: string }
-
-export type SubagentListItem = Pick<SubagentSummary, "id" | "conversationId" | "model" | "thinking" | "status" | "createdAt" | "startedAt" | "endedAt" | "version" | "usage" | "task" | "queueReason"> & { role: Pick<SubagentRole, "id" | "name"> };

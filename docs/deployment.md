@@ -66,8 +66,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
 - 桌面 Pi SDK 精确锁定为 1.0.0；终端 `pi update` 只更新外部 CLI。
-- 内置子代理由服务进程的 `process.execPath` 启动，保留 `ELECTRON_RUN_AS_NODE=1`，无需 `pi-subagents` 或 PATH 中的 Node。项目已移除旧扩展的开发依赖、专用后台 runner 环境和测试；用户全局安装不受影响。
-- 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs` 和 `tests/builtin-subagents-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块及内置子代理。
+- 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块。
 
 - 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
   判断 server 就绪，再让 `BrowserWindow` 加载 `http://127.0.0.1:{随机空闲端口}`。
@@ -118,10 +117,6 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 `electron-builder.yml` 的 `portable.unpackDirName: true` 让锁定的 electron-builder 26.15.3 不定义 `UNPACK_DIR_NAME`，NSIS 为每次启动分配独立 `$PLUGINSDIR`。该版本上游类型注释写的是 false，但实际实现需要 true。默认每个构建复用同一临时目录，重复打开时第二个单实例进程退出会删除第一个实例仍在使用的 SDK 文件，导致 `ERR_MODULE_NOT_FOUND`（如 `anthropic-messages.js`）。不要恢复默认值。
 
 Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使用打包后的 Electron 加载懒加载 provider 并启动包内服务端）及 `tests/portable-relaunch-test.ps1`（首次启动、重复打开、原进程存活及模块保留），通过后才上传安装包；这些检查失败会阻断 Windows 发布。手动运行 `Verify Windows desktop build` 时传入 `release_tag`，可直接验证已发布的 ZIP、NSIS 和便携 EXE，无需重新构建。
-
-### 内置子代理运行时
-
-开启内置子代理后，`server/subagent-worker.js` 由服务进程的 `process.execPath` 启动，Electron 保留 `ELECTRON_RUN_AS_NODE=1`。编译产物随 `dist/` 打包，不依赖额外安装的 pi 或 PATH 中的 Node。关闭应用先取消并等待子进程退出，未完成记录在下次启动标为中断。外部上游子代理扩展的版本兼容性由其自身维护。生命周期与配置见 [内置子代理](architecture-subagents.md)。
 
 ### Pi 1.0.0 resume 兼容补丁
 

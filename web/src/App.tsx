@@ -1,7 +1,7 @@
 import { LinkedText } from "./components/LinkedText";
 import { ImageWorkbench } from "./components/ImageWorkbench";
-import { SubagentsPanel } from "./components/SubagentsPanel";
-import { SubagentContext } from "./subagent-context";
+
+
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
 import { WorkspacePathContext } from "./workspace-context";
 import {
@@ -124,7 +124,7 @@ function NoticeToast({
 			onMouseLeave={() => setPaused(false)}
 		>
 			<Icon className="notice-icon" />
-			<span className="notice-text">{notice.code ? t(notice.code) : <LinkedText text={notice.text} />}</span>
+			<span className="notice-text">{<LinkedText text={notice.text} />}</span>
 			<button
 				type="button"
 				className="notice-close"
@@ -210,7 +210,7 @@ type ViewName = "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${str
 export function App() {
 	const t = useT();
 	const { locale } = useI18n();
-	const { chat, consumeSubagentResponses, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
+	const { chat, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();
 	// Conversation selection can arrive before its snapshot. Never present the
 	// previous conversation's transcript or usage under the new selection.
 	const conversationState = chat.state?.conversationId === chat.activeConversationId ? chat.state : null;
@@ -428,8 +428,6 @@ export function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	// Background-task panel (AI-started servers — stop individually or all).
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
-	const [subagentsOpen, setSubagentsOpen] = useState(false);
-	const [subagentsConfigure, setSubagentsConfigure] = useState(false);
 	// Global search panel (sessions / projects / workspace files).
 	const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
@@ -863,7 +861,6 @@ export function App() {
 					onManageModels={() => setManageModelsOpen(true)}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
-					onOpenSubagents={() => { setSubagentsConfigure(false); setSubagentsOpen(true); }}
 					onOpenGoal={() => { setView("chat"); setGoalOpenRequest((value) => value + 1); }}
 					onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 					sound={sound}
@@ -890,7 +887,7 @@ export function App() {
 					<div className={`view-pane ${previewFile ? "preview-open" : ""} ${view === "chat" ? "" : "hidden"}`}>
 						<main className="main">
 							{conversationState ? (
-								<SubagentContext.Provider value={chat.subagents?.tasks ?? []}><WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
+								<WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
 									active={view === "chat"}
 									connected={chat.ready}
 									silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"}
@@ -904,7 +901,7 @@ export function App() {
 								toolsWrap={chat.settings?.toolsWrap ?? true}
 								pendingEcho={chat.pendingEcho}
 								reloadEvents={chat.reloadEvents}
-								/></WorkspacePathContext.Provider></SubagentContext.Provider>
+								/></WorkspacePathContext.Provider>
 							) : (
 								<div className="boot-wait">
 									{chat.ready ? t("loadingSession") : t("connectingServer")}
@@ -1066,12 +1063,9 @@ export function App() {
 					send={send}
 					terminal={terminal}
 					onSwitchToTerminal={() => setView("terminal")}
-					consumeSubagentResponses={consumeSubagentResponses}
-					onOpenSubagents={() => { setSettingsOpen(false); setSubagentsConfigure(true); setSubagentsOpen(true); }}
 					onClose={() => setSettingsOpen(false)}
 				/>
 			)}
-			{subagentsOpen && <SubagentsPanel initialConfigure={subagentsConfigure} consumeResponses={consumeSubagentResponses} chat={chat} send={send} onClose={() => setSubagentsOpen(false)} />}
 			{bgTasksOpen && (
 				<BgTasksModal
 					servers={chat.bgServers}

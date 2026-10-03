@@ -35,7 +35,6 @@ import { PROTOCOL_VERSION } from "./protocol-version";
 export type ConnStatus = "connecting" | "open" | "closed";
 
 export interface Notice {
-	code?: "saSessionBusy";
 	id: number;
 	level: "info" | "warning" | "error";
 	text: string;
@@ -145,8 +144,6 @@ export interface ChatState {
 	goal: GoalStatus;
 	/** Settings-panel state (system prompt, skill/extension toggles, presets). */
 	settings: UiSettingsState | null;
-	subagents: Extract<ServerMessage, { type: "subagent_state" }> | null;
-	subagentResponses: Record<string, Extract<ServerMessage, { type: "subagent_response" }>>;
 	/** AI-started background servers (managed from the 后台任务 panel). The
 	 *  list lives on the client session, so it survives conversation ends. */
 	bgServers: BgServer[];
@@ -300,10 +297,7 @@ type Action =
 	| { type: "terminal_list"; conversationId?: string; terminals: TerminalInfo[] }
 	| { type: "goal_status"; status: GoalStatus }
 	| { type: "settings"; settings: UiSettingsState }
-	| { type: "subagents"; value: Extract<ServerMessage, { type: "subagent_state" }> }
-	| { type: "subagent_delta"; value: Extract<ServerMessage, { type: "subagent_delta" }> }
-	| { type: "consume_subagent_responses"; ids: string[] }
-	| { type: "subagent_response"; value: Extract<ServerMessage, { type: "subagent_response" }> }
+
 	| { type: "bg_servers"; servers: BgServer[] }
 	| { type: "plugins"; plugins: UiPluginInfo[]; epoch: number }
 	| { type: "set_pending_echo"; echo: PendingEcho }
@@ -642,21 +636,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, slashCommands: action.commands };
 		case "goal_status":
 			return { ...state, goal: action.status };
-		case "subagents":
-			return state.subagents && state.subagents.version > action.value.version ? state : { ...state, subagents: action.value };
-		case "subagent_delta": {
-			if (!state.subagents || state.subagents.version >= action.value.version) return state;
-			const tasks = new Map(state.subagents.tasks.map(task => [task.id, task]));
-			for (const id of action.value.removed) tasks.delete(id);
-			for (const task of action.value.tasks) tasks.set(task.id, task);
-			return { ...state, subagents: { ...state.subagents, version: action.value.version, config: action.value.config ?? state.subagents.config, tasks: [...tasks.values()] } };
-		}
-		case "consume_subagent_responses": {
-			const responses = { ...state.subagentResponses }; for (const id of action.ids) delete responses[id];
-			return { ...state, subagentResponses: responses };
-		}
-		case "subagent_response":
-			return { ...state, subagentResponses: Object.fromEntries(Object.entries({ ...state.subagentResponses, [action.value.requestId]: action.value }).slice(-256)) };
+
 		case "settings":
 			return { ...state, settings: action.settings };
 		case "bg_servers":
@@ -790,8 +770,6 @@ export function useChat() {
 		goal: DEFAULT_GOAL,
 		bgServers: [],
 		settings: null,
-		subagents: null,
-		subagentResponses: {},
 		fetchModelsResult: null,
 		refreshProviderResult: null,
 		cloneProviderResult: null,
@@ -1050,7 +1028,7 @@ export function useChat() {
 					const id = ++noticeId.current;
 					dispatch({
 						type: "notice",
-						notice: { id, level: msg.level, code: msg.code, text: msg.text },
+						notice: { id, level: msg.level, text: msg.text },
 					});
 					break;
 				}
@@ -1250,15 +1228,7 @@ export function useChat() {
 				case "goal_status":
 					dispatch({ type: "goal_status", status: msg.status });
 					break;
-				case "subagent_delta":
-					dispatch({ type: "subagent_delta", value: msg });
-					break;
-				case "subagent_state":
-					dispatch({ type: "subagents", value: msg });
-					break;
-				case "subagent_response":
-					dispatch({ type: "subagent_response", value: msg });
-					break;
+
 				case "settings_state":
 					dispatch({ type: "settings", settings: msg.settings });
 					break;
@@ -1411,5 +1381,5 @@ export function useChat() {
 		dialog: null,
 	} : { ...chat, ready: chat.ready && hasSnapshot, files: chat.files ?? cache.current.get(chat.state?.cwd ?? "")?.files ?? null };
 	return {
-		consumeSubagentResponses: (ids: string[]) => dispatch({ type: "consume_subagent_responses", ids }), ...chatApi.current, chat: displayChat, switching: switching?.path ?? null, switchError };
+		...chatApi.current, chat: displayChat, switching: switching?.path ?? null, switchError };
 }

@@ -167,10 +167,6 @@ bash 工具卡片运行中显示「停止」→ 发 `{ type: "abort_bash" }` →
 
 `update_component` 只接受服务端目录中的 ID，由 SDK 包管理器按原来源更新；内置依赖随应用发布，同包多安装范围需手动处理。更新前拒绝正在运行或排队的任务，期间暂停新任务准入；Git 目录有本地改动时拒绝覆盖。更新不热替换运行中模块，安装完成后提示重启应用生效。响应携带 requestId/cwd，浏览器丢弃旧请求，项目切换后不展示旧项目结果。协议版本 25。
 
-## 内置子代理
-
-修改委派工具、并发锁、结果归属、停止或任务抽屉时，阅读 [内置子代理](architecture-subagents.md)。服务级调度器默认开启；任务完成依据为 agent_settled 和子进程退出。后台子任务保护父对话生命周期，结果回传不唤醒空闲父代理。协议版本 26。
-
 ## 生图工作台（Pi 1.0）
 
 `server/image-service.ts` 使用客户端共享 ModelRuntime 查询 image 模型并 generateImages。记录和图片保存在 `<dataDir>/images/<id>/`，cwd 取真实路径；不会写入工作区。历史由用户主动删除。每客户端最多一个任务，全服务最多四个；断线与切项目保留原任务。取消丢弃迟到图片，启动把 running 记录改为 interrupted。独立费用取 SDK 实际 usage，不计入聊天费用。shutdown 发出取消信号。

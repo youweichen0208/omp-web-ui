@@ -1,5 +1,5 @@
 import { ImageService } from "./image-service.js";
-import { subagents } from "./subagents.js";
+
 /**
  * pi-web-ui server entry.
  *
@@ -424,13 +424,12 @@ const heartbeatTimer = setInterval(() => {
 	}
 }, 10_000);
 
-subagents.initialize(DATA_DIR);
 const service = new AgentService(
 	CWD,
 	// Per-client persisted UI state: last-used workspace + recent projects.
 	join(DATA_DIR, "client-state.json"),
 );
-subagents.isQuiesced = () => service.isQuiesced();
+
 const nodeWorkbench = new NodeWorkbench(DATA_DIR);
 
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
@@ -621,9 +620,7 @@ wss.on("connection", (ws) => {
 			case "kill_background_servers":
 				void cs.killAllBackgroundServers();
 				break;
-			case "subagent_request":
-				void cs.subagentRequest(msg);
-				break;
+
 			case "list_bg_servers":
 				void cs.listBgServers();
 				break;
@@ -1032,7 +1029,7 @@ async function shutdown(): Promise<void> {
 	pluginMgr.dispose();
 	mcpBridge.dispose();
 	images.shutdown();
-	await subagents.shutdown();
+
 	await service.disposeAll();
 	wss.close();
 	httpServer.close();

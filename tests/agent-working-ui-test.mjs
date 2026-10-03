@@ -252,15 +252,9 @@ await page.locator('.fp-edit-line.from-tool[data-line="1"]').waitFor();
 await page.locator('.fp-back').click();
 const groupedTools={id:'grouped-tools',role:'assistant',model:'glm-5.3',content:[
 {type:'toolCall',id:'grep-one',name:'grep',argumentsText:JSON.stringify({pattern:'TODO',path:'src'})},
-{type:'toolCall',id:'agent-one',name:'spawn_agent',argumentsText:JSON.stringify({task_name:'审查前端'})},
-{type:'toolCall',id:'agent-two',name:'spawn_agent',argumentsText:JSON.stringify({task_name:'审查服务端'})},
 ]};
-emit({messages:[messages[4],groupedTools,{id:'grep-result',role:'toolResult',toolCallId:'grep-one',content:[{type:'text',text:'src/problem.ts:1:TODO check\n'}]},{id:'agent-result-one',role:'toolResult',toolCallId:'agent-one',content:[{type:'text',text:'发现 1 处问题'}]},{id:'agent-result-two',role:'toolResult',toolCallId:'agent-two',content:[{type:'text',text:'未发现问题'}]}],isStreaming:false,streamingMessage:null});
+emit({messages:[messages[4],groupedTools,{id:'grep-result',role:'toolResult',toolCallId:'grep-one',content:[{type:'text',text:'src/problem.ts:1:TODO check\n'}]}],isStreaming:false,streamingMessage:null});
 await page.locator('.grep-summary-head',{hasText:'1 处匹配'}).waitFor();
-await page.locator('.subagent-group-head',{hasText:'子代理 × 2'}).click();
-assert.equal(await page.locator('.subagent-row').count(),2);
-await page.locator('.subagent-row-head').first().click();
-assert.equal(await page.locator('.subagent-row-body .toolcall').count(),1);
 emit({messages:[...conversation,tool('active','sleep 10')],isStreaming:true,streamingMessage:null});
 await page.locator('.inputbox textarea').fill('next queued action');
 for(const width of widths){
