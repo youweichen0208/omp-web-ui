@@ -132,3 +132,5 @@ Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使
 Wiki 的 PDF.js 依赖和 `wiki-pdf-worker` 随服务打包。PDF 解析复用桌面 Node 子进程环境，具体限制见 [Wiki 架构](architecture-wiki.md)。沙箱 preload 新增固定 `openWikiFile` 方法：主进程使用 clientId/cwd/path 向本机服务验证当前文件，再通过系统默认应用打开；渲染进程不直接传任意可执行路径。
 
 Extensions 包管理的 `extensions-worker` 与服务端一起编译打包，在 Electron 下使用 Node 子进程执行原生包管理。固定 `openExtensionPath` IPC 按服务器验证过的包 ID 在文件管理器中显示路径；不执行渲染进程传入的任意文件。
+
+服务端 Wiki 解析使用 `unified` 与 `remark-parse`，必须列入生产依赖。打包启动检查要求这两个模块解析到产物自身目录，禁止借用仓库上层 node_modules；仅清空 NODE_PATH 不会禁止 Node 向父目录查找模块。

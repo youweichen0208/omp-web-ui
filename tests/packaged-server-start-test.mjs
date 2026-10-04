@@ -9,9 +9,20 @@ import { createServer } from "node:net";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
+import { relative, isAbsolute } from "node:path";
 
 const [executable, appRoot] = process.argv.slice(2).map((p) => resolve(p));
 assert(executable && appRoot, "Usage: node tests/packaged-server-start-test.mjs <executable> <resources/app>");
+// A checkout-local package can otherwise hide missing runtime dependencies by
+// resolving them from the repository's parent node_modules directory.
+const packagedRequire = createRequire(join(appRoot, "package.json"));
+for (const name of ["unified", "remark-parse"]) {
+	const resolved = packagedRequire.resolve(name);
+	const inside = relative(appRoot, resolved);
+	assert(!isAbsolute(inside) && inside !== ".." && !inside.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`), `${name} must resolve inside the packaged app: ${resolved}`);
+}
+console.log("PASS Markdown parser dependencies resolve inside the packaged app");
 const { agentRuntimeEnvironment } = await import(pathToFileURL(join(appRoot, "electron/agent-runtime-env.mjs")).href);
 if (process.platform === "win32") {
 	const helper = readFileSync(join(appRoot, "node_modules/node-pty/lib/conpty_console_list_agent.js"), "utf8");
