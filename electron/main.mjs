@@ -1,3 +1,4 @@
+import { createAppUpdater } from "./app-updater.mjs";
 /**
  * pi-web-ui Electron 桌面版主进程。
  *
@@ -7,8 +8,7 @@
  *     在 electron-builder 打包时自动 rebuild 为 Electron ABI。
  *   - BrowserWindow 加载 http://127.0.0.1:{PORT}（server 就绪后）。
  *   - 托盘：关闭窗口 → 最小化到托盘；Quit → 真正退出（杀 server 子进程）。
- *   - 自动更新：electron-updater + GitHub Releases（当前未接发布 CI，
- *     autoUpdater.checkForUpdates() 在没有可用 feed 时会静默失败，不影响使用）。
+ *   - 自动更新：electron-updater + GitHub Releases；设置页发起下载，用户确认后重启安装。
  *
  * 开发模式（npm run dev:electron）：
  *   先构建 web + server（npm run build），然后 electron . 即可。
@@ -25,7 +25,7 @@
  *     不受影响）。
  */
 
-import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, Notification, ipcMain, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, shell } from "electron";
 import { fork } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
@@ -457,41 +457,27 @@ function createAppMenu() {
 // ── 自动更新 ──
 
 function setupAutoUpdater() {
-	if (isDev) return; // 开发模式不检查更新
-
-	autoUpdater.autoDownload = false;
-	autoUpdater.autoInstallOnAppQuit = true;
-
-	// 检查更新（启动后延迟 5s）。当前未配置发布 CI / publish feed，
-	// 找不到更新源时会静默失败，不影响正常使用。
-	setTimeout(() => {
-		autoUpdater.checkForUpdates().catch(() => {
-			// 静默失败（无网络 / 无 feed / 超时等）
-		});
-	}, 5000);
-
-	autoUpdater.on("update-available", (info) => {
-		const notification = new Notification({
-			title: "pi 更新可用",
-			body: `版本 ${info.version} 可下载（当前 ${app.getVersion()}）`,
-		});
-		notification.on("click", () => {
-			autoUpdater.downloadUpdate();
-		});
-		notification.show();
+	const appUpdater = createAppUpdater({
+		updater: autoUpdater, version: app.getVersion(), supported: !isDev,
+		publish: state => {
+			if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pi-app-update-state", state);
+		},
+		confirmInstall: async () => {
+			if (!mainWindow || mainWindow.isDestroyed()) return false;
+			const zh = app.getLocale().startsWith("zh");
+			const result = await dialog.showMessageBox(mainWindow, {
+				type: "question",
+				message: zh ? "重启应用并安装更新？请先保存正在编辑的文件。" : "Restart to install the update? Save your open files first.",
+				buttons: zh ? ["稍后", "重启并安装"] : ["Later", "Restart and install"], defaultId: 0, cancelId: 0,
+			});
+			return result.response === 1;
+		},
 	});
-
-	autoUpdater.on("update-downloaded", () => {
-		const result = dialog.showMessageBoxSync({
-			type: "info",
-			title: "更新已下载",
-			message: "新版本已下载完成，是否立即重启以安装更新？",
-			buttons: ["立即重启", "稍后"],
-		});
-		if (result === 0) {
-			autoUpdater.quitAndInstall();
-		}
+	ipcMain.handle("pi-app-update", (event, action) => {
+		if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw Error("Forbidden");
+		return appUpdater.run(action);
 	});
+	if (!isDev) setTimeout(() => void appUpdater.run("check"), 5000);
 }
 
 // ── 应用生命周期 ──

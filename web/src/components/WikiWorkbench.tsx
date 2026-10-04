@@ -14,15 +14,16 @@ import { randomUuid } from "../uuid";
 
 type Guard = (next: () => void) => void;
 const EMPTY: WikiState = { entries: [], tags: [], revisions: [], running: false, limited: false };
-export function WikiWorkbench({ cwd, conversationId, messages, streaming, active, ready, send, guard }: {
+export function WikiWorkbench({ cwd, conversationId, messages, streaming, active, ready, send, guard, fileRequest }: {
 	cwd: string; conversationId: string; messages: UiMessage[]; streaming: boolean; active: boolean; ready: boolean;
+	fileRequest: {path:string;token:string} | null;
 	send: (message: ClientMessage) => boolean; guard: MutableRefObject<Guard | null>;
 }) {
 	const t = useT(), { locale } = useI18n();
 	const [state, setState] = useState<WikiState>(EMPTY);
 	const [directories, setDirectories] = useState<Record<string, WikiDirectory>>({});
 	const [fullChanges, setFullChanges] = useState<Record<string, WikiChange>>({});
-	const [path, setPath] = useState(() => localStorage.getItem(`pi-wiki-file:${cwd}`) ?? "");
+	const [path, setPath] = useState(() => fileRequest?.path ?? localStorage.getItem(`pi-wiki-file:${cwd}`) ?? "");
 	const [doc, setDoc] = useState<WikiDocument | null>(null), [draft, setDraft] = useState("");
 	const [source, setSource] = useState(false), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false);
 	const [error, setError] = useState(""), [nav, setNav] = useState<(() => void) | null>(null);
@@ -85,6 +86,10 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, active
 			if (alive.current) setDirectories(prev => ({ ...prev, [target]: { ...result, entries: offset ? [...(prev[target]?.entries ?? []), ...result.entries] : result.entries } }));
 		} catch (e) { if (alive.current) setError((e as Error).message); }
 	}, [cwd]);
+	useEffect(() => {
+		if (!fileRequest) return;
+		setPath(fileRequest.path); setSource(false); setSearch(false); setSidebar(false); setSelection(""); setSelectionMenu(null);
+	}, [fileRequest]);
 	useEffect(() => { if (active && ready) void loadDirectory(""); }, [active, ready, loadDirectory]);
 	const refresh = useCallback(async (fresh = false) => {
 		const seq = ++stateSequence.current;

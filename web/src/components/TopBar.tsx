@@ -1,7 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import {
-	FiBookOpen,
 	FiSidebar,
 	FiGitBranch,
 	FiGlobe,
@@ -229,7 +228,6 @@ export function TopBar({
 						<FiMessageSquare />
 						<span>{t("chat")}</span>
 					</button>
-					<button type="button" role="tab" aria-label={t("wikiMode")} title={t("wikiMode")} aria-selected={view === "wiki"} className={view === "wiki" ? "active wiki-tab" : "wiki-tab"} onClick={() => onViewChange("wiki")}><FiBookOpen /><span>Wiki</span></button>
 					<button
 						type="button"
 						role="tab"

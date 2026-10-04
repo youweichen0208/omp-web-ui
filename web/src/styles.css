@@ -6263,9 +6263,10 @@ span.msg-editor-hint svg {
 
 /* ---- settings modal ---- */
 .settings-modal {
-	max-width: 760px;
+	width: min(1180px, calc(100vw - 32px));
+	max-width: min(1180px, calc(100vw - 32px));
 	/* 固定高度：内容不足时不塌缩成矮条，内容超高时仅内容区（modal-body）滚动 */
-	height: min(74vh, 720px);
+	height: min(820px, calc(100dvh - 48px));
 	/* 头部（modal-head）与底部（modal-actions）固定，仅内容区滚动 */
 	overflow-y: hidden;
 }
@@ -9773,10 +9774,10 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-mode .topbar .brand-name, .wiki-mode .topbar .conn-label, .wiki-mode .topbar .desktop-window-title, .wiki-mode .header-location, .wiki-mode .project-panel-toggle { display: none; }
 .wiki-mode #wiki-toolbar-slot { display: flex; flex: 1; min-width: 0; align-items: center; gap: 16px; order: 2; }
 .wiki-mode .topbar-actions { flex: none; margin-left: 0; order: 1; }
-.wiki-mode .topbar-actions > :not(.view-switch), .wiki-mode .view-switch > :not(:first-child):not(.wiki-tab) { display: none; }
+.wiki-mode .topbar-actions > :not(.view-switch), .wiki-mode .view-switch > :not(:first-child) { display: none; }
 .wiki-mode .topbar .view-switch { padding: 3px; background: #f2f1ef; border-radius: 7px; }
 .wiki-mode .topbar .view-switch button { padding: 3px 12px; }
-.wiki-mode .topbar .view-switch button.active { background: white; box-shadow: 0 1px 3px #00000012; }
+.wiki-mode .topbar .view-switch button.active { background: var(--bg-elev); box-shadow: 0 1px 3px #00000012; }
 .wiki-mode .desktop-window-controls { order: 3; }
 .wiki-breadcrumb { display: flex; align-items: center; flex: 1; min-width: 0; gap: 8px; overflow: hidden; white-space: nowrap; color: var(--text-dim); font-size: 12px; }
 .wiki-breadcrumb > span { display: flex; gap: 8px; flex: none; }
@@ -9788,12 +9789,12 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-toolbar-actions button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; padding: 5px 8px; white-space: nowrap; font-size: 12px; color: var(--text-dim); border-radius: 5px; }
 .wiki-toolbar-actions button.active, .wiki-toolbar-actions button:hover { background: #f3f0fa; color: #6450bf; }
 .wiki-toolbar-actions .wiki-save { background: #6450bf; color: white; }
-.wiki-workbench { --wiki-accent: oklch(0.5 0.16 285); --wiki-soft: oklch(0.95 0.03 285); --wiki-line: oklch(0.92 0.005 80); display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: #fff; color: oklch(0.24 0.01 80); font-family: "IBM Plex Sans", sans-serif; font-size: 13px; }
+.wiki-workbench { --wiki-accent: oklch(0.5 0.16 285); --wiki-soft: oklch(0.95 0.03 285); --wiki-line: oklch(0.92 0.005 80); display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-elev); color: var(--text); font-family: "IBM Plex Sans", sans-serif; font-size: 13px; }
 .wiki-workbench button { cursor: pointer; white-space: nowrap; color: inherit; font: inherit; }
 .wiki-workbench button:disabled { cursor: default; opacity: .45; }
 .wiki-workbench button:focus-visible, .wiki-workbench a:focus-visible, .wiki-toolbar-actions button:focus-visible { outline: 2px solid var(--wiki-accent, #6450bf); outline-offset: 2px; }
-.wiki-sidebar { width: 264px; flex: none; display: flex; flex-direction: column; background: oklch(0.97 0.004 80); border-right: 1px solid var(--wiki-line); }
-.wiki-search-trigger { margin: 16px 12px 10px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #dedcd7; border-radius: 7px; background: white; color: #85827b !important; text-align: left; }
+.wiki-sidebar { width: 264px; flex: none; display: flex; flex-direction: column; background: var(--sidebar-bg); border-right: 1px solid var(--wiki-line); }
+.wiki-search-trigger { margin: 16px 12px 10px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #dedcd7; border-radius: 7px; background: var(--bg-elev); color: #85827b !important; text-align: left; }
 .wiki-search-trigger span { flex: 1; }
 .wiki-search-trigger kbd { font: 10px "JetBrains Mono", monospace; }
 .wiki-tree-label { display: flex; justify-content: space-between; align-items: center; padding: 4px 16px; color: #8a877f; font-size: 11px; }
@@ -9803,11 +9804,11 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-tree-row > svg { flex: none; width: 12px; color: #8c8880; }
 .wiki-tree-row > span { overflow: hidden; text-overflow: ellipsis; }
 .wiki-tree-row:hover { background: #eeece8; }
-.wiki-tree-row.selected { background: white; font-weight: 600; }
+.wiki-tree-row.selected { background: var(--bg-elev); font-weight: 600; }
 .wiki-unread { background: var(--wiki-accent); width: 6px; height: 6px; border-radius: 50%; margin-left: auto; flex: none; }
 .wiki-tags { border-top: 1px solid var(--wiki-line); padding: 12px; color: #89857e; font-size: 11px; max-height: 180px; overflow: auto; }
 .wiki-tags > div { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.wiki-tags button { border: 1px solid #dedbd6; border-radius: 14px; padding: 2px 9px; background: white; color: #69655e; font-size: 12px; }
+.wiki-tags button { border: 1px solid #dedbd6; border-radius: 14px; padding: 2px 9px; background: var(--bg-elev); color: #69655e; font-size: 12px; }
 .wiki-tags button.active { border-color: var(--wiki-accent); background: var(--wiki-accent); color: white; }
 .wiki-tags small { opacity: .8; }
 .wiki-main { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
@@ -9840,7 +9841,7 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-empty > svg { font-size: 32px; color: var(--wiki-accent); }
 .wiki-empty h1 { font-size: 22px; font-weight: 500; }
 .wiki-empty p { line-height: 1.7; }
-.wiki-empty button { border: 1px solid var(--wiki-line); background: white; border-radius: 6px; padding: 8px 12px; }
+.wiki-empty button { border: 1px solid var(--wiki-line); background: var(--bg-elev); border-radius: 6px; padding: 8px 12px; }
 .wiki-empty a { color: var(--wiki-accent); }
 .wiki-muted { padding: 15px; color: #918a7f; line-height: 1.6; font-size: 12px; }
 .wiki-error { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f0d1ce; padding: 10px 16px; background: #fff4f2; color: #9f3a30; z-index: 2; }
@@ -9849,11 +9850,11 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-limit { padding: 6px 16px; font-size: 11px; color: #8a765c; background: #fcfaf5; }
 .wiki-composer-area { position: absolute; bottom: 20px; left: 24px; right: 24px; max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 8px; pointer-events: none; z-index: 3; }
 .wiki-composer-area > * { pointer-events: auto; }
-.wiki-change-toast { display: flex; align-items: center; align-self: center; gap: 8px; padding: 6px 8px 6px 12px; max-width: 100%; border: 1px solid #e1ded8; border-radius: 10px; background: #fffffff5; box-shadow: 0 3px 20px #00000007; font-size: 12px; }
+.wiki-change-toast { display: flex; align-items: center; align-self: center; gap: 8px; padding: 6px 8px 6px 12px; max-width: 100%; border: 1px solid #e1ded8; border-radius: 10px; background: var(--bg-elev); box-shadow: 0 3px 20px #00000007; font-size: 12px; }
 .wiki-change-toast > i { width: 6px; height: 6px; background: #239873; border-radius: 50%; flex: none; }
 .wiki-change-toast button { border: 0; background: transparent; padding: 3px; overflow: hidden; text-overflow: ellipsis; }
 .wiki-change-toast button:last-child { background: #f2f1ee; padding: 5px 9px; border-radius: 5px; flex: none; }
-.wiki-composer { position: relative; border: 1px solid #d4cfe2; border-radius: 14px; padding: 10px 12px; background: #fffffffa; box-shadow: 0 6px 30px #44326410; }
+.wiki-composer { position: relative; border: 1px solid #d4cfe2; border-radius: 14px; padding: 10px 12px; background: var(--bg-elev); box-shadow: 0 6px 30px #44326410; }
 .wiki-context-chips { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 6px; }
 .wiki-context-chips > * { border: 0; background: var(--wiki-soft); border-radius: 4px; padding: 3px 7px; color: var(--wiki-accent) !important; display: flex; gap: 5px; align-items: center; white-space: nowrap; font-size: 11px !important; max-width: 80%; flex: none; overflow: hidden; text-overflow: ellipsis; }
 .wiki-context-chips svg { flex: none; }
@@ -9866,15 +9867,15 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-composer-controls > button:not(.wiki-send) { border: 0; padding: 0; color: #918982; background: transparent; font-size: 11px; }
 .wiki-composer-controls .wiki-send { display: flex; align-items: center; justify-content: center; margin-left: auto; width: 30px; height: 30px; flex: none; background: var(--wiki-accent); color: white; border: 0; border-radius: 9px; font-size: 16px; }
 .wiki-prompt-preview { max-height: 160px; overflow: auto; white-space: pre-wrap; font: 11px/1.6 "JetBrains Mono", monospace; color: #716883; margin-top: 8px; }
-.wiki-mentions { position: absolute; left: 10px; right: 10px; bottom: 100%; display: flex; flex-direction: column; padding: 6px; background: #fff; border: 1px solid var(--wiki-line); box-shadow: 0 4px 24px #0001; border-radius: 8px; }
+.wiki-mentions { position: absolute; left: 10px; right: 10px; bottom: 100%; display: flex; flex-direction: column; padding: 6px; background: var(--bg-elev); border: 1px solid var(--wiki-line); box-shadow: 0 4px 24px #0001; border-radius: 8px; }
 .wiki-mentions button { text-align: left; border: 0; background: transparent; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
 .wiki-mentions button:hover { background: var(--wiki-soft); }
-.wiki-answer { background: #fffffffa; border: 1px solid var(--wiki-line); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px #00000005; }
+.wiki-answer { background: var(--bg-elev); border: 1px solid var(--wiki-line); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px #00000005; }
 .wiki-answer > button { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 12px; border: 0; background: transparent; text-align: left; font-size: 11px; color: #827a8c; }
 .wiki-answer > button svg { margin-left: auto; }
 .wiki-answer > button span { color: var(--wiki-accent); font-weight: 600; }
 .wiki-answer > div { padding: 0 14px 10px; max-height: 140px; overflow: auto; font-size: 13px; }
-.wiki-changes { width: 400px; max-width: 42%; display: flex; flex-direction: column; flex: none; border-left: 1px solid var(--wiki-line); background: #fff; }
+.wiki-changes { width: 400px; max-width: 42%; display: flex; flex-direction: column; flex: none; border-left: 1px solid var(--wiki-line); background: var(--bg-elev); }
 .wiki-changes > header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--wiki-line); }
 .wiki-changes h2 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
 .wiki-changes header span { color: #928b81; font-size: 11px; }
@@ -9909,7 +9910,7 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-selection-menu button { border: 0; background: transparent; color: inherit; padding: 6px 9px; font: 12px "IBM Plex Sans", sans-serif; cursor: pointer; border-radius: 4px; }
 .wiki-selection-menu button:hover { background: #ffffff20; }
 .wiki-modal-backdrop { position: fixed; inset: 0; z-index: 2200; background: #201c2e35; backdrop-filter: blur(2px); display: flex; align-items: flex-start; justify-content: center; padding: 12vh 20px 24px; }
-.wiki-search-modal { width: 640px; max-width: 100%; border-radius: 12px; background: white; box-shadow: 0 16px 80px #231b3030; overflow: hidden; display: flex; flex-direction: column; max-height: 75vh; }
+.wiki-search-modal { width: 640px; max-width: 100%; border-radius: 12px; background: var(--bg-elev); box-shadow: 0 16px 80px #231b3030; overflow: hidden; display: flex; flex-direction: column; max-height: 75vh; }
 .wiki-search-modal > div:first-child { display: flex; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid var(--wiki-line); }
 .wiki-search-modal input { flex: 1; min-width: 0; border: 0; outline: none; font: 15px "IBM Plex Sans", sans-serif; }
 .wiki-search-modal button { border: 0; background: transparent; }
@@ -9921,11 +9922,11 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-search-results strong { display: block; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; white-space: normal; }
 .wiki-search-results span { display: block; margin-top: 5px; color: #8a8174; font-size: 12px; white-space: normal; }
 .wiki-search-modal footer { border-top: 1px solid var(--wiki-line); padding: 12px 20px; font-size: 11px; color: #91877b; }
-.wiki-confirm { width: 440px; max-width: 100%; padding: 24px; border-radius: 12px; background: white; box-shadow: 0 10px 60px #0002; }
+.wiki-confirm { width: 440px; max-width: 100%; padding: 24px; border-radius: 12px; background: var(--bg-elev); box-shadow: 0 10px 60px #0002; }
 .wiki-confirm h2 { font-size: 18px; margin-top: 0; }
 .wiki-confirm p { color: #8e8477; }
 .wiki-confirm > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
-.wiki-confirm button { border: 1px solid var(--wiki-line); border-radius: 6px; padding: 7px 10px; background: #fff; }
+.wiki-confirm button { border: 1px solid var(--wiki-line); border-radius: 6px; padding: 7px 10px; background: var(--bg-elev); }
 .wiki-confirm button:last-child { background: var(--wiki-accent); color: #fff; }
 .wiki-mobile-tools, .wiki-sidebar-scrim { display: none; }
 @media (max-width: 1200px) {
@@ -10019,7 +10020,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .codemode-images figure { margin: 0; min-width: 0; }
 .codemode-images img { width: 100%; max-height: 260px; object-fit: contain; border-radius: 6px; background: #f7f6f8; }
 .codemode-images figcaption { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
-.codemode-images button, .codemode-full-output button { background: white; border: 1px solid var(--border); border-radius: 5px; font-size: 11px; padding: 5px 8px; color: inherit; cursor: pointer; }
+.codemode-images button, .codemode-full-output button { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; padding: 5px 8px; color: inherit; cursor: pointer; }
 .codemode-feedback { padding: 8px 16px; margin: 0; color: var(--text-faint); overflow-wrap: anywhere; }
 
 /* MCP & Codemode — quiet configuration cards, attention states first */
@@ -10031,7 +10032,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .mcp-page-head > div, .mcp-section-head > div { flex: 1; }
 .mcp-page-head p, .mcp-section-head p, .mcp-muted { color: var(--text-faint); font-size: 11px; }
 .mcp-version { color: #817393; border: 1px solid #e5dfef; border-radius: 5px; padding: 4px 7px; white-space: nowrap; }
-.mcp-workbench button, .mcp-workbench select { font: inherit; padding: 6px 9px; border: 1px solid var(--border); border-radius: 5px; color: inherit; background: white; cursor: pointer; }
+.mcp-workbench button, .mcp-workbench select { font: inherit; padding: 6px 9px; border: 1px solid var(--border); border-radius: 5px; color: inherit; background: var(--bg-elev); cursor: pointer; }
 .mcp-workbench button:disabled, .mcp-workbench input:disabled, .mcp-workbench select:disabled { opacity: .5; cursor: default; }
 .mcp-workbench button:focus-visible, .mcp-workbench select:focus-visible, .codemode-card button:focus-visible, .codemode-card summary:focus-visible { outline: 2px solid #8d7bc0; outline-offset: 2px; }
 .mcp-scope-row { display: flex; align-items: center; gap: 12px; margin: 18px 0 24px; }
@@ -10103,9 +10104,8 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .mcp-exposure-control > small { color: var(--text-faint); font-size: 10px; }
 
 /* Extensions — native package manager, design round 1 */
-.settings-extensions-modal { width: min(1180px, calc(100vw - 32px)); }
 .extensions-panel { --ext-purple: #6545b3; --ext-pale: #f1ecfb; --ext-line: #e7e7ec; --ext-muted: #85858f; --ext-ink: #303039; color: var(--ext-ink); font-family: "IBM Plex Sans", sans-serif; min-width: 0; }
-.extensions-panel button, .extensions-panel select { font: inherit; font-size: 12px; border: 1px solid var(--ext-line); border-radius: 6px; padding: 7px 10px; background: #fff; color: inherit; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.extensions-panel button, .extensions-panel select { font: inherit; font-size: 12px; border: 1px solid var(--ext-line); border-radius: 6px; padding: 7px 10px; background: var(--bg-elev); color: inherit; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .extensions-panel button:hover:not(:disabled) { background: #f6f4fa; border-color: #cfc3e9; }
 .extensions-panel button:disabled { opacity: .45; cursor: default; }
 .extensions-panel button:focus-visible, .extensions-panel input:focus-visible, .extensions-panel select:focus-visible, .extensions-panel a:focus-visible { outline: 2px solid var(--ext-purple); outline-offset: 3px; }
@@ -10144,7 +10144,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .ext-pin { display: inline-flex; gap: 3px; align-items: center; color: #8f682d; background: #fbf3e3; border: 1px solid #f0e0bb; border-radius: 4px; padding: 1px 5px; font-size: 9px; white-space: nowrap; }
 .extensions-panel .ext-update { color: var(--ext-purple); border-color: #dacdef; background: var(--ext-pale); }
 .ext-switch { appearance: none; -webkit-appearance: none; width: 29px; height: 17px; border: 0; border-radius: 12px; background: #d7d5dc; position: relative; flex-shrink: 0; cursor: pointer; }
-.ext-switch::after { content: ""; position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform .15s; }
+.ext-switch::after { content: ""; position: absolute; width: 13px; height: 13px; border-radius: 50%; background: var(--bg-elev); top: 2px; left: 2px; transition: transform .15s; }
 .ext-switch:checked { background: var(--ext-purple); }
 .ext-switch:checked::after { transform: translateX(12px); }
 .ext-switch:disabled { opacity: .5; cursor: default; }
@@ -10182,7 +10182,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .ext-job > div { display: flex; justify-content: space-between; align-items: center; }
 .ext-job pre { font-size: 10px; max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ext-dialog-backdrop { position: fixed; inset: 0; z-index: 100; background: #18142250; backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.ext-dialog { width: 520px; max-width: 100%; max-height: 85vh; overflow: auto; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 20px 80px #18142230; }
+.ext-dialog { width: 520px; max-width: 100%; max-height: 85vh; overflow: auto; background: var(--bg-elev); border-radius: 12px; padding: 24px; box-shadow: 0 20px 80px #18142230; }
 .ext-dialog header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .ext-dialog h3 { font-size: 16px; margin: 0; }
 .ext-dialog h4 { overflow-wrap: anywhere; font-size: 15px; margin: 0 0 10px; }
@@ -10205,16 +10205,11 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .ext-editor { width: 760px; }
 .ext-editor textarea { box-sizing: border-box; width: 100%; min-height: 330px; resize: vertical; border: 1px solid var(--ext-line); border-radius: 5px; padding: 14px; font: 12px/1.7 "JetBrains Mono", monospace; tab-size: 4; }
 .ext-rail-badge { display: inline-block; padding: 1px 5px; border-radius: 5px; background: #e8dff7; color: #6545b3; font-size: 10px; margin-left: 8px; }
-.settings-extensions-modal { max-width: min(1180px, calc(100vw - 32px)); height: min(820px, calc(100vh - 48px)); }
-.settings-extensions-modal > .modal-head { justify-content: space-between; }
-@media (min-width: 900px) { .settings-extensions-modal .settings-rail { width: 192px; } .settings-extensions-modal .set-section { padding: 22px; } }
 .ext-new { color: #6545b3; background: #f1ecfb; border-radius: 4px; padding: 1px 5px; font-size: 9px; }
 
 /* ─── Native system prompt settings ─── */
-.settings-prompt-modal { width: min(1180px, calc(100vw - 32px)); max-width: min(1180px, calc(100vw - 32px)); height: min(820px, calc(100vh - 48px)); }
-.settings-prompt-modal > .modal-head { justify-content: space-between; }
-.system-prompt-panel { --prompt-purple: #6545b3; --prompt-line: #e7e7ec; color: #303039; font-family: "IBM Plex Sans", sans-serif; min-width: 0; }
-.system-prompt-panel button, .system-prompt-panel select { font: inherit; font-size: 12px; border: 1px solid var(--prompt-line); border-radius: 6px; padding: 6px 10px; background: #fff; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.system-prompt-panel { --prompt-purple: #6545b3; --prompt-line: #e7e7ec; color: var(--text); font-family: "IBM Plex Sans", sans-serif; min-width: 0; }
+.system-prompt-panel button, .system-prompt-panel select { font: inherit; font-size: 12px; border: 1px solid var(--prompt-line); border-radius: 6px; padding: 6px 10px; background: var(--bg-elev); color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .system-prompt-panel button:hover { background: #f7f5fb; }
 .system-prompt-panel button:disabled { cursor: default; opacity: .45; }
 .system-prompt-panel button:focus-visible, .system-prompt-panel textarea:focus-visible, .system-prompt-panel select:focus-visible { outline: 2px solid #967cc9; outline-offset: 2px; }
@@ -10223,7 +10218,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .prompt-token { font: 11px/1.5 "JetBrains Mono", monospace; color: #8d8b95; white-space: nowrap; }
 .prompt-heading-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .system-prompt-panel .prompt-link { color: var(--prompt-purple); background: transparent; border: 0; padding: 3px 4px; }
-.prompt-sections { border: 1px solid var(--prompt-line); border-radius: 9px; overflow: hidden; background: #fff; }
+.prompt-sections { border: 1px solid var(--prompt-line); border-radius: 9px; overflow: hidden; background: var(--bg-elev); }
 .prompt-section + .prompt-section { border-top: 1px solid var(--prompt-line); }
 .prompt-section-line { display: flex; align-items: center; gap: 15px; padding: 20px; min-width: 0; }
 .prompt-label { color: #8a8792; font-size: 12px; flex: 0 0 94px; }
@@ -10262,11 +10257,10 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .prompt-editor { border-top: 1px solid #ece7f5; padding: 18px 20px; }
 .prompt-scope { display: flex; align-items: center; gap: 12px; color: #8a8493; font-size: 11px; margin-bottom: 10px; }
 .prompt-editor-path { display: block; overflow-wrap: anywhere; color: #958aab; font: 11px/1.7 "JetBrains Mono", monospace; margin-bottom: 10px; }
-.prompt-editor textarea { box-sizing: border-box; width: 100%; min-height: 200px; resize: vertical; background: #fff; border: 1px solid #ded4ec; border-radius: 5px; padding: 14px; color: #40394b; font: 12px/1.8 "JetBrains Mono", monospace; tab-size: 4; }
+.prompt-editor textarea { box-sizing: border-box; width: 100%; min-height: 200px; resize: vertical; background: var(--bg-elev); border: 1px solid #ded4ec; border-radius: 5px; padding: 14px; color: #40394b; font: 12px/1.8 "JetBrains Mono", monospace; tab-size: 4; }
 .prompt-editor-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .prompt-editor-actions > span { margin-right: auto; font-size: 11px; color: #aaa1b7; }
 .system-prompt-panel .prompt-primary { background: var(--prompt-purple); border-color: var(--prompt-purple); color: #fff; }
-@media (min-width: 900px) { .settings-prompt-modal .settings-rail { width: 192px; } .settings-prompt-modal .set-section { padding: 22px; } }
 @media (max-width: 650px) {
 	.prompt-heading-actions { width: 100%; margin-left: 0; justify-content: space-between; }
 	.prompt-section-line { flex-wrap: wrap; padding: 15px; gap: 9px; }
@@ -10280,3 +10274,57 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 	.prompt-editor-actions > span { flex-basis: 100%; }
 	.prompt-auto { white-space: normal; }
 }
+
+/* All settings pages share one shell and scrolling content canvas. */
+.settings-modal > .modal-head { justify-content: space-between; }
+.settings-modal > .modal-head .icon-btn { border: 0; background: transparent; color: var(--text-dim); cursor: pointer; padding: 8px; border-radius: 6px; display: flex; }
+.settings-modal > .modal-head .icon-btn:hover { background: var(--bg-elev2); }
+.settings-modal .modal-body > .set-section { flex: 1 0 auto; margin: 0; }
+.settings-modal .set-section > label.set-row { justify-content: space-between; min-height: 48px; padding: 10px 14px; }
+.settings-modal .set-section > label.set-row > input { accent-color: var(--accent); width: 16px; height: 16px; }
+.settings-modal .set-section > label.set-row > select,
+.component-updates-panel button { font: inherit; font-size: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); }
+.component-updates-panel button { cursor: pointer; flex-shrink: 0; }
+.component-updates-panel button:disabled { cursor: default; opacity: .45; }
+.component-updates-panel .settings-primary { background: var(--accent); color: var(--accent-fg, white); border-color: var(--accent); }
+.settings-page-title { font-size: 21px; font-weight: 600; letter-spacing: -.5px; margin: 4px 0 16px; }
+.settings-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.settings-page-heading h2 { margin-bottom: 0; }
+.component-updates-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.component-update-row { justify-content: space-between; padding: 16px; gap: 20px; }
+.component-update-row > div { min-width: 0; }
+.component-update-row p { color: var(--text-dim); font-size: 12px; line-height: 1.7; margin: 8px 0 0; overflow-wrap: anywhere; }
+.settings-error { color: var(--red); overflow-wrap: anywhere; }
+.settings-modal .native-mcp-panel.mcp-workbench { max-width: none; width: 100%; margin: 0; }
+@media (min-width: 900px) { .settings-modal .settings-rail { width: 192px; } .settings-modal .set-section { padding: 22px; } }
+@media (max-width: 640px) { .settings-modal { padding: 16px; } .settings-layout { gap: 8px; } .component-update-row { flex-wrap: wrap; } .settings-page-heading { align-items: flex-start; flex-wrap: wrap; } }
+
+/* Application appearance; code preview keeps its independent palette. */
+:root[data-appearance="dark"] {
+	color-scheme: dark;
+	--bg: #1c1b20; --bg-elev: #242329; --bg-elev2: #2d2b33;
+	--border: #45414e; --border-soft: #37343f;
+	--text: #e7e3ec; --text-dim: #b9b2c4; --text-faint: #a39bab; --heading: #f2eef8;
+	--accent: #b69aed; --accent-soft: #342b45; --accent-fg: #231a34; --link: #c5a8fc;
+	--sidebar-bg: #211f26; --row-active: #35303f; --bubble-bg: #332c40; --code-chip-bg: #34303c;
+	--green: #6ccea1; --red: #f38d99; --amber: #e9bd73;
+}
+:root[data-appearance="dark"] .extensions-panel { --ext-purple: var(--accent); --ext-pale: var(--accent-soft); --ext-line: var(--border-soft); --ext-muted: var(--text-dim); --ext-ink: var(--text); }
+:root[data-appearance="dark"] .system-prompt-panel { --prompt-purple: var(--accent); --prompt-line: var(--border-soft); color: var(--text); }
+:root[data-appearance="dark"] .wiki-workbench { --wiki-accent: var(--accent); --wiki-soft: var(--accent-soft); --wiki-line: var(--border-soft); }
+
+:root[data-appearance="dark"] :is(.settings-modal, .wiki-workbench, .wiki-search-modal, .wiki-confirm) :is(input:not([type="checkbox"]), textarea, select) { color: var(--text); background-color: var(--bg-elev); border-color: var(--border); }
+:root[data-appearance="dark"] :is(.prompt-raw, .prompt-editing, .prompt-tool-list code, .prompt-rule-origin, .ext-avatar, .ext-badge, .ext-tabs span, .ext-command, .ext-preview-resources, .ext-notice, .ext-job, .ext-type-filters button, .mcp-exposure-guide, .mcp-notice, .wiki-composer-controls select, .wiki-avatar.user, .wiki-change-toast button:last-child) { background: var(--bg-elev2); color: var(--text-dim); border-color: var(--border-soft); }
+:root[data-appearance="dark"] :is(.prompt-section-text, .prompt-label, .prompt-auto, .prompt-muted, .prompt-footnote, .prompt-scope, .ext-source, .ext-actions a, .ext-catalog-card > p, .ext-version, .ext-group-title, .wiki-prompt-preview, .wiki-composer-controls label, .wiki-answer > button, .wiki-tags, .wiki-tags button, .wiki-tree-label, .wiki-document-meta, .wiki-muted, .wiki-code-hint, .wiki-empty, .wiki-backlinks button span) { color: var(--text-dim); }
+:root[data-appearance="dark"] :is(.prompt-warning, .ext-security, .ext-pin, .mcp-warning, .wiki-limit) { background: #3b3222; color: var(--amber); border-color: #635238; }
+:root[data-appearance="dark"] :is(.prompt-error, .ext-error, .mcp-error, .wiki-error, .wiki-diff-before) { background: #3d282e; color: var(--red); border-color: #654049; }
+:root[data-appearance="dark"] :is(.wiki-diff-after, .wiki-prose .wiki-added) { background: #223c32; color: var(--green); }
+:root[data-appearance="dark"] :is(.wiki-tree-row:hover, .extensions-panel button:hover:not(:disabled), .system-prompt-panel button:hover, .wiki-toolbar-actions button:hover) { background: var(--accent-soft); color: var(--accent); }
+:root[data-appearance="dark"] :is(.wiki-composer, .wiki-change-toast, .wiki-search-trigger, .ext-avatar, .ext-badge) { border-color: var(--border); }
+:root[data-appearance="dark"] :is(.extensions-panel .ext-primary, .system-prompt-panel .prompt-primary, .wiki-composer-controls .wiki-send, .wiki-tags button.active) { color: var(--accent-fg); }
+:root[data-appearance="dark"] .design-workspace :is(.inputbox, .view-switch button.active, .thinking-segments button[aria-pressed="true"], .sidebar-new button:hover) { background: var(--bg-elev); border-color: var(--border); }
+:root[data-appearance="dark"] .design-workspace :is(.drawer-right:not(:has(.fp-embedded)), .view-switch, .thinking-segments, .termline) { background: var(--bg-elev2); color: var(--text); }
+:root[data-appearance="dark"] .design-workspace :is(.sidebar-footer, .topbar-actions > .panel-toggle) { color: var(--text-dim); }
+:root[data-appearance="dark"] .design-workspace :is(.sidebar-new button, .panel-sessions, .topbar-actions > .panel-toggle) { border-color: var(--border); }
+:root[data-appearance="dark"] .design-workspace .session-item.active { box-shadow: 0 0 0 1px var(--border-soft); }
+:root[data-appearance="dark"] .design-workspace .inputbox :is(.btn.send, .btn.stop) { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }

@@ -6,6 +6,12 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	platform: process.platform,
+	appUpdate: action => ipcRenderer.invoke("pi-app-update", action),
+	onAppUpdate: callback => {
+		const listener = (_event, state) => callback(state);
+		ipcRenderer.on("pi-app-update-state", listener);
+		return () => ipcRenderer.removeListener("pi-app-update-state", listener);
+	},
 	openExtensionPath: (request) => ipcRenderer.invoke("pi-extension-open-path", { clientId: request.clientId, cwd: request.cwd, id: request.id }),
 	openWikiFile: (request) => ipcRenderer.invoke("pi-wiki-open-file", { clientId: request.clientId, cwd: request.cwd, path: request.path }),
 	windowAction: (action) => {

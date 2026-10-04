@@ -24,7 +24,7 @@ Windows 计划任务部署。
 | 前端 | React 18 + Vite 6 + react-markdown + highlight.js + xterm.js |
 | 智能体 | `@earendil-works/pi-coding-agent` SDK（进程内，读 `~/.pi/agent` 配置） |
 | 终端 | node-pty（服务端 PTY）+ `@xterm/xterm`（浏览器渲染，经 terminal bridge 转发） |
-| 样式 | 单文件 `web/src/styles.css`（固定浅色主题，CSS 变量） |
+| 样式 | 单文件 `web/src/styles.css`（浅色/深色/跟随系统，CSS 变量） |
 
 SDK 与 pi-ai 精确锁定 1.0.1，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
 系统提示词：修改分段来源、原生文件编辑或重载时，读取 `docs/architecture-system-prompt.md`。
@@ -79,7 +79,7 @@ pi-web-ui/
 │   │   ├── use-workspace-scm.ts # 顶栏与文件栏共用 Git 改动状态，按请求 ID 和 cwd 校验归属
 │   │   ├── types.ts            # ★ wire 协议 re-export shim（`export type * from "../../server/protocol"`）
 │   │   ├── i18n.tsx            # ★ 中英文案（zh 默认），新增 key 必须两处都加
-│   │   ├── styles.css          # ★ 全部样式（按组件分区，带注释分隔线）；唯一/固定的默认主题
+│   │   ├── styles.css          # ★ 全部样式（按组件分区，带注释分隔线）；应用外观与独立代码配色
 │   │   ├── theme.ts            # CSS 变量 → xterm 终端调色板桥接（THEME_CHANGE_EVENT + buildTermTheme）
 │   │   ├── sounds.ts           # WebAudio 提示音
 │   │   ├── download.ts         # 下载（fetch→blob，绕开 Chrome Safe Browsing）
@@ -125,7 +125,7 @@ pi-web-ui/
 
 | 组件 | 职责 |
 | --- | --- |
-| `FilePreview.tsx` | 右栏代码高亮编辑、Markdown 默认在预览画布中编辑（`/` 插入元素、截图粘贴）与媒体/SQLite 只读预览；当前文件 chip 严格镜像预览面板，发送时携带编辑器快照（含未保存改动）；版本校验保存与离开保护（详见 docs/architecture-attachments.md） |
+| `FilePreview.tsx` | 右栏代码高亮编辑与媒体/SQLite 只读预览；Markdown 点击自动进入 Wiki；当前文件 chip 严格镜像预览面板，发送时携带编辑器快照（含未保存改动）；版本校验保存与离开保护（详见 docs/architecture-attachments.md） |
 | `LeftPanel.tsx` | 全高项目栏：品牌、新对话、可折叠项目及会话、悬停更多菜单（重命名／删除）、连接／语言／设置；布局见 `docs/ui-design.md` |
 | `RightPanel.tsx` / `TaskProgressPanel.tsx` | 可展开目录树、Git 改动标记、文件预览；当前任务进度由服务端 transcript 推断，右栏展示合并后的任务阶段和结果；布局见 `docs/ui-design.md` |
 | `ChatInput.tsx` | 输入框 + 附件 chips（inline/reference/lines 三色）+ 当前文件 chip（镜像预览面板，发送取编辑器快照）；全窗口拖放目标；followUp 排队/steer 插队；斜杠命令选择器 |
@@ -138,7 +138,7 @@ pi-web-ui/
 | `Dialog.tsx` | 扩展 `ui.select/confirm/input` → 浏览器弹窗 |
 | `ModelConfigModal.tsx` / `PiSetupModal.tsx` | models.json 管理 / 首次配置引导 |
 | `SystemPromptPanel.tsx` | 原生提示词分段、全文复制、SYSTEM/APPEND/上下文文件编辑；见 `docs/architecture-system-prompt.md` |
-| `SettingsModal.tsx` | 设置面板（侧边栏分页：消息显示/原生提示词/技能/扩展/MCP/更新/界面插件） |
+| `SettingsModal.tsx` | 设置面板（侧边栏分页：消息显示（外观与代码配色）/原生提示词/技能/扩展/MCP/更新；各页共用固定尺寸弹窗） |
 | `BgTasksModal.tsx` | 后台任务弹窗：AI 启动的监听端口进程列表 |
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
@@ -176,7 +176,7 @@ pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 S
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 
-Wiki：修改文档浏览、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
+Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改文档浏览、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
 
 ## 5. 开发工作流
 

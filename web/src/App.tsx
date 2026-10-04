@@ -280,6 +280,7 @@ export function App() {
 		return () => window.removeEventListener("pi-configure-radius", configure);
 	}, [chat.state?.cwd, send]);
 	const [view, setView] = useState<ViewName>("chat");
+	const [wikiFileRequest, setWikiFileRequest] = useState<{cwd:string;conversationId:string;path:string;token:string} | null>(null);
 	const [commitJump, setCommitJump] = useState<{ hash: string; token: number } | null>(null);
 	const visited = useRef(new Set<ViewName>(["chat"]));
 	visited.current.add(view);
@@ -374,15 +375,26 @@ export function App() {
 	const openPreview = useCallback((path: string, name: string) => {
 		if (switching || !chat.state?.cwd) return;
 		const cwd = chat.state.cwd;
-		// Reveal the editor before asking about its draft, even when search
-		// was opened from Git/Terminal or a closed mobile drawer.
-		setView("chat");
-		setDrawer("right");
-		if (previewFile?.cwd === cwd && previewFile.path === path) return;
-		const open = () => setPreviewFile({ path, name, cwd });
-		if (fileGuard.current) fileGuard.current(open);
-		else open();
-	}, [switching, chat.state?.cwd, previewFile]);
+		const open = () => {
+			if (/\.(md|markdown)$/i.test(path)) {
+				setPreviewFile(null);
+				setWikiFileRequest({ cwd, conversationId: chat.activeConversationId, path, token: randomUuid() });
+				setView("wiki");
+				setDrawer(null);
+			} else {
+				setView("chat");
+				setDrawer("right");
+				setPreviewFile({ path, name, cwd });
+			}
+		};
+		if (wikiGuard.current) { wikiGuard.current(open); return; }
+		if (fileGuard.current) {
+			// Reveal the existing draft before asking whether to leave it.
+			setView("chat");
+			setDrawer("right");
+			fileGuard.current(open);
+		} else open();
+	}, [switching, chat.state?.cwd, chat.activeConversationId]);
 	useEffect(() => {
 		const onToolFile = (event: Event) => {
 			const detail = (event as CustomEvent<{ path?: string; line?: number }>).detail;
@@ -1005,7 +1017,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} messages={conversationState.messages} streaming={conversationState.isStreaming} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

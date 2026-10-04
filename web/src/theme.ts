@@ -1,18 +1,4 @@
-/**
- * Terminal theming helper.
- *
- * pi-web-ui used to support swapping the whole UI stylesheet at runtime
- * (multiple selectable themes served from /themes/<id>.css). That system has
- * been removed — the app now ships a single bundled stylesheet
- * (web/src/styles.css) with no in-app switcher. What's left here is just the
- * bridge from that stylesheet's --term-* CSS variables to the xterm.js
- * terminal canvas, which reads its palette from JS rather than CSS.
- */
-
-/** Broadcast when the active theme changes. Nothing currently dispatches
- *  this (no runtime theme switch exists anymore), but TermXterm.tsx still
- *  listens for it defensively — kept as a no-op hook point rather than
- *  ripped out, in case theme switching returns later. */
+/** Bridge application appearance changes to the xterm CSS-variable palette. */
 export const THEME_CHANGE_EVENT = "pi-web-ui:theme-change";
 
 /** CSS variable → xterm theme. Reads the --term-* palette from the current

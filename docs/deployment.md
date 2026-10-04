@@ -93,9 +93,14 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - 图标：`build/icon.png`（1024×1024，从 `web/public/favicon.svg` 派生）+
   `build/icon.ico`；electron-builder 打包时自动生成各平台格式，不需要手动出
   `.icns`。
-- 自动更新：`electron-updater` 已经接上 GitHub Releases 作为 feed
-  （`publish:` provider 配好了）——装了旧版本的用户，新 tag 发布后应该能收到
-  更新通知。没网络/没新版本时 `checkForUpdates()` 静默失败，不影响正常使用。
+- 自动更新：`electron-updater` 使用 GitHub Releases feed；安装版启动时检查版本，
+  在「设置 → 组件更新」点击「自动更新」下载，显示进度后点击「重启并安装」。
+  安装前系统对话框提示保存文件并确认，不在普通退出时自动安装。检查/下载错误在设置页显示，
+  开发模式禁用安装。`electron/app-updater.mjs` 管理状态及重复请求，preload 仅暴露固定操作，
+  主进程校验请求来自主窗口主 frame；内置 Pi 跟随应用版本升级。
+- 浏览器版的应用更新在可见终端运行固定的 `npm install -g @youweichen/pi-web-ui@<版本>`；
+  registry 版本不高于当前版本时禁用，避免旧 npm 标签导致降级。成功后手动执行
+  `pi-web-ui server restart`。原生扩展更新继续使用 Pi 包管理器。
 
 注意：这个 Electron 壳子和 CLI 共用同一份 `server/index.ts`，改 server 端代码
 时两边都要重新验证——尤其是 `resolvePkgRoot()`（`PI_WEB_PKG_ROOT` 覆盖逻辑）和

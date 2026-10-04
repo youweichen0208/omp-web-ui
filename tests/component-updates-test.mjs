@@ -7,8 +7,10 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
 import { chromium } from 'playwright-core';
+import { portUp } from './lib/port-utils.mjs';
 import { CHROME_PATH } from './lib/chrome.mjs';
 const port = Number(process.argv.slice(2).find(arg => /^\d+$/.test(arg)) || 9149);
+assert.equal(await portUp(port), false, `Port ${port} busy`);
 const root = mkdtempSync(join(tmpdir(), 'pi-component-updates-'));
 const agent = join(root, 'agent');
 const registryMock = join(root, 'registry-mock.mjs');
@@ -48,11 +50,16 @@ try {
 	await wait(m => m.type === 'component_updates' && m.requestId === 'reject-arbitrary' && m.phase === 'error');
 	if (process.argv.includes('--browser')) {
 		browser = await chromium.launch({ executablePath: CHROME_PATH || chromium.executablePath() });
-		const page = await browser.newPage();
+		const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+		page.setDefaultTimeout(12000);
+		const terminalCommands = [];
+		let staleRegistry = false;
+		const errors = []; page.on('pageerror', e => errors.push(e.message));
 		await page.routeWebSocket('**/ws', route => {
 			const upstream = route.connectToServer();
 			route.onMessage(wire => {
 				const message = JSON.parse(wire.toString());
+				if (message.type === 'run_command') { terminalCommands.push(message); return; }
 				if (message.type === 'update_component') {
 					route.send(JSON.stringify({ type: 'component_updates', requestId: message.requestId, cwd: root, phase: 'updating', items: [] }));
 					setTimeout(() => route.send(JSON.stringify({ type: 'component_updates', requestId: message.requestId, cwd: root, phase: 'updated', restartRequired: true, items: report.items.map(item => item.id === message.id ? { ...item, current: item.latest, status: 'current', canUpdate: false } : item) })), 100);
@@ -60,7 +67,7 @@ try {
 				}
 				upstream.send(wire);
 			});
-			upstream.onMessage(wire => { const message = JSON.parse(wire.toString()); if (message.type === 'snapshot' || message.type === 'snapshot_delta') message.state.piConfigured = true; route.send(JSON.stringify(message)); });
+			upstream.onMessage(wire => { const message = JSON.parse(wire.toString()); if (message.type === 'snapshot' || message.type === 'snapshot_delta') message.state.piConfigured = true; if (staleRegistry && message.type === 'update_status') Object.assign(message, { latest: '0.9.0', upToDate: true }); route.send(JSON.stringify(message)); });
 		});
 		await page.goto(`http://127.0.0.1:${port}`);
 		// Close first-run model setup when present; no real model is required.
@@ -69,10 +76,42 @@ try {
 		await page.locator('.topbar-more .chip').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		assert.equal(await page.getByRole('button', { name: /目标审查|视觉桥|预设/ }).count(), 0);
+		assert.equal(await page.getByRole('button', { name: '界面插件', exact: true }).count(), 0);
+		for (const width of [1440, 900, 390]) {
+			await page.setViewportSize({ width, height: 1000 });
+			let expected;
+			for (const name of ['消息显示', '系统提示词', '技能', 'Extensions', 'MCP 与 Codemode', '组件更新']) {
+				await page.locator('.settings-rail').getByRole('button', { name, exact: true }).click();
+				const boxes = await page.evaluate(() => ['.settings-modal', '.settings-rail', '.modal-body'].map(selector => { const b = document.querySelector(selector).getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(Math.round); }));
+				expected ??= boxes; assert.deepEqual(boxes, expected, `consistent settings shell at ${width}: ${name}`);
+				const modal = await page.locator('.settings-modal').boundingBox();
+				const close = await page.locator('.settings-modal > .modal-head button').boundingBox();
+				assert(close.x > modal.x + modal.width - 90, 'close stays at top right');
+				assert(modal.x >= 0 && modal.x + modal.width <= width, 'modal fits viewport');
+			}
+		}
+		await page.setViewportSize({ width: 1440, height: 1000 });
+		await page.getByRole('button', { name: '消息显示', exact: true }).click();
+		await page.getByLabel('外观', { exact: true }).selectOption('dark');
+		assert.equal(await page.locator('html').getAttribute('data-appearance'), 'dark');
+		assert.equal(await page.locator('.settings-modal').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(45, 43, 51)');
+		await page.mouse.move(0, 0);
+		await page.screenshot({ path: '/tmp/pi-settings-dark.png' });
+		for (const [index, name] of ['系统提示词', '技能', 'Extensions', 'MCP 与 Codemode', '组件更新'].entries()) {
+			await page.locator('.settings-rail').getByRole('button', { name, exact: true }).click();
+			await page.screenshot({ path: `/tmp/pi-settings-dark-${index}.png` });
+		}
+		await page.getByRole('button', { name: '消息显示', exact: true }).click();
+		await page.getByLabel('外观', { exact: true }).selectOption('system');
+		await page.emulateMedia({ colorScheme: 'dark' });
+		await page.waitForFunction(() => document.documentElement.dataset.appearance === 'dark');
+		await page.emulateMedia({ colorScheme: 'light' });
+		await page.waitForFunction(() => document.documentElement.dataset.appearance === 'light');
+		await page.getByLabel('外观', { exact: true }).selectOption('dark');
 		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
-		await page.locator('.set-prompt-preview').waitFor();
+		await page.locator('.prompt-sections').waitFor();
 		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'native prompt must be read-only');
-		assert((await page.locator('.set-prompt-preview').textContent()).length > 0);
+		assert((await page.locator('.prompt-sections').textContent()).length > 0);
 		await page.getByRole('button', { name: '消息显示', exact: true }).click();
 		const thinking = page.locator('.settings-modal label', { hasText: '完整显示思考' }).locator('input');
 		await thinking.click();
@@ -87,6 +126,48 @@ try {
 		await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).click();
 		await page.getByText('更新已安装，请重启应用以加载新版本。', { exact: true }).waitFor();
 		assert.equal(await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).count(), 0);
+		await page.getByRole('button', { name: '自动更新', exact: true }).click();
+		await page.waitForFunction(() => !document.querySelector('.settings-modal'));
+		for (let i = 0; i < 100 && !terminalCommands.length; i++) await sleep(50);
+		assert.equal(terminalCommands.length, 1);
+		assert.equal(terminalCommands[0].command.command, 'npm install -g @youweichen/pi-web-ui@999.0.0');
+		staleRegistry = true;
+		await page.reload();
+		await page.locator('.topbar-more .chip').waitFor();
+		assert.equal(await page.locator('html').getAttribute('data-appearance'), 'dark');
+		await page.locator('.topbar-more .chip').click();
+		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
+		await page.getByRole('button', { name: '组件更新', exact: true }).click();
+		await page.locator('.component-update-row', { hasText: 'pi-web-ui 应用' }).getByText(/0.9.0/).waitFor();
+		assert(await page.getByRole('button', { name: '自动更新', exact: true }).isDisabled(), 'old registry latest cannot downgrade');
+		assert.deepEqual(errors, []);
+
+		// Exercise the renderer against a desktop bridge without downloading or installing anything.
+		await page.addInitScript(() => {
+			let listener, state = { phase: 'available', current: '0.12.0', latest: '0.13.0' };
+			window.updateActions = [];
+			window.electronAPI = {
+				platform: 'darwin', windowAction() {}, onWindowState() { return () => {}; },
+				onAppUpdate(callback) { listener = callback; return () => { listener = undefined; }; },
+				async appUpdate(action) {
+					window.updateActions.push(action);
+					if (action === 'update') { state = { ...state, phase: 'downloading', percent: 42 }; listener?.(state); }
+					return state;
+				},
+			};
+			window.finishDownload = () => { state = { ...state, phase: 'downloaded', percent: 100 }; listener?.(state); };
+		});
+		await page.reload();
+		await page.locator('.topbar-more .chip').click();
+		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
+		await page.getByRole('button', { name: '组件更新', exact: true }).click();
+		await page.getByRole('button', { name: '自动更新', exact: true }).click();
+		await page.getByText('正在下载：42%', { exact: true }).waitFor();
+		assert(await page.getByRole('button', { name: '自动更新', exact: true }).isDisabled());
+		await page.evaluate(() => window.finishDownload());
+		await page.getByRole('button', { name: '重启并安装', exact: true }).click();
+		assert.deepEqual(await page.evaluate(() => window.updateActions.filter(a => a !== 'read')), ['update', 'install']);
+
 	}
 	console.log('PASS component versions, built-in restrictions, pinned sources, registry errors and update UI');
 } finally {

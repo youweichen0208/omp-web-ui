@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { createAppUpdater } from '../electron/app-updater.mjs';
+function fixture(supported = true) {
+	const updater = new EventEmitter(), events = [];
+	let checks = 0, downloads = 0, installs = 0, allow = false;
+	updater.checkForUpdates = async () => { checks++; updater.emit('checking-for-update'); await Promise.resolve(); updater.emit('update-available', { version: '1.0.0' }); };
+	updater.downloadUpdate = async () => { downloads++; updater.emit('download-progress', { percent: 42 }); await Promise.resolve(); updater.emit('update-downloaded', { version: '1.0.0' }); };
+	updater.quitAndInstall = () => installs++;
+	const controller = createAppUpdater({ updater, supported, version: '0.12.0', publish: state => events.push(state), confirmInstall: async () => allow });
+	return { updater, events, controller, counts: () => ({ checks, downloads, installs }), allow: () => { allow = true; } };
+}
+const f = fixture();
+assert.equal(f.updater.autoDownload, false);
+assert.equal(f.updater.autoInstallOnAppQuit, false);
+await assert.rejects(f.controller.run('https://arbitrary.example'), /Invalid/);
+await assert.rejects(f.controller.run('install'), /not been downloaded/);
+await Promise.all([f.controller.run('update'), f.controller.run('update')]);
+assert.deepEqual(f.counts(), { checks: 1, downloads: 1, installs: 0 });
+assert(f.events.some(s => s.phase === 'downloading' && s.percent === 42));
+assert.equal((await f.controller.run('read')).phase, 'downloaded');
+await f.controller.run('check');
+assert.equal((await f.controller.run('read')).phase, 'downloaded');
+await f.controller.run('install');
+assert.equal(f.counts().installs, 0);
+f.allow(); await f.controller.run('install'); assert.equal(f.counts().installs, 1);
+const failed = fixture();
+failed.updater.checkForUpdates = async () => { throw Error('network unavailable'); };
+assert.equal((await failed.controller.run('update')).error, 'network unavailable');
+const current = fixture();
+current.updater.checkForUpdates = async () => current.updater.emit('update-not-available');
+assert.equal((await current.controller.run('update')).phase, 'current');
+assert.equal(current.counts().downloads, 0);
+const dev = fixture(false);
+assert.equal((await dev.controller.run('update')).phase, 'unsupported');
+assert.equal(dev.counts().checks, 0);
+console.log('PASS updater download, progress, deduplication, explicit restart, errors, current and development mode');

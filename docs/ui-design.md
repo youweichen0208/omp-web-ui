@@ -97,9 +97,9 @@ Web 与 Electron 共用同一套 React 布局与 `web/src/styles.css`。本次�
 
 设置「原生 MCP」有全局/项目来源选择、stdio/HTTP 表单、args/env/headers/OAuth 结构化 JSON、启用和 exposure。完整 JSON 草稿保留高级及未知字段，保存前进行版本检查。官方连接状态与 OAuth 链接显示在管理页，交互弹窗在页内展示。Radius 登录成功后按钮显式写入全局 MCP，新名称避免覆盖同名配置。
 
-## Wiki 模式（12a）
+## Markdown 文档界面（12a）
 
-Wiki 使用 264px 目录栏、720px 最大正文宽度、680px 悬浮输入框和 400px 按需改动抽屉。抽屉占据布局宽度，输入框在剩余主区居中。850px 以下目录切为抽屉，600px 以下改动面板在输入区域上方覆盖。文件类型、交互、历史与验证入口见 [Wiki 模式](architecture-wiki.md)。
+Markdown 文件点击后自动进入 Wiki，顶栏移除独立 Wiki 模式入口，点「对话」返回聊天。Wiki 使用 264px 目录栏、720px 最大正文宽度、680px 悬浮输入框和 400px 按需改动抽屉。抽屉占据布局宽度，输入框在剩余主区居中。850px 以下目录切为抽屉，600px 以下改动面板在输入区域上方覆盖。文件类型、交互、历史与验证入口见 [Wiki 模式](architecture-wiki.md)。
 
 ## Codemode 与 MCP（15a / 15b）
 
@@ -114,3 +114,13 @@ Wiki 使用 264px 目录栏、720px 最大正文宽度、680px 悬浮输入框�
 ## 系统提示词设置（18c）
 
 `SystemPromptPanel` 按原生顺序展示身份、工具、规则、Pi 文档、追加提示词、项目上下文。左侧浅灰固定标签、中部内容、右侧动作；IBM Plex Sans + JetBrains Mono，紫色编辑态。技能/cwd 仅在全文中显示。文件编辑在原行下方展开，支持范围选择、冲突重读、草稿离开保护。SYSTEM 替换先提醒，替换后三行说明变淡。强制提示词只读。详见 [系统提示词架构](architecture-system-prompt.md)。
+
+## 设置窗口与外观
+
+设置页共用 `settings-modal`：最大 1180×820，随视口缩小，固定右上角关闭按钮；侧栏与内容画布尺寸不随分页切换，超长内容仅在右栏滚动。设置保留消息显示、系统提示词、技能、Extensions、MCP 与 Codemode、组件更新六页；移除界面插件设置入口。
+
+消息显示中的「外观」提供浅色、深色、跟随系统，默认浅色，偏好以 `pi-web-ui:appearance` 存于浏览器。`appearance.ts` 更新根元素的 `data-appearance`，监听系统配色及跨标签页存储变化。代码文件配色仍可独立选择。终端通过 `THEME_CHANGE_EVENT` 重新读取 CSS 调色板。
+
+组件更新包含应用与原生扩展：桌面版通过固定 IPC 操作检查、下载并展示进度，下载后用户确认重启安装；开发桌面版不安装。浏览器版仅在 registry 版本高于运行版本时启用应用更新，打开可见终端执行固定 npm 包更新命令，完成后需重启服务。内置 Pi 随应用更新，本地单文件扩展提示编辑源文件，只有 `canUpdate` 的原生扩展显示更新按钮。
+
+回归：`tests/component-updates-test.mjs --browser` 验证多宽度尺寸、外观持久化、系统配色和更新命令；`tests/app-updater-test.mjs` 验证更新生命周期；`tests/wiki-electron-test.mjs` 验证真实 preload 更新桥。

@@ -12,10 +12,14 @@ try {
 	let page;
 	for (let i = 0; i < 200; i++) { page = app.windows().find(w => w.url().startsWith('http://127.0.0.1:')); if (page) break; await new Promise(r => setTimeout(r, 100)); }
 	assert(page); page.setDefaultTimeout(12000);
+	await page.waitForFunction(() => !!window.electronAPI?.appUpdate);
+	assert.equal((await page.evaluate(() => window.electronAPI.appUpdate('read'))).phase, 'unsupported');
+	assert.equal(await page.evaluate(async () => { try { await window.electronAPI.appUpdate('arbitrary'); return false; } catch { return true; } }), true);
 	await page.locator('.setup-modal').waitFor();
 	await page.locator('.setup-modal .modal-close').click();
 	await app.evaluate(({ BrowserWindow, shell }) => { BrowserWindow.getAllWindows()[0].setSize(1440, 950); shell.openPath = async path => { globalThis.wikiOpened = path; return ''; }; });
-	await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).click();
+	assert.equal(await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).count(), 0);
+	await page.locator('.file-name', { hasText: 'README.md' }).click();
 	await page.locator('.wiki-document h1', { hasText: 'Desktop Wiki' }).waitFor();
 	const tabs = await page.locator('.topbar .view-switch').boundingBox(); assert(tabs.x >= 90, 'tabs must avoid macOS traffic lights');
 	await page.getByRole('treeitem', { name: 'sample.bin', exact: true }).click();
