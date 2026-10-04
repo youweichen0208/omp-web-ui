@@ -1017,7 +1017,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} live={conversationState.streamingMessage} model={conversationState.model} contextPercent={conversationState.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

@@ -30,8 +30,9 @@ const mock = createServer(async (req, res) => {
 		{ path: 'README.md', content: readFileSync(join(cwd, 'README.md'), 'utf8') + '\n## 隔夜持仓\n\n隔夜持仓的止损阈值按开盘价重新计算。\n' },
 		{ path: '交易系统/参数配置.md', content: '# 参数配置\n\n#风控\n\n新增 overnight_reset: true\n' },
 	];
-	const chunks = afterTools ? [[{ content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
+	const chunks = afterTools ? [[{ role: 'assistant', content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{ content: '\n\n- **第 2 节补充建议**：可以明确仓位上限的例外。\n- **第 99 节不存在**：不应出现跳转。\n\n需要我继续吗？' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
 	for (const [delta, finish_reason] of chunks) {
+		if (afterTools) await new Promise(r => setTimeout(r, 800));
 		res.write(`data: ${JSON.stringify({ id: 'wiki-test', object: 'chat.completion.chunk', created: Date.now(), model: payload.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
 	}
 	res.end('data: [DONE]\n\n');
@@ -57,6 +58,17 @@ try {
 	await page.locator('.wiki-document h1:visible', { hasText: '风控规则' }).waitFor();
 	assert.equal(await page.locator('.wiki-workbench').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 35, 41)');
 	assert.equal(await page.locator('.wiki-sidebar').evaluate(el => Math.round(el.getBoundingClientRect().width)), 250);
+	await page.locator('.wiki-chat-panel').waitFor();
+	assert.equal(Math.round((await page.locator('.wiki-chat-panel').boundingBox()).width), 400);
+	assert((await page.locator('.wiki-chat-model').innerText()).includes('Wiki test'));
+	assert.equal(await page.locator('.wiki-main > .wiki-composer-area').count(), 0, 'panel open hides floating input');
+	const reading = await page.locator('.wiki-main').boundingBox(), panel = await page.locator('.wiki-chat-panel').boundingBox();
+	assert(reading.x + reading.width <= panel.x, 'desktop panel does not cover article');
+	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
+	assert.equal(await page.evaluate(cwd => localStorage.getItem(`pi-wiki-chat:${cwd}`), cwd), 'false');
+	await page.keyboard.press('Meta+j');
+	await page.locator('.wiki-chat-panel').waitFor();
+	await page.keyboard.press('Meta+j');
 	await page.locator('.wiki-index-status').waitFor();
 	assert.equal(await page.locator('.wiki-document h1:visible').count(), 1);
 	assert.equal(await page.locator('.wiki-limit').count(), 0);
@@ -105,7 +117,7 @@ try {
 	await page.locator('.wiki-search-results strong', { hasText: '.obsidian/hidden.md' }).click();
 	await page.locator('.wiki-document-heading h1', { hasText: 'Different page title' }).waitFor();
 	assert.equal(await page.locator('.wiki-prose h1').innerText(), 'Different body title');
-	await page.getByRole('treeitem', { name: 'README.md', exact: true }).click();
+	await page.locator('.wiki-tree-row[title="README.md"]').click();
 	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
 
 	assert.equal(await page.locator('.wiki-prose a').first().textContent(), '参数配置');
@@ -194,10 +206,30 @@ try {
 	assert((await page.locator('.wiki-prompt-preview').innerText()).includes('代码文件默认只读'));
 	await page.getByRole('button', { name: '范围', exact: true }).click();
 	await page.getByRole('button', { name: '查看发送内容', exact: true }).click();
+	await page.keyboard.press('Meta+j');
+	assert.equal(await page.locator('.wiki-chat-panel').count(), 0);
 	await page.getByRole('button', { name: '发送', exact: true }).click();
-	await page.locator('.wiki-answer', { hasText: '已更新两个文档' }).waitFor({ timeout: 20000 });
+	await page.locator('.wiki-chat-answer', { hasText: '已更新两个文档' }).waitFor({ timeout: 20000 });
+	assert(await page.locator('.wiki-chat-working').isVisible(), 'live reply is visible before settled');
+	await page.locator('.wiki-chat-working').waitFor({ state: 'hidden' });
 	await page.locator('.wiki-change-toast', { hasText: '2 个文件' }).waitFor({ timeout: 20000 });
 	assert(requests.length >= 2);
+	await page.getByRole('button', { name: '跳到 §2', exact: true }).waitFor();
+	assert.equal(await page.getByRole('button', { name: '跳到 §99', exact: true }).count(), 0);
+	await page.getByRole('button', { name: '跳到 §2', exact: true }).click();
+	assert.equal(await page.locator('.wiki-save').count(), 0, 'heading flash does not dirty the editor');
+	assert.equal(await page.locator('.wiki-chat-tool.done').count(), 2, 'tools show actual completion');
+	assert((await page.locator('.wiki-chat-messages').innerText()).includes('需要我继续吗？'));
+	await page.screenshot({ path: '/tmp/pi-wiki-chat-desktop.png' });
+	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
+	await page.screenshot({ path: '/tmp/pi-wiki-chat-desktop-light.png' });
+	await page.evaluate(() => document.documentElement.dataset.appearance = 'dark');
+	await page.locator('.wiki-tree-row[title="交易系统/参数配置.md"]').click();
+	await page.locator('.wiki-document-heading h1', { hasText: '参数配置' }).waitFor();
+	assert((await page.locator('.wiki-chat-messages').innerText()).includes('已更新两个文档'), 'document switches preserve conversation');
+	assert((await page.locator('.wiki-context-chips').innerText()).includes('参数配置.md'));
+	await page.locator('.wiki-tree-row[title="README.md"]').click();
+	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
 	assert(requests.some(r => r.messages.some(m => m.role === 'tool')), 'native SDK executed tool calls');
 	assert(JSON.stringify(requests[0].messages).includes('选中内容'));
 	await page.locator('.wiki-change-toast button').first().click();
@@ -216,6 +248,13 @@ try {
 	await page.locator('.wiki-changes header button').click();
 	await page.setViewportSize({ width: 390, height: 844 });
 	assert(!(await page.locator('.wiki-toc').isVisible()));
+	const closedWidth = (await page.locator('.wiki-main').boundingBox()).width;
+	await page.locator('.wiki-chat-toggle').click();
+	await page.getByRole('dialog', { name: 'Wiki 对话面板', exact: true }).waitFor();
+	assert.equal((await page.locator('.wiki-main').boundingBox()).width, closedWidth, 'mobile chat overlays instead of squeezing article');
+	assert(await page.getByRole('textbox', { name: '问 pi', exact: true }).isVisible());
+	await page.screenshot({ path: '/tmp/pi-wiki-chat-mobile.png' });
+	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
 	await page.locator('.wiki-scroll').evaluate(el => el.scrollTop = el.scrollHeight);
 	const end = await page.locator('.wiki-backlinks').boundingBox(), composer = await page.locator('.wiki-composer-area').boundingBox();
 	assert(end.y + end.height <= composer.y, 'last content can scroll above the floating composer');
@@ -223,6 +262,14 @@ try {
 	assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile overflow');
 	await page.locator('.wiki-mobile-tools button').first().click();
 	await page.locator('.wiki-sidebar.open').waitFor();
+	await page.keyboard.press('Escape');
+	await page.setViewportSize({ width: 1440, height: 1000 });
+	await page.locator('.wiki-chat-toggle').click();
+	await page.locator('.wiki-chat-panel').getByRole('button', { name: '新对话', exact: true }).click();
+	await page.locator('.wiki-chat-empty').waitFor();
+	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
+	assert.equal(await page.locator('.wiki-chat-answer').count(), 0, 'new native conversation clears the panel');
+	assert.equal(await page.evaluate(cwd => localStorage.getItem(`pi-wiki-chat:${cwd}`), cwd), 'true');
 	assert.deepEqual(errors, []);
 	console.log('PASS Wiki layout, links, search, source save, draft guard, selection, native request, batch undo/redo and mobile');
 } catch (e) { console.error(log.slice(-5000)); throw e; }

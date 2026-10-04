@@ -9865,11 +9865,6 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 .wiki-mentions { position: absolute; left: 10px; right: 10px; bottom: 100%; display: flex; flex-direction: column; padding: 6px; background: var(--bg-elev); border: 1px solid var(--wiki-line); box-shadow: 0 4px 24px #0001; border-radius: 8px; }
 .wiki-mentions button { text-align: left; border: 0; background: transparent; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
 .wiki-mentions button:hover { background: var(--wiki-soft); }
-.wiki-answer { background: var(--bg-elev); border: 1px solid var(--wiki-line); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px #00000005; }
-.wiki-answer > button { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 12px; border: 0; background: transparent; text-align: left; font-size: 11px; color: #827a8c; }
-.wiki-answer > button svg { margin-left: auto; }
-.wiki-answer > button span { color: var(--wiki-accent); font-weight: 600; }
-.wiki-answer > div { padding: 0 14px 10px; max-height: 140px; overflow: auto; font-size: 13px; }
 .wiki-changes { width: 400px; max-width: 42%; display: flex; flex-direction: column; flex: none; border-left: 1px solid var(--wiki-line); background: var(--bg-elev); }
 .wiki-changes > header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--wiki-line); }
 .wiki-changes h2 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
@@ -9955,7 +9950,6 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { height: 44px;
 	.wiki-composer-controls > button:not(.wiki-send) { font-size: 10px; }
 	.wiki-changes { position: absolute; inset: 0 0 190px 0; max-width: none; width: auto; z-index: 4; box-shadow: -5px 0 20px #0001; }
 	.wiki-change-toast { font-size: 11px; }
-	.wiki-answer > div { max-height: 100px; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.wiki-workbench *, .wiki-selection-menu { scroll-behavior: auto !important; transition: none !important; }
@@ -10310,7 +10304,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 :root[data-appearance="dark"] :is(.settings-modal, .wiki-workbench, .wiki-search-modal, .wiki-confirm) :is(input:not([type="checkbox"]), textarea, select) { color: var(--text); background-color: var(--bg-elev); border-color: var(--border); }
 :root[data-appearance="dark"] :is(.prompt-raw, .prompt-editing, .prompt-tool-list code, .prompt-rule-origin, .ext-avatar, .ext-badge, .ext-tabs span, .ext-command, .ext-preview-resources, .ext-notice, .ext-job, .ext-type-filters button, .mcp-exposure-guide, .mcp-notice, .wiki-composer-controls select, .wiki-avatar.user, .wiki-change-toast button:last-child) { background: var(--bg-elev2); color: var(--text-dim); border-color: var(--border-soft); }
-:root[data-appearance="dark"] :is(.prompt-section-text, .prompt-label, .prompt-auto, .prompt-muted, .prompt-footnote, .prompt-scope, .ext-source, .ext-actions a, .ext-catalog-card > p, .ext-version, .ext-group-title, .wiki-prompt-preview, .wiki-composer-controls label, .wiki-answer > button, .wiki-tree-label, .wiki-document-meta, .wiki-muted, .wiki-code-hint, .wiki-empty, .wiki-backlinks button span) { color: var(--text-dim); }
+:root[data-appearance="dark"] :is(.prompt-section-text, .prompt-label, .prompt-auto, .prompt-muted, .prompt-footnote, .prompt-scope, .ext-source, .ext-actions a, .ext-catalog-card > p, .ext-version, .ext-group-title, .wiki-prompt-preview, .wiki-composer-controls label, .wiki-tree-label, .wiki-document-meta, .wiki-muted, .wiki-code-hint, .wiki-empty, .wiki-backlinks button span) { color: var(--text-dim); }
 :root[data-appearance="dark"] :is(.prompt-warning, .ext-security, .ext-pin, .mcp-warning, .wiki-limit) { background: #3b3222; color: var(--amber); border-color: #635238; }
 :root[data-appearance="dark"] :is(.prompt-error, .ext-error, .mcp-error, .wiki-error, .wiki-diff-before) { background: #3d282e; color: var(--red); border-color: #654049; }
 :root[data-appearance="dark"] :is(.wiki-diff-after, .wiki-prose .wiki-added) { background: #223c32; color: var(--green); }
@@ -10516,3 +10510,69 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 }
 
 .settings-modal .prompt-section-line .prompt-text-button { color: var(--text-dim); }
+
+/* Wiki 19a conversation panel: reading and conversation share the canvas. */
+.wiki-workbench { position: relative; }
+.wiki-chat-panel { width: 400px; flex: none; min-height: 0; display: flex; flex-direction: column; background: var(--bg-elev); border-left: 1px solid var(--wiki-line); }
+.wiki-chat-panel > header { height: 44px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid var(--wiki-line); }
+.wiki-chat-brand { display: grid; place-items: center; width: 21px; height: 21px; flex: none; border-radius: 5px; background: var(--wiki-accent); color: white; font-size: 15px; }
+.wiki-chat-panel > header strong { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.wiki-chat-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); font-size: 11px; }
+.wiki-chat-panel > header button { display: flex; align-items: center; border: 0; background: transparent; color: var(--text-dim); font-size: 11px; padding: 5px; }
+.wiki-chat-toggle kbd { font: 10px var(--sans); color: inherit; }
+.wiki-chat-toggle.active { background: var(--accent-soft) !important; color: var(--accent) !important; }
+.wiki-chat-messages { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 16px; scrollbar-gutter: stable; }
+.wiki-chat-message { margin-bottom: 18px; overflow-wrap: anywhere; }
+.wiki-chat-message.user { max-width: 85%; width: fit-content; margin-left: auto; padding: 8px 12px; border-radius: 12px; background: oklch(0.955 0.004 80); font-size: 13px; }
+.wiki-chat-message :is(.md) { font-size: 13.5px; line-height: 1.7; }
+.wiki-chat-message .md > :first-child { margin-top: 0; }
+.wiki-chat-message .md > :last-child { margin-bottom: 0; }
+.wiki-chat-message img { max-width: 100%; max-height: 200px; object-fit: contain; }
+.wiki-chat-answer > .md { margin: 0 0 12px; }
+.wiki-chat-tool { font-size: 12px; color: var(--text-dim); margin: 8px 0; }
+.wiki-chat-tool summary { display: flex; gap: 6px; align-items: center; cursor: pointer; list-style: none; }
+.wiki-chat-tool summary::-webkit-details-marker { display: none; }
+.wiki-chat-tool summary > span { display: flex; flex: none; }
+.wiki-chat-tool.done summary > span { color: var(--green); }
+.wiki-chat-tool.error summary > span, .wiki-chat-error { color: var(--red); }
+.wiki-chat-tool code { font: 11.5px/1.7 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.wiki-chat-tool small { flex: none; font-size: 10.5px; color: var(--text-faint); }
+.wiki-chat-tool pre, .wiki-chat-request pre { overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.7 var(--mono); padding: 8px; background: var(--bg); border-radius: 6px; }
+.wiki-chat-request { margin-top: 6px; color: var(--text-dim); font-size: 11px; }
+.wiki-chat-request summary { cursor: pointer; }
+.wiki-suggestion { border: 1px solid var(--wiki-line); border-radius: 9px; padding: 11px 12px; margin: 8px 0; }
+.wiki-suggestion > header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; }
+.wiki-suggestion strong { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; }
+.wiki-suggestion header button { border: 0; background: transparent; color: var(--wiki-accent); font-size: 11px; padding: 0; }
+.wiki-suggestion .md { font-size: 13px; color: var(--text-dim); }
+.wiki-chat-empty { color: var(--text-faint); text-align: center; font-size: 13px; line-height: 1.8; margin: 48px 20px; }
+.wiki-chat-earlier { display: block; margin: 0 auto 16px; border: 0; color: var(--wiki-accent); background: transparent; font-size: 12px; }
+.wiki-chat-working { display: flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: 12px; }
+.wiki-chat-panel > footer { flex: none; padding: 10px 12px 12px; border-top: 1px solid var(--wiki-line); }
+.wiki-chat-panel .wiki-composer-area { position: static; max-width: none; margin: 0; gap: 0; }
+.wiki-chat-panel .wiki-composer { border-radius: 12px; border-color: oklch(0.86 0.02 285); box-shadow: none; padding: 8px 10px; display: flex; flex-direction: column; }
+.wiki-chat-panel .wiki-composer textarea { order: -1; min-height: 50px; max-height: 120px; font-size: 13px; }
+.wiki-chat-panel .wiki-context-chips { margin: 0 0 8px; max-height: 68px; overflow: auto; }
+.wiki-chat-panel .wiki-context-chips > span { background: var(--wiki-soft); color: var(--wiki-accent); }
+.wiki-chat-panel .wiki-composer-controls { gap: 5px; }
+.wiki-chat-panel .wiki-composer-controls .wiki-send { margin-left: auto; }
+.wiki-chat-panel .wiki-scope-control { max-width: 125px; }
+.wiki-chat-panel .wiki-change-toast { margin-bottom: 8px; box-shadow: none; }
+.wiki-chat-panel .wiki-prompt-preview { max-height: 140px; }
+.wiki-chat-scrim { display: none; }
+.wiki-workbench.with-chat .wiki-document { padding-bottom: 48px; }
+:root[data-appearance="dark"] .wiki-chat-message.user { background: var(--bg-elev2); }
+:root[data-appearance="dark"] .wiki-chat-panel .wiki-composer { border-color: var(--border); }
+@media (max-width: 1099px) {
+	.wiki-chat-panel { position: absolute; inset: 0 0 0 auto; width: min(400px, calc(100% - 24px)); z-index: 7; box-shadow: -12px 0 32px #0002; }
+	.wiki-chat-scrim { display: block; position: absolute; inset: 0; z-index: 6; background: #0003; border: 0; padding: 0; }
+}
+@media (max-width: 760px) {
+	.wiki-chat-toggle kbd { display: none; }
+	.wiki-toolbar-actions { gap: 2px; }
+	.wiki-toolbar-actions button { font-size: 11px; padding: 5px; }
+	.wiki-chat-panel .wiki-composer-controls > button:not(.wiki-send) { font-size: 11px; }
+	.wiki-chat-panel .wiki-mention-hints { display: flex; }
+}
+.wiki-context-chips .wiki-quoted-selection { flex-basis: 100%; max-width: 100%; white-space: normal; text-align: left; border-radius: 0; border-left: 2px solid var(--wiki-accent); background: var(--bg); }
+.wiki-quoted-selection span { max-height: 54px; overflow: auto; flex: 1; font-size: 12px; line-height: 1.6; }
