@@ -8,12 +8,14 @@ import rehypeHighlight from "rehype-highlight";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import type { Root, RootContent } from "mdast";
+import { renderWikiLinks, wikiMetadata } from "./wiki-document";
 
 interface SourceBlock {
 	raw: string;
 	prefix: string;
 	html: string;
 	protected: boolean;
+	hidden?: boolean;
 }
 export interface RichDocument {
 	source: string;
@@ -55,6 +57,14 @@ converter.addRule("preservedSource", {
 converter.addRule("preservedInlineSource", {
 	filter: (node) => node.hasAttribute("data-rich-inline"),
 	replacement: (_content, node) => node.getAttribute("data-rich-inline") ?? "",
+});
+converter.addRule("wikiLink", {
+	filter: (node) => node.nodeName === "A" && (node.getAttribute("href") ?? "").startsWith("#wiki="),
+	replacement: (content, node) => {
+		let target: string;
+		try { target = decodeURIComponent(node.getAttribute("href")!.slice(6)); } catch { return content; }
+		return `[[${target}${content === target ? "" : "|" + content}]]`;
+	},
 });
 converter.addRule("codeFence", {
 	filter: "pre",
@@ -106,14 +116,16 @@ function preserveInlineHtml() {
 }
 
 /** Preserve source slices, including definitions/HTML/front matter, independently of editable DOM. */
-export function prepareRichDocument(source: string): RichDocument {
+export function prepareRichDocument(source: string, wiki = false): RichDocument {
 	const blocks: SourceBlock[] = [];
 	const nodes = parser.parse(source).children;
 	const definitions = nodes.filter((node) => node.type === "definition").map((node) => source.slice(node.position?.start.offset, node.position?.end.offset)).join("\n");
 	const frontMatter = source.match(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/)?.[0];
+	const metadata = wiki ? wikiMetadata(source) : null;
+	let firstHeading = true;
 	let end = 0;
 	if (frontMatter) {
-		blocks.push({ raw: frontMatter.trimEnd(), prefix: "", html: "", protected: true });
+		blocks.push({ raw: frontMatter.trimEnd(), prefix: "", html: "", protected: true, hidden: wiki });
 		end = frontMatter.trimEnd().length;
 	}
 	for (const node of nodes) {
@@ -122,9 +134,11 @@ export function prepareRichDocument(source: string): RichDocument {
 		if (start === undefined || stop === undefined || start < end) continue;
 		const raw = source.slice(start, stop);
 		const protectedBlock = needsSource(node);
+		const hidden = !!metadata && firstHeading && node.type === "heading" && node.depth === 1 && metadata.readingBody !== metadata.body;
+		if (node.type === "heading" && node.depth === 1) firstHeading = false;
 		blocks.push({
-			raw, prefix: source.slice(end, start), protected: protectedBlock,
-			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={[rehypeHighlight]}>{raw + "\n\n" + definitions}</ReactMarkdown>),
+			raw, prefix: source.slice(end, start), protected: protectedBlock, hidden,
+			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={[rehypeHighlight]}>{(wiki ? renderWikiLinks(raw) : raw) + "\n\n" + definitions}</ReactMarkdown>),
 		});
 		end = stop;
 	}
@@ -143,6 +157,7 @@ export function mountRichDocument(root: HTMLElement, document: RichDocument, sou
 		wrapper.dataset.sourceStart = String(startLine);
 		wrapper.dataset.sourceEnd = String(startLine + block.raw.split("\n").length - 1);
 		wrapper.className = "rich-block";
+		wrapper.hidden = !!block.hidden;
 		if (block.protected) {
 			wrapper.contentEditable = "false";
 			wrapper.dataset.richSource = block.raw;
@@ -184,6 +199,16 @@ export function readRichDocument(root: HTMLElement, document: RichDocument): str
 		img.setAttribute("src", img.dataset.richImageSrc!);
 		img.removeAttribute("data-rich-image-src");
 	});
+	// Hidden metadata/title are outside the editable reading surface. A select-all
+	// replacement must not delete them along with the visible body.
+	for (let index = document.blocks.length - 1; index >= 0; index--) {
+		const block = document.blocks[index];
+		if (!block.hidden || root.querySelector(`[data-rich-block="${index}"]`)) continue;
+		const restored = root.ownerDocument.createElement("div");
+		restored.dataset.richBlock = String(index); restored.innerHTML = block.html;
+		const next = [...root.children].find(child => Number((child as HTMLElement).dataset.richBlock) > index);
+		if (next) root.insertBefore(restored, next); else root.prepend(restored);
+	}
 	const seen = new Set<number>();
 	const parts: string[] = [];
 	for (const child of Array.from(root.childNodes)) {

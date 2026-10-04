@@ -78,29 +78,19 @@ export function ComponentUpdatesPanel({ ready, cwd, conversationId, updates, app
 			<h2 className="settings-page-title">{t("componentUpdates")}</h2>
 			<button disabled={!ready || checking || appBusy} onClick={check}>{t(checking || appBusy ? "componentChecking" : "componentCheck")}</button>
 		</header>
-		<div className="set-row component-update-row">
-			<div>
-				<strong>{t("componentApp")}</strong>
-				<p>{current ?? "—"}{latest && ` → ${latest}`}</p>
-				<p>{t(appHint)}</p>
-				<p>{t("componentBundledHint")}</p>
-				{desktop?.phase === "downloading" && <p role="status">{t("componentDownloading", { n: desktop.percent ?? 0 })}</p>}
-			</div>
+		<div className="settings-group"><div className="set-row component-update-row">
+			<strong>pi-web-ui</strong><span className="component-version" title={t(appHint)}>{current ?? "—"}{latest && latest !== current && (isDesktop || !appStatus?.upToDate) ? ` → ${latest}` : ` · ${t(desktop?.phase === "current" || !isDesktop && appStatus?.upToDate ? "componentCurrent" : "componentUnknown")}`}{desktop?.phase === "downloading" && <small role="status"> {t("componentDownloading", { n: desktop.percent ?? 0 })}</small>}</span>
 			<button className="settings-primary" disabled={appDisabled} onClick={updateApp}>{t(desktop?.phase === "downloaded" ? "componentRestartInstall" : "componentAutoUpdate")}</button>
-		</div>
+		</div></div>
 		{appError && <p role="alert" className="settings-error">{appError}</p>}
 		{updates?.phase === "updating" && <p role="status">{t("componentInstalling")}</p>}
 		{updates?.restartRequired && <p role="status">{t("componentRestart")}</p>}
 		{updates?.error && <p role="alert" className="settings-error">{updates.error}</p>}
-		{updates?.items.map(item => <div className="set-row component-update-row" key={item.id}>
-			<div>
-				<strong>{item.name}</strong>
-				<p>{item.current ?? "—"} → {item.latest ?? "—"}</p>
-				<p>{t(item.kind === "local" ? "componentLocal" : item.kind === "bundled" ? "componentBundledHint"
-					: item.status === "available" ? "componentNewVersion" : item.status === "error" ? "componentCheckFailed"
-					: item.status === "pinned" ? "componentPinned" : item.status === "current" ? "componentCurrent" : "componentUnknown")}</p>
-			</div>
-			{item.canUpdate && <button disabled={!ready || checking} onClick={() => send({ type: "update_component", requestId: randomUuid(), id: item.id })}>{t("componentInstall")}</button>}
-		</div>)}
+		<div className="settings-group">{updates?.items.map(item => <div className="set-row component-update-row" key={item.id}>
+			<strong>{item.name}</strong><span className="component-version" title={item.kind === "bundled" ? t("componentBundledHint") : undefined}>{item.current ?? "—"}{item.latest && item.latest !== item.current ? ` → ${item.latest}` : ""}<small> · {t(item.kind === "local" ? "componentLocal" : item.kind === "bundled" ? "settingsBundled"
+				: item.status === "available" ? "componentNewVersion" : item.status === "error" ? "componentCheckFailed"
+				: item.status === "pinned" ? "componentPinned" : item.status === "current" ? "componentCurrent" : "componentUnknown")}</small></span>
+			{item.canUpdate ? <button disabled={!ready || checking} onClick={() => send({ type: "update_component", requestId: randomUuid(), id: item.id })}>{t("componentInstall")}</button> : <span className="settings-readonly">—</span>}
+		</div>)}</div>
 	</section>;
 }

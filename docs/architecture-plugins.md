@@ -102,7 +102,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ### Pi 1.0.1 MCP / Codemode 工作台
 
-设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全球/项目范围分别使用自己的文件版本；新增、导入、启停、暴露方式、单工具覆盖和高级 JSON 都先进入草稿，再明确保存。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
+设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全局/项目范围分别使用自己的文件版本；新增和导入在完成编辑后立即保存，启停、暴露方式和单工具覆盖修改后立即保存；高级 JSON 保留草稿，在离开输入框时保存。请求串行，期间禁用其他修改，仍使用原生版本校验、凭据掩码和会话生命周期；失败保留草稿并提供重试/重新加载，关闭和切页保护未完成编辑。Codemode 用分段选项并立即保存，已有非预设预算仍显示。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
 
 1.0.1 的项目覆盖允许 `.pi/mcp.json` 中只写 `enabled`、`exposure`、`toolExposure`，沿用同名全局服务器的连接和凭据。Web 服务按 SDK 的规则校验覆盖，不复制凭据、不隐式授予项目信任。项目范围中可以为当前运行的全局服务器新增启停覆盖。
 

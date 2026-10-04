@@ -21,6 +21,8 @@ for (const name of ['sample', 'pinned', 'broken']) {
 	writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version: '1.0.0', pi: { extensions: ['index.ts'] } }));
 	writeFileSync(join(directory, 'index.ts'), 'export default function () {}');
 }
+mkdirSync(join(agent, 'skills', 'settings-fixture'), { recursive: true });
+writeFileSync(join(agent, 'skills', 'settings-fixture', 'SKILL.md'), '---\nname: settings-fixture\ndescription: A loaded skill description that expands in the compact settings list.\n---\nUse this fixture only in tests.\n');
 writeFileSync(join(agent, 'settings.json'), JSON.stringify({ packages: ['npm:sample', 'npm:pinned@1.0.0', 'npm:broken'] }));
 const server = spawn(process.execPath, ['--import', pathToFileURL(registryMock).href, 'dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: join(root, 'data'), PI_WEB_CWD: root, PI_CODING_AGENT_DIR: agent }, stdio: 'ignore' });
 let browser, ws;
@@ -77,10 +79,12 @@ try {
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		assert.equal(await page.getByRole('button', { name: /目标审查|视觉桥|预设/ }).count(), 0);
 		assert.equal(await page.getByRole('button', { name: '界面插件', exact: true }).count(), 0);
+		assert.equal(await page.getByRole('button', { name: '消息显示', exact: true }).count(), 0);
+		assert.equal(await page.locator('.settings-tab.active').innerText(), '系统提示词');
 		for (const width of [1440, 900, 390]) {
 			await page.setViewportSize({ width, height: 1000 });
 			let expected;
-			for (const name of ['消息显示', '系统提示词', '技能', 'Extensions', 'MCP 与 Codemode', '组件更新']) {
+			for (const name of ['系统提示词', '技能', 'Extensions', 'MCP 与 Codemode', '组件更新']) {
 				await page.locator('.settings-rail').getByRole('button', { name, exact: true }).click();
 				const boxes = await page.evaluate(() => ['.settings-modal', '.settings-rail', '.modal-body'].map(selector => { const b = document.querySelector(selector).getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(Math.round); }));
 				expected ??= boxes; assert.deepEqual(boxes, expected, `consistent settings shell at ${width}: ${name}`);
@@ -88,40 +92,23 @@ try {
 				const close = await page.locator('.settings-modal > .modal-head button').boundingBox();
 				assert(close.x > modal.x + modal.width - 90, 'close stays at top right');
 				assert(modal.x >= 0 && modal.x + modal.width <= width, 'modal fits viewport');
+				if (width === 1440 || width === 390) await page.screenshot({ path: `/tmp/pi-settings-minimal-${width}-${name.replaceAll(' ', '-')}.png` });
 			}
 		}
 		await page.setViewportSize({ width: 1440, height: 1000 });
-		await page.getByRole('button', { name: '消息显示', exact: true }).click();
-		await page.getByLabel('外观', { exact: true }).selectOption('dark');
-		assert.equal(await page.locator('html').getAttribute('data-appearance'), 'dark');
-		assert.equal(await page.locator('.settings-modal').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(45, 43, 51)');
-		await page.mouse.move(0, 0);
-		await page.screenshot({ path: '/tmp/pi-settings-dark.png' });
-		for (const [index, name] of ['系统提示词', '技能', 'Extensions', 'MCP 与 Codemode', '组件更新'].entries()) {
-			await page.locator('.settings-rail').getByRole('button', { name, exact: true }).click();
-			await page.screenshot({ path: `/tmp/pi-settings-dark-${index}.png` });
-		}
-		await page.getByRole('button', { name: '消息显示', exact: true }).click();
-		await page.getByLabel('外观', { exact: true }).selectOption('system');
-		await page.emulateMedia({ colorScheme: 'dark' });
-		await page.waitForFunction(() => document.documentElement.dataset.appearance === 'dark');
-		await page.emulateMedia({ colorScheme: 'light' });
-		await page.waitForFunction(() => document.documentElement.dataset.appearance === 'light');
-		await page.getByLabel('外观', { exact: true }).selectOption('dark');
+		await page.locator('.settings-rail').getByRole('button', { name: '技能', exact: true }).click();
+		const skill = page.locator('.settings-skill').filter({ hasText: 'settings-fixture' });
+		await skill.locator('summary').click();
+		assert(await skill.locator('p').isVisible(), 'skill expands its full description');
 		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
 		await page.locator('.prompt-sections').waitFor();
 		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'native prompt must be read-only');
 		assert((await page.locator('.prompt-sections').textContent()).length > 0);
-		await page.getByRole('button', { name: '消息显示', exact: true }).click();
-		const thinking = page.locator('.settings-modal label', { hasText: '完整显示思考' }).locator('input');
-		await thinking.click();
-		await page.waitForFunction(() => [...document.querySelectorAll(".settings-modal label")].find(label => label.textContent.includes("完整显示思考"))?.querySelector("input")?.checked);
-		assert(await thinking.isChecked(), 'display preference should persist');
 		await page.getByRole('button', { name: '组件更新', exact: true }).click();
 		await page.locator('.component-update-row', { hasText: 'pi Agent' }).waitFor();
 
 		await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).waitFor();
-		await page.locator('.component-update-row', { hasText: 'broken' }).getByText('检查失败，可重试', { exact: true }).waitFor();
+		await page.locator('.component-update-row', { hasText: 'broken' }).getByText('检查失败，可重试', { exact: false }).waitFor();
 		await page.screenshot({ path: '/tmp/pi-component-updates.png' });
 		await page.locator('.component-update-row', { hasText: 'sample' }).getByRole('button', { name: '更新扩展' }).click();
 		await page.getByText('更新已安装，请重启应用以加载新版本。', { exact: true }).waitFor();
@@ -132,13 +119,14 @@ try {
 		assert.equal(terminalCommands.length, 1);
 		assert.equal(terminalCommands[0].command.command, 'npm install -g @youweichen/pi-web-ui@999.0.0');
 		staleRegistry = true;
+		await page.evaluate(() => localStorage.setItem('pi-web-ui:appearance', 'dark'));
 		await page.reload();
 		await page.locator('.topbar-more .chip').waitFor();
 		assert.equal(await page.locator('html').getAttribute('data-appearance'), 'dark');
 		await page.locator('.topbar-more .chip').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.getByRole('button', { name: '组件更新', exact: true }).click();
-		await page.locator('.component-update-row', { hasText: 'pi-web-ui 应用' }).getByText(/0.9.0/).waitFor();
+		await page.locator('.component-update-row', { hasText: 'pi-web-ui' }).getByText(/已是最新/).waitFor();
 		assert(await page.getByRole('button', { name: '自动更新', exact: true }).isDisabled(), 'old registry latest cannot downgrade');
 		assert.deepEqual(errors, []);
 

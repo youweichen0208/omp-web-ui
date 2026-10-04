@@ -57,15 +57,17 @@ export const Markdown = memo(function Markdown({ text, imageSrc, sourceLines, fi
 	);
 });
 
-export function PreWithCopy({ children, fileLinks, ...props }: JSX.IntrinsicElements["pre"] & { fileLinks?: boolean }) {
+export function PreWithCopy({ children, fileLinks, showLanguage, ...props }: JSX.IntrinsicElements["pre"] & { fileLinks?: boolean; showLanguage?: boolean }) {
 	if (isMermaidCodeBlock(children)) {
 		return <MermaidDiagram code={codeText(children)} />;
 	}
 	const asciiTable = fileLinks && isAsciiTableCodeBlock(children);
 	const code = codeText(children);
+	const child = Array.isArray(children) ? children[0] : children;
+	const language = child && typeof child === "object" && "props" in child ? /language-([\w+-]+)/.exec(String(child.props.className ?? ""))?.[1] : undefined;
 	return (
 		<div className={`codeblock${asciiTable ? " ascii-table" : ""}`}>
-			<CopyButton text={code} />
+			{showLanguage ? <div className="codeblock-heading"><span>{language}</span><CopyButton text={code} label /></div> : <CopyButton text={code} />}
 			<pre {...props}>{asciiTable ? <code>{linkedFilePaths(code)}</code> : children}</pre>
 		</div>
 	);

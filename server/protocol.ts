@@ -311,7 +311,7 @@ export type McpExposure = "codemode" | "deferred" | "direct" | "hidden";
 export interface NativeMcpServerStatus { name: string; state: string; toolCount: number; detail: string; }
 export interface NativeMcpTool { name: string; exposure: string; description: string; readOnly?: boolean; destructive?: boolean; }
 export interface NativeCodemodeSettings { version: string; path: string; mode: "on" | "only"; inlineBudget: number; effectiveMode: "on" | "only"; effectiveInlineBudget: number; }
-export interface NativeMcpConfigState { path: string; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; }
+export interface NativeMcpConfigState { path: string; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; inheritedAutoEnableCodemode?: boolean; }
 
 export type ClientMessage =
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
@@ -1216,8 +1216,23 @@ export interface WikiRevision {
 	changes: WikiChange[];
 	skipped: string[];
 }
+export interface WikiIndexIssue {
+	path: string;
+	size?: number;
+	reason: "file-size" | "byte-budget" | "entry-limit" | "depth-limit" | "unreadable";
+	/** A whole directory has not been scanned; its descendants are not counted. */
+	subtree?: boolean;
+}
+export interface WikiIndexStatus {
+	indexed: number;
+	total: number;
+	/** Scanning stopped before all files could be counted. Display the total as a lower bound. */
+	totalIsLowerBound: boolean;
+	issues: WikiIndexIssue[];
+}
 export interface WikiState {
 	entries: WikiEntry[];
+	index?: WikiIndexStatus;
 	tags: { name: string; count: number }[];
 	revisions: WikiRevision[];
 	running: boolean;

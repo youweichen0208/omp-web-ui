@@ -115,3 +115,42 @@ describe("Wiki visible request", () => {
 		expect(text).toContain('"inside.md"'); expect(text).toContain('"explicit.md"'); expect(text).not.toContain('"outside.md"');
 	});
 });
+
+describe("Wiki reading metadata", () => {
+	it("only removes the first matching H1, preserving different headings and source", () => {
+		const matching = wikiMetadata('---\ntitle: "Same title"\n---\nIntro\n\n# Same title\n\n# Same title\n');
+		expect(matching.title).toBe("Same title");
+		expect(matching.body.match(/# Same title/g)).toHaveLength(2);
+		expect(matching.readingBody.match(/# Same title/g)).toHaveLength(1);
+		const different = wikiMetadata('---\ntitle: Page title\n---\n# Body title\n');
+		expect(different.title).toBe("Page title");
+		expect(different.readingBody).toContain("# Body title");
+		expect(wikiMetadata('# Plain title\n\nBody').readingBody.trim()).toBe("Body");
+	});
+	it("filters hex colors, inline code, fenced code, indented code and link destinations", () => {
+		const text = '---\ntags: [Work, ff475040, 中文]\n---\n#visible #fff #abcd #AABBCC #11223344 #face-to-face\n\n`#inline` ``a ` #nested``\n\n~~~js\n#fenced\n~~~~\n\n    #indented\n\n[label](https://example.test/#url)\n\n[ref]: https://example.test/#definition\n';
+		expect(wikiMetadata(text).tags).toEqual(["Work", "中文", "visible", "face-to-face"]);
+		expect(wikiMetadata('```\n#unclosed\n').tags).toEqual([]);
+		expect(wikiMetadata('word**#adjacent** \\#escaped [#label](https://example.test)').tags).toEqual([]);
+	});
+	it("estimates mixed Chinese and English reading time without fenced code", () => {
+		expect(wikiMetadata('中'.repeat(400) + '\n\n' + 'word '.repeat(200) + '\n```\n' + 'ignored '.repeat(1000) + '\n```').minutes).toBe(2);
+	});
+	it("reports file and byte-budget limits with real paths and sizes", async () => {
+		const { cwd, service } = fixture();
+		writeFileSync(join(cwd, "a-too-large.md"), Buffer.alloc(2 * 1024 * 1024 + 1));
+		for (let i = 0; i < 32; i++) writeFileSync(join(cwd, `budget-${i}.bin`), Buffer.alloc(2 * 1024 * 1024));
+		const state = await service.state(cwd);
+		expect(state.index).toMatchObject({ indexed: 32, total: 36, totalIsLowerBound: false });
+		expect(state.index?.issues).toContainEqual({ path: "a-too-large.md", size: 2 * 1024 * 1024 + 1, reason: "file-size" });
+		expect(state.index?.issues.some(i => i.path === "index.md" && i.reason === "byte-budget")).toBe(true);
+	});
+	it("marks totals as lower bounds when a subtree cannot be scanned", async () => {
+		const { cwd, service } = fixture();
+		const deep = Array(34).fill("nested").join("/"); mkdirSync(join(cwd, deep), { recursive: true });
+		writeFileSync(join(cwd, deep, "deep.md"), "unscanned");
+		const state = await service.state(cwd);
+		expect(state.index?.totalIsLowerBound).toBe(true);
+		expect(state.index?.issues.some(i => i.reason === "depth-limit" && i.subtree)).toBe(true);
+	});
+});

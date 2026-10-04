@@ -1,25 +1,73 @@
-/** Shared, deterministic Wiki indexing rules (no filesystem access). */
-export function wikiMetadata(text: string): { tags: string[]; title?: string; body: string } {
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+
+const parser = unified().use(remarkParse);
+type TextNode = { type: string; value?: string; depth?: number; children?: TextNode[]; position?: { start: { offset?: number }; end: { offset?: number } } };
+function plain(node: TextNode): string {
+	if (["code", "html", "definition"].includes(node.type)) return "";
+	return node.value ?? node.children?.map(plain).join("") ?? "";
+}
+function visit(node: TextNode, fn: (node: TextNode) => void) {
+	fn(node);
+	if (!["code", "inlineCode", "html", "definition"].includes(node.type)) node.children?.forEach(child => visit(child, fn));
+}
+function scalar(value: string): string {
+	const trimmed = value.trim();
+	if (trimmed.startsWith('"') && trimmed.endsWith('"')) { try { return JSON.parse(trimmed); } catch { /* YAML also accepts non-JSON strings. */ } }
+	return trimmed.replace(/^(['"])([\s\S]*)\1$/, "$2").replaceAll("''", "'");
+}
+/** Shared metadata and reading presentation. The source is never rewritten on disk. */
+export function wikiMetadata(text: string): { tags: string[]; title?: string; body: string; readingBody: string; minutes: number } {
 	const front = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
 	const body = front ? text.slice(front[0].length) : text;
-	const tags = new Set<string>();
-	const yaml = front?.[1] ?? "";
+	const yaml = front?.[1] ?? "", tags = new Set<string>();
+	const addTag = (value: string) => {
+		const tag = scalar(value).replace(/^#/, "").trim();
+		if (tag && !/^(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i.test(tag)) tags.add(tag);
+	};
 	const field = /^tags?:[ \t]*(.*)$/m.exec(yaml);
-	if (field?.[1].trim()) for (const item of field[1].replace(/[\[\]'"#]/g, "").split(/[,\s]+/)) if (item) tags.add(item);
+	if (field?.[1].trim()) for (const item of field[1].replace(/^\[|\]$/g, "").split(/[,\s]+/)) addTag(item);
 	if (field && !field[1].trim()) {
-		const rest = yaml.slice(field.index + field[0].length);
-		for (const line of rest.split(/\r?\n/)) {
+		for (const line of yaml.slice(field.index + field[0].length).split(/\r?\n/)) {
 			if (!line.trim()) continue;
-			const item = /^\s+-\s+["']?#?([^"'\s]+)["']?\s*$/.exec(line);
+			const item = /^\s*-\s+(.+)$/.exec(line);
 			if (!item) break;
-			tags.add(item[1]);
+			addTag(item[1]);
 		}
 	}
-	for (const match of withoutCode(body).matchAll(/(?:^|\s)#([\p{L}\p{N}_/-]+)/gu)) tags.add(match[1]);
-	return { tags: [...tags].slice(0, 100), title: /^#\s+(.+)$/m.exec(body)?.[1], body };
+	const tree = parser.parse(body);
+	let firstHeading: TextNode | undefined;
+	visit(tree, node => {
+		if (!firstHeading && node.type === "heading" && node.depth === 1) firstHeading = node;
+		if (node.type === "text" && node.position?.start.offset !== undefined && node.position.end.offset !== undefined) {
+			const offset = node.position.start.offset, raw = body.slice(offset, node.position.end.offset);
+			for (const match of raw.matchAll(/(?:^|\s)#([\p{L}\p{N}_/-]+)/gu)) {
+				if (match.index === 0 && raw.startsWith("#") && offset > 0 && !/\s/.test(body[offset - 1])) continue;
+				addTag(match[1]);
+			}
+		}
+	});
+	const heading = firstHeading ? plain(firstHeading).trim() : undefined;
+	const title = scalar(/^title:[ \t]*(.*)$/m.exec(yaml)?.[1] ?? "") || heading;
+	let readingBody = body;
+	if (title && heading === title.trim() && firstHeading?.position) {
+		const { start, end } = firstHeading.position;
+		if (start.offset !== undefined && end.offset !== undefined) readingBody = body.slice(0, start.offset) + body.slice(end.offset);
+	}
+	const prose = tree.children.map(node => plain(node)).join(" ");
+	const chinese = (prose.match(/\p{Script=Han}/gu) ?? []).length;
+	const words = (prose.replace(/\p{Script=Han}/gu, " ").match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu) ?? []).length;
+	return { tags: [...tags].slice(0, 100), title, body, readingBody, minutes: Math.max(1, Math.ceil(chinese / 400 + words / 200)) };
 }
+/** Blank code ranges while preserving line/offset positions for link indexing. */
 export function withoutCode(text: string): string {
-	return text.replace(/(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2[^\n]*(?=\n|$)/g, m => m.replace(/[^\n]/g, " ")).replace(/`[^`\n]*`/g, m => " ".repeat(m.length));
+	const tree = parser.parse(text), ranges: [number, number][] = [];
+	visit(tree, node => {
+		if ((node.type === "code" || node.type === "inlineCode") && node.position?.start.offset !== undefined && node.position.end.offset !== undefined) ranges.push([node.position.start.offset, node.position.end.offset]);
+	});
+	let result = "", at = 0;
+	for (const [start, end] of ranges) { result += text.slice(at, start) + text.slice(start, end).replace(/[^\n]/g, " "); at = end; }
+	return result + text.slice(at);
 }
 export function resolveWikiLink(source: string, target: string, paths: string[]): string | undefined {
 	let raw: string;

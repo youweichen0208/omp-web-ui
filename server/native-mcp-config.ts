@@ -28,7 +28,8 @@ export class NativeMcpConfigService {
 	get(cwd: string, scope: "global" | "project"): NativeMcpConfigState {
 		const path = this.path(cwd,scope), raw = read(path), document = JSON.parse(raw) as Document;
 		if (!document || typeof document !== "object" || Array.isArray(document)) throw new Error("MCP configuration must be an object");
-		return { path, scope, version: version(raw), document: transform(document, undefined, true) as Record<string,unknown>, trusted: this.isTrusted(cwd) };
+		const inheritedAutoEnableCodemode = scope === "global" || JSON.parse(read(this.path(cwd, "global")))?.autoEnableCodemode !== false;
+		return { path, scope, version: version(raw), document: transform(document, undefined, true) as Record<string,unknown>, trusted: this.isTrusted(cwd), inheritedAutoEnableCodemode };
 	}
 	save(cwd: string, scope: "global" | "project", expected: string, incoming: Record<string,unknown>) {
 		if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) throw new Error("MCP configuration must be an object");

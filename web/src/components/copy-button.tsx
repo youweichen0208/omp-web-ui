@@ -2,7 +2,7 @@ import { memo, useState } from "react";
 import { FiCheck, FiCopy } from "react-icons/fi";
 import { useT } from "../i18n";
 
-export const CopyButton = memo(function CopyButton({ text }: { text: string }) {
+export const CopyButton = memo(function CopyButton({ text, label = false }: { text: string; label?: boolean }) {
 	const t = useT();
 	const [copied, setCopied] = useState(false);
 	if (!text) return null;
@@ -18,7 +18,7 @@ export const CopyButton = memo(function CopyButton({ text }: { text: string }) {
 				});
 			}}
 		>
-			{copied ? <FiCheck /> : <FiCopy />}
+			{copied ? <FiCheck /> : <FiCopy />}{label && <span>{t("copy")}</span>}
 		</button>
 	);
 });

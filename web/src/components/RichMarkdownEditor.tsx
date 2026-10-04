@@ -10,8 +10,9 @@ import type { RichDocument } from "../rich-markdown";
 
 const CODE_LANGUAGES = ["javascript", "typescript", "python", "bash", "json", "yaml", "html", "css", "sql", "go", "rust", "java", "c", "cpp", "csharp", "ruby", "php", "swift", "kotlin", "markdown", "xml", "toml", "diff"];
 
-export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, readOnly, onChange, file }: {
+export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, readOnly, onChange, file, wiki }: {
 	file: { cwd: string; path: string };
+	wiki?: { followLink: (href: string) => void; resolveCode: (value: string) => string | undefined; added: Set<string> };
 	value: string;
 	readOnly: boolean;
 	onChange: (value: string) => void;
@@ -36,8 +37,20 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		if (!root.current || value === emitted.current) return;
 		closeMenu();
 		setTableCell(null);
-		const prepared = prepareRichDocument(value);
+		const prepared = prepareRichDocument(value, !!wiki);
 		mountRichDocument(root.current, prepared, t("richSourceBlock"));
+		if (wiki) {
+			root.current.querySelectorAll<HTMLElement>("pre:has(> code)").forEach(pre => pre.classList.add("codeblock"));
+			root.current.querySelectorAll<HTMLElement>("h2").forEach((heading, index) => { heading.id = `wiki-heading-${index}`; });
+			root.current.querySelectorAll<HTMLElement>("p").forEach(p => { if ([...wiki.added].some(line => line.trim() && p.textContent?.includes(line))) p.classList.add("wiki-added"); });
+			root.current.querySelectorAll<HTMLElement>("code").forEach(code => {
+				if (code.closest("pre") || !wiki.resolveCode(code.textContent ?? "")) return;
+				const link = document.createElement("a"); link.href = `#wiki=${encodeURIComponent(code.textContent ?? "")}`;
+				link.textContent = code.textContent; code.replaceChildren(link);
+			});
+			// Decoration belongs to the render baseline, not to a user's edit.
+			root.current.querySelectorAll<HTMLElement>("[data-rich-block]").forEach(block => { prepared.blocks[Number(block.dataset.richBlock)].html = block.innerHTML; });
+		}
 		documentState.current = prepared;
 		emitted.current = value;
 	}, [value, t]);
@@ -57,6 +70,12 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 				control = document.createElement("select");
 				control.dataset.codeLanguage = "";
 				chrome.append(control);
+				if (wiki) {
+					const copy = document.createElement("button"); copy.type = "button"; copy.textContent = t("copy");
+					copy.onmousedown = event => event.preventDefault();
+					copy.onclick = () => { void navigator.clipboard.writeText(code.textContent ?? ""); };
+					chrome.append(copy);
+				}
 				pre.prepend(chrome);
 			}
 			const detected = code.className.match(/language-([^\s]+)/)?.[1] ?? "";
@@ -351,7 +370,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 						update();
 						if (!(event.nativeEvent as InputEvent).isComposing) inspectSlash();
 					}}
-					onClick={(event) => { setTableCell(selectedCell()); closeMenu(); if ((event.target as HTMLElement).closest("a")) event.preventDefault(); }}
+					onClick={(event) => { setTableCell(selectedCell()); closeMenu(); const link = (event.target as HTMLElement).closest("a"); if (link) { event.preventDefault(); const href = link.getAttribute("href"); if (wiki && href) { if (/^(https?:|mailto:)/i.test(href)) window.open(href, "_blank", "noopener,noreferrer"); else wiki.followLink(href); } } }}
 					onChange={(event) => {
 						const input = event.target as HTMLInputElement;
 						if (input.type === "checkbox") { input.toggleAttribute("checked", input.checked); update(); }

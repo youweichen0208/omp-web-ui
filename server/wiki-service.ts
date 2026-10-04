@@ -5,7 +5,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import { decodeText, looksLikeText, previewKind } from "./text-sniff.js";
 import { wikiMetadata, wikiReferences, resolveWikiLink } from "./wiki-links.js";
 import { readWikiPdf } from "./wiki-pdf.js";
-import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory } from "./protocol.js";
+import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory, WikiIndexStatus } from "./protocol.js";
 
 const MAX_FILE = 2 * 1024 * 1024;
 const MAX_SNAPSHOT = 64 * 1024 * 1024;
@@ -37,7 +37,7 @@ function kindOf(path: string, text: boolean): WikiEntry["kind"] {
 }
 export class WikiService {
 	private active = new Set<string>();
-	private cache = new Map<string, { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean }>();
+	private cache = new Map<string, { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean; status: WikiIndexStatus }>();
 	constructor(private dataDir: string) { mkdirSync(dataDir, { recursive: true }); }
 	private key(cwd: string) { return hash(realpathSync(cwd)); }
 	private folder(cwd: string) { const dir = join(this.dataDir, this.key(cwd)); mkdirSync(join(dir, "blobs"), { recursive: true }); return dir; }
@@ -65,34 +65,38 @@ export class WikiService {
 		const key = this.key(cwd), cached = this.cache.get(key);
 		if (!fresh && cached && Date.now() - cached.at < 3000) return cached;
 		const entries: WikiEntry[] = [], texts = new Map<string, string>();
-		let limited = false, bytes = 0;
+		let limited = false, bytes = 0, visited = 0;
+		const status: WikiIndexStatus = { indexed: 0, total: 0, totalIsLowerBound: false, issues: [] };
 		const walk = async (path: string, depth: number) => {
-			if (entries.length >= 20000 || depth > 32) { limited = true; return; }
+			if (depth > 32) { limited = true; status.totalIsLowerBound = true; status.issues.push({ path, reason: "depth-limit", subtree: true }); return; }
 			let children;
-			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); } catch { limited = true; return; }
+			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); } catch { limited = true; status.totalIsLowerBound = true; status.issues.push({ path, reason: "unreadable", subtree: true }); return; }
 			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 			for (const child of children) {
 				if (IGNORED.has(child.name)) continue;
-				if (entries.length >= 20000) { limited = true; break; }
+				if (visited >= 20000) { limited = true; status.totalIsLowerBound = true; status.issues.push({ path: path || ".", reason: "entry-limit", subtree: true }); break; }
+				visited++;
 				const p = path ? `${path}/${child.name}` : child.name;
+				let size: number | undefined, counted = false;
 				try {
 					const abs = wikiPath(cwd, p);
 					if (realpathSync(abs) === realpathSync(this.dataDir)) continue;
 					const info = await stat(abs);
 					if (info.isDirectory()) { entries.push({ path: p, name: child.name, kind: "directory", size: 0, modified: info.mtimeMs, tags: [], symlink: child.isSymbolicLink() }); if (!child.isSymbolicLink()) await walk(p, depth + 1); continue; }
 					if (!info.isFile()) continue;
+					status.total++; counted = true; size = info.size;
 					let text: string | undefined;
 					if (info.size <= MAX_FILE && bytes + info.size <= MAX_SNAPSHOT) {
-						const data = await readFile(abs); bytes += data.length;
+						const data = await readFile(abs); bytes += data.length; status.indexed++;
 						if (!/\.pdf$/i.test(p) && previewKind(p) !== "image" && looksLikeText(data)) { text = decodeText(data); texts.set(p, text); }
-					} else limited = true;
+					} else { limited = true; status.issues.push({ path: p, size: info.size, reason: info.size > MAX_FILE ? "file-size" : "byte-budget" }); }
 					const metadata = text === undefined ? { tags: [] } : wikiMetadata(text);
 					entries.push({ path: p, name: child.name, kind: kindOf(p, text !== undefined), size: info.size, modified: info.mtimeMs, tags: metadata.tags, title: "title" in metadata ? metadata.title : undefined });
-				} catch { limited = true; }
+				} catch { limited = true; if (!counted && !child.isDirectory()) status.total++; if (child.isDirectory()) status.totalIsLowerBound = true; status.issues.push({ path: p, size, reason: "unreadable", subtree: child.isDirectory() }); }
 			}
 		};
 		await walk("", 0);
-		const result = { at: Date.now(), entries, texts, limited };
+		const result = { at: Date.now(), entries, texts, limited, status };
 		if (this.cache.size >= 8) this.cache.delete(this.cache.keys().next().value!);
 		this.cache.set(key, result); return result;
 	}
@@ -116,7 +120,7 @@ export class WikiService {
 	async state(cwd: string): Promise<WikiState> {
 		const index = await this.index(cwd), counts = new Map<string, number>();
 		for (const entry of index.entries) for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-		return { entries: index.entries, tags: [...counts].map(([name, count]) => ({ name, count })), revisions: this.history(cwd).reverse().map(({ blobs: _blobs, ...r }) => r), running: this.busy(cwd), limited: index.limited };
+		return { entries: index.entries, index: index.status, tags: [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)), revisions: this.history(cwd).reverse().map(({ blobs: _blobs, ...r }) => r), running: this.busy(cwd), limited: index.limited };
 	}
 	async document(cwd: string, path: string): Promise<WikiDocument> {
 		const abs = wikiPath(cwd, path), size = statSync(abs).size;

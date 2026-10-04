@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.14.0 正式版
+
+`0.14.0` 更新 Wiki 阅读布局并默认支持预览内编辑，移除标签和消息显示入口，设置统一为 20a 紧凑列表，MCP / Codemode 常用控件自动保存。SDK / pi-ai 保持 1.0.1，协议版本 34。说明见 `.github/release-notes/v0.14.0.md`；npm 使用 `latest`，桌面三平台验证及附件齐全后公开 Release。
+
 ## 0.13.0 正式版
 
 `0.13.0` 统一设置窗口布局，增加浅色/深色/跟随系统及应用更新按钮，移除界面插件设置入口。点击 Markdown 文件直接进入 Wiki，取消独立 Wiki 标签。SDK / pi-ai 保持精确锁定 1.0.1，协议版本 34。发布说明见 `.github/release-notes/v0.13.0.md`；npm 使用 `latest`，桌面三平台验证及附件齐全后公开 Release。

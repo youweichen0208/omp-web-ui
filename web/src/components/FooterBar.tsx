@@ -182,6 +182,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 				</>
 			)}
 
+			<span id="wiki-status-slot" />
 			{current && queueTotal > 0 && <span className="status-queue">{queueTotal} {t("queued")}</span>}
 
 			{editing ? (
