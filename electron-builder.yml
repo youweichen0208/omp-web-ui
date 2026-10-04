@@ -12,6 +12,11 @@ copyright: Copyright © 2026 youweichen
 # 显式指定成 productName 同一个值，避免再从 package.json 的 name 推导。
 executableName: pi
 
+# /webui is an optional CLI extension, not a Desktop extension resource.
+extraMetadata:
+  # electron-builder merges arrays by index, so [] would retain ./extensions.
+  pi: null
+
 directories:
   output: release
   buildResources: build
@@ -31,7 +36,7 @@ directories:
 # 2. node-pty 是原生模块，.node 文件也得是磁盘上的真文件才能 dlopen——原来
 #    asarUnpack 是空的，等于没给它留出口。
 #
-# 关掉 asar 之后，所有东西（dist、web/dist、extensions、剪枝过的生产依赖）都平
+# 关掉 asar 之后，所有东西（dist、web/dist、剪枝过的生产依赖）都平
 # 铺在 Resources/app/ 下，server 从 Resources/app/dist/server/index.js 往上找一
 # 层就是 Resources/app/node_modules，Node 原生的解析规则直接就通了，不需要任何
 # 额外的路径拼接。代价是文件数量多一些、源码没打包，对这个项目无所谓。
@@ -43,6 +48,7 @@ files:
   - "**/*"
   - "!release/**"
   - "!server/**"
+  - "!extensions/**"
   - "!tests/**"
   - "!scripts/**"
   - "!docs/**"

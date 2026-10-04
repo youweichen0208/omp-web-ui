@@ -24,7 +24,11 @@ module.exports = async function afterPack(context) {
 		? path.join(context.appOutDir, `${product}.app`, "Contents/Resources/app")
 		: path.join(context.appOutDir, "resources/app");
 	const sdkRoot = path.join(packagedRoot, "node_modules/@earendil-works/pi-coding-agent");
-	const expectedSdk = JSON.parse(fs.readFileSync(path.join(packagedRoot, "package.json"), "utf8")).dependencies?.["@earendil-works/pi-coding-agent"];
+	const manifest = JSON.parse(fs.readFileSync(path.join(packagedRoot, "package.json"), "utf8"));
+	if (fs.existsSync(path.join(packagedRoot, "extensions")) || manifest.pi?.extensions?.length) {
+		throw new Error("Desktop must not bundle application extensions; load user Pi extensions instead");
+	}
+	const expectedSdk = manifest.dependencies?.["@earendil-works/pi-coding-agent"];
 	const actualSdk = JSON.parse(fs.readFileSync(path.join(sdkRoot, "package.json"), "utf8")).version;
 	if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(expectedSdk ?? "") || actualSdk !== expectedSdk) {
 		throw new Error(`Unexpected packaged Pi SDK version: expected ${expectedSdk}, got ${actualSdk}`);

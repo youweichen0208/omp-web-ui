@@ -1,3 +1,5 @@
+import type { UiState, ToolStatus } from "../types";
+import { activeTool, toolTarget } from "../agent-activity";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { waitingPhase } from "../waiting-phase";
@@ -32,4 +34,38 @@ export function WorkingStatus({ label, phase, durationMs }: { label: string; pha
 	}, [phase, durationMs]);
 	const elapsed = clock.phase === phase ? clock.elapsed : durationMs ?? 0;
 	return <div className="agent-working" role="status"><WorkingDots /><span>{label}</span>{elapsed >= 3000 && <span className="working-duration"> · {t("thinkingDuration", { n: Math.floor(elapsed / 1000) })}</span>}</div>;
+}
+
+/** Shared by chat and Wiki: identical waiting phases, tool activity and disconnect state. */
+export function ConversationWorkingStatus({ state, connected, silenceNotified, toolStatuses }: {
+	state: Pick<UiState, "messages" | "streamingMessage" | "isStreaming" | "conversationId" | "model">;
+	connected: boolean; silenceNotified: boolean; toolStatuses: ReadonlyMap<string, ToolStatus>;
+}) {
+	const t = useT();
+	const messages = state.streamingMessage ? [...state.messages, state.streamingMessage] : state.messages;
+	const toolResults = new Map(state.messages.filter(m => m.role === "toolResult").map(m => [m.toolCallId, m]));
+	const lastUserIndex = state.messages.findLastIndex((message) => message.role === "user");
+	const runningTool = state.isStreaming ? activeTool(messages, toolStatuses) : undefined;
+	const currentAssistant = state.messages.slice(lastUserIndex + 1).findLast((message) => message.role === "assistant");
+	const lastBlock = state.streamingMessage?.content.at(-1) ?? currentAssistant?.content.at(-1);
+	const completedTool = lastBlock?.type === "toolCall" && typeof lastBlock.id === "string" && (toolStatuses.has(lastBlock.id) || toolResults.has(lastBlock.id));
+	const activityLabel = runningTool ? runningTool.name === "bash" ? t("waitingCommand") : t(runningTool.name === "read" ? "activityReading" : "activityTool", { name: runningTool.name === "read" ? toolTarget(runningTool) : runningTool.name }) : t(completedTool ? "waitingModel" : lastBlock?.type === "text" ? "activityReply" : "activityAnalyze");
+	const activityPhase = `${state.conversationId}:${runningTool?.id ?? state.streamingMessage?.id ?? "waiting"}:${state.streamingMessage?.content.length ?? 0}:${lastBlock?.type ?? ""}`;
+	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
+	const awaitingFirstAssistant = state.isStreaming && !streamingHasContent && lastUserIndex >= 0 && !state.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
+	const showWorkingFooter = runningTool?.name !== "bash" && (!streamingHasContent || !!runningTool || !!completedTool);
+	if (!state.isStreaming) return null;
+	if (!connected) return <div className="agent-working disconnected" role="status">{t("workDisconnected")}</div>;
+	if (awaitingFirstAssistant) {
+		const user = state.messages[lastUserIndex];
+		return <div className="msg msg-assistant agent-working-placeholder">
+			<div className="msg-meta">
+				<span className="msg-role">{t("role.assistant")}</span>
+				{state.model?.id && <span className="msg-model">{state.model.id}</span>}
+				<span className="msg-time">{new Date(user.timestamp ?? Date.now()).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+			</div>
+			<WaitingHeaderStatus key={`${state.conversationId}:${user.id}`} startedAt={user.timestamp} silenceNotified={silenceNotified} />
+		</div>;
+	}
+	return showWorkingFooter ? <WorkingStatus key={state.conversationId} label={activityLabel} phase={activityPhase} durationMs={!runningTool && lastBlock?.type === "thinking" && typeof lastBlock.durationMs === "number" ? lastBlock.durationMs : undefined} /> : null;
 }

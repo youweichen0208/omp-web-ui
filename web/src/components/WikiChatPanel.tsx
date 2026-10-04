@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FiCheck, FiLoader, FiX } from "react-icons/fi";
 import { useT } from "../i18n";
-import type { UiMessage, UiToolCallBlock, ToolStatus } from "../types";
+import type { UiMessage, UiToolCallBlock, UiThinkingBlock, UiModelInfo, ToolStatus } from "../types";
 import { wikiReplyParts } from "../wiki-chat";
+import { ThinkingBlock } from "./ThinkingBlock";
+import { ConversationWorkingStatus } from "./WorkingStatus";
 import { Markdown } from "./Markdown";
 
-export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, changes, error }: {
+export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, changes, error, conversationId, thinkingWrap, connected, silenceNotified }: {
+	conversationId: string; thinkingWrap: boolean; connected: boolean; silenceNotified: boolean;
 	messages: UiMessage[]; live: UiMessage | null; streaming: boolean; toolStatuses: Map<string, ToolStatus>;
-	model?: string; contextPercent?: number | null; disabled: boolean; onNew: () => void; onClose: () => void;
+	model?: UiModelInfo; contextPercent?: number | null; disabled: boolean; onNew: () => void; onClose: () => void;
 	canJump: (section: number) => boolean; jump: (section: number) => void; composer: ReactNode; changes: ReactNode; error: ReactNode;
 }) {
 	const t = useT(), scroll = useRef<HTMLDivElement>(null), follow = useRef(true);
@@ -47,7 +50,7 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 			if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
 			else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
 		}}>
-		<header><span className="wiki-chat-brand">π</span><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model}>{model || t("wikiNoModel")}{contextPercent != null ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
+		<header><span className="wiki-chat-brand">π</span><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
 		{error}
 		<div className="wiki-chat-messages" ref={scroll} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
 			{transcript.length > limit && <button className="wiki-chat-earlier" onClick={() => { follow.current = false; setLimit(n => n + 60); }}>{t("wikiEarlierMessages")}</button>}
@@ -56,6 +59,7 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 				if (!["user", "assistant"].includes(message.role)) return null;
 				return <div key={message.id} className={`wiki-chat-message ${message.role}`}>
 					{message.content.map((block, index) => {
+						if (block.type === "thinking") { const thinking = block as UiThinkingBlock; return <ThinkingBlock key={index} thinking={thinking.thinking} durationMs={thinking.durationMs} streaming={streaming && message.id === live?.id && index === message.content.length - 1} wrap={thinkingWrap} />; }
 						if (block.type === "toolCall") return renderTool(block as UiToolCallBlock);
 						if (block.type === "image" && typeof block.dataUrl === "string") return <img key={index} src={block.dataUrl} alt={t("attachment")} />;
 						if (block.type !== "text" || typeof block.text !== "string" || !block.text.trim()) return null;
@@ -68,7 +72,7 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 					{message.errorMessage && <p role="alert" className="wiki-chat-error">{message.errorMessage}</p>}
 				</div>;
 			})}
-			{streaming && <p className="wiki-chat-working" role="status"><FiLoader />{t("wikiWorking")}</p>}
+			{streaming && <ConversationWorkingStatus state={{ messages, streamingMessage: live, isStreaming: streaming, conversationId, model: model ?? null }} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />}
 		</div>
 		<footer>{changes}{composer}</footer>
 	</aside>;

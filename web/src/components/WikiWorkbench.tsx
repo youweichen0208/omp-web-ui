@@ -17,9 +17,10 @@ import { randomUuid } from "../uuid";
 
 type Guard = (next: () => void) => void;
 const EMPTY: WikiState = { entries: [], tags: [], revisions: [], running: false, limited: false };
-export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, model, contextPercent, toolStatuses, active, ready, send, guard, fileRequest }: {
+export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, model, contextPercent, toolStatuses, active, ready, send, guard, fileRequest, openDocument, thinkingWrap, connected, silenceNotified }: {
 	cwd: string; conversationId: string; messages: UiMessage[]; streaming: boolean; active: boolean; ready: boolean;
 	fileRequest: {path:string;token:string} | null;
+	openDocument: (path: string) => Promise<void>; thinkingWrap: boolean; connected: boolean; silenceNotified: boolean;
 	live: UiMessage | null; model: UiModelInfo | null; contextPercent: number | null; toolStatuses: Map<string, ToolStatus>;
 	send: (message: ClientMessage) => boolean; guard: MutableRefObject<Guard | null>;
 }) {
@@ -33,8 +34,8 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const [error, setError] = useState(""), [nav, setNav] = useState<(() => void) | null>(null);
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const [showHidden, setShowHidden] = useState(() => localStorage.getItem(`pi-wiki-hidden:${cwd}`) === "true");
-	const [chatOpen, setChatOpen] = useState(() => { try { return localStorage.getItem(`pi-wiki-chat:${cwd}`) !== "false"; } catch { return true; } });
-	const toggleChat = (open: boolean) => { setChatOpen(open); setScopeOpen(false); if (open) setDrawer(null); try { localStorage.setItem(`pi-wiki-chat:${cwd}`, String(open)); } catch {} };
+	const [chatOpen, setChatOpen] = useState(true);
+	const toggleChat = (open: boolean) => { setChatOpen(open); setScopeOpen(false); if (open) setDrawer(null); };
 	const [composerOpen, setComposerOpen] = useState(false), [scopeOpen, setScopeOpen] = useState(false);
 	const [codeTheme, setCodeTheme] = useState(getCodeTheme);
 	const [statusHost, setStatusHost] = useState<HTMLElement | null>(null);
@@ -60,7 +61,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const docRef = useRef(doc), dirty = !!doc?.editable && doc.text !== undefined && draft !== doc.text;
 	docRef.current = doc;
 	const busy = sending || saving || loading || state.running || streaming || !ready || (!!doc && doc.entry.path !== path);
-	const latest = state.revisions.find(r => r.author === "pi");
+	const latest = state.revisions.find(r => r.author === "pi" && r.changes.length > 0);
 	const changedPaths = new Set(state.revisions.filter(r => r.author === "pi").flatMap(r => r.changes.filter(c => !c.undone && (viewed[c.path] ?? 0) < r.at).map(c => c.path)));
 	const entries = useMemo(() => {
 		const merged = new Map(state.entries.map(e => [e.path, e]));
@@ -103,7 +104,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	}, [cwd]);
 	useEffect(() => {
 		if (!fileRequest) return;
-		setPath(fileRequest.path); setSource(false); setSearch(false); setSidebar(false); setSelection(""); setSelectionMenu(null);
+		setChatOpen(true); setDrawer(null); setPath(fileRequest.path); setSource(false); setSearch(false); setSidebar(false); setSelection(""); setSelectionMenu(null);
 	}, [fileRequest]);
 	useEffect(() => { if (active && ready) void loadDirectory(""); }, [active, ready, loadDirectory]);
 	const refresh = useCallback(async (fresh = false) => {
@@ -136,6 +137,9 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	useEffect(() => { guard.current = dirty || saving ? navigate : null; return () => { guard.current = null; }; }, [guard, navigate, dirty, saving]);
 	useEffect(() => { const leave = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } }; window.addEventListener("beforeunload", leave); return () => window.removeEventListener("beforeunload", leave); }, [dirty]);
 	const open = (target: string) => navigate(() => {
+		if (!ready) return;
+		if (target !== path) { void openDocument(target); return; }
+		toggleChat(true);
 		setPath(target); setSource(false); setSearch(false); setSidebar(false); setSelectionMenu(null);
 		setExpanded(prev => { const next = new Set(prev), parts = target.split("/"); for (let i = 1; i < parts.length; i++) next.add(parts.slice(0, i).join("/")); return next; });
 		if (target === path) void load(target, true);
@@ -286,7 +290,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 			</div>
 			{!chatOpen && composer}
 		</div>
-		{chatOpen && <><button className="wiki-chat-scrim" aria-label={t("wikiCloseChat")} onClick={() => toggleChat(false)} /><WikiChatPanel messages={messages} live={live} streaming={streaming} toolStatuses={toolStatuses} model={model?.name || model?.id} contextPercent={contextPercent} disabled={busy} onNew={() => send({ type: "new_chat" })} onClose={() => toggleChat(false)} canJump={n => !source && wikiSectionIndex(headingTexts, n) >= 0} jump={jump} composer={composer} changes={changes} error={errorBanner} /></>}
+		{chatOpen && <><button className="wiki-chat-scrim" aria-label={t("wikiCloseChat")} onClick={() => toggleChat(false)} /><WikiChatPanel conversationId={conversationId} thinkingWrap={thinkingWrap} connected={connected} silenceNotified={silenceNotified} messages={messages} live={live} streaming={streaming} toolStatuses={toolStatuses} model={model ?? undefined} contextPercent={contextPercent} disabled={busy} onNew={() => send({ type: "new_chat" })} onClose={() => toggleChat(false)} canJump={n => !source && wikiSectionIndex(headingTexts, n) >= 0} jump={jump} composer={composer} changes={changes} error={errorBanner} /></>}
 		{!chatOpen && !drawer && !source && !loading && doc?.entry.kind === "document" && <WikiTableOfContents scroll={scrollRef} contentKey={`${path}:${body}`} />}
 		{drawer && <aside className="wiki-changes"><header><div><h2>{t(drawer === "recent" ? "wikiRecent" : "wikiRelatedChanges")}</h2><span>{cwd.split(/[\\/]/).at(-1)}</span></div><button aria-label={t("close")} onClick={() => setDrawer(null)}><FiX /></button></header><div className="wiki-changes-scroll">{state.revisions.filter(r => drawer === "recent" || r.id === drawer).map((revision, index, list) => <div key={revision.id} className="wiki-revision">{(index === 0 || new Date(list[index - 1].at).toDateString() !== new Date(revision.at).toDateString()) && <time>{new Date(revision.at).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US")}</time>}<div className="wiki-revision-title"><span className={`wiki-avatar ${revision.author}`}>{revision.author === "pi" ? "π" : t("wikiMe")}</span><div><strong>{revision.title.split("\n")[0]}</strong><small>{new Date(revision.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {t("wikiFileCount", { count: revision.changes.length })}</small></div></div><div className="wiki-revision-actions"><button disabled={busy || revision.changes.every(c => c.undone)} onClick={() => void restore(revision, true)}><FiCornerUpLeft />{t("wikiUndoAll")}</button><button disabled={busy || revision.changes.every(c => !c.undone)} onClick={() => void restore(revision, false)}><FiCornerUpRight />{t("wikiRedoAll")}</button></div>{revision.changes.map(summary => { const change = { ...summary, ...(fullChanges[`${revision.id}:${summary.path}`] ?? {}), undone: summary.undone }; return <div className={`wiki-file-change ${change.undone ? "undone" : ""}`} key={change.path}><div><button title={change.path} onClick={() => open(change.path)}>{change.path}</button><button disabled={busy} onClick={() => void restore(revision, !change.undone, change.path)}>{t(change.undone ? "wikiRedo" : "wikiUndo")}</button></div><small><em>+{change.additions}</em> <b>−{change.deletions}</b></small><details onToggle={e => { if (e.currentTarget.open && change.truncated) void wikiRequest<WikiChange>(cwd, "change", { id: revision.id, path: change.path }).then(result => { if (alive.current) setFullChanges(previous => ({ ...previous, [`${revision.id}:${change.path}`]: result })); }).catch(e => setError(e.message)); }}><summary>{t("wikiViewDiff")}</summary>{change.binary ? <p>{t("wikiBinaryChange")}</p> : <><pre className="wiki-diff-before">{change.before ?? t("wikiNewFile")}</pre><pre className="wiki-diff-after">{change.after ?? t("wikiDeletedFile")}</pre></>}</details></div>; })}{revision.skipped.length > 0 && <p className="wiki-skipped">{t("wikiUntracked")}: {revision.skipped.join(", ")}</p>}</div>)}{!state.revisions.length && <p className="wiki-muted">{t("wikiNoChanges")}</p>}</div></aside>}
 		{selectionMenu && createPortal(<div className="wiki-selection-menu" style={{ left: selectionMenu.x, top: selectionMenu.y }} onMouseDown={e => e.preventDefault()}>{(["ask", "rewrite", "explain", "link"] as const).map(action => <button key={action} onClick={() => selectionAction(action)}>{t(action === "ask" ? "wikiAskPi" : action === "rewrite" ? "wikiRewrite" : action === "explain" ? "wikiExplain" : "wikiAddLink")}</button>)}</div>, document.body)}

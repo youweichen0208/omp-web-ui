@@ -1,11 +1,17 @@
 // Actual Electron/preload/backend integration; OS opening is stubbed at the shell boundary.
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 const base = mkdtempSync(join(tmpdir(), 'pi-wiki-electron-')), cwd = join(base, 'wiki');
 mkdirSync(cwd); writeFileSync(join(cwd, 'README.md'), '# Desktop Wiki\n\nNative workspace.'); writeFileSync(join(cwd, 'sample.bin'), Buffer.from([0, 1, 2]));
+const agent = join(base, 'agent'), marker = join(base, 'local-extension-loaded'), disabledMarker = join(base, 'disabled-extension-loaded');
+mkdirSync(join(agent, 'extensions'), { recursive: true });
+writeFileSync(join(agent, 'extensions/local.js'), `import { appendFileSync } from 'node:fs'; export default pi => { pi.on('session_start', () => appendFileSync(${JSON.stringify(marker)}, 'loaded\\n')); };`);
+const disabledExtension = join(agent, 'extensions/disabled.js');
+writeFileSync(disabledExtension, `import { writeFileSync } from 'node:fs'; export default () => writeFileSync(${JSON.stringify(disabledMarker)}, 'unexpected');`);
+writeFileSync(join(agent, 'settings.json'), JSON.stringify({ extensions: [`-${disabledExtension}`] }));
 let app;
 try {
 	app = await electron.launch({ args: ['.', `--user-data-dir=${join(base, 'profile')}`], env: { ...process.env, PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(base, 'data'), PI_CODING_AGENT_DIR: join(base, 'agent') } });
@@ -17,11 +23,15 @@ try {
 	assert.equal(await page.evaluate(async () => { try { await window.electronAPI.appUpdate('arbitrary'); return false; } catch { return true; } }), true);
 	await page.locator('.setup-modal').waitFor();
 	await page.locator('.setup-modal .modal-close').click();
+	assert(existsSync(marker), 'Desktop discovers user-local Pi extensions');
+	const initialLoads = readFileSync(marker, 'utf8').length;
+	assert(!existsSync(disabledMarker), 'native extension disable rules remain authoritative');
 	await app.evaluate(({ BrowserWindow, shell }) => { BrowserWindow.getAllWindows()[0].setSize(1440, 950); shell.openPath = async path => { globalThis.wikiOpened = path; return ''; }; });
 	assert.equal(await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).count(), 0);
 	await page.locator('.file-name', { hasText: 'README.md' }).click();
 	await page.locator('.wiki-document-heading h1', { hasText: 'Desktop Wiki' }).waitFor();
 	await page.locator('.wiki-chat-panel').waitFor();
+	assert(readFileSync(marker, 'utf8').length > initialLoads, 'new native sessions reload local extensions');
 	assert.equal(Math.round((await page.locator('.wiki-chat-panel').boundingBox()).width), 400);
 	await page.keyboard.press('Meta+j');
 	assert.equal(await page.locator('.wiki-chat-panel').count(), 0);

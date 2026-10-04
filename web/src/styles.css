@@ -10547,7 +10547,6 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-suggestion .md { font-size: 13px; color: var(--text-dim); }
 .wiki-chat-empty { color: var(--text-faint); text-align: center; font-size: 13px; line-height: 1.8; margin: 48px 20px; }
 .wiki-chat-earlier { display: block; margin: 0 auto 16px; border: 0; color: var(--wiki-accent); background: transparent; font-size: 12px; }
-.wiki-chat-working { display: flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: 12px; }
 .wiki-chat-panel > footer { flex: none; padding: 10px 12px 12px; border-top: 1px solid var(--wiki-line); }
 .wiki-chat-panel .wiki-composer-area { position: static; max-width: none; margin: 0; gap: 0; }
 .wiki-chat-panel .wiki-composer { border-radius: 12px; border-color: oklch(0.86 0.02 285); box-shadow: none; padding: 8px 10px; display: flex; flex-direction: column; }

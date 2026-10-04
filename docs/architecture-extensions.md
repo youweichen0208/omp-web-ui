@@ -1,12 +1,14 @@
 # Extensions 原生包管理
 
-设置 › Extensions 对接 Pi 1.0.1 的 `DefaultPackageManager`、`SettingsManager` 和 `ProjectTrustStore`。安装、移除、更新与资源发现运行在独立 Node worker；浏览页面不执行扩展入口，缺失依赖采用 `resolve(() => "skip")`，不会因浏览自动安装。包变更在新会话生效，当前会话仅在用户点击重载时通过已有 `extensions_reload` 生效。宿主不向模型注册工具、注入消息或系统提示词。
+设置 › Extensions 对接 Pi 1.0.2 的 `DefaultPackageManager`、`SettingsManager` 和 `ProjectTrustStore`。安装、移除、更新与资源发现运行在独立 Node worker；浏览页面不执行扩展入口，缺失依赖采用 `resolve(() => "skip")`，不会因浏览自动安装。包变更在新会话生效，当前会话仅在用户点击重载时通过已有 `extensions_reload` 生效。宿主不向模型注册工具、注入消息或系统提示词。
 
 ## 请求与运行边界
 
 `/api/extensions` 位于公共鉴权中间件之后，校验同源、已连接 clientId、活动 cwd、工作区切换和 quiesce。HTTP 类型集中在 protocol.ts；独立于聊天 WebSocket 消息。来源预览返回绑定 clientId/cwd、20 分钟有效的 ticket；确认安装必须提交 ticket。列表与预览是只读操作，写任务全服务串行；日志有界 128 KB，关闭面板后可按任务 ID 恢复轮询。
 
 worker 保留原生 npmCommand，项目和个人作用域使用相同原生安装路径。读任务最多 4 个，超时 2 分钟；写任务超时 20 分钟。worker 是独立进程组，超时和服务退出仅终止其所属进程树。Electron 通过 ELECTRON_RUN_AS_NODE 加载相同 worker。
+
+Desktop 不打包应用自己的 `extensions/` 或声明其扩展入口。会话使用 Pi 原生用户目录与受信任项目资源发现，保留原生 Codemode/tool_search/MCP 工厂。CLI 的可选 `/webui` 入口只属于 npm 包；用户已配置的扩展不被 Desktop 删除或迁移。打包钩子拒绝夹带应用扩展，`wiki-electron-test.mjs` 验证用户扩展在启动和新会话中执行，并遵循原生禁用规则。
 
 ## 配置语义
 

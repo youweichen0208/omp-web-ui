@@ -343,6 +343,7 @@ export class ClientSession {
 	private convs = new Map<string, Conversation>();
 	private activeId = "";
 	private convSeq = 0;
+	private creatingConversation = false;
 	/** One ModelRuntime shared by all conversations — the model chosen in the
 	 *  top bar applies to every chat, not just the one that set it. Seeded by
 	 *  the first conversation and reused by later ones. */
@@ -2035,7 +2036,15 @@ export class ClientSession {
 		void this.pushSlashCommands();
 	}
 
-	async newChat(): Promise<void> {
+	async newChat(fresh = false): Promise<boolean> {
+		if (this.creatingConversation) return false;
+		this.creatingConversation = true;
+		const previous = this.activeId;
+		try { await this.createChat(fresh); return this.activeId !== previous; }
+		finally { this.creatingConversation = false; }
+	}
+
+	private async createChat(fresh: boolean): Promise<void> {
 		this.invalidateLists();
 		if (this.quiesceBlocked()) return;
 		// Reuse an already-open blank conversation instead of piling up new ones
@@ -2052,24 +2061,27 @@ export class ClientSession {
 			}
 		};
 		const active = this.conv;
-		if (active && isBlank(active)) {
+		if (!fresh && active && isBlank(active)) {
 			this.flushSnapshot();
 			return;
 		}
 		for (const conv of this.convs.values()) {
 			if (conv.id === this.activeId) continue;
-			if (isBlank(conv)) {
+			if (!fresh && isBlank(conv)) {
 				await this.switchConversation(conv.id);
 				this.flushSnapshot();
 				return;
 			}
 		}
+		// Wiki opens a fresh session for each document. Retire the outgoing idle
+		// runtime after success; its native session file remains in history.
+		const replaceActive = fresh && active && !active.session.isStreaming && active.terminals.list().length === 0 ? active : null;
 		// Cap is per project — conversations of other projects keep their own
 		// lists and don't consume this project's slots.
 		const openInProject = [...this.convs.values()].filter(
 			(c) => c.cwd === this.cwd,
 		).length;
-		if (openInProject >= MAX_OPEN_CONVERSATIONS) {
+		if (openInProject >= MAX_OPEN_CONVERSATIONS && !replaceActive) {
 			this.emit({
 				type: "notice",
 				level: "warning",
@@ -2080,7 +2092,7 @@ export class ClientSession {
 		// The outgoing conversation is left behind — apply the running-list
 		// lifecycle. Removal is deferred until the new chat exists so the active
 		// conversation stays valid during the (async) runtime creation.
-		const displaced = this.displaceActive();
+		const displaced = replaceActive ?? this.displaceActive();
 		// Carry the model chosen in the active chat over to the new chat so it
 		// doesn't silently revert to the ModelRuntime default model.
 		const prevModel = this.conv.session.agent.state.model ?? null;

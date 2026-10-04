@@ -2,7 +2,8 @@
 // the checkout's node_modules. No model calls or user configuration are needed.
 import assert from "node:assert/strict";
 import { fork, execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import WebSocket from "ws";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -14,6 +15,8 @@ import { relative, isAbsolute } from "node:path";
 
 const [executable, appRoot] = process.argv.slice(2).map((p) => resolve(p));
 assert(executable && appRoot, "Usage: node tests/packaged-server-start-test.mjs <executable> <resources/app>");
+assert(!existsSync(join(appRoot, "extensions")), "Desktop must not ship application extensions");
+assert(!JSON.parse(readFileSync(join(appRoot, "package.json"), "utf8")).pi?.extensions?.length, "Desktop must not declare application extensions");
 // A checkout-local package can otherwise hide missing runtime dependencies by
 // resolving them from the repository's parent node_modules directory.
 const packagedRequire = createRequire(join(appRoot, "package.json"));
@@ -41,6 +44,9 @@ execFileSync(executable, ["--input-type=module", "--eval", `await import(${JSON.
 const temp = mkdtempSync(join(tmpdir(), "pi-packaged-start-"));
 const workspace = join(temp, "workspace");
 mkdirSync(workspace);
+const marker = join(temp, "user-extension-loaded"), agent = join(temp, "agent");
+mkdirSync(join(agent, "extensions"), { recursive: true });
+writeFileSync(join(agent, "extensions/local.js"), `import { writeFileSync } from 'node:fs'; export default pi => pi.on('session_start', () => writeFileSync(${JSON.stringify(marker)}, 'loaded'));`);
 // Use the packaged runtime and worker, not the checkout's SQLite reader.
 const databasePath = join(workspace, "graph.db");
 const database = new DatabaseSync(databasePath);
@@ -127,6 +133,16 @@ try {
 	const page = await fetch(`http://127.0.0.1:${port}/`);
 	assert.equal(page.status, 200);
 	assert.match(await page.text(), /<div id="root">/);
+	const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+	try {
+		await new Promise((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error("Packaged session startup timed out")), 15000);
+			ws.on("error", error => { clearTimeout(timer); reject(error); });
+			ws.on("open", () => ws.send(JSON.stringify({ type: "hello", clientId: "packaged-local-extensions" })));
+			ws.on("message", data => { if (JSON.parse(data).type === "snapshot") { clearTimeout(timer); resolve(); } });
+		});
+		assert.equal(readFileSync(marker, "utf8"), "loaded", "packaged server loads the user's native Pi extensions");
+	} finally { ws.terminate(); }
 	console.log(`PASS packaged server: ${appRoot}`);
 } catch (error) {
 	console.error(output);

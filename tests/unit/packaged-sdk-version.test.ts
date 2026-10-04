@@ -17,6 +17,14 @@ test("desktop packaging follows the exact SDK pin and rejects mismatches or rang
 			writeFileSync(join(sdk, "package.json"), JSON.stringify({ version }));
 			await expect(afterPack(context)).resolves.toBeUndefined();
 		}
+		mkdirSync(join(app, "extensions"));
+		writeFileSync(join(app, "extensions/webui.ts"), "export default () => {};");
+		await expect(afterPack(context)).rejects.toThrow("Desktop must not bundle application extensions");
+		rmSync(join(app, "extensions"), { recursive: true });
+		writeFileSync(join(app, "package.json"), JSON.stringify({ pi: { extensions: ["./extensions"] } }));
+		await expect(afterPack(context)).rejects.toThrow("Desktop must not bundle application extensions");
+		writeFileSync(join(app, "package.json"), JSON.stringify({ pi: { extensions: [] }, dependencies: { "@earendil-works/pi-coding-agent": "2.0.0" } }));
+		await expect(afterPack(context)).resolves.toBeUndefined();
 		writeFileSync(join(sdk, "package.json"), JSON.stringify({ version: "1.0.0" }));
 		await expect(afterPack(context)).rejects.toThrow("expected 2.0.0, got 1.0.0");
 		writeFileSync(join(app, "package.json"), JSON.stringify({ dependencies: { "@earendil-works/pi-coding-agent": "^1.0.0" } }));

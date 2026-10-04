@@ -1,4 +1,6 @@
 import { LinkedText } from "./components/LinkedText";
+import type { WikiConversationResult } from "./types";
+import { wikiRequest } from "./wiki-api";
 import { WikiWorkbench } from "./components/WikiWorkbench";
 
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
@@ -258,9 +260,12 @@ export function App() {
 	}, [switching, chat.state?.cwd, previewFile]);
 	const fileGuard = useRef<FileNavigationGuard | null>(null);
 	const wikiGuard = useRef<((next: () => void) => void) | null>(null);
+	const wikiOpening = useRef(false);
+	const wikiWaiting = useRef<string | null>(null);
 	const send = useCallback((message: ClientMessage) => {
 		const navigation = message.type === "switch_conversation" || message.type === "new_chat" || message.type === "set_cwd" || message.type === "switch_session" ||
 			(message.type === "prompt" && /^\/cwd(?:\s|$)/.test(message.text));
+		if (navigation && (wikiOpening.current || wikiWaiting.current)) return false;
 		if (navigation && wikiGuard.current) { wikiGuard.current(() => { rawSend(message); }); return false; }
 		if (navigation && fileGuard.current) {
 			setView("chat");
@@ -281,6 +286,30 @@ export function App() {
 	}, [chat.state?.cwd, send]);
 	const [view, setView] = useState<ViewName>("chat");
 	const [wikiFileRequest, setWikiFileRequest] = useState<{cwd:string;conversationId:string;path:string;token:string} | null>(null);
+	const [wikiPending, setWikiPending] = useState(false);
+	const [wikiTargetId, setWikiTargetId] = useState<string | null>(null);
+	useEffect(() => {
+		if (wikiTargetId === chat.state?.conversationId && wikiTargetId === chat.activeConversationId) {
+			wikiWaiting.current = null;
+			setWikiTargetId(null);
+		}
+	}, [wikiTargetId, chat.state?.conversationId, chat.activeConversationId]);
+	const wikiCurrent = useRef({ cwd: chat.state?.cwd, conversationId: chat.activeConversationId });
+	wikiCurrent.current = { cwd: chat.state?.cwd, conversationId: chat.activeConversationId };
+	const openWikiDocument = useCallback(async (path: string) => {
+		const current = wikiCurrent.current;
+		if (!current.cwd || wikiOpening.current || wikiWaiting.current) return;
+		wikiOpening.current = true; setWikiPending(true);
+		try {
+			const result = await wikiRequest<WikiConversationResult>(current.cwd, "new-conversation", { path, conversationId: current.conversationId });
+			if (wikiCurrent.current.cwd !== current.cwd || ![current.conversationId, result.conversationId].includes(wikiCurrent.current.conversationId)) return;
+			wikiWaiting.current = result.conversationId;
+			setWikiTargetId(result.conversationId);
+			setWikiFileRequest({ cwd: current.cwd, conversationId: result.conversationId, path, token: randomUuid() });
+			setPreviewFile(null); setView("wiki"); setDrawer(null);
+		} catch (error) { pushNotice("error", (error as Error).message); }
+		finally { wikiOpening.current = false; setWikiPending(false); }
+	}, [pushNotice]);
 	const [commitJump, setCommitJump] = useState<{ hash: string; token: number } | null>(null);
 	const visited = useRef(new Set<ViewName>(["chat"]));
 	visited.current.add(view);
@@ -373,14 +402,11 @@ export function App() {
 		);
 	}, []);
 	const openPreview = useCallback((path: string, name: string) => {
-		if (switching || !chat.state?.cwd) return;
+		if (switching || wikiOpening.current || wikiWaiting.current || !chat.state?.cwd) return;
 		const cwd = chat.state.cwd;
 		const open = () => {
 			if (/\.(md|markdown)$/i.test(path)) {
-				setPreviewFile(null);
-				setWikiFileRequest({ cwd, conversationId: chat.activeConversationId, path, token: randomUuid() });
-				setView("wiki");
-				setDrawer(null);
+				void openWikiDocument(path);
 			} else {
 				setView("chat");
 				setDrawer("right");
@@ -394,7 +420,7 @@ export function App() {
 			setDrawer("right");
 			fileGuard.current(open);
 		} else open();
-	}, [switching, chat.state?.cwd, chat.activeConversationId]);
+	}, [switching, chat.state?.cwd, openWikiDocument]);
 	useEffect(() => {
 		const onToolFile = (event: Event) => {
 			const detail = (event as CustomEvent<{ path?: string; line?: number }>).detail;
@@ -1017,7 +1043,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} live={conversationState.streamingMessage} model={conversationState.model} contextPercent={conversationState.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} live={conversationState.streamingMessage} model={conversationState.model} contextPercent={conversationState.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={chat.ready && !switching && !wikiPending && (!wikiTargetId || wikiTargetId === conversationState.conversationId)} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

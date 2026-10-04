@@ -48,6 +48,19 @@ try {
 	assert.equal((await request('restore', { id: history.revisions[0].id, undo: true })).status, 200);
 	assert.equal(readFileSync(join(workspace, 'note.md'), 'utf8'), '# Notes\n\nsearch phrase');
 	const openInfo = await (await request('open-info', { path: 'note.md' })).json(); assert(openInfo.absolute.endsWith('note.md'));
+	assert.equal((await request('new-conversation', { path: '../outside.txt', conversationId: state.conversationId })).status, 400);
+	assert.equal((await request('new-conversation', { path: 'missing.md', conversationId: state.conversationId })).status, 400);
+	assert.equal((await request('new-conversation', { path: 'note.md', conversationId: 'stale' })).status, 400);
+	let conversationId = state.conversationId;
+	const identities = new Set([conversationId]);
+	for (let i = 0; i < 12; i++) {
+		const response = await request('new-conversation', { path: 'note.md', conversationId });
+		assert.equal(response.status, 200, 'idle document sessions must not exhaust running slots');
+		conversationId = (await response.json()).conversationId;
+		assert.equal(identities.has(conversationId), false, 'fresh native conversation even when outgoing chat was empty');
+		identities.add(conversationId);
+	}
+	assert.equal((await request('new-conversation', { path: 'note.md', conversationId: state.conversationId })).status, 400, 'stale navigation cannot replace current session');
 	console.log('PASS Wiki HTTP auth/origin/workspace boundaries, PDF full-text/media, saves and persistent undo');
 } finally {
 	ws?.terminate(); server.kill('SIGTERM'); if (server.exitCode === null) await new Promise(r => server.once('exit', r)); rmSync(base, { recursive: true, force: true });

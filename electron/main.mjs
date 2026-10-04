@@ -60,7 +60,7 @@ const dataDir = process.env.PI_WEB_DATA_DIR || join(
 
 // asar 关掉之后（见 electron-builder.yml 里的长注释），打包后的目录结构跟开发
 // 时是同构的：__dirname 是 <app>/electron，ROOT 就是 <app>——开发时是仓库根，
-// 打包后是 Resources/app。dist / web/dist / extensions / node_modules 全都平铺
+// 打包后是 Resources/app。dist / web/dist / node_modules 全都平铺
 // 在 ROOT 下面，所以这两个函数不再需要分打包和开发两种情况。
 
 /** server 入口：<root>/dist/server/index.js */
@@ -68,7 +68,7 @@ function getServerPath() {
 	return join(ROOT, "dist", "server", "index.js");
 }
 
-/** server 找 web/dist、extensions 的根目录 */
+/** server 找 web/dist 的根目录 */
 function getPkgRoot() {
 	return ROOT;
 }
@@ -112,7 +112,7 @@ async function startServer(reusePort) {
 			PI_WEB_HOST: "127.0.0.1",
 			PI_WEB_DATA_DIR: dataDir,
 			PI_WEB_NO_BROWSER: "1", // 不要自动打开浏览器（本身也不会打开，桌面版有自己的窗口）
-			PI_WEB_PKG_ROOT: getPkgRoot(), // 告诉 server 去哪找 web/dist / extensions
+			PI_WEB_PKG_ROOT: getPkgRoot(), // 告诉 server 去哪找 web/dist
 			ELECTRON_RUN_AS_NODE: "1", // 以 Node.js 模式运行（非 Electron）
 		},
 		stdio: ["ignore", "pipe", "pipe", "ipc"],

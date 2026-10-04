@@ -21,7 +21,7 @@ export function promptView(session: AgentSession, cwd: string) {
 	const internals = session as unknown as { _runSystemPromptOptions?: BuildSystemPromptOptions; _baseSystemPromptOptions?: BuildSystemPromptOptions };
 	const options = internals._runSystemPromptOptions ?? internals._baseSystemPromptOptions;
 	const defaultPreamble = nativePromptSections({cwd}).preamble;
-	if (VERSION !== "1.0.1" || !options || nativePromptText(options) !== raw) return { raw, defaultPreamble, opaque: true, forced: false, sections: [] as PromptSectionView[], rules: [] as PromptRuleView[], options: undefined };
+	if (VERSION !== "1.0.2" || !options || nativePromptText(options) !== raw) return { raw, defaultPreamble, opaque: true, forced: false, sections: [] as PromptSectionView[], rules: [] as PromptRuleView[], options: undefined };
 	if (options.forceSystemPrompt !== undefined) return {raw,defaultPreamble,opaque:true,forced:true,sections:[] as PromptSectionView[],rules:[] as PromptRuleView[],options:undefined};
 	const built = nativePromptSections(options);
 	const sections = Object.entries(built).map(([name,text])=>({name,text:unwrap(name,text)}));

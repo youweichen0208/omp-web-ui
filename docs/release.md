@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.15.1 Wiki 与 Desktop 修复
+
+`0.15.1` 修复文档打开时的对话面板、文档会话隔离和思考状态；内置 Pi / pi-ai 升级至 1.0.2。Desktop 排除应用扩展资源，继续按用户的原生 Pi 配置加载扩展。说明见 `.github/release-notes/v0.15.1.md`；发布 GitHub 源码与三平台桌面 Release。
+
 ## 0.15.0 Wiki 对话面板
 
 `0.15.0` 将 Wiki 对话改为右侧常驻面板，支持实时消息、建议小节跳转、按项目记忆及窄屏抽屉；保留预览编辑和原生上下文。说明见 `.github/release-notes/v0.15.0.md`；本次发布 GitHub 源码和三平台桌面 Release。

@@ -100,7 +100,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 界面插件只提供 Web 展示及用户交互，不向代理注册工具、斜杠命令或提示词。代理扩展和 MCP 由 pi 原生配置加载。
 
-### Pi 1.0.1 MCP / Codemode 工作台
+### Pi 1.0.2 MCP / Codemode 工作台
 
 设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全局/项目范围分别使用自己的文件版本；新增和导入在完成编辑后立即保存，启停、暴露方式和单工具覆盖修改后立即保存；高级 JSON 保留草稿，在离开输入框时保存。请求串行，期间禁用其他修改，仍使用原生版本校验、凭据掩码和会话生命周期；失败保留草稿并提供重试/重新加载，关闭和切页保护未完成编辑。Codemode 用分段选项并立即保存，已有非预设预算仍显示。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
 

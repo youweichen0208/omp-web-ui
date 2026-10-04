@@ -2,7 +2,7 @@
 
 ## 内置 Pi 与用户配置
 
-Desktop 使用安装包内精确锁定的 Pi SDK。终端执行 `pi update` 更新的是外部 CLI，不会替换桌面内置依赖；内置版本随应用构建升级。用户安装的原生扩展和凭据则由 Desktop 使用的 agent 目录加载，重启或 `/reload` 可加载其变化；不要把“内置版本固定”理解为“用户扩展配置永远无效”。
+Desktop 使用安装包内精确锁定的 Pi SDK。桌面包不包含应用自己的 `extensions/`，包元数据不声明应用扩展；CLI 的 `/webui` 扩展只随 npm 包提供。用户扩展由原生资源加载器读取 `~/.pi/agent/extensions`、Pi settings.json 声明的本地/已安装扩展包和受信任项目 `.pi/extensions`；`PI_CODING_AGENT_DIR` 可指定其他用户配置目录。沿用原生启停、过滤和项目信任，不复制或删除用户文件。Codemode、tool_search、MCP 属于 Pi 原生能力，继续按原生配置启用。终端执行 `pi update` 更新的是外部 CLI，不会替换桌面内置依赖；内置版本随应用构建升级。用户安装的原生扩展和凭据则由 Desktop 使用的 agent 目录加载，重启或 `/reload` 可加载其变化；不要把“内置版本固定”理解为“用户扩展配置永远无效”。
 
 Pi 1.0 的原生 MCP 配置入口和旧界面 MCP 桥不同，见 [插件文档](architecture-plugins.md)。模型管理提供官方账号登录桥，OpenAI 支持 ChatGPT 授权；真实账号授权由用户在浏览器完成。macOS 产物回归检查 ChatGPT 的 lazy 模块，不能仅凭应用能启动判断 OAuth 功能完整。
 
@@ -65,7 +65,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
-- 桌面 Pi SDK 精确锁定为 1.0.1；终端 `pi update` 只更新外部 CLI。
+- 桌面 Pi SDK 精确锁定为 1.0.2；终端 `pi update` 只更新外部 CLI。
 - 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块。
 
 - 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
@@ -74,7 +74,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   WebSocket 会自行重连；三次均失败时显示错误弹窗。退出应用时不会触发重启。
 - `PI_WEB_PKG_ROOT` 告诉 server 去哪找 `web/dist`（打包后指向
   `process.resourcesPath`，即 `electron-builder.yml` 里 `extraResources` 复制的
-  `dist/`、`web/dist/`、`extensions/`）。
+  `dist/`、`web/dist/`）。
 - `PI_WEB_DATA_DIR` 桌面版单独用 `~/.pi-web-desktop`，和命令行版的 `~/.pi-web` 分开，
   避免两边同时跑时抢 `client-state.json` 等运行时状态；对话历史本身走 SDK 的
   `~/.pi/agent`，两边共享，不受影响。
@@ -129,9 +129,9 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使用打包后的 Electron 加载懒加载 provider 并启动包内服务端）及 `tests/portable-relaunch-test.ps1`（首次启动、重复打开、原进程存活及模块保留），通过后才上传安装包；这些检查失败会阻断 Windows 发布。手动运行 `Verify Windows desktop build` 时传入 `release_tag`，可直接验证已发布的 ZIP、NSIS 和便携 EXE，无需重新构建。
 
-### Pi 1.0.1 原版 SDK
+### Pi 1.0.2 原版 SDK
 
-不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.1。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。
 
 ### Wiki 文件与 PDF
 

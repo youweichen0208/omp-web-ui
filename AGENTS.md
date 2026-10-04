@@ -26,7 +26,7 @@ Windows 计划任务部署。
 | 终端 | node-pty（服务端 PTY）+ `@xterm/xterm`（浏览器渲染，经 terminal bridge 转发） |
 | 样式 | 单文件 `web/src/styles.css`（浅色/深色/跟随系统，CSS 变量） |
 
-SDK 与 pi-ai 精确锁定 1.0.1，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
+SDK 与 pi-ai 精确锁定 1.0.2，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
 系统提示词：修改分段来源、原生文件编辑或重载时，读取 `docs/architecture-system-prompt.md`。
 Extensions：修改包安装、启停、更新、作用域迁移、目录浏览或单文件编辑时，读取 `docs/architecture-extensions.md`。
 Codemode 卡片与 MCP/Codemode 设置遵循 15a/15b 设计；状态、项目覆盖、费用及输出限制读取 `docs/architecture-plugins.md`。
@@ -103,7 +103,7 @@ pi-web-ui/
 │   └── scratch/                # 一次性调试脚本（gitignore，不入库）
 ├── scripts/check-protocol-sync.mjs  # 守护 types.ts shim 单源机制 + protocol.ts 纯类型约束
 ├── .github/workflows/ci.yml    # CI：协议同步 → typecheck → build → vitest → 冒烟
-├── extensions/                 # pi 扩展：webui.ts（/webui 命令启动本机服务并打开浏览器）
+├── extensions/                 # npm CLI 扩展：webui.ts（/webui 启动浏览器；Desktop 不打包）
 ├── electron/                   # Electron 桌面版壳子（main.mjs 主进程 + 沙箱兼容的 preload.cjs），本地构建，不进 npm 包
 ├── electron-builder.yml        # Electron 打包配置（mac dmg/zip、win nsis/portable、linux AppImage/deb）
 ├── build/                      # electron-builder 用的图标源文件（icon.png 1024x1024 + icon.ico）
@@ -151,7 +151,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能仅供查看；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.2，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能仅供查看；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 
@@ -176,7 +176,7 @@ pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 S
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 
-Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改阅读布局/本页目录、右侧对话面板/建议跳转、索引状态、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx` / `WikiReading.tsx` / `WikiChatPanel.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
+Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改阅读布局/本页目录、右侧对话面板/建议跳转、文档会话隔离/等待状态、索引状态、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx` / `WikiReading.tsx` / `WikiChatPanel.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
 
 ## 5. 开发工作流
 

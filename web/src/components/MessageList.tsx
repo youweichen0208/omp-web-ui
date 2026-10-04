@@ -1,5 +1,5 @@
-import { activeTool, assistantPredecessors, toolTarget } from "../agent-activity";
-import { WaitingHeaderStatus, WorkingStatus } from "./WorkingStatus";
+import { assistantPredecessors } from "../agent-activity";
+import { ConversationWorkingStatus } from "./WorkingStatus";
 import { goalEventText, goalCompletedText, groupGoalEvents } from "../goal-events";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -215,16 +215,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	const goalEvents = useMemo(() => groupGoalEvents(state.messages), [state.messages]);
 	const timeGaps = useMemo(() => messageTimeGaps(state.messages), [state.messages]);
 	const predecessors = assistantPredecessors(messages);
-	const lastUserIndex = state.messages.findLastIndex((message) => message.role === "user");
-	const runningTool = state.isStreaming ? activeTool(messages, toolStatuses) : undefined;
-	const currentAssistant = state.messages.slice(lastUserIndex + 1).findLast((message) => message.role === "assistant");
-	const lastBlock = state.streamingMessage?.content.at(-1) ?? currentAssistant?.content.at(-1);
-	const completedTool = lastBlock?.type === "toolCall" && typeof lastBlock.id === "string" && (toolStatuses.has(lastBlock.id) || toolResults.has(lastBlock.id));
-	const activityLabel = runningTool ? runningTool.name === "bash" ? t("waitingCommand") : t(runningTool.name === "read" ? "activityReading" : "activityTool", { name: runningTool.name === "read" ? toolTarget(runningTool) : runningTool.name }) : t(completedTool ? "waitingModel" : lastBlock?.type === "text" ? "activityReply" : "activityAnalyze");
-	const activityPhase = `${state.conversationId}:${runningTool?.id ?? state.streamingMessage?.id ?? "waiting"}:${state.streamingMessage?.content.length ?? 0}:${lastBlock?.type ?? ""}`;
 	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
-	const awaitingFirstAssistant = state.isStreaming && !streamingHasContent && lastUserIndex >= 0 && !state.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
-	const showWorkingFooter = runningTool?.name !== "bash" && (!streamingHasContent || !!runningTool || !!completedTool);
 	const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
 	// Only the last KEEP_RECENT persisted messages are fully rendered; older
 	// ones collapse to summary rows (unless the user expanded them).
@@ -812,7 +803,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						thinkingWrap={thinkingWrap}
 					/>
 				)}
-				{state.isStreaming && (connected ? (awaitingFirstAssistant ? <div className="msg msg-assistant agent-working-placeholder"><div className="msg-meta"><span className="msg-role">{t("role.assistant")}</span>{state.model?.id && <span className="msg-model">{state.model.id}</span>}<span className="msg-time">{new Date(state.messages[lastUserIndex].timestamp ?? Date.now()).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span></div><WaitingHeaderStatus key={`${state.conversationId}:${state.messages[lastUserIndex].id}`} startedAt={state.messages[lastUserIndex].timestamp} silenceNotified={silenceNotified} /></div> : showWorkingFooter ? <WorkingStatus key={state.conversationId} label={activityLabel} phase={activityPhase} durationMs={!runningTool && lastBlock?.type === "thinking" && typeof lastBlock.durationMs === "number" ? lastBlock.durationMs : undefined} /> : null) : <div className="agent-working disconnected" role="status">{t("workDisconnected")}</div>)}
+				<ConversationWorkingStatus state={state} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />
 				{/* 乐观本地回显：刚点发送、服务端确认（snapshot_delta 追加）之前，
 				 *  立刻把用户刚输入的文字显示出来，避免等待服务端往返的空白期。
 				 *  一旦真实消息落地（reducer 里 appended.length>0）就会清空 pendingEcho，

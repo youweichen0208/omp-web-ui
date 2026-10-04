@@ -212,8 +212,7 @@ assert.equal(await page.locator('.file-dir-main',{hasText:'src'}).count(),0,'unc
 await page.screenshot({path:'/private/tmp/pi-running-state-5b.png'});
 await page.locator('.tree-other-directories').click();
 await page.locator('.file-dir-main',{hasText:'src'}).waitFor();
-await page.locator('.toolcall-bash.run .toolcall-kill').click();
-assert(sent.some(m=>m.type==='abort_bash'),'card stop targets command');
+assert.equal(await page.locator('.toolcall-bash.run .toolcall-kill').count(),0,'native tools use the task stop control');
 await actions.locator('.stop').click();
 assert(sent.some(m=>m.type==='abort'),'composer stop targets task');
 await page.locator('.bash-output-gap-button').click();

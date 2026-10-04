@@ -1,5 +1,6 @@
 import type { Express, Request } from "express";
 import type { AgentService } from "./agent-service.js";
+import type { WikiConversationResult } from "./protocol.js";
 import { WikiService, wikiPath } from "./wiki-service.js";
 import { statSync } from "node:fs";
 import { extname } from "node:path";
@@ -19,6 +20,16 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 		try {
 			let result: unknown;
 			switch (action) {
+				case "new-conversation": {
+					if (conversationId !== cs.conversationId || service().quiesceInfo().quiesced) throw new Error("Conversation unavailable");
+					// Validate the target before leaving the current native session.
+					if (typeof path !== "string") throw new Error("Invalid path");
+					await wiki.document(cwd, path);
+					if (!valid()) throw new Error("Conversation changed");
+					if (!await cs.newChat(true)) throw new Error("Could not create conversation");
+					if (cs.cwd !== cwd || cs.switchingWorkspace || cs.conversationId === conversationId) throw new Error("Could not create conversation");
+					res.json({ conversationId: cs.conversationId } satisfies WikiConversationResult); return;
+				}
 				case "open-info": { if (typeof path !== "string") throw new Error("Invalid path"); const absolute = wikiPath(cwd, path); if (!statSync(absolute).isFile()) throw new Error("Not a file"); result = { absolute }; break; }
 				case "state": result = await wiki.state(cwd); break;
 				case "directory": if (typeof path !== "string") throw new Error("Invalid path"); result = await wiki.directory(cwd, path, offset); break;

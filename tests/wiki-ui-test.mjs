@@ -30,7 +30,9 @@ const mock = createServer(async (req, res) => {
 		{ path: 'README.md', content: readFileSync(join(cwd, 'README.md'), 'utf8') + '\n## 隔夜持仓\n\n隔夜持仓的止损阈值按开盘价重新计算。\n' },
 		{ path: '交易系统/参数配置.md', content: '# 参数配置\n\n#风控\n\n新增 overnight_reset: true\n' },
 	];
-	const chunks = afterTools ? [[{ role: 'assistant', content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{ content: '\n\n- **第 2 节补充建议**：可以明确仓位上限的例外。\n- **第 99 节不存在**：不应出现跳转。\n\n需要我继续吗？' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
+	const confirmation = JSON.stringify(payload.messages.filter(m => m.role === 'user')).includes('仅确认当前文档');
+	const chunks = confirmation ? [[{ role: 'assistant', content: '当前文档已确认。' }, null], [{}, 'stop']] : afterTools ? [[{ role: 'assistant', reasoning_content: '先核对文档范围和已完成的修改。' }, null], [{ content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{ content: '\n\n- **第 2 节补充建议**：可以明确仓位上限的例外。\n- **第 99 节不存在**：不应出现跳转。\n\n需要我继续吗？' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
+	if (!afterTools) await new Promise(r => setTimeout(r, 1200));
 	for (const [delta, finish_reason] of chunks) {
 		if (afterTools) await new Promise(r => setTimeout(r, 800));
 		res.write(`data: ${JSON.stringify({ id: 'wiki-test', object: 'chat.completion.chunk', created: Date.now(), model: payload.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
@@ -49,8 +51,21 @@ try {
 	browser = await chromium.launch({ executablePath: CHROME_PATH || chromium.executablePath() });
 	const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 	page.setDefaultTimeout(10000);
+	let holdSnapshots = false, releaseSnapshots;
+	await page.routeWebSocket('**/ws', ws => {
+		const upstream = ws.connectToServer(), pending = [];
+		releaseSnapshots = () => { holdSnapshots = false; for (const message of pending.splice(0)) ws.send(message); };
+		upstream.onMessage(message => {
+			const type = JSON.parse(String(message)).type;
+			if (holdSnapshots && ['snapshot', 'snapshot_delta', 'conversations'].includes(type)) pending.push(message);
+			else ws.send(message);
+		});
+	});
+	let activeConversation, activeSnapshot; const wikiConversations = [];
+	page.on('websocket', ws => ws.on('framereceived', ({ payload }) => { try { const msg = JSON.parse(String(payload)); if (msg.type === 'snapshot') { activeConversation = msg.state.conversationId; activeSnapshot = msg.state; } } catch {} }));
+	page.on('response', async response => { if (response.url().endsWith('/api/wiki') && response.request().postDataJSON()?.action === 'new-conversation' && response.ok()) wikiConversations.push((await response.json()).conversationId); });
 	const errors = []; page.on('pageerror', e => { errors.push(e.message); console.error('Browser error:', e.message); });
-	await page.addInitScript(cwd => { localStorage.setItem(`pi-wiki-file:${cwd}`, '交易系统/参数配置.md'); localStorage.setItem('pi-web-ui:appearance', 'dark'); }, cwd);
+	await page.addInitScript(cwd => { localStorage.setItem(`pi-wiki-file:${cwd}`, '交易系统/参数配置.md'); localStorage.setItem('pi-web-ui:appearance', 'dark'); localStorage.setItem(`pi-wiki-chat:${cwd}`, 'false'); }, cwd);
 	await page.goto(`http://127.0.0.1:${port}`);
 	await page.locator('.conn-dot.ok').first().waitFor({ state: 'attached', timeout: 20000 });
 	assert.equal(await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).count(), 0);
@@ -65,7 +80,6 @@ try {
 	const reading = await page.locator('.wiki-main').boundingBox(), panel = await page.locator('.wiki-chat-panel').boundingBox();
 	assert(reading.x + reading.width <= panel.x, 'desktop panel does not cover article');
 	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
-	assert.equal(await page.evaluate(cwd => localStorage.getItem(`pi-wiki-chat:${cwd}`), cwd), 'false');
 	await page.keyboard.press('Meta+j');
 	await page.locator('.wiki-chat-panel').waitFor();
 	await page.keyboard.press('Meta+j');
@@ -152,7 +166,7 @@ try {
 	// Markdown is editable immediately in its rendered layout; both modes share the draft.
 	const rendered = page.locator('.wiki-prose [contenteditable="true"][role="textbox"]');
 	await rendered.waitFor();
-	await rendered.locator('p').first().click();
+	await rendered.locator('p').first().click({ position: { x: 10, y: 5 } });
 	await page.keyboard.press('End');
 	await page.keyboard.type(' Preview edit.');
 	await page.locator('.wiki-save').waitFor();
@@ -209,9 +223,11 @@ try {
 	await page.keyboard.press('Meta+j');
 	assert.equal(await page.locator('.wiki-chat-panel').count(), 0);
 	await page.getByRole('button', { name: '发送', exact: true }).click();
+	await page.locator('.wiki-chat-panel .waiting-header-status .working-dots').waitFor();
+	await page.locator('.wiki-chat-panel .thinking.live').waitFor();
+	assert((await page.locator('.wiki-chat-panel .thinking.live').innerText()).includes('先核对文档'));
 	await page.locator('.wiki-chat-answer', { hasText: '已更新两个文档' }).waitFor({ timeout: 20000 });
-	assert(await page.locator('.wiki-chat-working').isVisible(), 'live reply is visible before settled');
-	await page.locator('.wiki-chat-working').waitFor({ state: 'hidden' });
+	await page.getByRole('button', { name: '跳到 §2', exact: true }).waitFor();
 	await page.locator('.wiki-change-toast', { hasText: '2 个文件' }).waitFor({ timeout: 20000 });
 	assert(requests.length >= 2);
 	await page.getByRole('button', { name: '跳到 §2', exact: true }).waitFor();
@@ -224,10 +240,31 @@ try {
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
 	await page.screenshot({ path: '/tmp/pi-wiki-chat-desktop-light.png' });
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'dark');
+	const previousConversation = activeConversation, previousSession = activeSnapshot.sessionId, previousFile = activeSnapshot.sessionFile;
+	assert.equal(typeof previousConversation, "string");
+	await page.locator('.wiki-tree-row[title="交易系统"]').click();
+	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
+	holdSnapshots = true;
+	const newDocument = page.waitForResponse(response => response.url().endsWith('/api/wiki') && response.request().postDataJSON()?.action === 'new-conversation');
 	await page.locator('.wiki-tree-row[title="交易系统/参数配置.md"]').click();
+	assert.equal((await newDocument).status(), 200);
+	await page.locator('.wiki-chat-toggle').click();
+	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('must not send into the old conversation');
+	assert(await page.getByRole('button', { name: '发送', exact: true }).isDisabled(), 'wait for the new conversation snapshot before sending');
+	releaseSnapshots();
 	await page.locator('.wiki-document-heading h1', { hasText: '参数配置' }).waitFor();
-	assert((await page.locator('.wiki-chat-messages').innerText()).includes('已更新两个文档'), 'document switches preserve conversation');
+	await page.locator('.wiki-chat-panel').waitFor();
+	assert.notEqual(activeConversation, previousConversation, 'document switch creates a distinct native conversation');
+	assert.notEqual(activeSnapshot.sessionId, previousSession, 'native SDK session identity is distinct');
+	assert(readFileSync(previousFile, 'utf8').includes('请补充隔夜持仓规则'), 'outgoing conversation remains in native history');
+	assert(!(await page.locator('.wiki-chat-messages').innerText()).includes('已更新两个文档'), 'document switches start a fresh conversation');
 	assert((await page.locator('.wiki-context-chips').innerText()).includes('参数配置.md'));
+	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('仅确认当前文档');
+	await page.getByRole('button', { name: '发送', exact: true }).click();
+	await page.locator('.wiki-chat-answer', { hasText: '当前文档已确认' }).waitFor();
+	assert.equal(requests.at(-1).messages.filter(m => m.role === 'user').length, 1, 'provider receives only the new document conversation');
+	assert(!JSON.stringify(requests.at(-1).messages).includes('请补充隔夜持仓规则'), 'previous document context is absent from provider request');
+
 	await page.locator('.wiki-tree-row[title="README.md"]').click();
 	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
 	assert(requests.some(r => r.messages.some(m => m.role === 'tool')), 'native SDK executed tool calls');
@@ -269,8 +306,9 @@ try {
 	await page.locator('.wiki-chat-empty').waitFor();
 	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
 	assert.equal(await page.locator('.wiki-chat-answer').count(), 0, 'new native conversation clears the panel');
-	assert.equal(await page.evaluate(cwd => localStorage.getItem(`pi-wiki-chat:${cwd}`), cwd), 'true');
+	assert(wikiConversations.length > 8, 'can browse more documents than the runtime limit');
+	assert.equal(new Set(wikiConversations).size, wikiConversations.length, 'each document navigation receives a fresh native conversation');
 	assert.deepEqual(errors, []);
 	console.log('PASS Wiki layout, links, search, source save, draft guard, selection, native request, batch undo/redo and mobile');
-} catch (e) { console.error(log.slice(-5000)); throw e; }
+} catch (e) { const page = browser?.contexts()[0]?.pages()[0]; if (page) { await page.screenshot({ path: '/tmp/pi-wiki-regression-failure.png' }); console.error(await page.locator('.wiki-document-heading').innerText().catch(() => 'No document')); } console.error(log.slice(-5000)); throw e; }
 finally { await browser?.close(); server.kill('SIGTERM'); await new Promise(r => server.once('exit', r)); await new Promise(r => mock.close(r)); rmSync(base, { recursive: true, force: true }); }
