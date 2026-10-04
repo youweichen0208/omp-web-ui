@@ -93,12 +93,14 @@ try {
 		await page.locator('.sound-master input').waitFor({ state: 'visible' });
 		await page.locator('.sound-menu-summary').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
-		await page.locator('.settings-tab[title="插件"]').click();
+		await page.locator('.settings-tab[title="Extensions"]').click();
 		assert.equal(await page.locator('.set-row', { hasText: 'rpiv-todo' }).count(), 0, 'removed bundled todo must not return');
-		assert.equal(await page.locator('.settings-modal [role="switch"]').count(), 0, 'native extensions are read-only');
+		await page.locator('.extensions-panel').getByRole('button', { name: '从 npm / Git / 本地安装', exact: true }).waitFor();
 		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
-		await page.locator('.set-prompt-preview').waitFor();
-		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'native system prompt is read-only');
+		await page.locator('.system-prompt-panel .prompt-sections').waitFor();
+		await page.getByRole('button', { name: '原始文本', exact: true }).click();
+		await page.locator('.prompt-raw').waitFor();
+		assert.equal(await page.locator('.settings-modal textarea').count(), 0, 'raw native prompt stays read-only; editing starts from a source file');
 
 		await page.close();
 	}
