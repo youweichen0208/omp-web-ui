@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.14.2 桌面修复版
+
+`0.14.2` 修复桌面完整退出后项目列表及当前目录恢复，以及网页链接交给系统默认浏览器打开。旧版临时客户端记录保留但不自动合并。说明见 `.github/release-notes/v0.14.2.md`；本次发布 GitHub 源码和三平台桌面 Release。
+
 ## 0.14.1 正式版
 
 `0.14.1` 包含以下 0.14.0 功能，并修复 Markdown 服务端解析器未列入生产依赖的问题。三平台重新构建，增加包内依赖解析检查；说明见 `.github/release-notes/v0.14.1.md`。

@@ -78,6 +78,12 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - `PI_WEB_DATA_DIR` 桌面版单独用 `~/.pi-web-desktop`，和命令行版的 `~/.pi-web` 分开，
   避免两边同时跑时抢 `client-state.json` 等运行时状态；对话历史本身走 SDK 的
   `~/.pi/agent`，两边共享，不受影响。
+- 桌面单窗口客户端 ID 保存到 `<PI_WEB_DATA_DIR>/desktop-client-id`，由主进程通过沙箱 preload
+  传给前端，不依赖随机端口的浏览器存储；完整退出再启动仍恢复服务端保存的最近项目和最后工作目录。
+  浏览器版继续为每个标签页分配独立 ID。旧版各临时 ID 下的记录保留，不自动合并。
+- HTTP/HTTPS 新窗口链接和离开应用的页面跳转由系统默认浏览器打开；应用内锚点保留，
+  非网页协议不交给系统执行。文件的默认应用打开仍走已验证的专用 IPC。
+  回归：`node tests/desktop-state-links-test.mjs` 与 `--links`（真实 Electron，临时数据目录，浏览器打开仅在系统调用边界替换）。
 - 关闭窗口 → 最小化到托盘（不退出）；托盘菜单可重新打开 / 退出。
 - 桌面窗口共用一条内容顶栏：macOS 隐藏系统标题栏、保留左侧原生红黄绿按钮；
   Windows/Linux 使用无边框窗口和右侧自绘最小化、最大化、关闭按钮。可拖动区域

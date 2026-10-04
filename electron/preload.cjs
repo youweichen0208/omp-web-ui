@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	platform: process.platform,
+	clientId: process.argv.find(arg => arg.startsWith("--pi-desktop-client-id="))?.split("=")[1],
 	appUpdate: action => ipcRenderer.invoke("pi-app-update", action),
 	onAppUpdate: callback => {
 		const listener = (_event, state) => callback(state);

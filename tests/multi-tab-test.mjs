@@ -22,6 +22,8 @@ const base = mkdtempSync(join(tmpdir(), "pi-web-multitab-"));
 const workdir = join(base, "work");
 const dataDir = join(base, "data");
 const agentDir = join(base, "agent");
+const otherDir = join(base, "other-work");
+mkdirSync(otherDir);
 mkdirSync(workdir, { recursive: true });
 mkdirSync(dataDir, { recursive: true });
 mkdirSync(agentDir, { recursive: true });
@@ -74,9 +76,7 @@ const readClientId = (page) =>
 	page.evaluate(() => sessionStorage.getItem("pi-web-client-id"));
 /** 等待页面 WebSocket ready。 */
 const waitChatReady = (page) =>
-	page.waitForFunction(() => document.querySelector("textarea") !== null, {
-		timeout: 20000,
-	});
+	page.waitForFunction(() => sessionStorage.getItem("pi-web-client-id") && document.querySelector(".project-item.active"), null, { timeout: 20000 });
 
 try {
 	await waitReady();
@@ -98,21 +98,23 @@ try {
 	const idB = await readClientId(b);
 	check("two tabs have DIFFERENT clientIds", !!idA && !!idB && idA !== idB, `${idA?.slice(0, 8)} vs ${idB?.slice(0, 8)}`);
 
-	// 标签页 B 切换到「历史对话」区域/新建对话，不应影响 A 的输入框可用性
-	// 与消息列表（无共享状态的最直接表现：A 的 DOM 不随 B 操作变化）。
-	const markerA = await a.evaluate(() => document.body.innerHTML.length);
+	// Exercise actual workspace separation, not changing DOM length (clocks/setup change it).
+	for (const page of [a, b]) {
+		if (await page.locator(".setup-modal").count()) await page.locator(".setup-modal .modal-close").click();
+	}
+	const projectA = await a.locator(".project-item.active .project-name").textContent();
+	await b.locator(".lp-add-project").click();
+	await b.locator(".fpk-modal-foot input").fill(otherDir);
+	await b.locator(".fpk-open-btn").click();
+	await b.locator(".project-item.active .project-name", { hasText: "other-work" }).waitFor();
 	await b.reload();
-	await b.waitForLoadState("domcontentloaded");
-	await sleep(800);
-	const markerA2 = await a.evaluate(() => document.body.innerHTML.length);
-	check(
-		"tab B reload does not disturb tab A",
-		markerA > 0 && markerA === markerA2,
-	);
-
-	// clientId 在刷新后保持稳定（sessionStorage 生命周期）
-	const idA2 = await readClientId(a);
-	check("tab A keeps its clientId across reload", idA2 === idA);
+	await waitChatReady(b);
+	check("tab B switch and reload do not disturb tab A", await a.locator(".project-item.active .project-name").textContent() === projectA);
+	check("tab B restores its own workspace", await b.locator(".project-item.active .project-name").textContent() === "other-work");
+	await a.reload();
+	await waitChatReady(a);
+	check("tab A keeps its clientId across reload", await readClientId(a) === idA);
+	check("tab B keeps its independent clientId", await readClientId(b) === idB);
 
 	await browser.close();
 	console.log(`\n${passed} passed, ${failed} failed`);

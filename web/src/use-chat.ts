@@ -2,6 +2,7 @@ import type { UiMessage } from "./types";
 import { mergeLiveToolOutput } from "./live-tool-output";
 import { useCallback, useEffect, useReducer, useRef, useState, useMemo } from "react";
 import { ProjectCache } from "./project-cache";
+import { desktopAPI } from "./desktop";
 import { randomUuid } from "./uuid";
 import { withToken } from "./auth-token";
 import type {
@@ -679,7 +680,7 @@ const CLIENT_ID_KEY = "pi-web-client-id";
 let cachedClientId: string | null = null;
 
 /**
- * 客户端标识 —— **每标签页独立**（sessionStorage 而非 localStorage）。
+ * 浏览器客户端标识每标签页独立；桌面单窗口使用主进程持久化的 ID。
  *
  * 曾用 localStorage：同源所有标签页共享同一 clientId，后端把它们挂到同一个
  * ClientSession 上互为镜像——B 标签页切换对话会同步切走 A 页、甚至把 A 页
@@ -688,9 +689,11 @@ let cachedClientId: string | null = null;
  */
 export function getClientId(): string {
 	if (cachedClientId) return cachedClientId;
-	let id: string | null = null;
+	let id: string | null = desktopAPI?.clientId ?? null;
 	try {
-		id = sessionStorage.getItem(CLIENT_ID_KEY);
+		// Mirror the desktop identity for existing integrations; browser tabs stay isolated.
+		if (id) sessionStorage.setItem(CLIENT_ID_KEY, id);
+		id = id ?? sessionStorage.getItem(CLIENT_ID_KEY);
 		if (!id) {
 			id = randomUuid();
 			sessionStorage.setItem(CLIENT_ID_KEY, id);

@@ -31,6 +31,7 @@ import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { desktopClientId } from "./client-identity.mjs";
 import { agentRuntimeEnvironment } from "./agent-runtime-env.mjs";
 // electron-updater 是 CJS 包，Node ESM 下不能直接 named import，
 // 得走默认导出再解构（Node 的 CJS→ESM 互操作不会自动分析 named exports）。
@@ -50,6 +51,10 @@ let tray = null;
 let serverProcess = null;
 let isQuitting = false;
 let serverPort = 0;
+let clientId;
+const dataDir = process.env.PI_WEB_DATA_DIR || join(
+	process.env.HOME || process.env.USERPROFILE || "~", ".pi-web-desktop",
+);
 
 // ── 路径 ──
 
@@ -98,10 +103,6 @@ async function startServer(reusePort) {
 	}
 
 	// 桌面版数据目录与命令行版分开（见文件头注释），确保存在
-	const dataDir = process.env.PI_WEB_DATA_DIR || join(
-		process.env.HOME || process.env.USERPROFILE || "~",
-		".pi-web-desktop",
-	);
 	mkdirSync(dataDir, { recursive: true });
 
 	serverProcess = fork(serverPath, [], {
@@ -224,6 +225,7 @@ function createWindow() {
 			preload: join(__dirname, "preload.cjs"),
 			nodeIntegration: false,
 			contextIsolation: true,
+			additionalArguments: [`--pi-desktop-client-id=${clientId}`],
 		},
 		icon: join(__dirname, "icon.png"),
 	});
@@ -256,6 +258,25 @@ function createWindow() {
 
 	// 加载 localhost 上的 server
 	const url = `http://127.0.0.1:${serverPort}`;
+	// Web links belong in the system browser, never a new privileged app window.
+	const openExternal = (target) => {
+		try {
+			const parsed = new URL(target);
+			if (!["http:", "https:"].includes(parsed.protocol)) return;
+			void shell.openExternal(parsed.href).catch(error => console.error("Unable to open browser:", error.message));
+		} catch { /* Invalid navigation targets are blocked. */ }
+	};
+	mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
+		openExternal(target);
+		return { action: "deny" };
+	});
+	const guardNavigation = (event, target) => {
+		try { if (new URL(target).origin === new URL(url).origin) return; } catch {}
+		event.preventDefault();
+		openExternal(target);
+	};
+	mainWindow.webContents.on("will-navigate", guardNavigation);
+	mainWindow.webContents.on("will-redirect", guardNavigation);
 	mainWindow.loadURL(url);
 
 	mainWindow.once("ready-to-show", () => {
@@ -500,6 +521,7 @@ if (!gotLock) {
 
 app.whenReady().then(async () => {
 	try {
+		clientId = desktopClientId(dataDir);
 		await startServer();
 		watchServerExit();
 	} catch (err) {

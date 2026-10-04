@@ -12,6 +12,7 @@ export interface DesktopWindowState {
 
 export interface DesktopAPI {
 	platform: string;
+	clientId?: string;
 	appUpdate?: (action: "read" | "check" | "update" | "install") => Promise<AppUpdateState>;
 	onAppUpdate?: (callback: (state: AppUpdateState) => void) => () => void;
 	openExtensionPath?: (request: { clientId: string; cwd: string; id: string }) => Promise<void>;
