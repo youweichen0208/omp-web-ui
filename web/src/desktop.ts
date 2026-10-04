@@ -5,6 +5,7 @@ export interface DesktopWindowState {
 
 export interface DesktopAPI {
 	platform: string;
+	openWikiFile?: (request: { clientId: string; cwd: string; path: string }) => Promise<void>;
 	windowAction: (action: "minimize" | "toggle-maximize" | "close") => void;
 	onWindowState: (callback: (state: DesktopWindowState) => void) => () => void;
 }

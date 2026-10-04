@@ -35,18 +35,16 @@ try {
 		
 		await page.getByRole('button',{name:locale==='zh'?'设置':'Settings',exact:true}).first().click();
 		await page.getByText(locale==='zh'?'所有设置':'All settings',{exact:true}).click();
-		await page.getByText(locale==='zh'?'原生 MCP':'Native MCP',{exact:true}).first().click();
-		await page.locator('.native-mcp-panel textarea').last().waitFor();
-		await page.locator('.native-mcp-panel').getByRole('button',{name:locale==='zh'?'官方连接状态':'Official connection status'}).click();
-		await page.waitForTimeout(250);
-		assert(!await page.locator('.native-mcp-panel [role="alert"]').count(),(await page.locator('.native-mcp-panel [role="alert"]').allTextContents()).join("; "));
-		await page.locator('.native-mcp-panel input').first().fill(`fixture-${locale}`);
-		await page.locator('.native-mcp-panel input').nth(1).fill('echo');
-		await page.locator('.native-mcp-panel input[type=checkbox]').uncheck();
-		await page.getByRole('button',{name:locale==='zh'?'加入配置草稿':'Add to draft'}).click();
-		assert((await page.locator('.native-mcp-panel textarea').last().inputValue()).includes(`"fixture-${locale}"`));
-		await page.locator('.native-mcp-panel').getByRole('button',{name:locale==='zh'?'保存':'Save',exact:true}).click();
-		await page.locator('.native-mcp-panel code').filter({hasText:`fixture-${locale}`}).waitFor();
+		await page.getByText(locale==='zh'?'MCP 与 Codemode':'MCP & Codemode',{exact:true}).first().click();
+		await page.getByRole('button',{name:locale==='zh'?'+ 新建服务':'+ New server',exact:true}).click();
+		await page.locator('.mcp-editor input').fill(`fixture-${locale}`);
+		await page.locator('.mcp-editor textarea').fill(JSON.stringify({command:'echo',enabled:false}));
+		await page.locator('.mcp-editor').getByRole('button',{name:locale==='zh'?'更新配置草稿':'Update draft'}).click();
+		await page.locator('.mcp-save-row').getByRole('button',{name:locale==='zh'?'保存并应用':'Save and apply'}).click();
+		await page.waitForFunction(() => document.querySelector('.mcp-save-row button')?.disabled);
+		await page.locator('.mcp-server-toggle strong').filter({hasText:`fixture-${locale}`}).waitFor();
+		assert(!await page.locator('.native-mcp-panel [role="alert"]').count(),(await page.locator('.native-mcp-panel [role="alert"]').allTextContents()).join('; '));
+		await page.screenshot({path:`tests/scratch/codemode-mcp-${locale}.png`,fullPage:true});
 		assert.deepEqual(errors,[]); await page.close();
 	}
 	console.log('PASS Chinese/English image and native MCP views, keyboard fields and desktop narrow viewport');

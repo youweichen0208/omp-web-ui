@@ -1,3 +1,5 @@
+import { parseNativeMcpStatus } from "./native-mcp-presentation.js";
+import { codemodeDetails } from "./codemode-presentation.js";
 import { NativeMcpConfigService } from "./native-mcp-config.js";
 
 import type { ClientMessage } from "./protocol.js";
@@ -403,6 +405,7 @@ export class ClientSession {
 		return this.conv.runtime;
 	}
 	/** Session of the active conversation. */
+	get conversationId(): string { return this.activeId; }
 	get session(): AgentSession {
 		return this.conv.session;
 	}
@@ -471,6 +474,7 @@ export class ClientSession {
 	/** Web-facing extension UI context (widgets, notifications). */
 	sendImageMessage(message: ServerMessage): void { this.emit(message); }
 	private pendingMcpReload = new Set<string>();
+	private mcpStatus = new WeakMap<AgentSession, { text: string; pending: boolean }>();
 	private async reloadMcpConversation(conv: Conversation): Promise<void> {
 		const trust = new NativeMcpConfigService().isTrusted(conv.cwd);
 		conv.session.settingsManager.setProjectTrusted(trust);
@@ -479,9 +483,11 @@ export class ClientSession {
 	}
 	async nativeMcpRequest(msg: Extract<ClientMessage, { type: "native_mcp_request" }>): Promise<void> {
 		const config = new NativeMcpConfigService();
+		const requestSession = this.session;
 		try {
 			if (msg.cwd !== this.cwd || this.switchingWorkspace) throw new Error("Workspace unavailable");
 			if (this.isQuiesced() && msg.action !== "get") throw new Error("Service draining");
+			if (msg.action === "codemode") config.saveCodemode(this.cwd, msg.scope, msg.version ?? "", msg.codemode);
 			if (msg.action === "save") config.save(this.cwd, msg.scope, msg.version ?? "", msg.document ?? {});
 			if (msg.action === "trust") config.trust(this.cwd);
 			if (msg.action === "radius") {
@@ -502,7 +508,7 @@ export class ClientSession {
 				if (msg.name && !/^[\w.-]+$/.test(msg.name)) throw new Error("Invalid server name");
 				await command.handler(msg.command === "status" ? "" : `${msg.command ?? ""} ${msg.name ?? ""}`, runner!.createCommandContext());
 			}
-			if (["save","trust","radius"].includes(msg.action)) {
+			if (["save","trust","radius","codemode"].includes(msg.action)) {
 				for (const cs of ClientSession.liveClients.values()) {
 					for (const conv of cs.convs.values()) {
 						if (msg.scope === "project" && msg.action !== "radius" && conv.cwd !== msg.cwd) continue;
@@ -511,7 +517,28 @@ export class ClientSession {
 					}
 				}
 			}
-			this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, state: config.get(msg.cwd,msg.scope), pending: [...ClientSession.liveClients.values()].some(cs => cs.pendingMcpReload.size > 0), tools: this.session.getAllTools().map(tool => tool.name).filter(n => n.startsWith("mcp__")) });
+			if (this.cwd !== msg.cwd || this.session !== requestSession || this.switchingWorkspace) throw new Error("Workspace or conversation changed");
+			const session = requestSession;
+			const runner = session.extensionRunner;
+			const command = runner?.getCommand("mcp");
+			let cached = this.mcpStatus.get(session);
+			if (!cached) { cached = { text: "", pending: false }; this.mcpStatus.set(session, cached); }
+			if (command && /^(builtin:mcp|<inline:mcp>)$/.test(command.sourceInfo.path) && !cached.pending) {
+				// Official /mcp waits for startup connections. Never block the settings reply on it.
+				const context = runner!.createCommandContext(), target = cached;
+				target.pending = true;
+				void Promise.resolve(command.handler("", { ...context, mode: "rpc", ui: { ...context.ui, notify: (text: string) => { target.text = text; } } }))
+					.catch(error => { target.text = String(error); }).finally(() => { target.pending = false; });
+			}
+			const statusText = cached.text;
+			const tools = session.getAllTools().filter(tool => tool.name.startsWith("mcp__"));
+			this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, state: config.get(msg.cwd,msg.scope),
+				pending: [...ClientSession.liveClients.values()].some(cs => cs.pendingMcpReload.size > 0), tools: tools.map(tool => tool.name),
+				toolInfo: tools.map(tool => ({ name: tool.name, exposure: tool.exposure, description: tool.description.slice(0, 2000), readOnly: tool.annotations?.readOnlyHint, destructive: tool.annotations?.destructiveHint })),
+				servers: parseNativeMcpStatus(statusText), statusText,
+				codemode: config.codemode(msg.cwd, msg.scope, session.settingsManager.getSettings().codemode),
+				...(msg.action === "log" ? { log: config.log() } : {}),
+			});
 		} catch (error) { this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, error: (error as Error).message }); }
 	}
 	get imageModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
@@ -954,7 +981,8 @@ export class ClientSession {
 			}
 			case "tool_execution_update": {
 				const update = toolOutputUpdate(event.partialResult);
-				if (update) {
+				const codemode = event.toolName === "codemode" ? codemodeDetails((event.partialResult as { details?: unknown })?.details) : undefined;
+				if (update || codemode) {
 					this.emit({
 						type: "tool_delta",
 						parentToolCallId: event.parentToolCallId,
@@ -962,7 +990,9 @@ export class ClientSession {
 						seq: ++conv.deltaSeq,
 						toolCallId: event.toolCallId,
 						toolName: event.toolName,
+						delta: "",
 						...update,
+						codemode,
 					});
 				}
 				break;
@@ -1719,6 +1749,7 @@ export class ClientSession {
 		 */
 		queue = false,
 		requestId?: string,
+		onAccepted?: (ok: boolean) => void,
 	): Promise<void> {
 		const conv = this.conv;
 		let acknowledged = false;
@@ -1726,6 +1757,7 @@ export class ClientSession {
 			if (acknowledged) return;
 			acknowledged = true;
 			if (requestId) this.emit({ type: "prompt_result", requestId, ok });
+			onAccepted?.(ok);
 		};
 		try {
 			const s = conv.session;

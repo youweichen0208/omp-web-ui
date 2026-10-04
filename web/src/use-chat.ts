@@ -1,3 +1,4 @@
+import type { UiMessage } from "./types";
 import { mergeLiveToolOutput } from "./live-tool-output";
 import { useCallback, useEffect, useReducer, useRef, useState, useMemo } from "react";
 import { ProjectCache } from "./project-cache";
@@ -66,7 +67,7 @@ export interface ChatState {
 	ready: boolean;
 	state: UiState | null;
 	/** Live tool output accumulated from tool_delta messages, keyed by toolCallId. */
-	liveOutputs: Map<string, { toolName: string; text: string }>;
+	liveOutputs: Map<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
 	/**
 	 * Tools that FINISHED executing (tool_status from tool_execution_end), keyed
 	 * by toolCallId. Lets the card show "done · waiting for the model" even
@@ -219,7 +220,7 @@ type Action =
 	| { type: "snapshot"; state: UiState }
 	| { type: "snapshot_delta"; msg: Extract<ServerMessage, { type: "snapshot_delta" }> }
 	| { type: "protocol_mismatch" }
-	| { type: "tool_delta"; toolCallId: string; toolName: string; delta: string; replace?: boolean }
+	| { type: "tool_delta"; toolCallId: string; toolName: string; delta: string; replace?: boolean; codemode?: UiMessage["codemode"] }
 	| { type: "message_delta"; msg: MessageDeltaMsg }
 	| { type: "tool_status"; status: ToolStatus }
 	| { type: "notice"; notice: Notice }
@@ -380,9 +381,9 @@ function makeTerminalBridge() {
 }
 
 function pruneLiveOutputs(
-	live: Map<string, { toolName: string; text: string }>,
+	live: Map<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>,
 	state: UiState,
-): Map<string, { toolName: string; text: string }> {
+): Map<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }> {
 	const completed = new Set<string>();
 	for (const m of state.messages) {
 		if (m.role === "toolResult" && m.toolCallId) completed.add(m.toolCallId);
@@ -500,6 +501,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 			liveOutputs.set(action.toolCallId, {
 				toolName: action.toolName,
 				text: capped,
+				codemode: action.codemode ?? prev?.codemode,
 			});
 			return { ...state, liveOutputs };
 		}
@@ -992,6 +994,7 @@ export function useChat() {
 						toolName: msg.toolName,
 						delta: msg.delta,
 						replace: msg.replace,
+						codemode: msg.codemode,
 					});
 					break;
 				case "tool_status":

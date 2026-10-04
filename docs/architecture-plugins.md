@@ -99,3 +99,23 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 配置变化对所有已加载会话应用：空闲会话立即 reload，运行会话按 conversationId 延迟到 agent_settled。连接状态、登录、退出、重连执行 sourceInfo 属于 builtin:mcp 的官方命令；替换命令明确不可用。OAuth 链接以 HTTP(S) 链接显示，回调输入/取消走扩展 dialog；重连重放待答 dialog。旧桥保持 data-dir/mcp.json 独立配置。
 
 界面插件只提供 Web 展示及用户交互，不向代理注册工具、斜杠命令或提示词。代理扩展和 MCP 由 pi 原生配置加载。
+
+### Pi 1.0.1 MCP / Codemode 工作台
+
+设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全球/项目范围分别使用自己的文件版本；新增、导入、启停、暴露方式、单工具覆盖和高级 JSON 都先进入草稿，再明确保存。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
+
+1.0.1 的项目覆盖允许 `.pi/mcp.json` 中只写 `enabled`、`exposure`、`toolExposure`，沿用同名全局服务器的连接和凭据。Web 服务按 SDK 的规则校验覆盖，不复制凭据、不隐式授予项目信任。项目范围中可以为当前运行的全局服务器新增启停覆盖。
+
+官方 `/mcp` 在 RPC 模式输出连接状态，但会等待首次后台连接完成。Web 以每会话缓存、单飞查询适配此接口：配置立即返回，浏览器每 3 秒刷新；首次尚无状态时显示连接中，不阻塞输入。连接完成后使用官方状态，不从工具数量推断成功。完整原生诊断可展开；SDK 未提供结构化的额外 scope 状态，因此统一显示「需要登录」，不会猜测请求的权限。登录/退出/重连仍调用官方命令，远程 OAuth 回调与取消走原生 WebUI dialog。工具名称、annotations 和实际 exposure 来自 `session.getAllTools()`；单工具覆盖另写原生 `toolExposure`。
+
+`codemode.mode`、`codemode.inlineBudget` 写入对应范围的 `settings.json`，保留未知字段并独立校验文件版本；界面显示当前会话实际生效值。`autoEnableCodemode` 写在 `mcp.json`，不代替 `defaultTools`，关闭自动启用不会关闭已经启用的工具。全部变更复用运行中会话的 `agent_settled` 延后 reload。`mcp.log` 按用户点击读取末尾 32,000 字符。
+
+### 原生 Codemode 卡片
+
+`server/codemode-presentation.ts` 对 SDK `CodemodeToolDetails` 做展示字段白名单：calls（含模型调用）、status、durationMs、cost、error、fullOutputPath。完成记录随 `UiMessage.codemode` 下发，执行中随 `tool_delta.codemode` 下发；不向模型加入任何消息。每张卡最多传输 256 条调用，保留实际总数并提示省略；默认展示最后 8 条，可展开其余已传输调用。旧 transcript 没有 details 时回退到 `nestedCalls`。
+
+卡片提供调用／脚本／输出页签，费用仅汇总 SDK 实际报告的值；没有费用时不显示虚构的 $0。脚本错误保留输出及调用列表，并提示已执行调用不会撤销。1.0.1 在输出超过 16 Mi 字符或 100,000 项时失败；界面原样呈现 SDK 错误。`max_output_tokens` 导致文本截断时，仅展示 SDK 实际提供的 `fullOutputPath`，不假定每种失败都有完整输出文件。
+
+图片保持原生结果的 data URL；「附加到下一条消息」使用现有图片附件路径，用户发送前不进入上下文。「保存到当前目录」走鉴权及同源保护的 `/api/codemode-image`，校验活动工作区与图片签名，以随机文件名、`wx` 创建，不覆盖已有文件；单张保存上限 6 MiB。保存是用户文件操作，不注册额外工具，也不把生成结果自动注入下一轮。图片超过此保存上限时仍可使用浏览器图片下载。
+
+验证：`codemode-mcp-test.mjs`（9204/9205、隔离配置和工作区、本地 mock 模型）验证真实 SDK 状态、凭据掩码、CAS、项目覆盖、配置生效、实时调用、部分失败、输出限制和图片安全；加 `--browser` 校验实际卡片、图片操作及设置交互。`native-tools-desktop-test.mjs` 覆盖 Node/Electron 的原生工具执行，`native-features-browser-test.mjs` 覆盖历史回退及 OAuth 界面。相关纯函数测试在 `tests/unit/codemode-presentation.test.ts`。

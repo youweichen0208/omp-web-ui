@@ -25,7 +25,7 @@
  *     不受影响）。
  */
 
-import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, Notification, ipcMain } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, Notification, ipcMain, shell } from "electron";
 import { fork } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
@@ -295,6 +295,21 @@ ipcMain.handle("pi-window-action", (event, action) => {
 			break;
 		case "close": win.close(); break;
 	}
+});
+// The renderer supplies workspace identity, never an arbitrary executable path.
+// Ask our authenticated server to resolve the active workspace's file first.
+ipcMain.handle("pi-wiki-open-file", async (event, request) => {
+	const win = mainWindow;
+	if (!win || win.isDestroyed() || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) throw new Error("Forbidden");
+	if (!request || ![request.clientId, request.cwd, request.path].every(value => typeof value === "string")) throw new Error("Invalid file request");
+	const response = await fetch(`http://127.0.0.1:${serverPort}/api/wiki`, {
+		method: "POST", headers: { "Content-Type": "application/json", ...(process.env.PI_WEB_TOKEN ? { Authorization: `Bearer ${process.env.PI_WEB_TOKEN.trim()}` } : {}) },
+		body: JSON.stringify({ clientId: request.clientId, cwd: request.cwd, path: request.path, action: "open-info" }),
+	});
+	const result = await response.json();
+	if (!response.ok || typeof result.absolute !== "string") throw new Error(result.error || "Unable to open file");
+	const error = await shell.openPath(result.absolute);
+	if (error) throw new Error(error);
 });
 ipcMain.handle("pi-window-state-read", (event) => {
 	const win = mainWindow;

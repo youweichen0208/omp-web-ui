@@ -1,3 +1,4 @@
+import { codemodeDetails } from "./codemode-presentation.js";
 /**
  * Serializes pi SDK AgentMessage[] into the browser-friendly UiMessage[] shape
  * defined in protocol.ts. Keeps payloads bounded (tool outputs and text blocks
@@ -139,6 +140,7 @@ export function serializeMessage(
 				...(nestedCalls ? { nestedCalls: { complete: nestedComplete, calls: nestedCalls } } : {}),
 				toolCallId: m.toolCallId,
 				toolName: m.toolName,
+				...(m.toolName === "codemode" ? { codemode: codemodeDetails(m.details) } : {}),
 				isError: m.isError,
 				...(todo ? { todoSnapshot: {
 					action: typeof todo.action === "string" ? todo.action : undefined,

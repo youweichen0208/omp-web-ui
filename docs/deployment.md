@@ -65,7 +65,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
-- 桌面 Pi SDK 精确锁定为 1.0.0；终端 `pi update` 只更新外部 CLI。
+- 桌面 Pi SDK 精确锁定为 1.0.1；终端 `pi update` 只更新外部 CLI。
 - 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块。
 
 - 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
@@ -118,6 +118,10 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使用打包后的 Electron 加载懒加载 provider 并启动包内服务端）及 `tests/portable-relaunch-test.ps1`（首次启动、重复打开、原进程存活及模块保留），通过后才上传安装包；这些检查失败会阻断 Windows 发布。手动运行 `Verify Windows desktop build` 时传入 `release_tag`，可直接验证已发布的 ZIP、NSIS 和便携 EXE，无需重新构建。
 
-### Pi 1.0.0 原版 SDK
+### Pi 1.0.1 原版 SDK
 
-不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.0。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.1。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。
+
+### Wiki 文件与 PDF
+
+Wiki 的 PDF.js 依赖和 `wiki-pdf-worker` 随服务打包。PDF 解析复用桌面 Node 子进程环境，具体限制见 [Wiki 架构](architecture-wiki.md)。沙箱 preload 新增固定 `openWikiFile` 方法：主进程使用 clientId/cwd/path 向本机服务验证当前文件，再通过系统默认应用打开；渲染进程不直接传任意可执行路径。

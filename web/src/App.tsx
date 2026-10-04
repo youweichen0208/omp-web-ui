@@ -1,4 +1,5 @@
 import { LinkedText } from "./components/LinkedText";
+import { WikiWorkbench } from "./components/WikiWorkbench";
 import { ImageWorkbench } from "./components/ImageWorkbench";
 
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
@@ -203,7 +204,7 @@ function ResizeHandle({
 }
 
 /** 顶栏视图：内置三个 + 每个已装插件一个 `plugin:<id>`。 */
-type ViewName = "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
+type ViewName = "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
 
 export function App() {
 	const t = useT();
@@ -257,9 +258,11 @@ export function App() {
 		if (!switching && chat.state?.cwd && previewFile && previewFile.cwd !== chat.state.cwd) setPreviewFile(null);
 	}, [switching, chat.state?.cwd, previewFile]);
 	const fileGuard = useRef<FileNavigationGuard | null>(null);
+	const wikiGuard = useRef<((next: () => void) => void) | null>(null);
 	const send = useCallback((message: ClientMessage) => {
-		const navigation = message.type === "set_cwd" || message.type === "switch_session" ||
+		const navigation = message.type === "switch_conversation" || message.type === "new_chat" || message.type === "set_cwd" || message.type === "switch_session" ||
 			(message.type === "prompt" && /^\/cwd(?:\s|$)/.test(message.text));
+		if (navigation && wikiGuard.current) { wikiGuard.current(() => { rawSend(message); }); return false; }
 		if (navigation && fileGuard.current) {
 			setView("chat");
 			setDrawer("right");
@@ -472,13 +475,13 @@ export function App() {
 	// Ctrl+K / Cmd+K opens global search (also reachable via the topbar button).
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
+			if (view === "wiki" || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
 			e.preventDefault();
 			setGlobalSearchOpen((v) => !v);
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, []);
+	}, [view]);
 
 	// -- sound notifications --------------------------------------------------
 	const [sound, setSound] = useState<SoundSettings>(loadSoundSettings);
@@ -593,13 +596,14 @@ export function App() {
 		const onNewChat = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "n") {
 				event.preventDefault();
+				if (wikiGuard.current) { wikiGuard.current(() => { setView("chat"); rawSend({ type: "new_chat" }); }); return; }
 				setView("chat");
 				panelSend({ type: "new_chat" });
 			}
 		};
 		window.addEventListener("keydown", onNewChat);
 		return () => window.removeEventListener("keydown", onNewChat);
-	}, [panelSend]);
+	}, [panelSend, rawSend]);
 
 	// -- pasted / dropped / uploaded images (no workspace path) ---------------
 	const pasteImageId = useRef(0);
@@ -712,6 +716,17 @@ export function App() {
 	const removeAttachmentCb = useCallback(removeAttachment, []);
 	const addImageFilesCb = useCallback(addImageFiles, [addImageFiles]);
 	const addLocalFilesCb = useCallback(addLocalFiles, [addLocalFiles]);
+	useEffect(() => {
+		const attach = (event: Event) => {
+			const { cwd, file, complete } = (event as CustomEvent<{ cwd: string; file: File; complete: (ok: boolean) => void }>).detail;
+			if (cwd !== chat.state?.cwd || !(file instanceof File)) { complete(false); return; }
+			const owner = chat.activeConversationId;
+			void fileToProcessedImage(file).then(image => { if (image) attachImage(image, owner); complete(!!image); }).catch(() => complete(false));
+		};
+		window.addEventListener("pi-codemode-attach", attach);
+		return () => window.removeEventListener("pi-codemode-attach", attach);
+	}, [chat.state?.cwd, chat.activeConversationId, addImageFilesCb]);
+
 
 	// Narrow snapshot of the model/thinking fields for the memoized ChatInput →
 	// ModelThinking chain; identity is stable while tokens stream in.
@@ -769,7 +784,7 @@ export function App() {
 		// navigating away; children with their own handlers (input bar / edit
 		// composer) call stopPropagation and keep priority.
 		<div
-			className={`app design-workspace ${leftCollapsed ? "left-collapsed" : ""} ${previewFile && view === "chat" ? "document-open" : ""}`}
+			className={`app design-workspace ${view === "wiki" ? "wiki-mode" : ""} ${leftCollapsed ? "left-collapsed" : ""} ${previewFile && view === "chat" ? "document-open" : ""}`}
 			style={{ "--left-w": `${leftWidth}px`, "--right-w": `${rightWidth}px` } as CSSProperties}
 			onDragOver={(e) => {
 				if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
@@ -802,7 +817,7 @@ export function App() {
 					<span>📎 {t("dropHereToAttach")}</span>
 				</div>
 			)}
-			{view !== "nodes" && <div
+			{view !== "nodes" && view !== "wiki" && <div
 				className={`panel-drawer drawer-left ${drawer === "left" ? "open" : ""}`}
 			>
 				<LeftPanel
@@ -821,7 +836,7 @@ export function App() {
 					activeConversationId={chat.activeConversationId}
 				/>
 			</div>}
-			{view !== "nodes" && !isMobile && !leftCollapsed && (
+			{view !== "nodes" && view !== "wiki" && !isMobile && !leftCollapsed && (
 				<ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />
 			)}
 
@@ -843,8 +858,10 @@ export function App() {
 						if (terminalOpenRequested.current && createShell()) {
 							terminalOpenRequested.current = false;
 						}
-						setView(v);
-						setDrawer(null);
+						const changeView = () => { setView(v); setDrawer(null); };
+						if (view === "wiki" && wikiGuard.current) wikiGuard.current(changeView);
+						else if (v === "wiki" && fileGuard.current) fileGuard.current(changeView);
+						else changeView();
 					}}
 					onOpenPanel={(side) => {
 						if (side === "left" && !isMobile) {
@@ -989,6 +1006,7 @@ export function App() {
 							)}
 						</div>
 					</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} messages={conversationState.messages} streaming={conversationState.isStreaming} active={view === "wiki"} ready={chat.ready && !switching} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

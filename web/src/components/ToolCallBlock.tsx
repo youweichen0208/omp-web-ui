@@ -1,3 +1,4 @@
+import { CodemodeCard } from "./CodemodeCard";
 
 
 import { commandPresentation, gitStatusLine, gitStatusSummary, numberedOutputLine, differentCommandDirectory, searchOutputKind, isLikelyErrorLine, selectVisibleOutputLines, displayBashCommand } from "../bash-presentation";
@@ -18,6 +19,7 @@ import { displayReadPath, readPath, splitFrontmatter } from "../read-presentatio
 import { bashCommand, parseBashDiagnostics, parseLabeledBashSteps, type BashStepRun } from "../bash-steps";
 
 export interface ToolView {
+	codemode?: UiMessage["codemode"];
 	nestedCalls?: UiMessage["nestedCalls"];
 	/** Tool result message if the tool already finished. */
 	result?: UiMessage;
@@ -264,7 +266,7 @@ type ToolCallBlockProps = {
 
 export const ToolCallBlock = memo(function ToolCallBlock(props: ToolCallBlockProps) {
 
-	return props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
+	return props.block.name === "codemode" ? <CodemodeCard {...props} /> : props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
 });
 
 function TodoCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {

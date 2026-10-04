@@ -1,0 +1,229 @@
+import { createHash, randomUUID } from "node:crypto";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
+import { decodeText, looksLikeText, previewKind } from "./text-sniff.js";
+import { wikiMetadata, wikiReferences, resolveWikiLink } from "./wiki-links.js";
+import { readWikiPdf } from "./wiki-pdf.js";
+import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory } from "./protocol.js";
+
+const MAX_FILE = 2 * 1024 * 1024;
+const MAX_SNAPSHOT = 64 * 1024 * 1024;
+const IGNORED = new Set([".git", "node_modules", ".pi-web", ".DS_Store"]);
+const hash = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
+type Snapshot = { files: Map<string, Buffer>; skipped: string[]; limited?: boolean };
+type StoredRevision = WikiRevision & { blobs: Record<string, { before: string | null; after: string | null }> };
+
+/** Resolve real paths, including every existing parent of a new file. */
+export function wikiPath(cwd: string, path: string): string {
+	if (typeof path !== "string" || path.includes("\0") || path.length > 4096) throw new Error("Invalid path");
+	const root = realpathSync(cwd), absolute = resolve(root, path);
+	const inside = (p: string) => { const r = relative(root, p); return r !== ".." && !r.startsWith(`..${sep}`) && !/^[A-Za-z]:/.test(r) && !r.startsWith(sep); };
+	if (!inside(absolute)) throw new Error("Path outside workspace");
+	let p = absolute;
+	while (p !== root) {
+		if (existsSync(p)) { if (!inside(realpathSync(p))) throw new Error("Path outside workspace"); break; }
+		// A dangling symlink must never be treated as an absent regular file.
+		try { if (lstatSync(p).isSymbolicLink()) throw new Error("Invalid symbolic link"); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
+		p = dirname(p);
+	}
+	return absolute;
+}
+function kindOf(path: string, text: boolean): WikiEntry["kind"] {
+	if (/\.(md|markdown|txt)$/i.test(path)) return "document";
+	if (/\.pdf$/i.test(path)) return "pdf";
+	if (previewKind(path) === "image") return "image";
+	return text || previewKind(path) === "text" ? "code" : "other";
+}
+export class WikiService {
+	private active = new Set<string>();
+	private cache = new Map<string, { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean }>();
+	constructor(private dataDir: string) { mkdirSync(dataDir, { recursive: true }); }
+	private key(cwd: string) { return hash(realpathSync(cwd)); }
+	private folder(cwd: string) { const dir = join(this.dataDir, this.key(cwd)); mkdirSync(join(dir, "blobs"), { recursive: true }); return dir; }
+	busy(cwd: string) { return this.active.has(this.key(cwd)); }
+	invalidate(cwd: string) { this.cache.delete(this.key(cwd)); }
+	private history(cwd: string): StoredRevision[] {
+		const file = join(this.folder(cwd), "history.json");
+		return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
+	}
+	private persist(cwd: string, records: StoredRevision[]) {
+		records = records.slice(-100);
+		let total = 0;
+		for (let i = records.length - 1; i >= 0; i--) {
+			const bytes = Object.values(records[i].blobs).flatMap(b => [b.before, b.after]).reduce((sum, id) => sum + (id ? statSync(join(this.folder(cwd), "blobs", id)).size : 0), 0);
+			if (i < records.length - 1 && total + bytes > 128 * 1024 * 1024) { records = records.slice(i + 1); break; }
+			total += bytes;
+		}
+		const file = join(this.folder(cwd), "history.json"), temporary = file + ".tmp";
+		writeFileSync(temporary, JSON.stringify(records.slice(-100)), { mode: 0o600 }); renameSync(temporary, file);
+		// Retain only blobs referenced by the latest 100 requests.
+		const retained = new Set(records.slice(-100).flatMap(r => Object.values(r.blobs).flatMap(b => [b.before, b.after]).filter(Boolean)));
+		for (const name of readdirSync(join(this.folder(cwd), "blobs"))) if (!retained.has(name)) rmSync(join(this.folder(cwd), "blobs", name), { force: true });
+	}
+	async index(cwd: string, fresh = false) {
+		const key = this.key(cwd), cached = this.cache.get(key);
+		if (!fresh && cached && Date.now() - cached.at < 3000) return cached;
+		const entries: WikiEntry[] = [], texts = new Map<string, string>();
+		let limited = false, bytes = 0;
+		const walk = async (path: string, depth: number) => {
+			if (entries.length >= 20000 || depth > 32) { limited = true; return; }
+			let children;
+			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); } catch { limited = true; return; }
+			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+			for (const child of children) {
+				if (IGNORED.has(child.name)) continue;
+				if (entries.length >= 20000) { limited = true; break; }
+				const p = path ? `${path}/${child.name}` : child.name;
+				try {
+					const abs = wikiPath(cwd, p);
+					if (realpathSync(abs) === realpathSync(this.dataDir)) continue;
+					const info = await stat(abs);
+					if (info.isDirectory()) { entries.push({ path: p, name: child.name, kind: "directory", size: 0, modified: info.mtimeMs, tags: [], symlink: child.isSymbolicLink() }); if (!child.isSymbolicLink()) await walk(p, depth + 1); continue; }
+					if (!info.isFile()) continue;
+					let text: string | undefined;
+					if (info.size <= MAX_FILE && bytes + info.size <= MAX_SNAPSHOT) {
+						const data = await readFile(abs); bytes += data.length;
+						if (!/\.pdf$/i.test(p) && previewKind(p) !== "image" && looksLikeText(data)) { text = decodeText(data); texts.set(p, text); }
+					} else limited = true;
+					const metadata = text === undefined ? { tags: [] } : wikiMetadata(text);
+					entries.push({ path: p, name: child.name, kind: kindOf(p, text !== undefined), size: info.size, modified: info.mtimeMs, tags: metadata.tags, title: "title" in metadata ? metadata.title : undefined });
+				} catch { limited = true; }
+			}
+		};
+		await walk("", 0);
+		const result = { at: Date.now(), entries, texts, limited };
+		if (this.cache.size >= 8) this.cache.delete(this.cache.keys().next().value!);
+		this.cache.set(key, result); return result;
+	}
+	async directory(cwd: string, path: string, offset = 0): Promise<WikiDirectory> {
+		if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000) throw new Error("Invalid directory offset");
+		const children = (await readdir(wikiPath(cwd, path), { withFileTypes: true })).filter(e => !IGNORED.has(e.name));
+		children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+		const known = new Map(this.cache.get(this.key(cwd))?.entries.map(e => [e.path, e]));
+		const entries: WikiEntry[] = [];
+		for (const child of children.slice(offset, offset + 500)) {
+			const p = path ? `${path}/${child.name}` : child.name;
+			try {
+				const absolute = wikiPath(cwd, p);
+				if (realpathSync(absolute) === realpathSync(this.dataDir)) continue;
+				const info = await stat(absolute);
+				entries.push(known.get(p) ?? { path: p, name: child.name, kind: info.isDirectory() ? "directory" : kindOf(p, false), size: info.size, modified: info.mtimeMs, tags: [], symlink: child.isSymbolicLink() });
+			} catch { /* Unreadable or outside-workspace symlinks are omitted. */ }
+		}
+		return { path, entries, ...(offset + 500 < children.length ? { nextOffset: offset + 500 } : {}) };
+	}
+	async state(cwd: string): Promise<WikiState> {
+		const index = await this.index(cwd), counts = new Map<string, number>();
+		for (const entry of index.entries) for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+		return { entries: index.entries, tags: [...counts].map(([name, count]) => ({ name, count })), revisions: this.history(cwd).reverse().map(({ blobs: _blobs, ...r }) => r), running: this.busy(cwd), limited: index.limited };
+	}
+	async document(cwd: string, path: string): Promise<WikiDocument> {
+		const abs = wikiPath(cwd, path), size = statSync(abs).size;
+		if (!statSync(abs).isFile()) throw new Error("Not a file");
+		const data = size <= MAX_FILE ? readFileSync(abs) : undefined;
+		const text = data && !/\.pdf$/i.test(path) && previewKind(path) !== "image" && looksLikeText(data) ? decodeText(data) : undefined;
+		const metadata = wikiMetadata(text ?? "");
+		const index = await this.index(cwd), paths = index.entries.map(e => e.path);
+		const backlinks = [...index.texts].flatMap(([source, body]) => source === path ? [] : wikiReferences(body).filter(ref => resolveWikiLink(source, ref.target, paths) === path).map(ref => ({ path: source, snippet: ref.snippet, line: ref.line })));
+		return { entry: { path, name: basename(path), size, modified: statSync(abs).mtimeMs, kind: kindOf(path, text !== undefined), tags: metadata.tags, title: metadata.title }, text, version: data ? hash(data) : "", editable: text !== undefined && Buffer.from(text).equals(data!), backlinks };
+	}
+	async search(cwd: string, query: string): Promise<{ results: WikiSearchResult[]; limited: boolean }> {
+		const index = await this.index(cwd), q = query.trim().toLocaleLowerCase().slice(0, 200);
+		if (!q) return { results: [], limited: index.limited };
+		const results: WikiSearchResult[] = []; let limited = index.limited, pdfs = 0;
+		for (const entry of index.entries) {
+			if (entry.kind === "directory") continue;
+			if (results.length >= 100) { limited = true; break; }
+			const body = index.texts.get(entry.path);
+			const lines = body?.split(/\r?\n/) ?? [];
+			let matches = 0;
+			for (let line = 0; line < lines.length && matches < 3; line++) {
+				const at = lines[line].toLocaleLowerCase().indexOf(q); if (at < 0) continue;
+				results.push({ path: entry.path, kind: entry.kind, line: line + 1, snippet: lines[line].slice(Math.max(0, at - 65), at + q.length + 100) }); matches++;
+			}
+			if (!matches && entry.path.toLocaleLowerCase().includes(q)) { results.push({ path: entry.path, kind: entry.kind, line: 1, snippet: lines.find(l => l.trim())?.slice(0, 160) ?? entry.name }); matches++; }
+			if (entry.kind === "pdf" && !matches) {
+				if (++pdfs > 8 || entry.size > 20 * 1024 * 1024) { limited = true; continue; }
+				try {
+					const pages = await readWikiPdf(wikiPath(cwd, entry.path));
+					for (let i = 0; i < pages.length; i++) { const at = pages[i].toLocaleLowerCase().indexOf(q); if (at >= 0) { results.push({ path: entry.path, kind: "pdf", line: 1, page: i + 1, snippet: pages[i].slice(Math.max(0, at - 65), at + q.length + 100) }); break; } }
+				} catch { limited = true; }
+			}
+		}
+		return { results: results.slice(0, 100), limited };
+	}
+	private async snapshot(cwd: string): Promise<Snapshot> {
+		const index = await this.index(cwd, true), files = new Map<string, Buffer>(), skipped: string[] = [];
+		let size = 0;
+		if (index.limited) skipped.push("Index limits reached; some files are not tracked");
+		for (const entry of index.entries) {
+			if (entry.kind === "directory") continue;
+			if (entry.size > MAX_FILE || size + entry.size > MAX_SNAPSHOT) { skipped.push(entry.path); continue; }
+			try { const abs = wikiPath(cwd, entry.path); if (lstatSync(abs).isSymbolicLink()) { skipped.push(entry.path); continue; } const data = await readFile(abs); files.set(entry.path, data); size += data.length; } catch { skipped.push(entry.path); }
+		}
+		return { files, skipped, limited: index.limited };
+	}
+	private record(cwd: string, before: Snapshot, after: Snapshot, author: "pi" | "user", title: string) {
+		const blobs: StoredRevision["blobs"] = {}, changes: WikiChange[] = [], skipped = [...new Set([...before.skipped, ...after.skipped])];
+		const put = (data: Buffer | undefined) => { if (!data) return null; const id = hash(data); writeFileSync(join(this.folder(cwd), "blobs", id), data, { mode: 0o600 }); return id; };
+		for (const path of new Set([...before.files.keys(), ...after.files.keys()])) {
+			if (skipped.includes(path)) continue;
+			const a = before.files.get(path), b = after.files.get(path);
+			if ((!a && before.limited) || (!b && existsSync(wikiPath(cwd, path)))) { skipped.push(path); continue; }
+			if (a?.equals(b ?? Buffer.alloc(0)) && b !== undefined) continue;
+			const binary = /\.pdf$/i.test(path) || previewKind(path) === "image" || !!((a && !looksLikeText(a)) || (b && !looksLikeText(b)));
+			const old = a ? decodeText(a) : null, next = b ? decodeText(b) : null;
+			const oldLines = new Set(old?.split("\n") ?? []), newLines = new Set(next?.split("\n") ?? []);
+			changes.push({ path, before: binary ? null : old?.slice(0, 4000) ?? null, after: binary ? null : next?.slice(0, 4000) ?? null, truncated: (old?.length ?? 0) > 4000 || (next?.length ?? 0) > 4000, binary, undone: false, additions: [...newLines].filter(l => !oldLines.has(l)).length, deletions: [...oldLines].filter(l => !newLines.has(l)).length });
+			blobs[path] = { before: put(a), after: put(b) };
+		}
+		if (changes.length || skipped.length) this.persist(cwd, [...this.history(cwd), { id: randomUUID(), at: Date.now(), author, title: title.slice(0, 300), changes, blobs, skipped }]);
+		this.invalidate(cwd);
+	}
+	async begin(cwd: string): Promise<Snapshot> {
+		const key = this.key(cwd); if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
+		this.active.add(key);
+		try { return await this.snapshot(cwd); } catch (e) { this.active.delete(key); throw e; }
+	}
+	async finish(cwd: string, before: Snapshot, title: string) {
+		try { this.record(cwd, before, await this.snapshot(cwd), "pi", title); } finally { this.active.delete(this.key(cwd)); }
+	}
+	cancel(cwd: string) { this.active.delete(this.key(cwd)); }
+	write(cwd: string, path: string, text: string, version: string) {
+		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
+		const abs = wikiPath(cwd, path), data = readFileSync(abs), next = Buffer.from(text);
+		if (data.length > MAX_FILE || next.length > MAX_FILE || !looksLikeText(data) || !Buffer.from(decodeText(data)).equals(data)) throw new Error("File is read-only");
+		if (hash(data) !== version) throw new Error("File changed on disk; reload before saving");
+		writeFileSync(abs, next);
+		this.record(cwd, { files: new Map([[path, data]]), skipped: [] }, { files: new Map([[path, next]]), skipped: [] }, "user", path);
+	}
+	change(cwd: string, id: string, path: string): WikiChange {
+		const revision = this.history(cwd).find(r => r.id === id), change = revision?.changes.find(c => c.path === path);
+		if (!revision || !change) throw new Error("Change record not found");
+		const blobs = revision.blobs[path];
+		return { ...change, before: !change.binary && blobs.before ? decodeText(readFileSync(join(this.folder(cwd), "blobs", blobs.before))) : null, after: !change.binary && blobs.after ? decodeText(readFileSync(join(this.folder(cwd), "blobs", blobs.after))) : null, truncated: false };
+	}
+	restore(cwd: string, id: string, undo: boolean, path?: string) {
+		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
+		const records = this.history(cwd), revision = records.find(r => r.id === id);
+		if (!revision) throw new Error("Change record not found");
+		const changes = revision.changes.filter(c => (!path || c.path === path) && c.undone !== undo);
+		const writes = changes.map(c => {
+			const abs = wikiPath(cwd, c.path), blob = revision.blobs[c.path];
+			const current = existsSync(abs) ? readFileSync(abs) : null;
+			if ((current ? hash(current) : null) !== (undo ? blob.after : blob.before)) throw new Error(`File changed since this request: ${c.path}`);
+			const target = undo ? blob.before : blob.after;
+			return { abs, current, next: target ? readFileSync(join(this.folder(cwd), "blobs", target)) : null, c };
+		});
+		const done: typeof writes = [];
+		try {
+			for (const w of writes) { if (w.next === null) rmSync(w.abs); else { mkdirSync(dirname(w.abs), { recursive: true }); writeFileSync(w.abs, w.next); } done.push(w); }
+			for (const w of writes) w.c.undone = undo;
+			this.persist(cwd, records);
+		} catch (error) {
+			for (const w of done.reverse()) { if (w.current === null) rmSync(w.abs, { force: true }); else writeFileSync(w.abs, w.current); }
+			throw error;
+		} finally { this.invalidate(cwd); }
+	}
+}

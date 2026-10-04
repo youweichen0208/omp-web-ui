@@ -1,6 +1,10 @@
 # 发布流程
 
-> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
+> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
+
+## 0.11.0 正式版
+
+`0.11.0` 增加完整 Wiki 文件工作台与原生 Codemode/MCP 展示，SDK / pi-ai 精确锁定 1.0.1。协议版本 31。Wiki 操作、搜索、改动历史与手动撤销不追加宿主系统提示；原生上下文继续与独立 pi 会话一致。发布说明见 `.github/release-notes/v0.11.0.md`。npm 使用 `latest`，GitHub 使用 `v0.11.0` 标签，三平台桌面附件通过构建验证后公开。
 
 ## 0.10.0 正式版
 

@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	platform: process.platform,
+	openWikiFile: (request) => ipcRenderer.invoke("pi-wiki-open-file", { clientId: request.clientId, cwd: request.cwd, path: request.path }),
 	windowAction: (action) => {
 		if (["minimize", "toggle-maximize", "close"].includes(action)) {
 			return ipcRenderer.invoke("pi-window-action", action);

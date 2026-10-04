@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import {
 	FiImage,
+	FiBookOpen,
 	FiSidebar,
 	FiGitBranch,
 	FiGlobe,
@@ -50,8 +51,8 @@ interface TopBarProps {
 		}) => void;
 		restart: (id: string) => void;
 	};
-	view: "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
-	onViewChange: (view: "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`) => void;
+	view: "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
+	onViewChange: (view: "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`) => void;
 	/** Installed optional plugins (<dataDir>/plugins) — one view tab each. */
 	plugins: { id: string; name: string; icon?: string; description?: string; error?: string }[];
 	/** Open a side panel as a mobile drawer ("left" = history, "right" = files). */
@@ -210,7 +211,7 @@ export function TopBar({
 			</div>
 
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
-			<div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
+			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
 				<div
 					className="view-switch"
@@ -229,6 +230,7 @@ export function TopBar({
 						<FiMessageSquare />
 						<span>{t("chat")}</span>
 					</button>
+					<button type="button" role="tab" aria-label={t("wikiMode")} title={t("wikiMode")} aria-selected={view === "wiki"} className={view === "wiki" ? "active wiki-tab" : "wiki-tab"} onClick={() => onViewChange("wiki")}><FiBookOpen /><span>Wiki</span></button>
 					<button
 						type="button"
 						role="tab"

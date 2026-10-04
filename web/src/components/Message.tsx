@@ -114,7 +114,7 @@ interface MessageProps {
 	/** toolResult messages by toolCallId (precomputed in MessageList, memoized). */
 	toolResults: ReadonlyMap<string, UiMessage>;
 	retriedEditIds?: ReadonlySet<string>;
-	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
+	liveOutputs: ReadonlyMap<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
 	/** tool_status entries (tool_execution_end) by toolCallId. */
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
 	streaming: boolean;
@@ -330,7 +330,7 @@ export const Message = memo(function Message({
 	const renderContentBlocks = (skipText: boolean): ReactNode[] => {
 
 		const elements: ReactNode[] = [];
-		const viewFor = (item: UiToolCallBlock): ToolView => ({ result: toolResults.get(item.id), nestedCalls: liveNestedCalls(item.id, toolStatuses), liveOutput: liveOutputs.get(item.id)?.text, status: toolStatuses.get(item.id), streaming });
+		const viewFor = (item: UiToolCallBlock): ToolView => ({ result: toolResults.get(item.id), nestedCalls: liveNestedCalls(item.id, toolStatuses), liveOutput: liveOutputs.get(item.id)?.text, codemode: liveOutputs.get(item.id)?.codemode, status: toolStatuses.get(item.id), streaming });
 		for (let i = 0; i < message.content.length; i++) {
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
@@ -742,7 +742,7 @@ function Block({
 	block: UiContentBlock;
 	user?: boolean;
 	toolResults: ReadonlyMap<string, UiMessage>;
-	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
+	liveOutputs: ReadonlyMap<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
 	streaming: boolean;
 	isLast: boolean;
@@ -799,6 +799,7 @@ function Block({
 			nestedCalls: liveNestedCalls(toolCall.id, toolStatuses),
 			result,
 			liveOutput: live?.text,
+			codemode: live?.codemode,
 			streaming,
 			status: toolStatuses.get(toolCall.id),
 		};

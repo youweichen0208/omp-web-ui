@@ -26,7 +26,8 @@ Windows 计划任务部署。
 | 终端 | node-pty（服务端 PTY）+ `@xterm/xterm`（浏览器渲染，经 terminal bridge 转发） |
 | 样式 | 单文件 `web/src/styles.css`（固定浅色主题，CSS 变量） |
 
-SDK 与 pi-ai 精确锁定 1.0.0，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
+SDK 与 pi-ai 精确锁定 1.0.1，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
+Codemode 卡片与 MCP/Codemode 设置遵循 15a/15b 设计；状态、项目覆盖、费用及输出限制读取 `docs/architecture-plugins.md`。
 
 SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` 只表示一次循环结束。修改队列、纠正或延迟设置前读 `docs/architecture-core.md`；修改桌面扩展子进程或打包前读 `docs/deployment.md`。
 
@@ -147,7 +148,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.0，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词、技能和扩展仅供查看；界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词、技能和扩展仅供查看；界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 
@@ -171,6 +172,8 @@ pi SDK 和 pi-ai 精确锁定 1.0.0，使用原版 SDK，不应用本项目的 S
 | **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：原生 `rpiv-todo` 管理跨轮次清单，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
+
+Wiki：修改文档浏览、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
 
 ## 5. 开发工作流
 

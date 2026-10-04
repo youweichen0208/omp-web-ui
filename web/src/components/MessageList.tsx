@@ -37,7 +37,7 @@ import { useT, type Translate } from "../i18n";
 
 /** Stable shared empty map — passing this (instead of a fresh Map) lets
  *  React.memo skip messages that have no live tool output to show. */
-const EMPTY_LIVE = new Map<string, { toolName: string; text: string }>();
+const EMPTY_LIVE = new Map<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>();
 
 /**
  * Messages beyond the most recent KEEP_RECENT are rendered as cheap collapsed
@@ -83,7 +83,7 @@ interface MessageListProps {
 	connected?: boolean;
 	silenceNotified?: boolean;
 	state: UiState;
-	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
+	liveOutputs: ReadonlyMap<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
 	/** Edit-and-re-ask handler (forwarded to user message bubbles). */
 	onEdit?: (

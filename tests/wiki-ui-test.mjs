@@ -1,0 +1,118 @@
+// Real workspace + SDK + local provider, isolated from the user's files/configuration.
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { CHROME_PATH } from './lib/chrome.mjs';
+import { portUp } from './lib/port-utils.mjs';
+const port = 8994;
+for (const p of [port, port + 1]) assert.equal(await portUp(p), false, `Port ${p} busy`);
+const base = mkdtempSync(join(tmpdir(), 'pi-wiki-ui-'));
+const cwd = join(base, 'wiki'), agent = join(base, 'agent');
+mkdirSync(join(cwd, '交易系统'), { recursive: true }); mkdirSync(join(cwd, 'risk')); mkdirSync(agent);
+writeFileSync(join(cwd, 'README.md'), '---\ntags: [风控, 交易]\n---\n# 风控规则\n\n本文定义下单前和持仓中的风控检查，参数见 [[参数配置]]。\n\n## 单笔止损\n\n单笔亏损达到账户净值的 2% 时强制平仓，不等待信号确认。\n\n## 仓位上限\n\n单品种不超过净值的 20%，总敞口不超过 60%。\n');
+writeFileSync(join(cwd, '交易系统', '参数配置.md'), '# 参数配置\n\n#风控\n\n止损阈值 0.02，参考 [[README]]。\n');
+writeFileSync(join(cwd, 'risk', 'guard.py'), 'def check_stop(loss):\n    return loss >= 0.02\n');
+const requests = [];
+const mock = createServer(async (req, res) => {
+	let body = ''; for await (const chunk of req) body += chunk;
+	const payload = JSON.parse(body); requests.push(payload);
+	res.writeHead(200, { 'content-type': 'text/event-stream' });
+	const afterTools = payload.messages.at(-1)?.role === 'tool';
+	const writeCalls = [
+		{ path: 'README.md', content: readFileSync(join(cwd, 'README.md'), 'utf8') + '\n## 隔夜持仓\n\n隔夜持仓的止损阈值按开盘价重新计算。\n' },
+		{ path: '交易系统/参数配置.md', content: '# 参数配置\n\n#风控\n\n新增 overnight_reset: true\n' },
+	];
+	const chunks = afterTools ? [[{ content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
+	for (const [delta, finish_reason] of chunks) {
+		res.write(`data: ${JSON.stringify({ id: 'wiki-test', object: 'chat.completion.chunk', created: Date.now(), model: payload.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
+	}
+	res.end('data: [DONE]\n\n');
+});
+await new Promise(r => mock.listen(port + 1, '127.0.0.1', r));
+writeFileSync(join(agent, 'models.json'), JSON.stringify({ providers: { wiki: { api: 'openai-completions', baseUrl: `http://127.0.0.1:${port + 1}`, apiKey: 'local-test', models: [{ id: 'wiki-test', name: 'Wiki test', input: ['text'], contextWindow: 32000, maxTokens: 4096 }] } } }));
+writeFileSync(join(agent, 'settings.json'), JSON.stringify({ defaultProvider: 'wiki', defaultModel: 'wiki-test', defaultTools: ['+codemode', '+tool_search'] }));
+writeFileSync(join(agent, 'auth.json'), JSON.stringify({ wiki: { type: 'api_key', key: 'local-test' } }));
+const server = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(base, 'data'), PI_CODING_AGENT_DIR: agent }, stdio: ['ignore', 'pipe', 'pipe'] });
+let log = ''; server.stdout.on('data', d => log += d); server.stderr.on('data', d => log += d);
+let browser;
+try {
+	for (let i = 0; i < 100 && !await portUp(port); i++) await new Promise(r => setTimeout(r, 100));
+	browser = await chromium.launch({ executablePath: CHROME_PATH || chromium.executablePath() });
+	const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+	page.setDefaultTimeout(10000);
+	const errors = []; page.on('pageerror', e => { errors.push(e.message); console.error('Browser error:', e.message); });
+	await page.goto(`http://127.0.0.1:${port}`);
+	await page.locator('.conn-dot.ok').first().waitFor({ state: 'attached', timeout: 20000 });
+	await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).click();
+	await page.locator('.wiki-document h1', { hasText: '风控规则' }).waitFor();
+	assert.equal(await page.locator('.wiki-sidebar').evaluate(el => Math.round(el.getBoundingClientRect().width)), 264);
+	assert.equal(await page.locator('.wiki-prose a').first().textContent(), '参数配置');
+	await page.locator('.wiki-prose a').first().click();
+	await page.locator('.wiki-document h1', { hasText: '参数配置' }).waitFor();
+	assert.equal(await page.locator('.wiki-backlinks > button').count(), 1);
+	await page.locator('.wiki-backlinks > button').click();
+	await page.locator('.wiki-document h1', { hasText: '风控规则' }).waitFor();
+	await page.keyboard.press('Meta+k');
+	await page.locator('.wiki-search-modal input').fill('阈值');
+	await page.locator('.wiki-search-results strong', { hasText: '参数配置.md' }).waitFor();
+	await page.keyboard.press('Escape');
+	await page.getByRole('button', { name: '编辑源码', exact: true }).click();
+	await page.locator('.wiki-document textarea').fill('# 风控规则\n\n手动修改。\n');
+	await page.keyboard.press('Meta+n');
+	await page.getByRole('dialog', { name: '有未保存修改' }).waitFor();
+	await page.getByRole('button', { name: '取消', exact: true }).click();
+	await page.getByRole('tab', { name: '对话', exact: true }).click();
+	await page.getByRole('dialog', { name: '有未保存修改' }).waitFor();
+	await page.getByRole('button', { name: '取消', exact: true }).click();
+	await page.getByRole('button', { name: '保存', exact: true }).click();
+	await page.waitForFunction(() => !document.querySelector('.wiki-save'));
+	assert.equal(readFileSync(join(cwd, 'README.md'), 'utf8'), '# 风控规则\n\n手动修改。\n');
+	await page.getByRole('button', { name: '最近改动', exact: true }).click();
+	await page.locator('.wiki-file-change').waitFor();
+	await page.getByRole('button', { name: '全部撤销', exact: true }).click();
+	await page.waitForFunction(() => document.querySelector('.wiki-file-change')?.classList.contains('undone'));
+	assert(readFileSync(join(cwd, 'README.md'), 'utf8').includes('仓位上限'));
+	await page.locator('.wiki-changes header button').click();
+	await page.getByRole('button', { name: '渲染预览', exact: true }).click();
+	// Selection toolbar routes quoted content into the visible request.
+	await page.locator('.wiki-prose p').first().evaluate(el => { const s = window.getSelection(), r = document.createRange(); r.selectNodeContents(el); s.removeAllRanges(); s.addRange(r); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
+	await page.locator('.wiki-selection-menu').waitFor();
+	await page.getByRole('button', { name: '解释', exact: true }).click();
+	assert((await page.locator('.wiki-context-chips').innerText()).includes('选中内容'));
+	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('请补充隔夜持仓规则并更新参数配置文档。');
+	await page.getByRole('combobox', { name: '范围', exact: true }).selectOption('workspace');
+	await page.getByRole('button', { name: '查看发送内容', exact: true }).click();
+	assert((await page.locator('.wiki-prompt-preview').innerText()).includes('代码文件默认只读'));
+	await page.getByRole('button', { name: '查看发送内容', exact: true }).click();
+	await page.getByRole('button', { name: '发送', exact: true }).click();
+	await page.locator('.wiki-answer', { hasText: '已更新两个文档' }).waitFor({ timeout: 20000 });
+	await page.locator('.wiki-change-toast', { hasText: '2 个文件' }).waitFor({ timeout: 20000 });
+	assert(requests.length >= 2);
+	assert(requests.some(r => r.messages.some(m => m.role === 'tool')), 'native SDK executed tool calls');
+	assert(JSON.stringify(requests[0].messages).includes('选中内容'));
+	await page.locator('.wiki-change-toast button').first().click();
+	await page.locator('.wiki-file-change').first().waitFor();
+	const main = await page.locator('.wiki-composer').boundingBox(), drawer = await page.locator('.wiki-changes').boundingBox();
+	assert(main.x + main.width <= drawer.x, 'composer overlaps drawer');
+	mkdirSync('tests/scratch', { recursive: true });
+	await page.screenshot({ path: 'tests/scratch/wiki-desktop.png' });
+	await page.getByRole('button', { name: '全部撤销', exact: true }).click();
+	await page.waitForFunction(() => [...document.querySelectorAll('.wiki-file-change')].every(el => el.classList.contains('undone')));
+	assert(!readFileSync(join(cwd, 'README.md'), 'utf8').includes('隔夜持仓'));
+	await page.getByRole('button', { name: '全部重做', exact: true }).click();
+	await page.waitForFunction(() => [...document.querySelectorAll('.wiki-file-change')].every(el => !el.classList.contains('undone')));
+	assert(readFileSync(join(cwd, 'README.md'), 'utf8').includes('隔夜持仓'));
+	await page.locator('.wiki-changes header button').click();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.screenshot({ path: 'tests/scratch/wiki-mobile.png' });
+	assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile overflow');
+	await page.locator('.wiki-mobile-tools button').first().click();
+	await page.locator('.wiki-sidebar.open').waitFor();
+	assert.deepEqual(errors, []);
+	console.log('PASS Wiki layout, links, search, source save, draft guard, selection, native request, batch undo/redo and mobile');
+} catch (e) { console.error(log.slice(-5000)); throw e; }
+finally { await browser?.close(); server.kill('SIGTERM'); await new Promise(r => server.once('exit', r)); await new Promise(r => mock.close(r)); rmSync(base, { recursive: true, force: true }); }

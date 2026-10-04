@@ -60,6 +60,12 @@ export interface UiTodoSnapshot {
 	tasks: { id: number; subject: string; status: "pending" | "in_progress" | "completed" | "deleted" }[];
 }
 
+export interface UiCodemodeDetails {
+	calls: { id: string; name: string; args: string; status: "running" | "ok" | "error" | "cancelled"; durationMs?: number; error?: string; cost?: number }[];
+	totalCalls: number;
+	fullOutputPath?: string;
+}
+
 export interface UiNestedToolCall {
 	id: string;
 	name: string;
@@ -88,6 +94,7 @@ export interface UiMessage {
 	isError?: boolean;
 	todoSnapshot?: UiTodoSnapshot;
 	nestedCalls?: { calls: UiNestedToolCall[]; complete: boolean };
+	codemode?: UiCodemodeDetails;
 	/** Extension-injected custom messages. */
 	customType?: string;
 	/** Extension-provided metadata (e.g. attachment file name/path). */
@@ -307,10 +314,14 @@ export interface ImageRecord {
 	usage?: { totalTokens: number; cost: { total: number } };
 }
 
+export type McpExposure = "codemode" | "deferred" | "direct" | "hidden";
+export interface NativeMcpServerStatus { name: string; state: string; toolCount: number; detail: string; }
+export interface NativeMcpTool { name: string; exposure: string; description: string; readOnly?: boolean; destructive?: boolean; }
+export interface NativeCodemodeSettings { version: string; path: string; mode: "on" | "only"; inlineBudget: number; effectiveMode: "on" | "only"; effectiveInlineBudget: number; }
 export interface NativeMcpConfigState { path: string; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; }
 
 export type ClientMessage =
-	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius"; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
+	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
 	| { type: "image_request"; requestId: string; cwd: string; action: "models" | "create" | "list" | "detail" | "cancel" | "delete"; id?: string; prompt?: string; provider?: string; model?: string; references?: { data: string; mimeType: string }[] }
 	| { type: "node_request"; requestId: string; action: string; nodeId?: string; terminalId?: string; conversationId?: string; payload?: Record<string, unknown> }
 	| { type: "hello"; clientId: string; protocolVersion?: number }
@@ -873,7 +884,7 @@ export interface UiSettingsState {
 	extensions: UiExtensionInfo[];
 }
 export type ServerMessage =
-	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[] }
+	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[]; toolInfo?: NativeMcpTool[]; servers?: NativeMcpServerStatus[]; statusText?: string; codemode?: NativeCodemodeSettings; log?: string }
 	| { type: "image_result"; requestId: string; cwd: string; error?: string; record?: ImageRecord; records?: ImageRecord[]; models?: { id: string; provider: string; name: string }[] }
 	| { type: "node_event"; requestId?: string; event: string; nodeId?: string; terminalId?: string; conversationId?: string; data?: Record<string, unknown>; error?: string }
 	| {
@@ -916,6 +927,7 @@ export type ServerMessage =
 	  }
 	| {
 			type: "tool_delta";
+			codemode?: UiCodemodeDetails;
 			parentToolCallId?: string;
 			conversationId: string;
 			/** Per-conversation monotonic sequence, shared with message_delta —
@@ -1173,4 +1185,55 @@ export interface NodeProfile {
 export interface NodeSource {
 	id: string; kind: "xshell" | "ssh"; path: string; enabled: boolean;
 	lastSync?: number; error?: string; count: number; groups: number; changes?: string[];
+}
+
+/** Wiki HTTP API. Workspace and request identity are checked at the boundary. */
+export interface WikiEntry {
+	path: string;
+	name: string;
+	kind: "directory" | "document" | "code" | "pdf" | "image" | "other";
+	size: number;
+	modified: number;
+	tags: string[];
+	title?: string;
+	symlink?: boolean;
+}
+export interface WikiLink { path: string; snippet: string; line: number }
+export interface WikiDocument {
+	entry: WikiEntry;
+	text?: string;
+	version: string;
+	editable: boolean;
+	backlinks: WikiLink[];
+}
+export interface WikiSearchResult extends WikiLink { kind: WikiEntry["kind"]; page?: number }
+export interface WikiChange {
+	path: string;
+	before: string | null;
+	after: string | null;
+	binary: boolean;
+	undone: boolean;
+	additions: number;
+	deletions: number;
+	truncated?: boolean;
+}
+export interface WikiRevision {
+	id: string;
+	at: number;
+	author: "pi" | "user";
+	title: string;
+	changes: WikiChange[];
+	skipped: string[];
+}
+export interface WikiState {
+	entries: WikiEntry[];
+	tags: { name: string; count: number }[];
+	revisions: WikiRevision[];
+	running: boolean;
+	limited: boolean;
+}
+export interface WikiDirectory {
+	path: string;
+	entries: WikiEntry[];
+	nextOffset?: number;
 }

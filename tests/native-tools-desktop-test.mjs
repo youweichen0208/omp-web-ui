@@ -61,13 +61,16 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 	assert(session.getActiveToolNames().includes('codemode'));
 	assert(session.extensionRunner.getRegisteredCommands().some(command => command.invocationName === 'mcp'));
 	const imageModel = {type:"image",id:"fixture",name:"Fixture",provider:"image-fixture",api:"fixture-images",baseUrl:"http://127.0.0.1",input:["text"],output:["image"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0}};
-	session.modelRuntime.registerNativeProvider({id:"image-fixture",name:"Image fixture",auth:{apiKey:{name:"Fixture",resolve:async()=>({auth:{apiKey:"FIXTURE_IMAGE_SECRET"},source:"fixture"})}},getModels:()=>[],getAllModels:()=>[imageModel],generateImages:async(_model,_context,options)=>{assert.equal(options.apiKey,"FIXTURE_IMAGE_SECRET");return {api:imageModel.api,provider:imageModel.provider,model:imageModel.id,stopReason:"stop",output:[{type:"image",mimeType:"image/png",data:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXioAAAAASUVORK5CYII="}],timestamp:Date.now()};}});
+	session.modelRuntime.registerNativeProvider({id:"image-fixture",name:"Image fixture",auth:{apiKey:{name:"Fixture",resolve:async()=>({auth:{apiKey:"FIXTURE_IMAGE_SECRET"},source:"fixture"})}},getModels:()=>[],getAllModels:()=>[imageModel],generateImages:async(_model,_context,options)=>{assert.equal(options.apiKey,"FIXTURE_IMAGE_SECRET");return {api:imageModel.api,provider:imageModel.provider,model:imageModel.id,stopReason:"stop",usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0.01,cacheRead:0,cacheWrite:0,total:0.01}},output:[{type:"image",mimeType:"image/png",data:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXioAAAAASUVORK5CYII="}],timestamp:Date.now()};}});
 	session.subscribe(event => events.push(event));
 	try {
 		await session.prompt('Run the local fixture.');
 		const result = session.messages.find(message => message.role === 'toolResult' && message.toolName === 'codemode');
 		assert(result && !result.isError, JSON.stringify(result));
 		assert(result.content.some(block => block.type === "image"), "codemode generation returns an image block");
+		const { serializeMessage } = await import(pathToFileURL(join(root, 'dist/server/serialize.js')));
+		const card = serializeMessage(result, 0);
+		assert(card.codemode.calls.some(call => call.name === 'models.generateImages' && call.status === 'ok' && call.cost === 0.01), JSON.stringify(card.codemode));
 		assert(result.nestedCalls?.calls.some(call => call.name === 'mcp__echo__add' && call.status === 'ok'), JSON.stringify(result));
 		assert(result.nestedCalls?.calls.some(call => call.name === 'mcp__http__add' && call.status === 'ok'), JSON.stringify(result));
 		assert(events.some(event => event.type === 'tool_execution_end' && event.parentToolCallId === 'native-script'));
@@ -91,7 +94,7 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 		try {
 			await resumed.bindExtensions({mode:"rpc"});
 			await resumed.extensionRunner.getCommand("mcp").handler("", resumed.extensionRunner.createCommandContext());
-			// Original Pi 1.0.0 resumes with its configured active loadout. Discovery remains native.
+			// Original Pi 1.0.1 resumes with its configured active loadout. Discovery remains native.
 			const search = resumed.getToolDefinition("tool_search");
 			assert(search, "native discovery remains available on resume");
 			await search.execute("resume-search", { query: "add" });

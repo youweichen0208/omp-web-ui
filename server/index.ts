@@ -1,3 +1,5 @@
+import { installCodemodeImageRoutes } from "./codemode-image-routes.js";
+import { installWikiRoutes } from "./wiki-routes.js";
 import { ImageService } from "./image-service.js";
 
 /**
@@ -134,6 +136,9 @@ if (AUTH_TOKEN) {
 		res.status(401).send("unauthorized: PI_WEB_TOKEN required (?token=…)");
 	});
 }
+
+installCodemodeImageRoutes(app, () => service, originAllowed);
+installWikiRoutes(app, () => service, join(DATA_DIR, "wiki"), originAllowed);
 
 app.get("/api/generated-image", (req, res) => {
 	try {

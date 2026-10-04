@@ -2,7 +2,7 @@
 
 ## 原生上下文边界
 
-会话由 pi 1.0.0 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置仅保留显示偏好和界面插件可见性。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
+会话由 pi 1.0.1 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置仅保留显示偏好和界面插件可见性。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
 
 > 改代码前必读。本文档覆盖快照驱动、协议单源、安全边界、多对话并发等全局架构决策。
 
@@ -138,3 +138,7 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 `server/image-service.ts` 使用客户端共享 ModelRuntime 查询 image 模型并 generateImages。记录和图片保存在 `<dataDir>/images/<id>/`，cwd 取真实路径；不会写入工作区。历史由用户主动删除。每客户端最多一个任务，全服务最多四个；断线与切项目保留原任务。取消丢弃迟到图片，启动把 running 记录改为 interrupted。独立费用取 SDK 实际 usage，不计入聊天费用。shutdown 发出取消信号。
 
 `image_request` 包含 requestId/cwd 和 models/create/list/detail/cancel/delete 操作；`image_result` 只传元数据。受既有 token/Origin 校验的 `/api/generated-image` 读取记录中的固定图片路径。Web 工作台按 cwd 过滤回执，定期刷新历史；下载使用 fetch/blob，附加图片沿用聊天缩放链路。Codemode 工具结果保留 SDK image blocks，并提供预览和下载。
+
+## Wiki 文档工作区
+
+顶栏 Wiki 复用当前工作区与原生会话，输入范围可查看，文件改动记录保存在界面数据目录。修改用户消息构建、任务结束记录或文件恢复时读 [Wiki 架构](architecture-wiki.md)。
