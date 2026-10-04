@@ -307,13 +307,6 @@ export interface PromptAttachment {
 	size?: number;
 }
 
-export interface ImageRecord {
-	id: string; cwd: string; prompt: string; provider: string; model: string;
-	status: "running" | "done" | "error" | "cancelled" | "interrupted";
-	createdAt: number; images: { mimeType: string; extension: string }[]; error?: string;
-	usage?: { totalTokens: number; cost: { total: number } };
-}
-
 export type McpExposure = "codemode" | "deferred" | "direct" | "hidden";
 export interface NativeMcpServerStatus { name: string; state: string; toolCount: number; detail: string; }
 export interface NativeMcpTool { name: string; exposure: string; description: string; readOnly?: boolean; destructive?: boolean; }
@@ -322,7 +315,6 @@ export interface NativeMcpConfigState { path: string; scope: "global" | "project
 
 export type ClientMessage =
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
-	| { type: "image_request"; requestId: string; cwd: string; action: "models" | "create" | "list" | "detail" | "cancel" | "delete"; id?: string; prompt?: string; provider?: string; model?: string; references?: { data: string; mimeType: string }[] }
 	| { type: "node_request"; requestId: string; action: string; nodeId?: string; terminalId?: string; conversationId?: string; payload?: Record<string, unknown> }
 	| { type: "hello"; clientId: string; protocolVersion?: number }
 	/** Re-request the slash-command catalog (also pushed on attach / cwd change). */
@@ -885,7 +877,6 @@ export interface UiSettingsState {
 }
 export type ServerMessage =
 	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[]; toolInfo?: NativeMcpTool[]; servers?: NativeMcpServerStatus[]; statusText?: string; codemode?: NativeCodemodeSettings; log?: string }
-	| { type: "image_result"; requestId: string; cwd: string; error?: string; record?: ImageRecord; records?: ImageRecord[]; models?: { id: string; provider: string; name: string }[] }
 	| { type: "node_event"; requestId?: string; event: string; nodeId?: string; terminalId?: string; conversationId?: string; data?: Record<string, unknown>; error?: string }
 	| {
 			type: "ready";
@@ -1236,4 +1227,32 @@ export interface WikiDirectory {
 	path: string;
 	entries: WikiEntry[];
 	nextOffset?: number;
+}
+
+// Extensions HTTP API: native Pi package management, separate from agent messages.
+export type ExtensionScope = "user" | "project";
+export interface ExtensionPackage {
+	id: string; source: string; name: string; scope: ExtensionScope; kind: "npm" | "git" | "local" | "file";
+	path?: string; version?: string; description?: string; enabled: boolean; pinned: boolean; trusted: boolean;
+	resources: Record<"extensions" | "skills" | "prompts" | "themes", string[]>;
+	latest?: string; update?: boolean; checkError?: string; protected?: boolean;
+}
+export interface ExtensionsState { packages: ExtensionPackage[]; version: string; trusted: boolean; checkedAt?: number; autoCheck?: boolean; }
+export interface ExtensionCatalogItem { name: string; description: string; version?: string; author?: string; downloads?: number; date?: number; types: string[]; image?: string; url: string; repository?: string; }
+export interface ExtensionCatalog { items: ExtensionCatalogItem[]; page: number; pages: number; }
+export interface ExtensionPreview { ticket: string; source: string; name: string; version?: string; description?: string; author?: string; repository?: string; resources: Record<string, string[]>; canPin: boolean; }
+export interface ExtensionOperation { action: "install" | "remove" | "toggle" | "update" | "update-all" | "unpin" | "move"; id?: string; scope?: ExtensionScope; enabled?: boolean; ticket?: string; pin?: boolean; }
+export interface ExtensionJob { id: string; phase: "running" | "done" | "error"; log: string; error?: string; }
+
+// Native system prompt inspection/file editing HTTP API.
+export interface PromptSectionView { name: string; text: string; }
+export interface PromptRuleView { text: string; kind: "builtin" | "tool" | "extension" | "unknown"; name?: string; path?: string; }
+export interface PromptFileView {
+	id: string; path: string; kind: "system" | "append" | "context"; scope: "user" | "project" | "context";
+	content: string; version: string; exists: boolean; active: boolean; editable: boolean; tokens: number; changedOnDisk?: boolean; error?: string;
+}
+export interface SystemPromptState {
+	raw: string; tokens: number; defaultPreamble: string; sections: PromptSectionView[]; rules: PromptRuleView[];
+	tools: {name:string;custom:boolean;path?:string}[]; files: PromptFileView[]; opaque: boolean; forced: boolean;
+	custom: boolean; trusted: boolean; pending: boolean; reloadError?: string; busy: boolean;
 }

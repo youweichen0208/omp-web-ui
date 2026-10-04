@@ -27,6 +27,8 @@ Windows 计划任务部署。
 | 样式 | 单文件 `web/src/styles.css`（固定浅色主题，CSS 变量） |
 
 SDK 与 pi-ai 精确锁定 1.0.1，不应用本项目的 SDK 补丁。Codemode 与工具搜索使用原生 defaultTools 默认开启，已有原生配置优先。
+系统提示词：修改分段来源、原生文件编辑或重载时，读取 `docs/architecture-system-prompt.md`。
+Extensions：修改包安装、启停、更新、作用域迁移、目录浏览或单文件编辑时，读取 `docs/architecture-extensions.md`。
 Codemode 卡片与 MCP/Codemode 设置遵循 15a/15b 设计；状态、项目覆盖、费用及输出限制读取 `docs/architecture-plugins.md`。
 
 SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` 只表示一次循环结束。修改队列、纠正或延迟设置前读 `docs/architecture-core.md`；修改桌面扩展子进程或打包前读 `docs/deployment.md`。
@@ -47,13 +49,13 @@ pi-web-ui/
 │   ├── uploads.ts              # 文件对话上传 + 保留期清理
 │   ├── bg-servers.ts           # 后台任务跟踪（bash 前后端口快照 diff + 存活刷新）
 │   ├── component-updates.ts    # pi Agent / 扩展版本检查、来源校验与包更新
+│   ├── system-prompt-view.ts / system-prompt-files.ts / system-prompt-routes.ts # 原生提示词分段、文件编辑与 reload
 │   ├── settings-service.ts     # 界面偏好与原生资源只读视图（扩展命名见 extension-display.ts）
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
 │   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── model-config-merge.ts   # 聊天模型表单合并；保留 typed models 和未知字段
-│   ├── image-service.ts        # Pi 1.0 生图任务、项目历史与取消；修改时读 docs/architecture-core.md
 │   ├── native-mcp-config.ts    # 原生 MCP 配置版本校验与敏感值；修改时读 docs/architecture-plugins.md
 │   ├── provider-auth.ts        # 官方 OAuth 登录桥；凭据由 SDK 保存，不下发浏览器
 │   ├── native-tools.ts         # 原生 MCP/codemode/tool_search factories；见 docs/architecture-plugins.md
@@ -135,12 +137,13 @@ pi-web-ui/
 | `TopBar.tsx` / `FooterBar.tsx` | 顶栏（项目／会话标题、后台任务、视图切换、文件栏开关）、状态栏（版本／分支／消息／工作目录）；模型与思考强度在 `ChatInput.tsx` 底部 |
 | `Dialog.tsx` | 扩展 `ui.select/confirm/input` → 浏览器弹窗 |
 | `ModelConfigModal.tsx` / `PiSetupModal.tsx` | models.json 管理 / 首次配置引导 |
+| `SystemPromptPanel.tsx` | 原生提示词分段、全文复制、SYSTEM/APPEND/上下文文件编辑；见 `docs/architecture-system-prompt.md` |
 | `SettingsModal.tsx` | 设置面板（侧边栏分页：消息显示/原生提示词/技能/扩展/MCP/更新/界面插件） |
 | `BgTasksModal.tsx` | 后台任务弹窗：AI 启动的监听端口进程列表 |
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
 | `PluginView.tsx` | 插件视图宿主：薄 React 壳 + 动态 import client bundle |
-| `ImageWorkbench.tsx` / `NativeMcpPanel.tsx` | Pi 1.0 生图工作台与原生 MCP 设置；修改任务归属或信任时读相关架构文档 |
+| `NativeMcpPanel.tsx` | 原生 MCP 与 Codemode 设置；修改作用域或信任时读 `docs/architecture-plugins.md` |
 | `NodeWorkbench.tsx` / `node-terminal.tsx` | SSH 节点工作台：来源同步、详情/凭据、终端引用与命令确认；修改时阅读 `docs/architecture-nodes.md` |
 | `CollapsedMessage.tsx` / `LazyMount.tsx` | 消息折叠摘要行 / 消息级惰性挂载包装 |
 | `SearchBar.tsx` | 会话内搜索栏（Ctrl+F，CSS Custom Highlight API 高亮） |
@@ -148,7 +151,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词、技能和扩展仅供查看；界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.1，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能仅供查看；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 

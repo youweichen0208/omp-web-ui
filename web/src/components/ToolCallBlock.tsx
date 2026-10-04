@@ -456,7 +456,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				</details>)}
 				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
 			</details>}
-			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("imageDownload")}</a></div>)}
+			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("downloadImage")}</a></div>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">
 					<div className="toolcall-output-label">

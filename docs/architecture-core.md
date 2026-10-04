@@ -2,7 +2,7 @@
 
 ## 原生上下文边界
 
-会话由 pi 1.0.1 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置仅保留显示偏好和界面插件可见性。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
+会话由 pi 1.0.1 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包，不添加宿主工具或提示词。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
 
 > 改代码前必读。本文档覆盖快照驱动、协议单源、安全边界、多对话并发等全局架构决策。
 
@@ -132,12 +132,6 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 回归：`tests/project-switch-test.mjs`（隔离真实服务及 Chrome，固定短/长会话、延迟确认、
 缓存内容首帧、草稿与视图保留），`tests/project-switch-electron-test.mjs`（隔离桌面壳），
 `tests/unit/project-cache.test.ts`（LRU、预算、扫描合并及失效）。
-
-## 生图工作台（Pi 1.0）
-
-`server/image-service.ts` 使用客户端共享 ModelRuntime 查询 image 模型并 generateImages。记录和图片保存在 `<dataDir>/images/<id>/`，cwd 取真实路径；不会写入工作区。历史由用户主动删除。每客户端最多一个任务，全服务最多四个；断线与切项目保留原任务。取消丢弃迟到图片，启动把 running 记录改为 interrupted。独立费用取 SDK 实际 usage，不计入聊天费用。shutdown 发出取消信号。
-
-`image_request` 包含 requestId/cwd 和 models/create/list/detail/cancel/delete 操作；`image_result` 只传元数据。受既有 token/Origin 校验的 `/api/generated-image` 读取记录中的固定图片路径。Web 工作台按 cwd 过滤回执，定期刷新历史；下载使用 fetch/blob，附加图片沿用聊天缩放链路。Codemode 工具结果保留 SDK image blocks，并提供预览和下载。
 
 ## Wiki 文档工作区
 

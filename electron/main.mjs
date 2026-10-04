@@ -311,6 +311,18 @@ ipcMain.handle("pi-wiki-open-file", async (event, request) => {
 	const error = await shell.openPath(result.absolute);
 	if (error) throw new Error(error);
 });
+ipcMain.handle("pi-extension-open-path", async (event, request) => {
+	const win = mainWindow;
+	if (!win || win.isDestroyed() || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) throw new Error("Forbidden");
+	if (!request || ![request.clientId, request.cwd, request.id].every(value => typeof value === "string")) throw new Error("Invalid package request");
+	const response = await fetch(`http://127.0.0.1:${serverPort}/api/extensions`, {
+		method: "POST", headers: { "Content-Type": "application/json", ...(process.env.PI_WEB_TOKEN ? { Authorization: `Bearer ${process.env.PI_WEB_TOKEN.trim()}` } : {}) },
+		body: JSON.stringify({ clientId: request.clientId, cwd: request.cwd, id: request.id, action: "open-info" }),
+	});
+	const result = await response.json();
+	if (!response.ok || typeof result.absolute !== "string") throw new Error(result.error || "Installed path unavailable");
+	shell.showItemInFolder(result.absolute);
+});
 ipcMain.handle("pi-window-state-read", (event) => {
 	const win = mainWindow;
 	if (!win || win.isDestroyed() || event.sender !== win.webContents) return null;

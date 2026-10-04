@@ -1,6 +1,7 @@
+import { installSystemPromptRoutes } from "./system-prompt-routes.js";
+import { installExtensionsRoutes } from "./extensions-routes.js";
 import { installCodemodeImageRoutes } from "./codemode-image-routes.js";
 import { installWikiRoutes } from "./wiki-routes.js";
-import { ImageService } from "./image-service.js";
 
 /**
  * pi-web-ui server entry.
@@ -88,7 +89,6 @@ if (process.platform === "win32") {
 	void ensureWindowsBash();
 }
 
-const images = new ImageService(join(DATA_DIR, "images"));
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 
@@ -138,18 +138,9 @@ if (AUTH_TOKEN) {
 }
 
 installCodemodeImageRoutes(app, () => service, originAllowed);
+installExtensionsRoutes(app, () => service, originAllowed);
+installSystemPromptRoutes(app, () => service, originAllowed);
 installWikiRoutes(app, () => service, join(DATA_DIR, "wiki"), originAllowed);
-
-app.get("/api/generated-image", (req, res) => {
-	try {
-		const { clientId, cwd, id, index } = req.query;
-		if (![clientId, cwd, id, index].every(v => typeof v === "string") || !originAllowed(req)) { res.sendStatus(400); return; }
-		if (!service.get(clientId as string)) { res.sendStatus(403); return; }
-		const file = images.file(cwd as string, id as string, Number(index));
-		if (!file) { res.sendStatus(404); return; }
-		res.setHeader("Cache-Control", "no-store"); res.sendFile(file);
-	} catch { res.sendStatus(404); }
-});
 
 app.get("/api/health", (_req, res) => {
 	res.json({ ok: true, piVersion: VERSION, cwd: CWD, pid: process.pid });
@@ -731,10 +722,6 @@ wss.on("connection", (ws) => {
 			case "native_mcp_request":
 				void cs.nativeMcpRequest(msg);
 				break;
-			case "image_request":
-				if (cs.cwd !== msg.cwd || cs.switchingWorkspace || service.isQuiesced()) { cs.sendImageMessage({ type: "image_result", requestId: msg.requestId, cwd: msg.cwd, error: "Workspace unavailable" }); break; }
-				void images.handle(cs.clientId, cs.imageModelRuntime, msg, message => cs.sendImageMessage(message));
-				break;
 			case "login_provider":
 				void cs.providerAuth.login(msg.provider);
 				break;
@@ -979,7 +966,6 @@ async function shutdown(): Promise<void> {
 	nodeWorkbench.dispose();
 	pluginMgr.dispose();
 
-	images.shutdown();
 
 	await service.disposeAll();
 	wss.close();

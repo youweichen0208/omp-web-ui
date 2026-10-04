@@ -1080,9 +1080,6 @@ export function useChat() {
 				case "native_mcp_result":
 					window.dispatchEvent(new CustomEvent("pi-native-mcp-event", { detail: msg }));
 					break;
-				case "image_result":
-					window.dispatchEvent(new CustomEvent("pi-image-event", { detail: msg }));
-					break;
 				case "provider_auth":
 					dispatch({ type: "provider_auth", state: msg.state });
 					break;

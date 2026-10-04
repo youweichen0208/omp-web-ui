@@ -28,6 +28,8 @@ const WIN32_KNOWN_ENV_FAIL = new Set(["terminal-smoke-test", "restart-handoff-te
 const ALL = [
 	"clear-provider-key-test",
 	"component-updates-test",
+	"extensions-test",
+	"system-prompt-test",
 	"conv-cwd-test",
 	"db-client-test",
 	"fetch-models-test",
@@ -42,7 +44,6 @@ const ALL = [
 	"native-tools-desktop-test",
 	"codemode-mcp-test",
 	"provider-auth-test",
-	"pi-one-images-test",
 	"model-config-preservation-test",
 	"node-workbench-test",
 	"plugin-settings-test",

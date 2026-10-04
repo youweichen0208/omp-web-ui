@@ -1,6 +1,5 @@
 import { LinkedText } from "./components/LinkedText";
 import { WikiWorkbench } from "./components/WikiWorkbench";
-import { ImageWorkbench } from "./components/ImageWorkbench";
 
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
 import { WorkspacePathContext } from "./workspace-context";
@@ -204,7 +203,7 @@ function ResizeHandle({
 }
 
 /** 顶栏视图：内置三个 + 每个已装插件一个 `plugin:<id>`。 */
-type ViewName = "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
+type ViewName = "wiki" | "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
 
 export function App() {
 	const t = useT();
@@ -1012,7 +1011,6 @@ export function App() {
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}
 						</Suspense>
 					</div>
-					<div className={`view-pane ${view === "images" ? "" : "hidden"}`}>{view === "images" && chat.state?.cwd && <ImageWorkbench cwd={chat.state.cwd} send={send} attach={(files) => addImageFiles(files, chat.activeConversationId)} />}</div>
 					<div className={`view-pane ${view === "nodes" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>{visited.current.has("nodes") && <NodeWorkbench active={view === "nodes"} send={send} />}</Suspense>
 					</div>

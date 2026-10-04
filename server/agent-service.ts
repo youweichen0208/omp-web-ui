@@ -1,3 +1,4 @@
+import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
 import { parseNativeMcpStatus } from "./native-mcp-presentation.js";
 import { codemodeDetails } from "./codemode-presentation.js";
 import { NativeMcpConfigService } from "./native-mcp-config.js";
@@ -457,6 +458,19 @@ export class ClientSession {
 		}
 	}
 
+	async systemPromptState() {
+		const session=this.session,cwd=this.cwd;await flushPromptReload(session);
+		return getSystemPromptState(session,cwd,this.agentDir);
+	}
+	async savePromptFile(id:string,version:string,content:string|undefined,restore:boolean) {
+		const path=writeSystemPromptFile(this.session,this.cwd,this.agentDir,id,version,content,restore);
+		for(const client of ClientSession.liveClients.values())for(const conv of client.convs.values()){
+			if(!promptUsesFile(conv.session,conv.cwd,client.agentDir,path))continue;
+			await queuePromptReload(conv.session,()=>{if(!client.disposed&&client.activeId===conv.id){client.pushSettings();void client.pushSlashCommands();client.flushSnapshot();}});
+		}
+	}
+	async retryPromptReload(){await flushPromptReload(this.session,true);}
+
 	/** The FULL system prompt actually in effect right now (AgentSession getter,
 	 *  includes native sections such as
 	 *  project context, skills and tool guidance). Read-only view source for
@@ -471,8 +485,6 @@ export class ClientSession {
 		}
 	}
 
-	/** Web-facing extension UI context (widgets, notifications). */
-	sendImageMessage(message: ServerMessage): void { this.emit(message); }
 	private pendingMcpReload = new Set<string>();
 	private mcpStatus = new WeakMap<AgentSession, { text: string; pending: boolean }>();
 	private async reloadMcpConversation(conv: Conversation): Promise<void> {
@@ -491,7 +503,7 @@ export class ClientSession {
 			if (msg.action === "save") config.save(this.cwd, msg.scope, msg.version ?? "", msg.document ?? {});
 			if (msg.action === "trust") config.trust(this.cwd);
 			if (msg.action === "radius") {
-				if (!this.imageModelRuntime.hasConfiguredAuth("radius")) throw new Error("Sign in to Radius first");
+				if (!this.nativeModelRuntime.hasConfiguredAuth("radius")) throw new Error("Sign in to Radius first");
 				const state = config.get(this.cwd, "global");
 				const servers = (state.document.mcpServers ?? {}) as Record<string,Record<string,unknown>>;
 				const existing = Object.entries(servers).find(([,entry]) => typeof entry.url === "string" && entry.url.replace(/\/+$/, "") === "https://radius.pi.dev/mcp");
@@ -541,7 +553,7 @@ export class ClientSession {
 			});
 		} catch (error) { this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, error: (error as Error).message }); }
 	}
-	get imageModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
+	get nativeModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
 	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piCheckCache = null; await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
 	private webUi = new WebUIContext((msg) => this.emit(msg));
 	private widgetsTimer: ReturnType<typeof setInterval> | null = null;
@@ -1761,6 +1773,10 @@ export class ClientSession {
 		};
 		try {
 			const s = conv.session;
+			await flushPromptReload(s);
+			const promptReloadError=promptReloadStatus(s).reloadError;
+			if(promptReloadError)throw new Error(`Native prompt reload failed: ${promptReloadError}`);
+			if (this.conv !== conv) throw new Error("Conversation changed");
 			validateEditorSnapshots(this.cwd, attachments);
 			// Native slash commands (see NATIVE_COMMANDS) are executed here and
 			// never reach the SDK. Extension / skill / template commands fall

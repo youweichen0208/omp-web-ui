@@ -1,7 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import {
-	FiImage,
 	FiBookOpen,
 	FiSidebar,
 	FiGitBranch,
@@ -51,8 +50,8 @@ interface TopBarProps {
 		}) => void;
 		restart: (id: string) => void;
 	};
-	view: "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`;
-	onViewChange: (view: "wiki" | "chat" | "terminal" | "git" | "nodes" | "images" | `plugin:${string}`) => void;
+	view: "wiki" | "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
+	onViewChange: (view: "wiki" | "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`) => void;
 	/** Installed optional plugins (<dataDir>/plugins) — one view tab each. */
 	plugins: { id: string; name: string; icon?: string; description?: string; error?: string }[];
 	/** Open a side panel as a mobile drawer ("left" = history, "right" = files). */
@@ -243,7 +242,6 @@ export function TopBar({
 						<FiTerminal />
 						<span>{t("terminal")}</span>
 					</button>
-					<button type="button" role="tab" aria-label={t("imageWorkbench")} title={t("imageWorkbench")} aria-selected={view === "images"} className={view === "images" ? "active" : ""} onClick={() => onViewChange("images")}><FiImage /><span>{t("imageWorkbench")}</span></button>
 					<button
 						type="button"
 						role="tab"

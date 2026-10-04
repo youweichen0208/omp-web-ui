@@ -85,7 +85,6 @@ jobs:
           node tests/terminal-smoke-test.mjs
           node tests/native-tools-desktop-test.mjs
           node tests/provider-auth-test.mjs
-          node tests/pi-one-images-test.mjs
           node tests/model-config-preservation-test.mjs
 
       - name: Build Electron (macOS)
@@ -99,7 +98,6 @@ jobs:
           node tests/packaged-server-start-test.mjs "$executable" "$root"
           node tests/native-tools-desktop-test.mjs "$executable" "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$PWD/$root"
-          ELECTRON_RUN_AS_NODE=1 "$executable" tests/pi-one-images-test.mjs "$PWD/$root"
           codesign --verify --deep --strict "$app"
 
       - name: Upload verified macOS packages
@@ -143,7 +141,6 @@ jobs:
         run: |
           node tests/native-tools-desktop-test.mjs
           node tests/provider-auth-test.mjs
-          node tests/pi-one-images-test.mjs
           node tests/model-config-preservation-test.mjs
 
       - name: Install browser for toolbar regression
@@ -165,8 +162,6 @@ jobs:
           $env:ELECTRON_RUN_AS_NODE = "1"
           & ./release/win-unpacked/pi.exe tests/provider-auth-test.mjs "$PWD/release/win-unpacked/resources/app"
           if ($LASTEXITCODE -ne 0) { throw "Packaged OAuth failed" }
-          & ./release/win-unpacked/pi.exe tests/pi-one-images-test.mjs "$PWD/release/win-unpacked/resources/app"
-          if ($LASTEXITCODE -ne 0) { throw "Packaged images failed" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
@@ -214,7 +209,6 @@ jobs:
           node tests/terminal-smoke-test.mjs
           node tests/native-tools-desktop-test.mjs
           node tests/provider-auth-test.mjs
-          node tests/pi-one-images-test.mjs
           node tests/model-config-preservation-test.mjs
 
       - name: Build Electron (Linux)
@@ -227,7 +221,6 @@ jobs:
           node tests/packaged-server-start-test.mjs "$executable" "$root"
           node tests/native-tools-desktop-test.mjs "$executable" "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$root"
-          ELECTRON_RUN_AS_NODE=1 "$executable" tests/pi-one-images-test.mjs "$root"
 
       - name: Upload verified Linux packages
         env:

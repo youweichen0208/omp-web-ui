@@ -33,7 +33,7 @@ export function NativeMcpPanel({ cwd, send, dialog }: { dialog: { id: number; ki
 	const request = (action: Action, extra = {}, preserve = false) => {
 		const requestId = randomUuid(); requests.current.set(requestId, { action, preserve });
 		if (action !== "get") setBusy(true);
-		if (!send({ type: "native_mcp_request", requestId, cwd, scope, action, ...extra })) { requests.current.delete(requestId); setBusy(false); setError(t("imageDisconnected")); }
+		if (!send({ type: "native_mcp_request", requestId, cwd, scope, action, ...extra })) { requests.current.delete(requestId); setBusy(false); setError(t("connectionDisconnected")); }
 	};
 	useEffect(() => {
 		requests.current.clear(); setState(undefined); setNative(undefined); setText(""); setError(""); setNotice(""); setStatuses([]); setTools([]); setBusy(false); setEditor(undefined); setImportText(undefined); setLog(undefined); setExpanded(undefined);

@@ -119,3 +119,5 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 图片保持原生结果的 data URL；「附加到下一条消息」使用现有图片附件路径，用户发送前不进入上下文。「保存到当前目录」走鉴权及同源保护的 `/api/codemode-image`，校验活动工作区与图片签名，以随机文件名、`wx` 创建，不覆盖已有文件；单张保存上限 6 MiB。保存是用户文件操作，不注册额外工具，也不把生成结果自动注入下一轮。图片超过此保存上限时仍可使用浏览器图片下载。
 
 验证：`codemode-mcp-test.mjs`（9204/9205、隔离配置和工作区、本地 mock 模型）验证真实 SDK 状态、凭据掩码、CAS、项目覆盖、配置生效、实时调用、部分失败、输出限制和图片安全；加 `--browser` 校验实际卡片、图片操作及设置交互。`native-tools-desktop-test.mjs` 覆盖 Node/Electron 的原生工具执行，`native-features-browser-test.mjs` 覆盖历史回退及 OAuth 界面。相关纯函数测试在 `tests/unit/codemode-presentation.test.ts`。
+
+原生 Pi 包与 standalone 扩展由设置 › Extensions 管理，接口、过滤恢复、作用域、目录与编辑规则见 [Extensions 架构](architecture-extensions.md)。这里的界面插件仍是独立的展示插件系统。
