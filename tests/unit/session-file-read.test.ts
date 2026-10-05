@@ -1,13 +1,15 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { mkdtempSync, writeFileSync, appendFileSync, readFileSync, rmSync, renameSync, statSync, utimesSync } from "node:fs";
 import * as fs from "node:fs/promises";
+import * as syncFs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { SessionBranchCounts, SessionTailValidator } from "../../server/session-file-read.js";
 vi.mock("node:fs/promises", { spy: true });
+vi.mock("node:fs", { spy: true });
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); vi.restoreAllMocks(); });
 function fixture(count = 1) {
 	const root = mkdtempSync(join(tmpdir(), "pi-tail-")); roots.push(root);
 	const path = join(root, "session.jsonl"), sm = SessionManager.inMemory(root);
@@ -19,10 +21,12 @@ function fixture(count = 1) {
 test("5000-entry file: own writes read only the new tail and never scan native history again", () => {
 	const f = fixture(5000); expect(statSync(f.path).size).toBeGreaterThan(11_000_000);
 	const validator = new SessionTailValidator(f.path, f.sm);
+	const baselineBytes = validator.bytesRead;
+	expect(baselineBytes).toBe(statSync(f.path).size);
 	vi.spyOn(f.sm, "getEntries").mockImplementation(() => { throw Error("must not rescan history"); });
 	const start = performance.now(); let bytes = 0;
 	for (let i = 0; i < 30; i++) { bytes += Buffer.byteLength(f.append()); expect(validator.check(f.sm)).toBe(true); }
-	expect(validator.bytesRead).toBe(bytes); expect(performance.now() - start).toBeLessThan(200);
+	expect(validator.bytesRead - baselineBytes).toBe(bytes); expect(performance.now() - start).toBeLessThan(200);
 });
 for (const kind of ["append", "partial", "truncate", "replace", "same-size", "duplicate"] as const) test(`detects external ${kind}`, () => {
 	const f = fixture(), guard = new SessionTailValidator(f.path, f.sm);
@@ -54,4 +58,75 @@ test("listing old, empty and branched files is read-only and uses a file-state c
 	const reads = vi.mocked(fs.readFile).mock.calls.length;
 	expect(await cache.get(f.path)).toBe(1); expect(vi.mocked(fs.readFile).mock.calls.length).toBe(reads);
 	f.append(); await cache.get(f.path); expect(vi.mocked(fs.readFile).mock.calls.length).toBe(reads + 1);
+});
+
+test("metadata-only changes preserve a verified session", () => {
+	const f = fixture(3), guard = new SessionTailValidator(f.path, f.sm);
+	utimesSync(f.path, new Date(), new Date(Date.now() + 10000));
+	expect(guard.check(f.sm)).toBe(true);
+	f.append(); expect(guard.check(f.sm)).toBe(true);
+});
+for (const kind of ["append", "same-size"] as const) test(`rejects external ${kind} before binding, permanently`, () => {
+	const f = fixture(3), original = readFileSync(f.path);
+	if (kind === "append") appendFileSync(f.path, JSON.stringify({ id: "external", type: "custom" }) + "\n");
+	else writeFileSync(f.path, original.toString().replace("xxx", "yyy"));
+	const guard = new SessionTailValidator(f.path, f.sm);
+	expect(guard.check(f.sm)).toBe(false);
+	writeFileSync(f.path, original);
+	expect(guard.check(f.sm)).toBe(false);
+});
+test("equal-size edits to an earlier record are detected even if the last record matches", () => {
+	const f = fixture(3), guard = new SessionTailValidator(f.path, f.sm);
+	writeFileSync(f.path, readFileSync(f.path, "utf8").replace("xxx", "yyy"));
+	utimesSync(f.path, new Date(), new Date(Date.now() + 10000));
+	expect(guard.check(f.sm)).toBe(false);
+});
+test("binding accepts JSON whitespace, CRLF, Unicode across chunks and header-only files", () => {
+	for (const count of [0, 40]) {
+		const f = fixture(count);
+		if (count) f.sm.appendMessage({ role: "user", content: "中文".repeat(40000), timestamp: 1 });
+		writeFileSync(f.path, [f.sm.getHeader(), ...f.sm.getEntries()].map(e => "  " + JSON.stringify(e) + "  ").join("\r\n") + "\r\n");
+		const guard = new SessionTailValidator(f.path, f.sm);
+		expect(guard.check(f.sm)).toBe(true);
+		utimesSync(f.path, new Date(), new Date(Date.now() + 10000));
+		expect(guard.check(f.sm)).toBe(true);
+		f.append(); expect(guard.check(f.sm)).toBe(true);
+	}
+});
+test("batch branch reads use eight workers and retain order despite reversed completion", async () => {
+	const cache = new SessionBranchCounts();
+	const pending = new Map<string, (value: number | undefined) => void>();
+	let active = 0, peak = 0;
+	vi.spyOn(cache, "get").mockImplementation(path => {
+		active++; peak = Math.max(peak, active);
+		return new Promise(resolve => pending.set(path, value => { active--; resolve(value); }));
+	});
+	const result = cache.getMany(Array.from({ length: 20 }, (_, i) => String(i)));
+	while (pending.size) {
+		const batch = [...pending.entries()].reverse(); pending.clear();
+		for (const [path, finish] of batch) finish(path === "3" ? undefined : Number(path));
+		await Promise.resolve(); await Promise.resolve();
+	}
+	expect(await result).toEqual(Array.from({ length: 20 }, (_, i) => i === 3 ? undefined : i));
+	expect(peak).toBe(8);
+	expect(await cache.getMany([])).toEqual([]);
+});
+
+test("rejects a file that changes during baseline reading", () => {
+	const f = fixture(40), originalRead = syncFs.readSync;
+	let changed = false;
+	vi.spyOn(syncFs, "readSync").mockImplementation((...args: Parameters<typeof syncFs.readSync>) => {
+		const result = originalRead(...args);
+		if (!changed) { changed = true; appendFileSync(f.path, JSON.stringify({ id: "outside" }) + "\n"); }
+		return result;
+	});
+	const guard = new SessionTailValidator(f.path, f.sm);
+	expect(guard.check(f.sm)).toBe(false);
+});
+test("batch failures affect only the missing file and cache valid reads", async () => {
+	const f = fixture(), cache = new SessionBranchCounts();
+	expect(await cache.getMany([f.path, f.path + ".missing"])).toEqual([0, undefined]);
+	const reads = vi.mocked(fs.readFile).mock.calls.length;
+	expect(await cache.getMany([f.path])).toEqual([0]);
+	expect(vi.mocked(fs.readFile).mock.calls.length).toBe(reads);
 });

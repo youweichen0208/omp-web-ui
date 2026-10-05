@@ -46,6 +46,7 @@ export class SessionTreeController {
 			});
 			this.watcher.on("error", () => { this.external = true; this.host.changed(); });
 		}
+		this.checkExternal();
 	}
 	checkExternal(): void {
 		if (!this.watchPath || this.external) return;

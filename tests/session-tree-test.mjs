@@ -1,7 +1,7 @@
 // Native SDK session tree contract through the production WebSocket routes.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -127,6 +127,12 @@ try {
 	// A live response may be interrupted only with explicit consent; queue is recovered first.
 	holdNext = true; send({ type: "prompt", text: "held live response" });
 	await wait(() => state.isStreaming);
+	// Metadata-only changes must not abort a live response or turn it read-only.
+	utimesSync(originalFile, new Date(), new Date(Date.now() + 10000));
+	result = await request("tree_label", { entryId: rootAnswer, label: "after-touch" });
+	assert.equal(result.status, "ok");
+	await sleep(150);
+	assert.equal(state.isStreaming, true); assert.equal(state.tree.externallyModified, false);
 	result = await request("tree_navigate", { targetId: rootAnswer, summary: "none" }); assert.equal(result.status, "busy");
 	result = await request("tree_label", { entryId: rootAnswer, label: "during-stream" }); assert.equal(result.status, "ok");
 	send({ type: "prompt", text: "queued followup", queue: true });
@@ -151,8 +157,10 @@ try {
 	result = await request("tree_label", { conversationId: "wrong", entryId: rootAnswer, label: "wrong" }); assert.equal(result.status, "error");
 	ws.close(); await sleep(100); state = undefined; await connect(); assert.equal(state.conversationId, id); assert(state.tree.branchPoints > 0);
 	// SDK writes from a second manager emulate the CLI; watcher must not confuse its own writes.
+	holdNext = true; send({ type: "prompt", text: "held before external write" });
+	await wait(() => state.isStreaming);
 	const cli = SessionManager.open(originalFile); cli.appendLabelChange(rootAnswer, "from-cli");
-	await wait(() => state.tree.externallyModified);
+	await wait(() => state.tree.externallyModified && !state.isStreaming);
 	result = await request("tree_label", { entryId: rootAnswer, label: "blocked" }); assert.equal(result.status, "error");
 	const externalLength = readFileSync(originalFile).length;
 	send({ type: "rename_session", path: originalFile, name: "blocked rename" });

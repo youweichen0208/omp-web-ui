@@ -2418,12 +2418,14 @@ export class ClientSession {
 				const infos = await SessionManager.list(cwd);
 				// SDK SessionInfo includes allMessagesText. Retain only UI summaries.
 				const sessions = new Map<string, SessionSummary>();
-				for (const info of infos.sort((a, b) => b.created.getTime() - a.created.getTime()).slice(0, 200)) {
+				const selected = infos.sort((a, b) => b.created.getTime() - a.created.getTime()).slice(0, 200);
+				const counts = await this.branchCounts.getMany(selected.map(info => resolve(info.path)));
+				for (const [index, info] of selected.entries()) {
 					const path = resolve(info.path);
 					sessions.set(path, {
 						path, name: info.name, firstMessage: info.firstMessage,
 						parentSessionPath: info.parentSessionPath,
-						branchPoints: await this.branchCounts.get(path),
+						branchPoints: counts[index],
 						messageCount: info.messageCount, modified: info.modified.getTime(),
 						created: info.created.getTime(), source: "web",
 					});
