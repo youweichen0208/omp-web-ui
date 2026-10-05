@@ -16,11 +16,12 @@ export function parseCatalog(html: string, page: number): ExtensionCatalog {
 		const text = match[0], attr = (name: string) => decode(new RegExp(`${name}="([^"]*)"`).exec(text)?.[1] ?? "");
 		const name = attr("data-package-name"); if (!name) continue;
 		const meta = /class="packages-meta">([\s\S]*?)<\/div>/.exec(text)?.[1] ?? "";
-		items.push({ name, description: plain(/class="packages-desc">([\s\S]*?)<\/p>/.exec(text)?.[1] ?? ""), author: plain(/<span>(.*?)<\/span>/.exec(meta)?.[1] ?? ""), downloads: Number(attr("data-package-downloads")) || 0, date: Number(attr("data-package-date")) || undefined, types: attr("data-package-types").split(/[ ,]+/).filter(Boolean), url: `https://pi.dev/packages/${name}`, version: /package-version=([^"&]+)/.exec(text)?.[1], image: safeUrl(/<img[^>]*src="([^"]+)"/.exec(text)?.[1]), repository: safeUrl(/href="(https:\/\/github.com\/(?!earendil-works\/pi\/issues)[^"]+)"/.exec(text)?.[1]) });
+		items.push({ name, description: plain(/class="packages-desc">([\s\S]*?)<\/p>/.exec(text)?.[1] ?? ""), author: plain(/<span>(.*?)<\/span>/.exec(meta)?.[1] ?? ""), downloads: attr("data-package-downloads") && Number.isFinite(Number(attr("data-package-downloads"))) ? Number(attr("data-package-downloads")) : undefined, date: Number(attr("data-package-date")) || undefined, types: attr("data-package-types").split(/[ ,]+/).filter(Boolean), url: `https://pi.dev/packages/${name}`, version: /package-version=([^"&]+)/.exec(text)?.[1], image: safeUrl(/<img[^>]*src="([^"]+)"/.exec(text)?.[1]), repository: safeUrl(/href="(https:\/\/github.com\/(?!earendil-works\/pi\/issues)[^"]+)"/.exec(text)?.[1]) });
 	}
 	if (!items.length && !/packages-grid|No packages|No results/i.test(html)) throw Error("Pi catalog format changed; open pi.dev/packages");
 	const pages = Math.max(page, ...[...html.matchAll(/[?&](?:amp;)?page=(\d+)/g)].map(m => Number(m[1])));
-	return { items, page, pages };
+	const count = /class="packages-count">\s*[\d,]+-[\d,]+\s*\/\s*([\d,]+)/.exec(html)?.[1];
+	return { items, page, pages, ...(count ? { total: Number(count.replaceAll(",", "")) } : {}) };
 }
 export async function browseCatalog(query: string, type: string, sort: string, page: number) {
 	const params = new URLSearchParams({ name: query.slice(0,200), type: ["extension","skill","prompt","theme"].includes(type) ? type : "", sort: sort === "recent" ? "recent" : "downloads", page: String(Math.max(1,Math.min(1000,page))) });

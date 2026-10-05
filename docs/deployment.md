@@ -121,7 +121,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 桌面测试可设置 `PI_WEB_DATA_DIR` 指向临时数据目录；未设置时继续使用 `~/.pi-web-desktop`。Chromium 配置可用 `--user-data-dir` 隔离。
 
-桌面文件编辑与 Web 共用右栏组件。关闭窗口到托盘保留草稿；退出或刷新遇到未保存内容时，主进程通过 `will-prevent-unload` 显示原生放弃确认，取消后服务继续运行。
+桌面文件编辑与 Web 共用右栏组件。Wiki 关闭到托盘或退出前，主进程通过固定 `pi-window-before-close` 请求等待自动保存，校验主 frame 与请求 ID 后才接受 `pi-window-close-result`；失败或 30 秒超时取消关闭、保留窗口，服务保持运行。普通文件预览关闭到托盘仍保留草稿；退出或刷新遇到未保存内容时，主进程通过 `will-prevent-unload` 显示原生放弃确认，取消后服务继续运行。回归：`tests/wiki-desktop-save-test.mjs`。
 
 ### Windows 便携版临时目录
 

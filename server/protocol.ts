@@ -1218,7 +1218,12 @@ export interface WikiChange {
 	deletions: number;
 	truncated?: boolean;
 }
+export interface WikiApiError { error: string; code?: "version_conflict"; }
 export interface WikiRevision {
+	/** Attribution is absent on legacy records; never attach those to a new chat. */
+	conversationId?: string;
+	requestId?: string;
+	assistantTimestamp?: number;
 	id: string;
 	at: number;
 	author: "pi" | "user";
@@ -1263,9 +1268,10 @@ export interface ExtensionPackage {
 	latest?: string; update?: boolean; checkError?: string; protected?: boolean;
 }
 export interface ExtensionsState { packages: ExtensionPackage[]; version: string; trusted: boolean; checkedAt?: number; autoCheck?: boolean; }
-export interface ExtensionCatalogItem { name: string; description: string; version?: string; author?: string; downloads?: number; date?: number; types: string[]; image?: string; url: string; repository?: string; }
-export interface ExtensionCatalog { items: ExtensionCatalogItem[]; page: number; pages: number; }
-export interface ExtensionPreview { ticket: string; source: string; name: string; version?: string; description?: string; author?: string; repository?: string; resources: Record<string, string[]>; canPin: boolean; }
+export interface ExtensionCatalogItem { name: string; description: string; descriptionZh?: string; version?: string; author?: string; downloads?: number; date?: number; types: string[]; image?: string; url: string; repository?: string; }
+export interface ExtensionCatalog { items: ExtensionCatalogItem[]; page: number; pages: number; total?: number; }
+export interface ExtensionPackageDetails { source: string; name: string; version?: string; description?: string; author?: string; repository?: string; license?: string; resources: Record<string, string[]>; canPin: boolean; }
+export interface ExtensionPreview extends ExtensionPackageDetails { ticket: string; }
 export interface ExtensionOperation { action: "install" | "remove" | "toggle" | "update" | "update-all" | "unpin" | "move"; id?: string; scope?: ExtensionScope; enabled?: boolean; ticket?: string; pin?: boolean; }
 export interface ExtensionJob { id: string; phase: "running" | "done" | "error"; log: string; error?: string; }
 

@@ -6,6 +6,16 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	platform: process.platform,
+	onBeforeClose: callback => {
+		const listener = async (_event, id) => {
+			let allow = false;
+			try { allow = await callback() === true; } catch { /* Preserve drafts on failure. */ }
+			ipcRenderer.send("pi-window-close-result", { id, allow });
+		};
+		ipcRenderer.on("pi-window-before-close", listener);
+		ipcRenderer.send("pi-window-close-ready", true);
+		return () => { ipcRenderer.removeListener("pi-window-before-close", listener); ipcRenderer.send("pi-window-close-ready", false); };
+	},
 	clientId: process.argv.find(arg => arg.startsWith("--pi-desktop-client-id="))?.split("=")[1],
 	appUpdate: action => ipcRenderer.invoke("pi-app-update", action),
 	onAppUpdate: callback => {

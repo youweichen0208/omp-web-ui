@@ -51,7 +51,7 @@ async function previewSource(source: string): Promise<Omit<ExtensionPreview,"tic
 	if (info.kind === "local") { try { meta = readJson(join(source,"package.json")); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOTDIR") throw e; } }
 	const resources: Record<string,string[]> = {};
 	for (const type of resourceTypes) if (Array.isArray(meta.pi?.[type])) resources[type] = meta.pi[type].filter((v: unknown) => typeof v === "string").slice(0,100);
-	return { source, name: textField(meta.name) ?? info.name, version: textField(meta.version), description: textField(meta.description), author: textField(typeof meta.author === "string" ? meta.author : meta.author?.name), repository: safeUrl(typeof meta.repository === "string" ? meta.repository : meta.repository?.url), resources, canPin: info.kind === "npm" && typeof meta.version === "string" };
+	return { source, name: textField(meta.name) ?? info.name, version: textField(meta.version), description: textField(meta.description), license: textField(meta.license), author: textField(typeof meta.author === "string" ? meta.author : meta.author?.name), repository: safeUrl(typeof meta.repository === "string" ? meta.repository : meta.repository?.url), resources, canPin: info.kind === "npm" && typeof meta.version === "string" };
 }
 export function installExtensionsRoutes(app: Express, service: () => AgentService, originAllowed: (req: Request) => boolean) {
 	canBackgroundRun = () => !service().quiesceInfo().quiesced;
@@ -86,6 +86,7 @@ export function installExtensionsRoutes(app: Express, service: () => AgentServic
 				const path=join(agentDir,"webui-extensions.json"), previous=readJson(path);mkdirSync(agentDir,{recursive:true});writeFileSync(`${path}.tmp`,JSON.stringify({...previous,autoCheck:req.body.enabled}),{mode:0o600});renameSync(`${path}.tmp`,path);res.json({autoCheck:req.body.enabled});return;
 			}
 			if (action === "search") { res.json(await browseCatalog(String(req.body.query ?? ""),String(req.body.type ?? ""),String(req.body.sort ?? ""), Number(req.body.page) || 1)); return; }
+			if (action === "details") { res.json(await previewSource(validateSource(req.body.source,cwd))); return; }
 			if (action === "preview") {
 				const preview = { ...await previewSource(validateSource(req.body.source,cwd)), ticket: randomUUID() };
 				if (tickets.size >= 64) tickets.delete(tickets.keys().next().value!);

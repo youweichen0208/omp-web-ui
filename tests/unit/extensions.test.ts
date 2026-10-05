@@ -67,7 +67,8 @@ describe("native extension management",()=>{
 
 	it("parses actual catalog data as text and preserves source pins",()=>{
 		const result=parseCatalog('<article data-package-card="true" data-package-name="@scope/name" data-package-types="extension skill" data-package-downloads="123" data-package-date="1234"><p class="packages-desc">A &amp; B</p><div class="packages-meta"><span>author</span></div><a href="https://example.com/?package-version=1.2.3">report</a></article><a href="/packages?page=4">4</a>',1);
-		expect(result.items[0]).toMatchObject({name:"@scope/name",description:"A & B",downloads:123,types:["extension","skill"],version:"1.2.3"});expect(result.pages).toBe(4);
+		expect(result.items[0]).toMatchObject({name:"@scope/name",description:"A & B",downloads:123,types:["extension","skill"],version:"1.2.3"});expect(result.pages).toBe(4);expect(result.total).toBeUndefined();
+		expect(parseCatalog('<div class="packages-grid"></div><span class="packages-count">1-50 / 5,350</span>',1).total).toBe(5350);
 		expect(sourceInfo("npm:@scope/name@1.0.0").pinned).toBe(true);expect(sourceInfo("npm:@scope/name@^1").pinned).toBe(false);
 		expect(sourceInfo("git:github.com/owner/repo@v1").pinned).toBe(true);
 		expect(()=>validateSource("--help","/tmp")).toThrow();

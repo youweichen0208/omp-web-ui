@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FiCheck, FiLoader, FiX } from "react-icons/fi";
+import { FiCheck, FiLoader, FiX, FiMoreHorizontal } from "react-icons/fi";
 import { useT } from "../i18n";
-import type { UiMessage, UiToolCallBlock, UiThinkingBlock, UiModelInfo, ToolStatus } from "../types";
+import type { UiMessage, UiToolCallBlock, UiThinkingBlock, UiModelInfo, ToolStatus, WikiRevision } from "../types";
 import { wikiReplyParts } from "../wiki-chat";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ConversationWorkingStatus } from "./WorkingStatus";
+import { WikiReadingDialog } from "./WikiReading";
 import { Markdown } from "./Markdown";
 
-export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, changes, error, conversationId, thinkingWrap, connected, silenceNotified }: {
+export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, revisions, onViewChange, onUndo, onResend, error, conversationId, thinkingWrap, connected, silenceNotified }: {
 	conversationId: string; thinkingWrap: boolean; connected: boolean; silenceNotified: boolean;
 	messages: UiMessage[]; live: UiMessage | null; streaming: boolean; toolStatuses: Map<string, ToolStatus>;
 	model?: UiModelInfo; contextPercent?: number | null; disabled: boolean; onNew: () => void; onClose: () => void;
-	canJump: (section: number) => boolean; jump: (section: number) => void; composer: ReactNode; changes: ReactNode; error: ReactNode;
+	canJump: (section: number) => boolean; jump: (section: number) => void; composer: ReactNode; revisions: WikiRevision[]; onViewChange: (revision: WikiRevision) => void; onUndo: (revision: WikiRevision) => void; onResend: (text: string) => void; error: ReactNode;
 }) {
 	const t = useT(), scroll = useRef<HTMLDivElement>(null), follow = useRef(true);
+	const [requestPreview, setRequestPreview] = useState<string | null>(null);
+	const [actionError, setActionError] = useState("");
 	const [limit, setLimit] = useState(60);
 	// Increment-only streaming messages can precede the snapshot that supplies role metadata.
 	const transcript = useMemo(() => streaming && live && !messages.some(m => m.id === live.id) ? [...messages, { ...live, role: "assistant" }] : messages, [messages, live, streaming]);
@@ -50,13 +53,14 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 			if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
 			else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
 		}}>
-		<header><span className="wiki-chat-brand">π</span><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
+		<header><span className="wiki-chat-brand">π</span><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null && contextPercent > 0 ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
 		{error}
 		<div className="wiki-chat-messages" ref={scroll} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
 			{transcript.length > limit && <button className="wiki-chat-earlier" onClick={() => { follow.current = false; setLimit(n => n + 60); }}>{t("wikiEarlierMessages")}</button>}
 			{!transcript.length && <p className="wiki-chat-empty">{t("wikiChatEmpty")}</p>}
 			{transcript.slice(-limit).map(message => {
 				if (!["user", "assistant"].includes(message.role)) return null;
+				const original = message.content.filter(b => b.type === "text").map(b => "text" in b ? b.text : "").join("\n");
 				return <div key={message.id} className={`wiki-chat-message ${message.role}`}>
 					{message.content.map((block, index) => {
 						if (block.type === "thinking") { const thinking = block as UiThinkingBlock; return <ThinkingBlock key={index} thinking={thinking.thinking} durationMs={thinking.durationMs} streaming={streaming && message.id === live?.id && index === message.content.length - 1} wrap={thinkingWrap} />; }
@@ -65,15 +69,26 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 						if (block.type !== "text" || typeof block.text !== "string" || !block.text.trim()) return null;
 						if (message.role === "user") {
 							const split = /\n\n(?:范围|Scope): /.exec(block.text);
-							return <div key={index}><Markdown text={split ? block.text.slice(0, split.index) : block.text} />{split && <details className="wiki-chat-request"><summary>{t("wikiPromptPreview")}</summary><pre>{block.text.slice(split.index + 2)}</pre></details>}</div>;
+							return <div key={index}><Markdown text={split ? block.text.slice(0, split.index) : block.text} /></div>;
 						}
 						return <div key={index} className="wiki-chat-answer">{wikiReplyParts(block.text).map((part, i) => part.kind === "text" ? <Markdown key={i} text={part.text} /> : <section key={i} className="wiki-suggestion"><header><strong>{part.title}</strong>{part.section !== null && canJump(part.section) && <button onClick={() => jump(part.section!)}>{t("wikiJumpSection", { section: part.section })}</button>}</header>{part.text && <Markdown text={part.text} />}</section>)}</div>;
 					})}
+					{message.role === "user" && <details className="wiki-message-actions"><summary aria-label={t("wikiMessageActions")}><FiMoreHorizontal /></summary><div role="menu">
+						<button role="menuitem" onClick={e => { e.currentTarget.closest("details")?.removeAttribute("open"); setRequestPreview(original); }}>{t("wikiFullRequest")}</button>
+						<button role="menuitem" onClick={e => { e.currentTarget.closest("details")?.removeAttribute("open"); void navigator.clipboard.writeText(original).catch(e => setActionError(e.message)); }}>{t("copy")}</button>
+						<button role="menuitem" disabled={disabled || streaming} onClick={e => { e.currentTarget.closest("details")?.removeAttribute("open"); onResend(original); }}>{t("wikiResend")}</button>
+					</div></details>}
+					{message.role === "assistant" && revisions.filter(r => r.author === "pi" && r.conversationId === conversationId && r.assistantTimestamp !== undefined && r.assistantTimestamp === message.timestamp && r.changes.length > 0).map(revision => <div className="wiki-reply-change" key={revision.id}>
+						<FiCheck /><span>{t("wikiReplyChanged", { file: revision.changes.length === 1 ? revision.changes[0].path.split("/").at(-1)! : t("wikiFileCount", { count: revision.changes.length }) })} · <em>+{revision.changes.reduce((n, c) => n + c.additions, 0)}</em> <b>−{revision.changes.reduce((n, c) => n + c.deletions, 0)}</b></span>
+						<button onClick={() => onViewChange(revision)}>{t("wikiViewChange")}</button><button disabled={disabled || streaming} onClick={() => onUndo(revision)}>{t(revision.changes.every(c => c.undone) ? "wikiRedo" : "wikiUndo")}</button>
+					</div>)}
 					{message.errorMessage && <p role="alert" className="wiki-chat-error">{message.errorMessage}</p>}
 				</div>;
 			})}
 			{streaming && <ConversationWorkingStatus state={{ messages, streamingMessage: live, isStreaming: streaming, conversationId, model: model ?? null }} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />}
 		</div>
-		<footer>{changes}{composer}</footer>
+		{actionError && <p role="alert">{actionError}</p>}
+		<footer>{composer}</footer>
+		{requestPreview !== null && <WikiReadingDialog title={t("wikiFullRequest")} onClose={() => setRequestPreview(null)}><pre className="wiki-full-request">{requestPreview}</pre></WikiReadingDialog>}
 	</aside>;
 }

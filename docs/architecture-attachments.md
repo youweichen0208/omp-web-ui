@@ -75,3 +75,5 @@ SDK 的 nextTurn 缓冲不会随 steer/followUp 消费，因此附件在预检�
 高亮块使用 `> [!NOTE]` 加引用正文保存为 Markdown，编辑器和只读 Markdown 渲染器共用标记转换；浅蓝底色仅属于显示样式。保存时不会写入 HTML 或编辑器属性，普通引用保持原样。回归：`tests/highlight-block-ui-test.mjs` 验证插入、编辑、保存重开与源码切换，`tests/unit/highlight-block.test.ts` 验证标记识别边界。
 
 渲染 Markdown 编辑器顶部提供紧凑格式栏（撤销、重做、正文、H1/H2、粗体、斜体、列表、引用）；鼠标按下保留文档选区，操作复用现有编辑与保存路径，只读状态禁用按钮。Web 与 Electron 使用统一的本地 IBM Plex Sans／JetBrains Mono 字体、白色文档画布、暖灰导航和紫色操作色；文档正文 15px、行距 1.7，保留浅色代码块与高亮块。
+
+Wiki 使用同一个富文本编辑器的专用编辑态：自动保存、H1–H3 紧凑菜单、选区浮条和两色标记，正文中空格后也可触发 `/`。普通文件预览仍使用本节的格式栏与块首菜单规则。详见 [Wiki 22a 编辑态](architecture-wiki.md#22a-编辑态与自动保存)。

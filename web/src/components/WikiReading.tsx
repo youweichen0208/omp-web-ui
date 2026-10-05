@@ -8,7 +8,7 @@ export function WikiReadingDialog({ title, onClose, children }: { title: string;
 	const t = useT(), dialog = useRef<HTMLElement>(null);
 	useEffect(() => {
 		const previous = document.activeElement as HTMLElement | null;
-		dialog.current?.querySelector<HTMLElement>("button")?.focus();
+		(dialog.current?.querySelector<HTMLElement>("input") ?? dialog.current?.querySelector<HTMLElement>("button"))?.focus();
 		return () => { if (previous?.isConnected) previous.focus(); };
 	}, []);
 	return createPortal(<div className="wiki-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -31,6 +31,7 @@ export function WikiIndexIndicator({ status }: { status: WikiIndexStatus }) {
 	const count = (n: number) => n.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 	const issueCount = status.issues.length;
 	const summary = t("wikiIndexStatus", { indexed: count(status.indexed), total: count(status.total) + (status.totalIsLowerBound ? "+" : "") });
+	if (!open && !issueCount && !status.totalIsLowerBound && status.indexed === status.total) return null;
 	return <>
 		<button className={`wiki-index-status ${issueCount ? "limited" : ""}`} onClick={() => setOpen(true)} title={summary}>
 			{issueCount > 0 && <i />}<span>{summary}</span>

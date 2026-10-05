@@ -26,6 +26,7 @@ import { createAppUpdater } from "./app-updater.mjs";
  */
 
 import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, shell } from "electron";
+import { randomUUID } from "node:crypto";
 import { fork } from "node:child_process";
 import { createServer } from "node:net";
 import { existsSync, mkdirSync } from "node:fs";
@@ -50,6 +51,7 @@ let tray = null;
 /** @type {import("node:child_process").ChildProcess | null} */
 let serverProcess = null;
 let isQuitting = false;
+let closeGuardReady = false, closeApproved = false, pendingClose = null;
 let serverPort = 0;
 let clientId;
 const dataDir = process.env.PI_WEB_DATA_DIR || join(
@@ -283,8 +285,19 @@ function createWindow() {
 		mainWindow.show();
 	});
 
-	// 关闭窗口 → 隐藏到托盘（不退出）
+	// Give the editor a chance to flush before hiding or quitting. Keep the server
+	// alive until the matching main-frame acknowledgement; failure cancels closing.
 	mainWindow.on("close", (event) => {
+		if (closeGuardReady && !closeApproved) {
+			event.preventDefault();
+			if (!pendingClose) {
+				const id = randomUUID();
+				pendingClose = { id, timer: setTimeout(() => { pendingClose = null; isQuitting = false; mainWindow?.show(); }, 30000) };
+				mainWindow.webContents.send("pi-window-before-close", id);
+			}
+			return;
+		}
+		closeApproved = false;
 		if (!isQuitting) {
 			event.preventDefault();
 			mainWindow.hide();
@@ -293,6 +306,9 @@ function createWindow() {
 	});
 
 	mainWindow.on("closed", () => {
+		closeGuardReady = false;
+		if (pendingClose) clearTimeout(pendingClose.timer);
+		pendingClose = null;
 		mainWindow = null;
 	});
 
@@ -301,6 +317,18 @@ function createWindow() {
 		mainWindow.webContents.openDevTools({ mode: "detach" });
 	}
 }
+
+ipcMain.on("pi-window-close-ready", (event, ready) => {
+	if (mainWindow && event.sender === mainWindow.webContents && event.senderFrame === mainWindow.webContents.mainFrame) closeGuardReady = ready === true;
+});
+ipcMain.on("pi-window-close-result", (event, result) => {
+	const win = mainWindow;
+	if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || !pendingClose || result?.id !== pendingClose.id) return;
+	clearTimeout(pendingClose.timer); pendingClose = null;
+	if (result.allow !== true) { isQuitting = false; win.show(); win.focus(); return; }
+	closeApproved = true;
+	if (isQuitting) app.quit(); else win.close();
+});
 
 // Only the app's main webContents may control its own window. The renderer
 // receives fixed operations, never an arbitrary Electron method or channel.

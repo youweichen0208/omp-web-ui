@@ -8292,8 +8292,8 @@ html.pi-desktop .desktop-window-controls {
 .fp-more-actions { position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px; width: min(280px, calc(100vw - 40px)); padding: 12px; background: var(--panel-bg, #fff); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px #0002; }
 .fp-selection-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; font-size: 11px; }
 .fp-slash-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; position: fixed; z-index: 1500; width: min(320px, calc(100vw - 16px)); max-height: min(364px, calc(100vh - 16px)); overflow-y: auto; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg, #fff); box-shadow: 0 8px 30px #0002; }
-.fp-slash-menu > button { display: flex; align-items: center; gap: 10px; min-height: 42px; width: 100%; border: 0; background: transparent; text-align: left; padding: 8px 12px; border-radius: 6px; color: inherit; cursor: pointer; font: inherit; }
-.fp-slash-menu > button[aria-selected="true"], .fp-slash-menu > button:hover { background: #eeeeec; color: #303030; }
+.fp-slash-menu .fp-slash-options > button { display: flex; align-items: center; gap: 10px; min-height: 42px; width: 100%; border: 0; background: transparent; text-align: left; padding: 8px 12px; border-radius: 6px; color: inherit; cursor: pointer; font: inherit; }
+.fp-slash-menu .fp-slash-options > button[aria-selected="true"], .fp-slash-menu .fp-slash-options > button:hover { background: #eeeeec; color: #303030; }
 .fp-slash-menu { background: #fff; color: #303030; font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; border-color: #e5e5e5; box-shadow: 0 8px 28px #0000000d; }
 .fp-slash-group { grid-column: 1 / -1; padding: 8px 8px 4px; color: #909090; font-size: 12px; }
 .fp-slash-group:not(:first-child) { border-top: 1px solid #eeeeee; margin-top: 6px; padding-top: 12px; }
@@ -10654,3 +10654,144 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 .settings-modal .mcp-page-head > .settings-heading-actions { flex: none; margin-left: auto; }
 .settings-modal .settings-list-row, .settings-modal .ext-row-main { min-height: 48px; }
+
+/* Wiki editing (22a): contextual tools, quiet save status, compact reading width. */
+.wiki-workbench { --wiki-accent: oklch(.5 .16 285); }
+.wiki-workbench .wiki-sidebar { width: 250px; flex-basis: 250px; }
+.wiki-workbench .wiki-chat-panel { width: 400px; flex-basis: 400px; }
+.wiki-workbench .wiki-document { max-width: 816px; padding: 40px 48px 100px; }
+.wiki-document-heading h1 { font-size: 34px; font-weight: 700; }
+.wiki-document-meta { font-size: 13px; margin-bottom: 34px; flex-wrap: wrap; }
+.wiki-prose, .wiki-prose .fp-markdown .md { font-size: 15.5px; line-height: 1.85; }
+.wiki-prose.md h2, .wiki-prose .fp-markdown .md h2 { font-size: 22px; font-weight: 600; }
+.wiki-prose ::selection { background: oklch(.88 .05 285); }
+.wiki-prose .fp-markdown-zoom { font: inherit; }
+.wiki-save-status { display: inline-flex; align-items: center; gap: 5px; font: inherit; }
+.wiki-document-meta .wiki-save-status:disabled { opacity: 1; cursor: default; }
+.wiki-save-status i { width: 5px; height: 5px; border-radius: 50%; background: #299b74; }
+.wiki-save-status.saving i { background: #c6a23c; }
+.wiki-save-status.failed { color: var(--red); }
+.wiki-save-status.failed i { background: var(--red); }
+.wiki-conflict { display: flex; align-items: center; gap: 12px; padding: 10px 18px; font-size: 13px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.wiki-conflict button { border: 0; background: transparent; color: var(--wiki-accent); cursor: pointer; font: inherit; }
+.wiki-mode .status-messages { display: none; }
+.wiki-format-popover { position: fixed; z-index: 3100; display: flex; align-items: center; padding: 4px; border-radius: 9px; background: #292721; color: #fff; box-shadow: 0 5px 20px #0003; max-width: calc(100vw - 16px); }
+.wiki-format-popover button { display: flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px; border: 0; border-radius: 5px; font: 12px "IBM Plex Sans", sans-serif; color: inherit; background: transparent; cursor: pointer; }
+.wiki-format-popover button:hover { background: #ffffff20; }
+.wiki-format-popover button:disabled { opacity: .4; cursor: default; }
+.wiki-format-popover button:focus-visible { outline: 2px solid #c4b5fd; outline-offset: -2px; }
+.wiki-format-popover > i { width: 1px; height: 17px; background: #ffffff25; margin: 0 3px; }
+.wiki-format-popover .wiki-ask-selection { padding-inline: 8px; white-space: nowrap; }
+.fp-slash-options { display: contents; }
+.fp-slash-menu.wiki-slash-menu { display: block; width: 300px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); padding: 5px; border: 1px solid var(--border); border-radius: 11px; background: var(--bg-elev); box-shadow: 0 8px 30px #0002; overflow: hidden; }
+.wiki-slash-menu .fp-slash-options { display: block; max-height: min(384px, calc(100vh - 56px)); overflow-y: auto; }
+.wiki-slash-menu .fp-slash-options > button { display: flex; align-items: center; width: 100%; height: 48px; min-height: 48px; gap: 10px; padding: 6px 8px; line-height: 1.35; text-align: left; border-radius: 6px; }
+.wiki-slash-menu .fp-slash-options > button[aria-selected=true] { background: oklch(.955 .015 285); color: oklch(.4 .12 285); }
+.wiki-slash-menu .fp-slash-icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border: 1px solid var(--border-soft); border-radius: 5px; background: var(--bg); font: 12px var(--mono); }
+.wiki-slash-menu .fp-slash-label { min-width: 0; font-size: 13px; }
+.wiki-slash-menu small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-dim); white-space: nowrap; }
+.wiki-slash-menu kbd { padding: 0; background: transparent; border: 0; font-size: 11px; }
+.wiki-slash-menu footer { padding: 8px 7px 3px; border-top: 1px solid var(--border-soft); color: var(--text-dim); font-size: 11.5px; }
+.wiki-slash-empty { display: block; padding: 18px 10px; font-size: 12px; color: var(--text-dim); }
+.wiki-link-form { display: flex; gap: 8px; }
+.wiki-link-form input { min-width: 0; flex: 1; padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+.wiki-link-results { display: flex; flex-direction: column; max-height: 260px; overflow: auto; padding-top: 10px; }
+.wiki-link-results button { text-align: left; }
+.wiki-chat-message.user { position: relative; margin-left: auto; }
+.wiki-message-actions { position: absolute; left: -30px; top: 3px; z-index: 2; }
+.wiki-message-actions > summary { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 5px; cursor: pointer; color: var(--text-dim); opacity: 0; list-style: none; }
+.wiki-message-actions > summary::-webkit-details-marker { display: none; }
+.wiki-chat-message.user:hover .wiki-message-actions > summary, .wiki-message-actions:focus-within > summary, .wiki-message-actions[open] > summary { opacity: 1; }
+.wiki-message-actions > div { position: absolute; top: 28px; left: 0; width: max-content; max-width: 220px; display: flex; flex-direction: column; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); box-shadow: 0 5px 18px #0002; }
+.wiki-message-actions button { border: 0; background: transparent; color: var(--text); padding: 8px 10px; text-align: left; font-size: 12px; cursor: pointer; border-radius: 4px; }
+.wiki-message-actions button:hover { background: var(--bg-elev2); }
+.wiki-message-actions button:disabled { opacity: .4; cursor: default; }
+.wiki-full-request { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.7 var(--mono); }
+.wiki-reply-change { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft); font-size: 11.5px; color: var(--text-dim); }
+.wiki-reply-change > svg, .wiki-reply-change em { color: #299b74; font-style: normal; }
+.wiki-reply-change b { color: var(--red); font-weight: 400; }
+.wiki-reply-change button { border: 0; background: transparent; font: inherit; color: var(--wiki-accent); padding: 2px; cursor: pointer; }
+.wiki-reply-change button:disabled { opacity: .4; }
+:root[data-appearance="dark"] .wiki-slash-menu .fp-slash-options > button[aria-selected=true] { background: var(--accent-soft); color: var(--accent); }
+@media (max-width: 1099px) { .wiki-workbench .wiki-sidebar { width: 220px; flex-basis: 220px; } }
+@media (max-width: 760px) { .wiki-workbench .wiki-document { padding: 24px 22px 100px; } .wiki-document-heading h1 { font-size: 27px; } .wiki-workbench .wiki-chat-panel { width: min(400px, 100%); } .wiki-message-actions > summary { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wiki-format-popover *, .wiki-slash-menu * { transition: none !important; } }
+
+.wiki-document-meta .wiki-save-status:not(.failed) { color: var(--text-dim); }
+
+/* Extensions v3: compact catalog and native package installation. */
+.extensions-v3 .ext-v3-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--ext-line); margin-bottom: 20px; }
+.extensions-v3 .ext-v3-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 12px 0; color: var(--ext-muted); font-size: 13px; }
+.extensions-v3 .ext-v3-tabs button[aria-selected="true"] { color: var(--ext-purple); border-bottom-color: var(--ext-purple); }
+.extensions-v3 .ext-filters { align-items: center; gap: 12px; }
+.extensions-v3 .ext-search { flex: 1; min-width: 160px; }
+.extensions-v3 .ext-type-filters { display: flex; gap: 2px; }
+.extensions-v3 .ext-type-filters button { padding: 5px 9px; border: 0; background: transparent; color: var(--ext-muted); white-space: nowrap; font-size: 12px; }
+.extensions-v3 .ext-type-filters button[aria-pressed="true"] { background: var(--ext-soft); color: var(--ext-purple); }
+.extensions-v3 .ext-filters select { font-size: 12px; padding: 6px; }
+.ext-catalog-row { border-bottom: 1px solid var(--ext-line); }
+.ext-catalog-row.expanded { background: var(--ext-soft); }
+.ext-catalog-line { display: flex; align-items: center; gap: 16px; padding: 0 12px; min-height: 60px; }
+.extensions-v3 .ext-catalog-expand { display: flex; align-items: center; gap: 20px; flex: 1; min-width: 0; border: 0; padding: 12px 0; text-align: left; background: transparent; color: inherit; }
+.ext-catalog-identity { flex: 0 0 260px; min-width: 0; }
+.ext-catalog-identity strong { display: block; font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-catalog-identity small { display: block; margin-top: 5px; font-size: 11.5px; color: var(--ext-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-catalog-summary { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ext-muted); }
+.extensions-v3 .ext-catalog-action { flex: 0 0 64px; font-size: 12px; padding: 5px 8px; }
+.extensions-v3 .ext-catalog-action.installed { border-color: transparent; background: transparent; color: var(--ext-muted); opacity: 1; }
+.extensions-v3 .ext-catalog-action.update, .extensions-v3 .ext-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.ext-catalog-detail { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 24px; padding: 2px 16px 18px; font-size: 12px; }
+.ext-catalog-detail p { margin: 0 0 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.ext-catalog-detail aside { display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; overflow-wrap: anywhere; color: var(--ext-muted); }
+.ext-catalog-detail a { color: var(--ext-purple); text-decoration: none; }
+.ext-resource-counts { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--ext-muted); }
+.ext-resource-counts span { background: var(--bg-elev); border: 1px solid var(--ext-line); border-radius: 4px; padding: 2px 6px; }
+.ext-catalog-origin { font-size: 11px; color: var(--ext-muted); margin: 12px 0; }
+.settings-modal .extensions-v3 .ext-row-main { padding: 10px 12px; }
+.settings-modal .extensions-v3 .ext-row-info { flex: 1; min-width: 120px; }
+.settings-modal .extensions-v3 .ext-row-info:has(.ext-meta code) { display: block; }
+.settings-modal .extensions-v3 .ext-meta:not(:has(code)) { display: flex; }
+.settings-modal .extensions-v3 .ext-meta { margin-top: 4px; font-size: 11.5px; gap: 6px; flex-wrap: wrap; }
+.settings-modal .extensions-v3 .ext-meta code { font-size: 11px; }
+.settings-modal .extensions-v3 .ext-name strong { font: 500 13px var(--mono); overflow-wrap: anywhere; }
+.settings-modal .extensions-v3 .ext-row-main > .ext-resource-counts { flex: 0 1 190px; }
+.settings-modal .extensions-v3 .ext-version { flex: 0 1 170px; margin-left: 0; font-size: 11.5px; }
+.extensions-v3 .ext-dialog { width: 480px; box-sizing: border-box; border-radius: 10px; }
+.extensions-v3 .ext-dialog h3 { font-size: 15px; overflow-wrap: anywhere; }
+.ext-install-meta { font-size: 12px; color: var(--ext-muted); }
+.extensions-v3 .ext-preview-resources { border: 1px solid var(--ext-line); border-radius: 6px; padding: 12px; font-size: 12px; }
+.extensions-v3 .ext-preview-resources p { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; margin: 10px 0 0; }
+.extensions-v3 .ext-preview-resources p:only-child { display: block; }
+.extensions-v3 .ext-preview-resources code { overflow-wrap: anywhere; font-size: 11.5px; color: var(--ext-muted); }
+.ext-install-scope { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; }
+.ext-install-scope > code, .ext-install-scope > small { flex-basis: 100%; color: var(--ext-muted); font-size: 11px; }
+.ext-scope-segments { display: flex; background: var(--ext-soft); border-radius: 5px; padding: 2px; }
+.extensions-v3 .ext-scope-segments button { border: 0; background: transparent; font-size: 12px; padding: 5px 12px; }
+.extensions-v3 .ext-scope-segments button[aria-pressed="true"] { background: var(--bg-elev); color: var(--ext-purple); box-shadow: 0 1px 3px #0001; }
+.extensions-v3 .ext-security { padding: 10px 12px; border: 1px solid #c99d3140; border-radius: 6px; background: #c99d3110; line-height: 1.7; font-size: 11.5px; }
+.ext-install-error { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; font-size: 11px; color: var(--error, #c44); }
+.extensions-v3 button:focus-visible { outline: 2px solid var(--ext-purple); outline-offset: 2px; }
+@media (max-width: 900px) {
+	.ext-catalog-identity { flex-basis: 200px; }
+	.extensions-v3 .ext-filters { flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+	.ext-catalog-line { gap: 8px; padding: 0 6px; }
+	.extensions-v3 .ext-catalog-expand { flex-direction: column; align-items: stretch; gap: 6px; }
+	.ext-catalog-identity { flex-basis: auto; }
+	.ext-catalog-detail { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+	.extensions-v3 .ext-type-filters { flex-wrap: wrap; }
+	.settings-modal .extensions-v3 .ext-row-main { flex-wrap: wrap; }
+	.settings-modal .extensions-v3 .ext-row-main > .ext-resource-counts { flex-basis: auto; }
+}
+.extensions-v3 { --ext-soft: oklch(.985 .004 285); --ext-purple: oklch(.5 .16 285); }
+:root[data-appearance="dark"] .extensions-v3 { --ext-soft: #ffffff06; --ext-purple: #b6a0f0; }
+.extensions-v3 .ext-primary:hover:not(:disabled), .extensions-v3 .ext-catalog-action.update:hover:not(:disabled) { background: var(--text); color: var(--bg); filter: brightness(.9); }
+
+.extensions-v3 .ext-v3-tabs button[aria-selected="true"] { font-weight: 600; }
+.extensions-v3 .ext-catalog-list { border: 1px solid var(--ext-line); border-radius: 6px; overflow: hidden; }
+.ext-catalog-row:last-child { border-bottom: 0; }
+.extensions-v3 .ext-catalog-action.install { color: var(--ext-purple); border-color: color-mix(in srgb, var(--ext-purple) 30%, var(--bg-elev)); }
+.extensions-v3 .ext-catalog-expand { border-radius: 0; }
+:root[data-appearance="dark"] .extensions-v3 .ext-type-filters button { background: transparent; }
+:root[data-appearance="dark"] .extensions-v3 .ext-type-filters button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ext-purple); }

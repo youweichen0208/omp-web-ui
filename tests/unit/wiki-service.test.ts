@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { WikiService, wikiPath } from "../../server/wiki-service.js";
+import { WikiService, WikiConflictError, wikiPath } from "../../server/wiki-service.js";
 import { wikiMetadata, resolveWikiLink, wikiReferences } from "../../server/wiki-links.js";
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -16,6 +16,23 @@ function fixture() {
 	return { root, cwd, service };
 }
 describe("Wiki workspace", () => {
+	it("persists request/reply attribution only for actual Pi changes", async () => {
+		const { cwd, root, service } = fixture();
+		const before = await service.begin(cwd);
+		writeFileSync(join(cwd, "notes.md"), "# Changed\n");
+		const attribution = { conversationId: "wiki-session", requestId: "request", assistantTimestamp: 1234 };
+		await service.finish(cwd, before, "Edit notes", attribution);
+		const reloaded = new WikiService(join(root, "history"));
+		expect((await reloaded.state(cwd)).revisions[0]).toMatchObject(attribution);
+		const unchanged = await service.begin(cwd);
+		await service.finish(cwd, unchanged, "hello", { ...attribution, requestId: "hello" });
+		expect((await service.state(cwd)).revisions).toHaveLength(1);
+		const doc = await service.documentContent(cwd, "notes.md");
+		writeFileSync(join(cwd, "notes.md"), "External");
+		expect(() => service.write(cwd, "notes.md", "Mine", doc.version)).toThrow(WikiConflictError);
+		expect(readFileSync(join(cwd, "notes.md"), "utf8")).toBe("External");
+	});
+
 	it("snapshot traversal excludes history, symlinks and oversized files", async () => {
 		const { cwd, root } = fixture();
 		const data = join(cwd, "history");

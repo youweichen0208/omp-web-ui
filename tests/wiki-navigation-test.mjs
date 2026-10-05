@@ -79,7 +79,6 @@ try {
 	assert.equal(await page.getByRole('textbox', { name: '问 pi', exact: true }).inputValue(), 'question draft');
 	delay = false;
 	await page.locator('.wiki-tree-row[title="doc-001.md"]').click();
-	await page.getByRole('button', { name: '放弃修改', exact: true }).click();
 	await editable(1); await sessionReady();
 
 	// A running request is retained, queued B is replaced by C. A late body cannot replace C.
@@ -129,8 +128,8 @@ try {
 	const currentEditor = page.locator('.wiki-prose [contenteditable=true]');
 	await currentEditor.click(); await page.keyboard.type(' unsaved');
 	writeFileSync(join(cwd, 'doc-003.md'), '# External version\n\nChanged on disk.');
-	await page.getByRole('button', { name: '保存', exact: true }).click();
-	await page.getByRole('alert').getByText('File changed on disk; reload before saving', { exact: true }).waitFor();
+	await page.keyboard.press('Meta+s');
+	await page.getByRole('alert').getByText('文件已在外部修改', { exact: true }).waitFor();
 	assert((await currentEditor.innerText()).includes('unsaved'));
 	await select(4); await page.getByRole('button', { name: '放弃修改', exact: true }).click();
 	await editable(4); await sessionReady();

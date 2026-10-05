@@ -12,6 +12,8 @@ const MAX_SNAPSHOT = 64 * 1024 * 1024;
 const IGNORED = new Set([".git", "node_modules", ".pi-web", ".DS_Store"]);
 const hash = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
 type Snapshot = { files: Map<string, Buffer>; skipped: string[]; limited?: boolean };
+export class WikiConflictError extends Error {}
+type RevisionAttribution = Pick<WikiRevision, "conversationId" | "requestId" | "assistantTimestamp">;
 type StoredRevision = WikiRevision & { blobs: Record<string, { before: string | null; after: string | null }> };
 
 /** Resolve real paths, including every existing parent of a new file. */
@@ -236,7 +238,7 @@ export class WikiService {
 		await walk("", 0);
 		return { files, skipped, limited };
 	}
-	private record(cwd: string, before: Snapshot, after: Snapshot, author: "pi" | "user", title: string) {
+	private record(cwd: string, before: Snapshot, after: Snapshot, author: "pi" | "user", title: string, attribution: RevisionAttribution = {}) {
 		const blobs: StoredRevision["blobs"] = {}, changes: WikiChange[] = [], skipped = [...new Set([...before.skipped, ...after.skipped])];
 		const put = (data: Buffer | undefined) => { if (!data) return null; const id = hash(data); writeFileSync(join(this.folder(cwd), "blobs", id), data, { mode: 0o600 }); return id; };
 		for (const path of new Set([...before.files.keys(), ...after.files.keys()])) {
@@ -250,7 +252,7 @@ export class WikiService {
 			changes.push({ path, before: binary ? null : old?.slice(0, 4000) ?? null, after: binary ? null : next?.slice(0, 4000) ?? null, truncated: (old?.length ?? 0) > 4000 || (next?.length ?? 0) > 4000, binary, undone: false, additions: [...newLines].filter(l => !oldLines.has(l)).length, deletions: [...oldLines].filter(l => !newLines.has(l)).length });
 			blobs[path] = { before: put(a), after: put(b) };
 		}
-		if (changes.length || skipped.length) this.persist(cwd, [...this.history(cwd), { id: randomUUID(), at: Date.now(), author, title: title.slice(0, 300), changes, blobs, skipped }]);
+		if (changes.length || skipped.length) this.persist(cwd, [...this.history(cwd), { id: randomUUID(), at: Date.now(), author, ...attribution, title: title.slice(0, 300), changes, blobs, skipped }]);
 		this.invalidate(cwd);
 	}
 	async begin(cwd: string): Promise<Snapshot> {
@@ -258,15 +260,15 @@ export class WikiService {
 		this.active.add(key);
 		try { return await this.snapshot(cwd); } catch (e) { this.active.delete(key); throw e; }
 	}
-	async finish(cwd: string, before: Snapshot, title: string) {
-		try { this.record(cwd, before, await this.snapshot(cwd), "pi", title); } finally { this.active.delete(this.key(cwd)); }
+	async finish(cwd: string, before: Snapshot, title: string, attribution: RevisionAttribution = {}) {
+		try { this.record(cwd, before, await this.snapshot(cwd), "pi", title, attribution); } finally { this.active.delete(this.key(cwd)); }
 	}
 	cancel(cwd: string) { this.active.delete(this.key(cwd)); }
 	write(cwd: string, path: string, text: string, version: string) {
 		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
 		const abs = wikiPath(cwd, path), data = readFileSync(abs), next = Buffer.from(text);
 		if (data.length > MAX_FILE || next.length > MAX_FILE || !looksLikeText(data) || !Buffer.from(decodeText(data)).equals(data)) throw new Error("File is read-only");
-		if (hash(data) !== version) throw new Error("File changed on disk; reload before saving");
+		if (hash(data) !== version) throw new WikiConflictError("File changed on disk; reload before saving");
 		writeFileSync(abs, next);
 		this.record(cwd, { files: new Map([[path, data]]), skipped: [] }, { files: new Map([[path, next]]), skipped: [] }, "user", path);
 	}

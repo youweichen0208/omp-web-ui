@@ -1,6 +1,8 @@
+import { createPortal } from "react-dom";
+import { WikiReadingDialog } from "./WikiReading";
 import { TEXT_HIGHLIGHT_COLORS } from "../remark-text-highlight";
 import { Fragment, memo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare } from "react-icons/fi";
+import { FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare, FiLink, FiImage } from "react-icons/fi";
 import { markdownImageUrl } from "../markdown-image";
 import { withToken } from "../auth-token";
 import { getClientId } from "../use-chat";
@@ -15,7 +17,7 @@ const CODE_LANGUAGES = ["javascript", "typescript", "python", "bash", "json", "y
 
 export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, readOnly, onChange, file, wiki }: {
 	file: { cwd: string; path: string };
-	wiki?: { followLink: (href: string) => void; resolveCode: (value: string) => string | undefined; added: Set<string> };
+	wiki?: { paths: string[]; ask: (text: string) => void; followLink: (href: string) => void; resolveCode: (value: string) => string | undefined; added: Set<string> };
 	value: string;
 	readOnly: boolean;
 	onChange: (value: string) => void;
@@ -41,6 +43,11 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		const code = element?.closest<HTMLElement>("pre > code");
 		return code && root.current?.contains(code) && selection?.focusNode && code.contains(selection.focusNode) ? code : null;
 	};
+	const [floating, setFloating] = useState<{ x: number; y: number } | null>(null);
+	const [linkInput, setLinkInput] = useState<string | null>(null);
+	const linkRange = useRef<Range | null>(null), imageRange = useRef<Range | null>(null);
+	const imageInput = useRef<HTMLInputElement>(null);
+	const popup = useRef<HTMLDivElement>(null), floatingToolbar = useRef<HTMLDivElement>(null);
 	const [canHighlight, setCanHighlight] = useState(false);
 	const highlightSelection = () => {
 		const selection = window.getSelection();
@@ -50,10 +57,25 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		return range;
 	};
 	useEffect(() => {
-		const changed = () => setCanHighlight(!!highlightSelection());
+		const changed = () => {
+			const range = highlightSelection(); setCanHighlight(!!range);
+			if (!range) { setFloating(null); return; }
+			const rect = range.getBoundingClientRect();
+			if (rect.bottom < 0 || rect.top > window.innerHeight) { setFloating(null); return; }
+			setFloating({ x: Math.max(8, Math.min(rect.left + rect.width / 2 - 160, window.innerWidth - 328)), y: rect.top >= 50 ? rect.top - 46 : Math.min(rect.bottom + 8, window.innerHeight - 46) });
+		};
 		document.addEventListener("selectionchange", changed);
-		return () => document.removeEventListener("selectionchange", changed);
+		window.addEventListener("scroll", changed, true);
+		window.addEventListener("resize", changed);
+		return () => { document.removeEventListener("selectionchange", changed); window.removeEventListener("scroll", changed, true); window.removeEventListener("resize", changed); };
 	}, []);
+	useLayoutEffect(() => {
+		const toolbar = floatingToolbar.current, range = highlightSelection();
+		if (!toolbar || !range) return;
+		const rect = range.getBoundingClientRect();
+		toolbar.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - toolbar.offsetWidth / 2, window.innerWidth - toolbar.offsetWidth - 8))}px`;
+		toolbar.style.top = `${Math.max(8, rect.top >= toolbar.offsetHeight + 8 ? rect.top - toolbar.offsetHeight - 8 : Math.min(rect.bottom + 8, window.innerHeight - toolbar.offsetHeight - 8))}px`;
+	}, [floating]);
 	const documentState = useRef<RichDocument | null>(null);
 	const [menu, setMenu] = useState<{ query: string; x: number; y: number } | null>(null);
 	const [active, setActive] = useState(0);
@@ -82,6 +104,10 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		documentState.current = prepared;
 		emitted.current = value;
 	}, [value, t]);
+	useLayoutEffect(() => {
+		if (!wiki || !root.current) return;
+		root.current.querySelectorAll<HTMLElement>("p").forEach(p => p.classList.toggle("wiki-added", [...wiki.added].some(line => line.trim() && p.textContent?.includes(line))));
+	}, [wiki?.added, value]);
 	useLayoutEffect(() => {
 		if (readOnly) closeMenu();
 		root.current?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((input) => { input.disabled = readOnly; });
@@ -253,7 +279,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		update();
 	};
 	const items = [
-		...([1, 2, 3, 4, 5, 6] as const).map(level => ({ label: "richHeading", keywords: `heading header title h${level} bt${level} biaoti${level} 标题${level}`, alias: `bt${level}`, action: "formatBlock", argument: `h${level}` } as const)),
+		...((wiki ? [1, 2, 3] : [1, 2, 3, 4, 5, 6]) as (1 | 2 | 3 | 4 | 5 | 6)[]).map(level => ({ label: "richHeading", keywords: `heading header title h${level} bt${level} biaoti${level} 标题${level}`, alias: `bt${level}`, action: "formatBlock", argument: `h${level}` } as const)),
 		{ label: "richParagraph", alias: "zw", keywords: "paragraph text zw zhengwen 正文", action: "formatBlock", argument: "p" },
 		{ label: "richCodeBlock", alias: "dmk", keywords: "code fence dmk daimakuai 代码 代码块", action: "insertHTML", argument: "<pre><code data-slash-insert><br></code></pre><p><br></p>" },
 		{ label: "richHighlightBlock", alias: "glk", keywords: "highlight note callout glk gaoliangkuai ts tishi 高亮 提示", action: "insertHTML", argument: '<blockquote class="rich-highlight" data-rich-highlight="note"><p data-slash-insert><br></p></blockquote><p><br></p>' },
@@ -263,11 +289,16 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: "richTaskList", alias: "rw", keywords: "task todo checkbox rw rwlb renwu renwuliebiao 任务", action: "insertHTML", argument: '<ul><li><input type="checkbox"><span data-slash-insert> </span></li></ul><p><br></p>' },
 		{ label: "richQuote", alias: "yy", keywords: "quote yy yinyong 引用", action: "formatBlock", argument: "blockquote" },
 		{ label: "richDivider", alias: "fgx", keywords: "divider horizontal rule fgx fengexian 分隔线", action: "insertHTML", argument: "<hr><p><br></p>" },
+			{ label: "richImage", alias: "tp", keywords: "image photo upload tp tupian 图片", action: "image" },
+		{ label: "richWikiLink", alias: "sl", keywords: "wiki link document sl shuanglian 链接 双链 文档", action: "wikiLink" },
 	] as const;
-	const icons = { richHighlightBlock: <FiSquare />, richHeading: <span>H₂</span>, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <span>1.</span>, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
+	const icons = { richImage: <FiImage />, richWikiLink: <FiLink />, richHighlightBlock: <FiSquare />, richHeading: <span>H₂</span>, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <span>1.</span>, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
 	const itemLabel = (item: typeof items[number]) => item.label === "richHeading" ? `${t(item.label)} ${"argument" in item ? item.argument.slice(1) : ""}` : t(item.label);
 	const isBlock = (item: typeof items[number]) => item.action === "insertHTML";
-	const matches = items.filter((item) => `${itemLabel(item)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => Number(isBlock(a)) - Number(isBlock(b)));
+	const order = ["zw", "bt1", "bt2", "bt3", "lb", "bh", "rw", "yy", "dmk", "glk", "bg", "fgx", "tp", "sl"];
+	const hints: Record<string, string> = { zw: "", bt1: "#", bt2: "##", bt3: "###", lb: "-", bh: "1.", rw: "[]", yy: ">", dmk: "```", glk: ":::", bg: "3 × 3", fgx: "---", tp: "![]", sl: "[[" };
+	const help: Record<string, Parameters<typeof t>[0]> = { zw: "wikiInsertParagraph", bt1: "wikiInsertH1", bt2: "wikiInsertH2", bt3: "wikiInsertH3", lb: "wikiInsertList", bh: "wikiInsertOrdered", rw: "wikiInsertTask", yy: "wikiInsertQuote", dmk: "wikiInsertCode", glk: "wikiInsertCallout", bg: "wikiInsertTable", fgx: "wikiInsertDivider", tp: "wikiInsertImage", sl: "wikiInsertLink" };
+	const matches = items.filter(item => wiki || !["image", "wikiLink"].includes(item.action)).filter((item) => `${itemLabel(item)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => wiki ? order.indexOf(a.alias) - order.indexOf(b.alias) : Number(isBlock(a)) - Number(isBlock(b)));
 	const inspectSlash = () => {
 		if (readOnly) return closeMenu();
 		const selection = window.getSelection();
@@ -275,7 +306,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		const node = selection.anchorNode;
 		if (node.nodeType !== Node.TEXT_NODE || node.parentElement?.closest("pre, code, a, li, [contenteditable=false]")) return closeMenu();
 		const before = node.textContent?.slice(0, selection.anchorOffset) ?? "";
-		const match = /\/([^\s/]{0,32})$/.exec(before);
+		const match = (wiki ? /\/([\p{L}\p{N}]{0,32})$/u : /\/([^\s/]{0,32})$/).exec(before);
 		if (!match) return closeMenu();
 		const range = selection.getRangeAt(0).cloneRange();
 		range.setStart(node, selection.anchorOffset - match[1].length - 1);
@@ -287,15 +318,26 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		prefix.selectNodeContents(block);
 		prefix.setEnd(range.startContainer, range.startOffset);
 		const preceding = prefix.cloneContents();
-		if (preceding.textContent || preceding.querySelector("br, img, input, hr, video, audio")) return closeMenu();
+		if ((wiki ? !!preceding.textContent && !/\s$/.test(preceding.textContent) : !!preceding.textContent) || preceding.querySelector("br, img, input, hr, video, audio")) return closeMenu();
 		slashRange.current = range;
 		const rect = range.getBoundingClientRect();
-		setMenu({ query: match[1], x: Math.max(8, Math.min(rect.left, window.innerWidth - 328)), y: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - Math.min(380, window.innerHeight - 16))) });
+		setMenu({ query: match[1], x: Math.max(8, Math.min(rect.left, window.innerWidth - (wiki ? 308 : 328))), y: rect.bottom + 6 });
 		setActive(0);
 	};
+	useEffect(() => {
+		if (!menu) return;
+		const close = (event: Event) => { if (!(event.target instanceof Element && event.target.closest(".fp-slash-menu"))) closeMenu(); };
+		window.addEventListener("scroll", close, true); window.addEventListener("resize", close);
+		return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+	}, [!!menu]);
+	useLayoutEffect(() => {
+		if (!menu || !popup.current || !slashRange.current) return;
+		const rect = slashRange.current.getBoundingClientRect(), height = popup.current.offsetHeight;
+		popup.current.style.top = `${Math.max(8, rect.bottom + 6 + height <= window.innerHeight - 8 ? rect.bottom + 6 : rect.top - height - 6)}px`;
+	}, [menu]);
 	useLayoutEffect(() => {
 		const option = document.getElementById(`fp-slash-option-${active}`);
-		const popup = option?.parentElement;
+		const popup = wiki ? option?.parentElement : option?.closest<HTMLElement>(".fp-slash-menu");
 		if (option && popup) {
 			if (option.offsetTop < popup.scrollTop) popup.scrollTop = option.offsetTop;
 			else if (option.offsetTop + option.offsetHeight > popup.scrollTop + popup.clientHeight) popup.scrollTop = option.offsetTop + option.offsetHeight - popup.clientHeight;
@@ -312,7 +354,10 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		selection?.addRange(range);
 		closeMenu();
 		document.execCommand("delete");
-		command(item.action, "argument" in item ? item.argument : undefined);
+		if (item.action === "image") { imageRange.current = selection?.getRangeAt(0).cloneRange() ?? null; imageInput.current?.click(); update(); return; }
+		if (item.action === "wikiLink") { linkRange.current = selection?.getRangeAt(0).cloneRange() ?? null; setLinkInput("[["); update(); return; }
+		if (wiki && item.alias === "bg") command("insertHTML", `<table><thead><tr>${[1, 2, 3].map(n => `<th ${n === 1 ? "data-slash-insert" : ""}>${t("richColumn")} ${n}</th>`).join("")}</tr></thead><tbody>${[1, 2].map(() => "<tr><td>…</td><td>…</td><td>…</td></tr>").join("")}</tbody></table><p><br></p>`);
+		else command(item.action, "argument" in item ? item.argument : undefined);
 		// Chromium can leave an empty formatted heading's caret in the preceding block.
 		const target = root.current.querySelector("[data-slash-insert]") ?? (item.action === "formatBlock" ? blockParent?.querySelector(item.argument) : null);
 		if (target) {
@@ -324,6 +369,50 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			selection?.addRange(caret);
 			update();
 		}
+	};
+	const toggleHighlight = (color: typeof TEXT_HIGHLIGHT_COLORS[number]) => {
+		const range = highlightSelection();
+		if (!range || !root.current) return;
+		const walker = document.createTreeWalker(root.current, NodeFilter.SHOW_TEXT);
+		const colors: string[] = [];
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			if (!node.textContent || !range.intersectsNode(node)) continue;
+			if (range.endContainer === node && range.endOffset === 0 || range.startContainer === node && range.startOffset === node.textContent.length) continue;
+			let element = node.parentElement, background = "";
+			while (element && element !== root.current) {
+				if (element.style.backgroundColor && element.style.backgroundColor !== "transparent") { background = element.style.backgroundColor; break; }
+				element = element.parentElement;
+			}
+			colors.push(background);
+		}
+		command("hiliteColor", colors.length && colors.every(value => value === color.rgb || value === color.hex) ? "transparent" : color.hex);
+	};
+	const insertLink = (address: string, internal = false) => {
+		const range = linkRange.current;
+		if (readOnly || !range || !root.current?.contains(range.startContainer)) return;
+		if (!internal && !/^(https?:\/\/|mailto:|#|\.?\.?\/)/i.test(address)) { setImageError(t("wikiInvalidLink")); return; }
+		const a = document.createElement("a"); a.setAttribute("href", internal ? `#wiki=${encodeURIComponent(address)}` : address);
+		a.textContent = range.toString() && range.toString() !== "[[" ? range.toString() : address;
+		root.current.focus(); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+		command("insertHTML", a.outerHTML); setLinkInput(null);
+	};
+	const markdownShortcut = () => {
+		if (!wiki || readOnly) return false;
+		const selection = window.getSelection(), node = selection?.anchorNode;
+		if (!selection?.isCollapsed || !node || !root.current?.contains(node) || node.parentElement?.closest("pre, code, a, [contenteditable=false]")) return false;
+		const block = node.parentElement?.closest("p, div");
+		if (!block || block === root.current) return false;
+		const range = selection.getRangeAt(0).cloneRange(); range.setStart(block, 0);
+		const text = range.toString(), heading = /^(#{1,6})$/.exec(text);
+		const item = items.find(item => item.alias === ({ "-": "lb", "*": "lb", "1.": "bh", "[]": "rw", "[ ]": "rw", ">": "yy", "```": "dmk", "---": "fgx", ":::": "glk" } as Record<string, string>)[text]);
+		if (!heading && !item) return false;
+		selection.removeAllRanges(); selection.addRange(range); document.execCommand("delete");
+		if (heading) command("formatBlock", `h${heading[1].length}`);
+		else if (item) command(item.action, "argument" in item ? item.argument : undefined);
+		const target = root.current.querySelector("[data-slash-insert]");
+		if (target) { target.removeAttribute("data-slash-insert"); range.selectNodeContents(target); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); }
+		closeMenu(); update(); return true;
 	};
 	const formatTools = [
 		{ label: t("richUndo"), icon: <FiRotateCcw />, action: "undo" },
@@ -337,7 +426,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: t("richOrderedList"), icon: <span>1.</span>, action: "insertOrderedList" },
 	];
 	return <div className="fp-rich-editor" onScrollCapture={(event) => { if (!(event.target as HTMLElement).closest(".fp-slash-menu")) { if (menu) inspectSlash(); } }}>
-		<div className="fp-rich-toolbar" role="toolbar" aria-label={t("richFormatToolbar")}>
+		{!wiki && <div className="fp-rich-toolbar" role="toolbar" aria-label={t("richFormatToolbar")}>
 			{formatTools.map((tool) => <Fragment key={tool.label}>
 				{tool.separator && <span className="fp-rich-toolbar-separator" aria-hidden="true" />}
 				<button type="button" title={tool.label} aria-label={tool.label} disabled={readOnly}
@@ -350,7 +439,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 				onMouseDown={event => event.preventDefault()} onClick={() => { if (highlightSelection()) command("hiliteColor", color.hex); }}><span /></button>)}
 			<button type="button" title={t("richHighlightClear")} aria-label={t("richHighlightClear")} disabled={readOnly || !canHighlight}
 				onMouseDown={event => event.preventDefault()} onClick={() => { if (highlightSelection()) command("hiliteColor", "transparent"); }}><FiMinus /></button>
-		</div>
+		</div>}
 		{tableCell?.isConnected && !readOnly && <div className="fp-table-tools" role="toolbar" aria-label={t("richTableTools")}>
 			<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => editTable("row")}>{t("richAddRow")}</button>
 			<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => editTable("column")}>{t("richAddColumn")}</button>
@@ -361,14 +450,23 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		</div>}
 		{uploading && <div className="fp-notice" role="status">{t("richImageUploading")}</div>}
 		{imageError && <div className="fp-notice" role="alert">{imageError}</div>}
-		{menu && !readOnly && <div className="fp-slash-menu" role="listbox" aria-label={t("richInsertMenu")} style={{ left: menu.x, top: menu.y }}>
+		{wiki && floating && linkInput === null && createPortal(<div ref={floatingToolbar} className="wiki-format-popover" role="toolbar" aria-label={t("richFormatToolbar")} style={{ left: floating.x, top: floating.y }} onMouseDown={e => e.preventDefault()}>
+			{[{ label: t("richBold"), action: "bold", icon: <FiBold /> }, { label: t("richItalic"), action: "italic", icon: <FiItalic /> }, { label: `${t("richHeading")} 2`, action: "formatBlock", argument: "h2", icon: "H₂" }, { label: `${t("richHeading")} 3`, action: "formatBlock", argument: "h3", icon: "H₃" }].map(tool => <button key={tool.label} aria-label={tool.label} title={tool.label} disabled={readOnly} onClick={() => command(tool.action, tool.argument)}>{tool.icon}</button>)}
+			<button aria-label={t("wikiAddLink")} title={t("wikiAddLink")} disabled={readOnly} onClick={() => { linkRange.current = highlightSelection()?.cloneRange() ?? null; setLinkInput(""); }}><FiLink /></button><i />
+			{TEXT_HIGHLIGHT_COLORS.slice(0, 2).map(color => <button className={`fp-highlight-swatch fp-highlight-${color.name}`} key={color.name} aria-label={t(`richHighlight_${color.name}`)} title={t(`richHighlight_${color.name}`)} disabled={readOnly} onClick={() => toggleHighlight(color)}><span /></button>)}<i />
+			<button className="wiki-ask-selection" onClick={() => { wiki.ask(window.getSelection()?.toString() ?? ""); setFloating(null); }}>{t("wikiAskPi")}</button>
+		</div>, document.body)}
+		<input ref={imageInput} type="file" accept="image/*" hidden onChange={event => { const image = event.target.files?.[0], range = imageRange.current; if (image && range && root.current?.contains(range.startContainer)) { root.current.focus(); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); void pasteImage(image); } event.target.value = ""; }} />
+		{linkInput !== null && <WikiReadingDialog title={t("wikiAddLink")} onClose={() => setLinkInput(null)}><form className="wiki-link-form" onSubmit={event => { event.preventDefault(); insertLink(linkInput); }}><input aria-label={t("wikiLinkAddress")} placeholder={t("wikiLinkAddress")} value={linkInput} onChange={e => setLinkInput(e.target.value)} /><button type="submit" disabled={!linkInput.trim() || linkInput.startsWith("[[")}>{t("wikiInsertLinkAction")}</button></form>{linkInput.startsWith("[[") && <div className="wiki-link-results">{wiki?.paths.filter(path => /\.(md|markdown|mdown)$/i.test(path) && path.toLowerCase().includes(linkInput.slice(2).toLowerCase())).slice(0, 30).map(path => <button key={path} onClick={() => insertLink(path, true)}>{path}</button>)}</div>}</WikiReadingDialog>}
+		{menu && !readOnly && createPortal(<div ref={popup} className={`fp-slash-menu ${wiki ? "wiki-slash-menu" : ""}`} style={{ left: menu.x, top: menu.y }}>
+			<div className="fp-slash-options" role="listbox" aria-label={t("richInsertMenu")}>
 			{matches.length ? matches.map((item, index) => <Fragment key={item.alias}>
-				{(index === 0 || isBlock(item) !== isBlock(matches[index - 1])) && <div className="fp-slash-group" role="presentation">{t(isBlock(item) ? "richBlocksGroup" : "richTextGroup")}</div>}
-				<button type="button" role="option" aria-selected={index === active}
-				id={`fp-slash-option-${index}`} key={item.alias} onMouseDown={(event) => event.preventDefault()} onClick={() => insert(index)}>
-				<span className="fp-slash-icon" aria-hidden="true">{item.label === "richHeading" ? ("argument" in item ? item.argument.toUpperCase() : "H") : icons[item.label]}</span><span>{itemLabel(item)}</span><kbd aria-hidden="true">/{item.alias}</kbd>
-			</button></Fragment>) : <span>{t("richNoElements")}</span>}
-		</div>}
+				{!wiki && (index === 0 || isBlock(item) !== isBlock(matches[index - 1])) && <div className="fp-slash-group" role="presentation">{t(isBlock(item) ? "richBlocksGroup" : "richTextGroup")}</div>}
+				<button type="button" role="option" aria-label={itemLabel(item)} aria-selected={index === active} id={`fp-slash-option-${index}`} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => insert(index)}>
+					<span className="fp-slash-icon" aria-hidden="true">{item.label === "richHeading" ? ("argument" in item ? item.argument.toUpperCase() : "H") : icons[item.label]}</span><span className="fp-slash-label">{itemLabel(item)}{wiki && <small>{t(help[item.alias])}</small>}</span><kbd aria-hidden="true">{wiki ? hints[item.alias] : `/${item.alias}`}</kbd>
+				</button></Fragment>) : <span className="wiki-slash-empty">{t(wiki ? "wikiNoInsertResults" : "richNoElements")}</span>}
+			</div>{wiki && <footer>{t("wikiInsertKeys")}</footer>}
+		</div>, document.body)}
 		<div className="fp-markdown msg-text">
 			<div className="fp-markdown-zoom">
 				<div ref={root} className="md fp-rich-document" role="textbox" aria-label={t("richEditMarkdown")} aria-multiline="true"
@@ -379,6 +477,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 					onCompositionEnd={() => { const code = selectedCode(); if (code) paintCode(code); update(); inspectSlash(); }}
 					onKeyUp={() => setTableCell(selectedCell())}
 					onKeyDown={(event) => {
+						if (event.key === " " && !event.nativeEvent.isComposing && markdownShortcut()) { event.preventDefault(); return; }
 						if (event.key === "Enter" && !readOnly && !event.nativeEvent.isComposing) {
 							const code = selectedCode();
 							if (code) { event.preventDefault(); command("insertLineBreak"); return; }
@@ -412,7 +511,13 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 						const input = event.target as HTMLInputElement;
 						if (input.type === "checkbox") input.toggleAttribute("checked", input.checked);
 						update();
-						if (!(event.nativeEvent as InputEvent).isComposing) inspectSlash();
+						if (!(event.nativeEvent as InputEvent).isComposing) {
+							inspectSlash();
+							const selection = window.getSelection(), node = selection?.anchorNode;
+							if (wiki && selection?.isCollapsed && node?.nodeType === Node.TEXT_NODE && !node.parentElement?.closest("pre, code, a") && node.textContent?.slice(0, selection.anchorOffset).endsWith("[[")) {
+								const range = selection.getRangeAt(0).cloneRange(); range.setStart(node, selection.anchorOffset - 2); linkRange.current = range; setLinkInput("[[");
+							}
+						}
 					}}
 					onClick={(event) => { setTableCell(selectedCell()); closeMenu(); const link = (event.target as HTMLElement).closest("a"); if (link) { event.preventDefault(); const href = link.getAttribute("href"); if (wiki && href) { if (/^(https?:|mailto:)/i.test(href)) window.open(href, "_blank", "noopener,noreferrer"); else wiki.followLink(href); } } }}
 					onChange={(event) => {

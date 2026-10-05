@@ -33,11 +33,12 @@ try {
 	}
 	for (let level = 1; level <= 6; level++) {
 		await editor.locator('p').last().fill('');
-		await page.keyboard.type(`/bt${level}`);
-		await page.getByRole('option', { name: `标题 ${level}`, exact: true }).click();
+		if (level <= 3) { await page.keyboard.type(`/bt${level}`); await page.getByRole('option', { name: `标题 ${level}`, exact: true }).click(); }
+		else await page.keyboard.type('#'.repeat(level) + ' ');
 		await page.keyboard.type(`Heading ${level}`);
 		check(await editor.locator(`h${level}`).last().textContent() === `Heading ${level}`, `H${level} inserts correct heading level`);
-		await page.getByRole('toolbar', { name: '文档格式' }).getByRole('button', { name: '正文', exact: true }).click();
+		await page.keyboard.press('Enter');
+		await page.evaluate(() => document.execCommand('formatBlock', false, 'p'));
 	}
 	await editor.locator('p').last().fill('Before marked words after');
 	const selectWords = async () => {
@@ -57,13 +58,13 @@ try {
 	const yellow = page.getByRole('button', { name: '黄色背景', exact: true });
 	await selectWords(); await yellow.click();
 	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.textContent === 'marked words' && span.style.backgroundColor === 'rgb(255, 243, 163)')), 'selection receives yellow background');
-	await page.getByRole('button', { name: '撤销', exact: true }).click();
+	await page.keyboard.press('Meta+z');
 	check(await editor.locator('p').last().locator('span[style*="background-color"]').count() === 0, 'highlight supports native undo');
-	await page.getByRole('button', { name: '重做', exact: true }).click();
+	await page.keyboard.press('Meta+Shift+z');
 	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
 	let source = await page.locator('.fp-editor').inputValue();
 	check(source.includes('Before <mark style="background-color: #fff3a3">marked words</mark> after'), 'selected background persists as mark HTML');
-	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '保存', exact: true }).click();
+	await page.keyboard.press('Meta+s');
 	for (let i = 0; i < 50 && readFileSync(join(base, 'note.md'), 'utf8') !== source; i++) await new Promise(r => setTimeout(r, 100));
 	check(readFileSync(join(base, 'note.md'), 'utf8') === source, 'highlight saved to disk');
 	await page.reload();
@@ -71,9 +72,9 @@ try {
 	await page.locator('.file-name', { hasText: 'note.md' }).click();
 	await editor.locator('p').last().waitFor();
 	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.style.backgroundColor === 'rgb(255, 243, 163)')), 'highlight survives reload');
-	await selectWords(); await page.getByRole('button', { name: '蓝色背景', exact: true }).click();
-	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.style.backgroundColor === 'rgb(200, 228, 255)')), 'reopened highlight can change color');
-	await selectWords(); await page.getByRole('button', { name: '清除背景标记', exact: true }).click();
+	await selectWords(); await page.getByRole('button', { name: '绿色背景', exact: true }).click();
+	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.style.backgroundColor === 'rgb(204, 235, 197)')), 'reopened highlight can change color');
+	await selectWords(); await page.getByRole('button', { name: '绿色背景', exact: true }).click();
 	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
 	source = await page.locator('.fp-editor').inputValue();
 	check(source.includes('Before marked words after') && !source.includes('<mark'), 'clear removes color without losing text');

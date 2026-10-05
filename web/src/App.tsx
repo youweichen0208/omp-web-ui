@@ -19,7 +19,7 @@ import {
 } from "react";
 import { useWorkspaceScm } from "./use-workspace-scm";
 import { TopBar } from "./components/TopBar";
-import { desktopAPI } from "./desktop";
+import { desktopAPI, flushWindowSaves } from "./desktop";
 import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
 import { MessageList } from "./components/MessageList";
@@ -208,6 +208,7 @@ function ResizeHandle({
 type ViewName = "wiki" | "chat" | "terminal" | "git" | "nodes" | `plugin:${string}`;
 
 export function App() {
+	useEffect(() => desktopAPI?.onBeforeClose?.(flushWindowSaves), []);
 	const t = useT();
 	const { locale } = useI18n();
 	const { chat, send: rawSend, dismissNotice, pushNotice, setPendingEcho, terminal, switching, switchError } = useChat();

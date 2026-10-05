@@ -12,6 +12,7 @@ export interface DesktopWindowState {
 
 export interface DesktopAPI {
 	platform: string;
+	onBeforeClose?: (callback: () => Promise<boolean>) => () => void;
 	clientId?: string;
 	appUpdate?: (action: "read" | "check" | "update" | "install") => Promise<AppUpdateState>;
 	onAppUpdate?: (callback: (state: AppUpdateState) => void) => () => void;
@@ -28,3 +29,13 @@ declare global {
 }
 
 export const desktopAPI = window.electronAPI;
+
+const windowSaves = new Set<() => Promise<boolean>>();
+export function registerWindowSave(save: () => Promise<boolean>) {
+	windowSaves.add(save);
+	return () => { windowSaves.delete(save); };
+}
+export async function flushWindowSaves() {
+	const results = await Promise.allSettled([...windowSaves].map(save => save()));
+	return results.every(result => result.status === "fulfilled" && result.value);
+}

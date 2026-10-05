@@ -64,7 +64,7 @@ try {
 	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
 	const source = await page.locator('.fp-editor').inputValue();
 	check(source.includes('public class Demo {\nx\n\nreturn 1;'), 'saved Markdown retains exactly one newline');
-	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '保存', exact: true }).click();
+	await page.keyboard.press('Meta+s');
 	for (let i = 0; i < 50 && readFileSync(join(base, 'note.md'), 'utf8') !== source; i++) await new Promise(r => setTimeout(r, 100));
 	check(readFileSync(join(base, 'note.md'), 'utf8') === source, 'disk save preserves edited code and blank lines');
 	check(source.includes('```java\npublic class Original {}\n```'), 'existing untouched code remains unchanged');

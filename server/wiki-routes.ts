@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import type { AgentService } from "./agent-service.js";
 import type { WikiConversationResult } from "./protocol.js";
-import { WikiService, wikiPath } from "./wiki-service.js";
+import { WikiService, WikiConflictError, wikiPath } from "./wiki-service.js";
 import { statSync } from "node:fs";
 import { extname } from "node:path";
 
@@ -52,8 +52,9 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 					if (typeof text !== "string" || !text.trim() || text.length > 100000 || typeof requestId !== "string" || conversationId !== cs.conversationId) throw new Error("Invalid Wiki request");
 					const before = await wiki.begin(cwd);
 					if (!valid() || session.isStreaming) { wiki.cancel(cwd); throw new Error("Conversation changed"); }
+					const messageCount = session.messages.length;
 					let settled = false;
-					const finish = () => { if (settled) return; settled = true; off(); void wiki.finish(cwd, before, text).catch(e => console.error(`Wiki history failed: ${e.message}`)); };
+					const finish = () => { if (settled) return; settled = true; off(); void wiki.finish(cwd, before, text, { conversationId, requestId, assistantTimestamp: session.messages.slice(messageCount).findLast(message => message.role === "assistant")?.timestamp }).catch(e => console.error(`Wiki history failed: ${e.message}`)); };
 					const off = session.subscribe(event => { if (event.type === "agent_settled") finish(); });
 					await new Promise<void>((resolve, reject) => {
 						void cs.prompt(text, undefined, false, requestId, ok => ok ? resolve() : reject(new Error("Pi rejected the request; check model configuration"))).finally(() => { finish(); resolve(); });
@@ -64,7 +65,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 			}
 			if (cs.switchingWorkspace || cs.cwd !== cwd || (["prompt", "write", "restore"].includes(action) && !valid())) { res.status(409).json({ error: "Workspace changed" }); return; }
 			res.json(result);
-		} catch (error) { res.status(400).json({ error: (error as Error).message }); }
+		} catch (error) { res.status(error instanceof WikiConflictError ? 409 : 400).json({ error: (error as Error).message, ...(error instanceof WikiConflictError ? { code: "version_conflict" } : {}) }); }
 	});
 	app.get("/api/wiki-media", (req, res) => {
 		try {

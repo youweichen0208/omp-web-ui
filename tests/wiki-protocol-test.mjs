@@ -52,7 +52,10 @@ try {
 	const savedContent = await saved.json();
 	assert.equal(savedContent.text, '# saved');
 	assert.equal('backlinks' in savedContent, false, 'save response must not rebuild the reference index');
-	assert.equal((await request('write', { path: 'note.md', version: doc.version, text: '# stale' })).status, 400);
+	const conflict = await request('write', { path: 'note.md', version: doc.version, text: '# stale' });
+	assert.equal(conflict.status, 409);
+	assert.equal((await conflict.json()).code, 'version_conflict');
+	assert.equal(readFileSync(join(workspace, 'note.md'), 'utf8'), '# saved', 'conflicts never overwrite disk');
 	const history = await (await request('state')).json();
 	assert.equal(history.revisions.length, 1);
 	assert.equal((await request('restore', { id: history.revisions[0].id, undo: true })).status, 200);
