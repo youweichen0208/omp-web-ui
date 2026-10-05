@@ -131,7 +131,9 @@ Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使
 
 ### Pi 1.0.2 原版 SDK
 
-不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。每个对话创建原生 SettingsManager，生效配置未声明 defaultTools 时仅通过内存覆盖启用 `["+codemode", "+tool_search"]`；reload/信任变化后重新应用。已有原生选择（含空数组和禁用项）保持权威，不自动删除旧版已写入的值。MCP 使用原生 mcp.json，不配置外部服务器。
+依赖安装前运行 `npm run check:lockfile`，验证 lockfile 下载地址全部使用 HTTPS npm 官方源，再运行 `npm ci`。常规 CI、桌面发布和 Windows 验证工作流均在每次安装前检查；不修改用户全局 npm 配置。
+
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。每个对话创建原生 SettingsManager，getDefaultTools() 原生返回 undefined 时才在读取时提供由公开 getter 解析的 `["+codemode", "+tool_search"]` 默认工具副本；不写入配置。对话级压缩/重试开关也仅在 getter 读取时应用内存覆盖，原生保存、reload 和信任切换均保留对话选择。已有原生选择（含空数组和禁用项）保持权威，不自动删除旧版已写入的值。MCP 使用原生 mcp.json，不配置外部服务器。
 
 ### Wiki 文件与 PDF
 

@@ -73,3 +73,51 @@ test("a third-party extension replaces the native codemode tool", async () => {
 		expect(session.getAllTools().filter(tool => tool.name === "codemode")).toMatchObject([{ description: "third-party sentinel" }]);
 	} finally { session?.dispose(); rmSync(root, { recursive: true, force: true }); }
 });
+
+test.each([false, true])("native setters preserve explicit run overrides (%s) without persisting them", async enabled => {
+	const root = mkdtempSync(join(tmpdir(), "pi-native-setters-"));
+	try {
+		const path = join(root, "settings.json");
+		const original = { compaction: { enabled: !enabled }, retry: { enabled: !enabled } };
+		writeFileSync(path, JSON.stringify(original));
+		const a = conversationSettings(root, root), b = conversationSettings(root, root);
+		setConversationRunSettings(a, { autoCompaction: enabled });
+		setConversationRunSettings(a, { autoRetry: enabled });
+		const check = () => {
+			expect(a.getCompactionEnabled()).toBe(enabled);
+			expect(a.getRetryEnabled()).toBe(enabled);
+			expect(a.getCompactionSettings().enabled).toBe(enabled);
+			expect(a.getRetrySettings().enabled).toBe(enabled);
+			expect(a.getDefaultTools()).toEqual(["read", "bash", "edit", "write", "codemode", "tool_search"]);
+			expect(a.getSettings()).toMatchObject(original);
+			expect(a.getSettings().defaultTools).toBeUndefined();
+			expect(b.getCompactionEnabled()).toBe(!enabled);
+			expect(b.getRetryEnabled()).toBe(!enabled);
+		};
+		check();
+		for (const update of [
+			() => a.setDefaultThinkingLevel("high"),
+			() => a.setModelThinkingLevel("fixture", "model", "low"),
+			() => a.setDefaultModelAndProvider("fixture", "model"),
+			() => a.setSteeringMode("all"),
+			() => a.setFollowUpMode("all"),
+		]) {
+			update(); check(); await a.flush(); check();
+			expect(JSON.parse(readFileSync(path, "utf8"))).toMatchObject(original);
+			expect(JSON.parse(readFileSync(path, "utf8")).defaultTools).toBeUndefined();
+		}
+		expect(JSON.parse(readFileSync(path, "utf8"))).toMatchObject({ defaultThinkingLevel: "high", defaultProvider: "fixture", defaultModel: "model", steeringMode: "all", followUpMode: "all" });
+		a.getDefaultTools()!.length = 0;
+		await a.reload(); check();
+		a.setProjectTrusted(true); check();
+		a.setProjectTrusted(false); check();
+		const fresh = conversationSettings(root, root);
+		expect(fresh.getCompactionEnabled()).toBe(!enabled);
+		expect(fresh.getRetryEnabled()).toBe(!enabled);
+		writeFileSync(path, JSON.stringify({ compaction: { enabled }, retry: { enabled }, defaultTools: [] }));
+		await b.reload();
+		expect(b.getCompactionEnabled()).toBe(enabled);
+		expect(b.getRetryEnabled()).toBe(enabled);
+		expect(b.getDefaultTools()).toEqual([]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});

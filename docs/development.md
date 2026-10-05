@@ -8,6 +8,7 @@ npm run dev          # 并行：node --watch --import tsx 后端(:8788，dev:ser
 #                     注意：不要用 `tsx watch` 起后端——它在 Windows 下、stdio 为管道（concurrently 的 spawn 方式）
 #                     时会静默挂死（tsx 上游 bug），改用 Node 原生 --watch。
 npm run typecheck    # 双端 tsc --noEmit（提交前必跑）
+npm run check:lockfile  # 安装前校验 lockfile 下载地址为 HTTPS npm 官方源
 npm run check:protocol  # 守护协议单源 shim 机制（CI 必跑）
 npm run build        # build:web (vite) + build:server (tsc)
 npm start            # 跑编译产物 dist/server/index.js（生产）
@@ -18,7 +19,7 @@ npm run test:freeze  # 冻结/重连回归测试（Playwright，需要本机 chr
 
 ## CI
 
-GitHub Actions ubuntu-latest（`.github/workflows/ci.yml`，push/PR → main 或 develop 触发）：`check:protocol → typecheck → build → vitest → test:smoke`。
+GitHub Actions ubuntu-latest（`.github/workflows/ci.yml`，push/PR → main 或 develop 触发）：`check:lockfile → npm ci → check:protocol → typecheck → build → vitest → test:smoke`。
 
 SSH 节点另有 macOS/Windows CI job：两平台分别构建服务端并运行 `node-workbench-test.mjs` 的 mock SSH 测试。浏览器工作台交互可在 macOS 本地运行 `node tests/node-workbench-browser-test.mjs`（先 `npm run build`）。
 

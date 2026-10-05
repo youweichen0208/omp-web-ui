@@ -124,4 +124,4 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ## 原生默认值和可替换内置扩展
 
-Codemode/tool_search 默认值只覆盖每个对话的内存 SettingsManager，原生文件未声明 defaultTools 时生效。reload 和项目信任变化后通过公开 API 重放，不修改 SDK 或私有字段。codemode、tool-search、mcp 的 InlineExtension 标记 replaceable:true，用户扩展可以接管同名工具或命令。pi 1.0.2 未公开导出 llama.cpp 工厂，宿主暂不通过内部路径补装。
+每个对话的 SettingsManager 在 getDefaultTools() 读取时优先使用原生返回值，仅 undefined 时返回由 SettingsManager.inMemory 公开 getter 解析的 Codemode/tool_search 默认列表，每次返回副本。显式空数组、禁用项和项目配置保留原生语义；getSettings() 保留原生配置。对话压缩/重试开关同样由 getter 读取内存覆盖，不包装 reload/信任方法，不改变原生 setter、持久化和加载错误处理，不修改 SDK 或私有字段。codemode、tool-search、mcp 的 InlineExtension 标记 replaceable:true，用户扩展可以接管同名工具或命令。pi 1.0.2 未公开导出 llama.cpp 工厂，宿主暂不通过内部路径补装。

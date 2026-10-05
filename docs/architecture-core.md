@@ -112,7 +112,7 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 
 `recovery` 快照分别保存 compaction、auto retry 和 summary retry 的生命周期、操作 ID、原因、次数、截止时间和最长 500 字符错误。摘要重试结束只清理其子状态；agent_settled 清理整轮状态。切换及重连从权威快照恢复，恢复期间不触发静默提示或宿主重发。
 
-普通聊天和 Wiki 显示阶段与退避倒计时。取消携带 conversationId 和 operationId，仅匹配当前操作时调用原生 abortCompaction/abortRetry/abortBranchSummary。当前对话运行菜单的自动压缩和自动重试开关通过 SettingsManager.applyOverrides 生效，reload/信任变化后重放内存覆盖，新对话重新继承原生配置；切换开关不取消正在执行的操作。
+普通聊天和 Wiki 显示阶段与退避倒计时。取消携带 conversationId 和 operationId，仅匹配当前操作时调用原生 abortCompaction/abortRetry/abortBranchSummary。当前对话运行菜单的自动压缩和自动重试开关保存在每实例独立的内存映射中，由 SettingsManager 的 getCompactionEnabled/getRetryEnabled 在读取时优先应用（包括显式 false）；原生 setter、reload 和信任变化不会清除覆盖，getSettings() 仍返回原生配置，新对话重新继承原生配置；切换开关不取消正在执行的操作。
 
 ### 原生工具结果与下载
 

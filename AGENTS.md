@@ -102,7 +102,7 @@ pi-web-ui/
 │   ├── *-test.mjs              # 手写 Playwright E2E / WS 协议测试
 │   └── scratch/                # 一次性调试脚本（gitignore，不入库）
 ├── scripts/check-protocol-sync.mjs  # 守护 types.ts shim 单源机制 + protocol.ts 纯类型约束
-├── .github/workflows/ci.yml    # CI：协议同步 → typecheck → build → vitest → 冒烟
+├── .github/workflows/ci.yml    # CI：lockfile 检查 → 安装 → 协议同步 → typecheck → build → vitest → 冒烟
 ├── extensions/                 # npm CLI 扩展：webui.ts（/webui 启动浏览器；Desktop 不打包）
 ├── electron/                   # Electron 桌面版壳子（main.mjs 主进程 + 沙箱兼容的 preload.cjs），本地构建，不进 npm 包
 ├── electron-builder.yml        # Electron 打包配置（mac dmg/zip、win nsis/portable、linux AppImage/deb）
@@ -190,6 +190,8 @@ npm start            # 跑编译产物 dist/server/index.js（生产）
 npm test             # vitest 纯函数单测
 npm run test:smoke   # 零 token 协议冒烟聚合跑器
 ```
+
+依赖安装前先运行 `npm run check:lockfile`，确保下载地址全部使用 HTTPS npm 官方源；安装验证流程见 `docs/development.md`。
 
 **关键约定**：缩进用 Tab；i18n 走 `useT()`（zh/en 同时加）；样式全部在 `styles.css`；新增协议消息只改 `protocol.ts` 再两端 switch 加分支。
 

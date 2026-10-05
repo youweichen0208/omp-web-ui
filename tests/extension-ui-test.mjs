@@ -14,7 +14,7 @@ assert(PORT >= 8900); assert.equal(await portUp(PORT), false);
 const root = mkdtempSync(join(tmpdir(), "pi-extension-ui-"));
 const agent = join(root, "agent"), cwd = join(root, "work");
 mkdirSync(join(agent, "extensions"), { recursive: true }); mkdirSync(cwd);
-writeFileSync(join(agent, "models.json"), JSON.stringify({ providers: { fixture: { api: "openai-completions", baseUrl: "http://127.0.0.1:1", apiKey: "unused", models: [{ id: "fixture", input: ["text"], contextWindow: 32000, maxTokens: 1024 }] } } }));
+writeFileSync(join(agent, "models.json"), JSON.stringify({ providers: { fixture: { api: "openai-completions", baseUrl: "http://127.0.0.1:1", apiKey: "unused", models: ["fixture", "fixture-alt"].map(id => ({ id, reasoning: true, input: ["text"], contextWindow: 32000, maxTokens: 1024 })) } } }));
 writeFileSync(join(agent, "auth.json"), JSON.stringify({ fixture: { type: "api_key", key: "unused" } }));
 const settings = JSON.stringify({ defaultProvider: "fixture", defaultModel: "fixture", retry: { enabled: true }, compaction: { enabled: true } });
 writeFileSync(join(agent, "settings.json"), settings);
@@ -74,6 +74,26 @@ try {
  send({ type: "set_run_settings", conversationId: a, autoCompaction: false, autoRetry: false });
  await wait(m => ["snapshot", "snapshot_delta"].includes(m.type) && m.state.runSettings?.autoRetry === false);
  send({ type: "prompt", text: "/fixture-timeout" }); await wait(m => m.type === "notice" && m.text === "timeout:undefined");
+ const assertRunSettings = (state, enabled) => {
+  assert.equal(state.runSettings.autoCompaction, enabled);
+  assert.equal(state.runSettings.autoRetry, enabled);
+ };
+ for (const [message, matches] of [
+  [{ type: "set_thinking", level: "high" }, state => state.thinkingLevel === "high"],
+  [{ type: "set_model", modelId: "fixture/fixture-alt" }, state => state.model?.id === "fixture-alt"],
+ ]) {
+  wire.length = 0; send(message);
+  const updated = await wait(m => ["snapshot", "snapshot_delta"].includes(m.type) && m.state.conversationId === a && matches(m.state));
+  assertRunSettings(updated.state, false);
+  assert(!wire.some(m => m.type === "notice" && m.level === "error"));
+ }
+ wire.length = 0; ws.close(); await sleep(100); await connect(); send({ type: "get_state" });
+ assertRunSettings((await wait(m => m.type === "snapshot" && m.state.conversationId === a)).state, false);
+ wire.length = 0; send({ type: "switch_conversation", id: b });
+ assertRunSettings((await wait(m => m.type === "snapshot" && m.state.conversationId === b)).state, true);
+ send({ type: "prompt", text: "/fixture-timeout" }); await wait(m => m.type === "notice" && m.text === "timeout:undefined");
+ wire.length = 0; send({ type: "switch_conversation", id: a });
+ assertRunSettings((await wait(m => m.type === "snapshot" && m.state.conversationId === a)).state, false);
  send({ type: "prompt", text: "/fixture-ui reload" }); const old = await wait(m => m.type === "dialog" && m.title === "permission-reload");
  send({ type: "prompt", text: "/reload" }); await wait(m => m.type === "dialog_closed" && m.id === old.id);
  await wait(m => m.type === "reload_status" && m.phase === "done");
@@ -83,7 +103,13 @@ try {
  send({ type: "dialog_response", conversationId: a, id: old.id, value: true });
  send({ type: "dialog_response", conversationId: a, id: after.id, value: false });
  await wait(m => m.type === "notice" && m.text === "answer-after-reload:false");
- assert.equal(readFileSync(join(agent, "settings.json"), "utf8"), settings);
+ wire.length = 0; send({ type: "get_state" });
+ assertRunSettings((await wait(m => m.type === "snapshot" && m.state.conversationId === a)).state, false);
+ const persisted = JSON.parse(readFileSync(join(agent, "settings.json"), "utf8"));
+ assert.equal(persisted.compaction.enabled, true); assert.equal(persisted.retry.enabled, true);
+ assert.equal(persisted.defaultTools, undefined);
+ assert.equal(persisted.defaultProvider, "fixture");
+
  if (process.argv.includes("--browser")) {
   browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
   const page = await browser.newPage();

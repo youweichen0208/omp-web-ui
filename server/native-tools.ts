@@ -4,21 +4,18 @@ const runOverrides = new WeakMap<SettingsManager, { compaction?: { enabled: bool
 export function setConversationRunSettings(settings: SettingsManager, values: { autoCompaction?: boolean; autoRetry?: boolean }) {
 	const overrides = { ...runOverrides.get(settings), ...(typeof values.autoCompaction === "boolean" ? { compaction: { enabled: values.autoCompaction } } : {}), ...(typeof values.autoRetry === "boolean" ? { retry: { enabled: values.autoRetry } } : {}) };
 	runOverrides.set(settings, overrides);
-	settings.applyOverrides(overrides);
 }
 
 /** A native manager with conversation-local overrides; native writes stay native. */
 export function conversationSettings(cwd: string, agentDir: string): SettingsManager {
 	const settings = SettingsManager.create(cwd, agentDir);
-	const apply = () => {
-		settings.applyOverrides(runOverrides.get(settings) ?? {});
-		if (settings.getSettings().defaultTools === undefined) settings.applyOverrides({ defaultTools: ["+codemode", "+tool_search"] });
-	};
-	const reload = settings.reload.bind(settings);
-	settings.reload = async () => { await reload(); apply(); };
-	const trust = settings.setProjectTrusted.bind(settings);
-	settings.setProjectTrusted = value => { trust(value); apply(); };
-	apply();
+	const getCompactionEnabled = settings.getCompactionEnabled.bind(settings);
+	const getRetryEnabled = settings.getRetryEnabled.bind(settings);
+	const getDefaultTools = settings.getDefaultTools.bind(settings);
+	const defaultTools = SettingsManager.inMemory({ defaultTools: ["+codemode", "+tool_search"] }).getDefaultTools()!;
+	settings.getCompactionEnabled = () => runOverrides.get(settings)?.compaction?.enabled ?? getCompactionEnabled();
+	settings.getRetryEnabled = () => runOverrides.get(settings)?.retry?.enabled ?? getRetryEnabled();
+	settings.getDefaultTools = () => [...(getDefaultTools() ?? defaultTools)];
 	return settings;
 }
 
