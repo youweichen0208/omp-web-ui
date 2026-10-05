@@ -41,6 +41,9 @@ try {
 			await page.goto(`http://127.0.0.1:${port}`);
 			await page.locator('.topbar-actions .topbar-more').waitFor();
 			await page.locator('.tab-change-count', { hasText: String(changeCount) }).waitFor();
+			assert.equal(await page.locator('.tab-change-count').evaluate(el => getComputedStyle(el).color), 'rgb(169, 67, 54)');
+			assert.equal(await page.locator('.tab-change-count').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(252, 233, 228)');
+			await page.waitForFunction(() => getComputedStyle(document.querySelector('.view-switch button.active')).color === 'rgb(47, 122, 174)');
 			assert.equal(await page.locator('.topbar').evaluate(el => el.getBoundingClientRect().height), 44);
 			assert.equal(await page.locator('.workspace-jobs .bg-task-badge').textContent(), '2');
 			assert.equal(await page.locator('.header-task-progress').textContent(), '●第 2 / 5 步');
@@ -80,6 +83,9 @@ try {
 				changeCount++;
 				socket.send(JSON.stringify({ type: 'scm_changed' }));
 				await page.locator('.tab-change-count', { hasText: String(changeCount) }).waitFor();
+			assert.equal(await page.locator('.tab-change-count').evaluate(el => getComputedStyle(el).color), 'rgb(169, 67, 54)');
+			assert.equal(await page.locator('.tab-change-count').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(252, 233, 228)');
+			await page.waitForFunction(() => getComputedStyle(document.querySelector('.view-switch button.active')).color === 'rgb(47, 122, 174)');
 				await page.locator('.topbar-actions > .panel-toggle').click();
 				await page.locator('.tree-filter', { hasText: `改动 ${changeCount}` }).waitFor();
 				await page.locator('.project-panel-toggle').click();

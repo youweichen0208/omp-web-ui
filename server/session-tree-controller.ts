@@ -1,5 +1,6 @@
+import { SessionTailValidator } from "./session-file-read.js";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname } from "node:path";
 import { collectEntriesForBranchSummary, type AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import { projectTree, treeEntryContent, treeRevision, toUiTree } from "./session-tree.js";
@@ -21,7 +22,7 @@ export interface SessionTreeHost {
 export class SessionTreeController {
 	private watcher?: FSWatcher;
 	private watchPath?: string;
-	private fileStamp = "";
+	private validator?: SessionTailValidator;
 	private external = false;
 	private operation = false;
 	private revision = "";
@@ -32,15 +33,13 @@ export class SessionTreeController {
 	get busy() { return this.operation; }
 	get externallyModified() { this.checkExternal(); return this.external; }
 	private get session() { return this.host.runtime().session; }
-	private stamp(): string {
-		try { const s = statSync(this.watchPath!); return `${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`; } catch { return "missing"; }
-	}
+
 	bindFile(): void {
 		const path = this.session.sessionFile;
 		if (path === this.watchPath) return;
 		this.watcher?.close(); this.watcher = undefined;
 		this.watchPath = path; this.external = false; this.revision = "";
-		this.fileStamp = path ? this.stamp() : "";
+		this.validator = path ? new SessionTailValidator(path, this.session.sessionManager) : undefined;
 		if (path && existsSync(dirname(path))) {
 			this.watcher = watch(dirname(path), { persistent: false }, (_event, file) => {
 				if (!file || file.toString() === basename(path)) this.checkExternal();
@@ -50,16 +49,7 @@ export class SessionTreeController {
 	}
 	checkExternal(): void {
 		if (!this.watchPath || this.external) return;
-		const stamp = this.stamp();
-		if (stamp === this.fileStamp) return;
-		this.fileStamp = stamp;
-		try {
-			const disk = readFileSync(this.watchPath, "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
-			const native = this.session.sessionManager;
-			const entries = native.getEntries();
-			// Native writes are synchronous. A watch callback sees the updated manager.
-			if (disk[0]?.id === native.getSessionId() && disk.length === entries.length + 1 && entries.every((entry, i) => JSON.stringify(entry) === JSON.stringify(disk[i + 1]))) return;
-		} catch { /* Deletion, replacement and partial external writes are all conflicts. */ }
+		if (this.validator?.check(this.session.sessionManager)) return;
 		this.external = true;
 		if (!this.session.isIdle) void this.session.abort().catch(() => {});
 		this.host.changed();
@@ -156,7 +146,7 @@ export class SessionTreeController {
 					if (!session.isIdle) { reply("busy"); return; }
 				}
 				validate();
-				this.host.summary({ id: randomUUID() });
+				if (request.summary !== "none") this.host.summary({ id: randomUUID() });
 				const result = await session.navigateTree(request.targetId, { summarize: request.summary !== "none", customInstructions: request.summary === "custom" ? request.customInstructions?.slice(0, 16000) : undefined, replaceInstructions: request.replaceInstructions, label: request.label?.slice(0, 200) });
 				reply(result.aborted ? "aborted" : result.cancelled ? "cancelled" : "ok", { editorText: result.editorText });
 				return;

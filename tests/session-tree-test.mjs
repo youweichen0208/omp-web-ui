@@ -57,13 +57,16 @@ async function connect() {
 	ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
 	ws.on("message", raw => { const m = JSON.parse(raw); wire.push(m); if (m.type === "snapshot") state = m.state; if (m.type === "snapshot_delta" && state) state = { ...state, ...m.state, messages: [...state.messages, ...m.appended] }; });
 	await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
-	send({ type: "hello", clientId: "tree-test", protocolVersion: 36 }); send({ type: "get_state" });
+	send({ type: "hello", clientId: "tree-test", protocolVersion: 37 }); send({ type: "get_state" });
 	await wait(() => state);
 }
 async function request(type, fields = {}) {
 	const reqId = `test-${++sequence}`;
+	const start = wire.length;
 	send({ type, reqId, conversationId: state.conversationId, ...fields });
-	return wait(() => wire.find(m => m.reqId === reqId));
+	const result = await wait(() => wire.find(m => m.reqId === reqId));
+	if (type === "tree_navigate" && fields.summary === "none" && result.status === "ok") assert(!wire.slice(start).some(m => (m.type === "snapshot" || m.type === "snapshot_delta") && m.state.recovery?.branch), "no-summary navigation must not advertise summarization");
+	return result;
 }
 async function prompt(text) {
 	const count = state.messages.length;
@@ -172,6 +175,16 @@ try {
 		await page.addInitScript(() => sessionStorage.setItem("pi-web-client-id", "tree-test"));
 		await page.goto(`http://127.0.0.1:${PORT}`);
 		await page.waitForSelector(".inputbox textarea");
+		assert.equal(await page.locator(".conversation-run-settings").count(), 0);
+		assert.equal(await page.locator(".sidebar-logo").evaluate(el => getComputedStyle(el).width), "24px");
+		assert.equal(await page.locator(".inputbox").evaluate(el => getComputedStyle(el).borderRadius), "8px");
+		assert.equal(await page.locator(".view-switch button.active").evaluate(el => getComputedStyle(el).color), "rgb(47, 122, 174)");
+		await page.locator(".thinking-control .chip").click();
+		const retryToggle = page.locator(".thinking-run-settings").getByRole("checkbox", { name: "自动重试" });
+		await retryToggle.click(); await wait(() => state.runSettings.autoRetry);
+		await page.waitForFunction(() => document.querySelectorAll(".thinking-run-settings input")[1]?.checked);
+		await retryToggle.click(); await wait(() => !state.runSettings.autoRetry);
+		await page.keyboard.press("Escape");
 		await page.getByRole("button", { name: "会话树", exact: true }).click();
 		await page.waitForSelector(".session-tree-panel .tree-node");
 		await page.getByRole("combobox", { name: "过滤节点" }).selectOption("user-only");
@@ -205,6 +218,13 @@ try {
 		await page.locator(".tree-node-preview").click();
 		assert((await page.locator(".tree-content-dialog pre").textContent()).includes("root question"));
 		await page.locator(".tree-content-dialog").getByRole("button", { name: "关闭", exact: true }).click();
+		await prompt("browser busy edit source");
+		const busyEdit = state.messages.find(m => m.role === "user" && m.content.some(b => b.text === "browser busy edit source"));
+		holdNext = true; send({ type: "prompt", text: "/compact" }); await wait(() => state.recovery?.compaction);
+		await page.locator(".session-tree-panel header button").click();
+		send({ type: "edit_message", conversationId: state.conversationId, messageId: busyEdit.id, entryId: busyEdit.entryId, text: "blocked edit" });
+		await page.getByText("编辑重问暂不可用，请等待当前回复、压缩或切换完成。", { exact: true }).waitFor();
+		send({ type: "cancel_recovery", conversationId: state.conversationId, operationId: state.recovery.compaction.id }); await wait(() => !state.recovery?.compaction);
 		await page.screenshot({ path: "/tmp/pi-session-tree-browser.png", fullPage: true });
 	}
 	// Both the explicit secondary action and the saved preference retain file forks.

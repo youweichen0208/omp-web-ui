@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.3 配色与会话文件读取修复
+
+采用图标蓝主色、珊瑚色 Git 计数与黄色运行状态，统一圆角及 24px logo；运行开关移入思考菜单，长路径缩写。外部修改检测改为尾部增量校验，历史列表分叉统计采用缓存的只读解析。修复无摘要切换状态、编辑重问失败提示及跨机器重试倒计时。SDK 保持 1.0.3，协议升至 37。发布 GitHub 源码与三平台桌面安装包；说明见 `.github/release-notes/v0.99.3.md`。
+
 ## 0.99.2 原生会话树、Pi 1.0.3 与新图标
 
 `0.99.2` 一并交付原生会话树的只读可视化、分支切换/摘要/书签、原地编辑重问及派生命令。SDK / pi-ai 精确锁定 1.0.3，原生提示词适配器同步校验该版本；会话树协议为 36。GitHub 仓库与桌面更新源改为 `youweichen0208/pi-harness`。网页和三平台打包图标统一使用 `icon-1a/1a-flat` 素材。npm 包名、CLI 命令与桌面应用标识沿用现有值。本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。说明见 `.github/release-notes/v0.99.2.md`。

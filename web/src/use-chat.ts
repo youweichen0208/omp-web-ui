@@ -1,3 +1,5 @@
+import { useT } from "./i18n";
+import { localRecoveryClock } from "./recovery-clock";
 import { emitTreeResponse, queueTreeDraft } from "./tree-events";
 import { discardExtensionEditor, queueExtensionEditor } from "./extension-editor";
 import type { UiMessage } from "./types";
@@ -708,6 +710,8 @@ function wsUrl(): string {
 }
 
 export function useChat() {
+	const t = useT();
+	const translate = useRef(t); translate.current = t;
 	const [chat, dispatch] = useReducer(reducer, {
 		status: "connecting",
 		ready: false,
@@ -965,7 +969,7 @@ export function useChat() {
 					}
 					// Snapshot is authoritative — delta sequence tracking restarts.
 					lastDeltaSeqRef.current = new Map();
-					dispatch({ type: "snapshot", state: msg.state });
+					dispatch({ type: "snapshot", state: { ...msg.state, recovery: localRecoveryClock(msg.state.recovery) } });
 					if (pendingAbortRef.current) {
 						const shouldAbort = pendingAbortRef.current === msg.state.conversationId && msg.state.isStreaming;
 						pendingAbortRef.current = null;
@@ -983,7 +987,7 @@ export function useChat() {
 						cur.rev !== msg.baseRev
 					)
 						scheduleResync();
-					dispatch({ type: "snapshot_delta", msg });
+					dispatch({ type: "snapshot_delta", msg: { ...msg, state: { ...msg.state, recovery: localRecoveryClock(msg.state.recovery) } } });
 					break;
 				}
 				case "tool_delta":
@@ -1163,6 +1167,10 @@ export function useChat() {
 					break;
 				case "tree": case "tree_changed": case "tree_open": case "tree_content_result": case "tree_preview_result": case "tree_navigate_result":
 					if (msg.type === "tree_navigate_result") {
+						if (msg.reqId.startsWith("edit-") && msg.status !== "ok") dispatch({ type: "notice", notice: {
+							id: ++noticeId.current, conversationId: msg.conversationId, level: "warning",
+							text: msg.error ?? translate.current(msg.status === "busy" ? "editBusy" : "editFailed"),
+						} });
 						const restored = [...(msg.restoredQueue?.steering ?? []), ...(msg.restoredQueue?.followUp ?? [])];
 						if (msg.editorText && !msg.reqId.startsWith("edit-")) restored.push(msg.editorText);
 						queueTreeDraft({ id: msg.reqId, conversationId: msg.conversationId, text: restored.join("\n\n") });

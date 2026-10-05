@@ -1,3 +1,4 @@
+import { compactWorkspacePath } from "../display-path";
 import { useEffect, useRef, useState } from "react";
 import { FiFile, FiFolder } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
@@ -231,7 +232,7 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 					title={t("cwdTip", { path: state.cwd })}
 					onClick={startEdit}
 				>
-					<span className="workspace-stat-label">{t("workspacePath")}</span><span className="workspace-stat-path">{state.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~")}</span>
+					<span className="workspace-stat-label">{t("workspacePath")}</span><span className="workspace-stat-path">{compactWorkspacePath(state.cwd)}</span>
 				</button>
 			)}
 		</footer>

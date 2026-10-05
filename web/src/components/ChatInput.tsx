@@ -36,6 +36,8 @@ interface ChatInputProps {
 	slashCommands: SlashCommandInfo[];
 	/** Forwarded to ModelThinking (all fields stable while streaming). */
 	modelState: {
+		conversationId: string;
+		runSettings?: UiState["runSettings"];
 		model: UiState["model"];
 		thinkingLevel: UiState["thinkingLevel"];
 		routedModel?: UiState["routedModel"];

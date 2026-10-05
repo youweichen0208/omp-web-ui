@@ -155,4 +155,6 @@ Wiki 复用当前工作区，使用原生内存会话，离开后释放，不写
 
 ## 原生会话树
 
-协议 v36 的树投影、原地切换、摘要与取消、label、编辑重问、派生、外部修改检测和草稿保护见 [会话树架构](architecture-session-tree.md)。原生 JSONL 是唯一事实来源，树请求按活动对话和 reqId 归属。
+协议 v37 的树投影、原地切换、摘要与取消、label、编辑重问、派生、外部修改检测和草稿保护见 [会话树架构](architecture-session-tree.md)。原生 JSONL 是唯一事实来源，树请求按活动对话和 reqId 归属。
+
+重试倒计时：服务端仅内部保留 deadline，快照通过 `recoverySnapshot` 采样 remainingMs，不下发绝对时间。浏览器接收完整或增量快照时，用 performance.now() 建立本地截止时间；重连重新采样，不依赖两端系统时钟一致。

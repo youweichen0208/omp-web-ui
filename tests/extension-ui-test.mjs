@@ -42,7 +42,7 @@ async function connect() {
  ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
  ws.on("message", raw => wire.push(JSON.parse(raw)));
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 36 });
+ send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 37 });
  await wait(m => m.type === "ready");
 }
 try {
@@ -138,7 +138,7 @@ try {
   send({ type: "dialog_response", conversationId: a, id: prompt.id, value: false });
   await page.locator('[data-dialog-kind="confirm"]').waitFor({ state: "hidden" });
   const beforeRetry = sent.filter(m => m.type === "retry_silent_prompt").length;
-  const recoveryState = { ...snapshot, rev: snapshot.rev + 1, isStreaming: true, messages: [{ id: "recovery-user", role: "user", timestamp: Date.now() - 240000, content: [{ type: "text", text: "fixture" }] }], recovery: { compaction: { id: "long-compaction", reason: "overflow" }, summary: { id: "summary-retry", source: "compaction", phase: "waiting", attempt: 2, maxAttempts: 3, deadline: Date.now() + 10000, error: "529 overload" } } };
+  const recoveryState = { ...snapshot, rev: snapshot.rev + 1, isStreaming: true, messages: [{ id: "recovery-user", role: "user", timestamp: Date.now() - 240000, content: [{ type: "text", text: "fixture" }] }], recovery: { compaction: { id: "long-compaction", reason: "overflow" }, summary: { id: "summary-retry", source: "compaction", phase: "waiting", attempt: 2, maxAttempts: 3, remainingMs: 10000, error: "529 overload" } } };
   browserSocket.send(JSON.stringify({ type: "snapshot", state: recoveryState }));
   await page.getByText(/等待摘要重试/).waitFor();
   assert.equal(await page.locator(".waiting-header-status").count(), 0);

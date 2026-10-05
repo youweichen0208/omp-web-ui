@@ -1,9 +1,8 @@
 import { SessionTreeController } from "./session-tree-controller.js";
-import { projectTree } from "./session-tree.js";
+import { SessionBranchCounts } from "./session-file-read.js";
 import type { TreeRequest } from "./protocol.js";
 import { createHash, randomUUID } from "node:crypto";
-import { recoveryEvent, isRecovering } from "./recovery-state.js";
-import type { UiRecovery } from "./protocol.js";
+import { recoveryEvent, isRecovering, recoverySnapshot, type RecoveryState } from "./recovery-state.js";
 import { openToolOutput } from "./tool-output.js";
 import { nativeToolDetails, toolExitCode } from "./serialize.js";
 import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
@@ -184,7 +183,7 @@ interface Conversation {
 	tree?: SessionTreeController;
 	treeProjectionRevision?: string;
 	treeEntryIds?: Map<string, string[]>;
-	recovery: UiRecovery;
+	recovery: RecoveryState;
 	webUi: WebUIContext;
 	/** Wiki conversations are temporary native in-memory sessions. */
 	wiki?: boolean;
@@ -1298,7 +1297,7 @@ export class ClientSession {
 			streamingMessage,
 			taskProgress: deriveTaskProgress(conv.id, taskHistoryFromSession(conv.session.sessionManager, (message) => this.serializeCached(message)) ?? messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
 			isStreaming: this.session.isStreaming,
-			recovery: conv.recovery,
+			recovery: recoverySnapshot(conv.recovery),
 			runSettings: { autoCompaction: conv.session.autoCompactionEnabled, autoRetry: conv.session.autoRetryEnabled },
 			model: model
 				? {
@@ -2407,6 +2406,7 @@ export class ClientSession {
 		await this.pushSessions();
 	}
 
+	private readonly branchCounts = new SessionBranchCounts();
 	private async pushSessions(): Promise<void> {
 		if (!this.sessionsRequested) return;
 		const cwd = this.cwd;
@@ -2423,7 +2423,7 @@ export class ClientSession {
 					sessions.set(path, {
 						path, name: info.name, firstMessage: info.firstMessage,
 						parentSessionPath: info.parentSessionPath,
-						branchPoints: projectTree(SessionManager.open(path)).branchPoints,
+						branchPoints: await this.branchCounts.get(path),
 						messageCount: info.messageCount, modified: info.modified.getTime(),
 						created: info.created.getTime(), source: "web",
 					});

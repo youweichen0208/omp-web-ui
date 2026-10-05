@@ -17,6 +17,8 @@ const STORAGE_KEY = "pi-web-ui:lang";
 /* ------------------------------------------------------------------ */
 
 const zh = {
+	editBusy: "编辑重问暂不可用，请等待当前回复、压缩或切换完成。",
+	editFailed: "编辑重问已取消或失败。",
 	"treeTitle": "会话树",
 	"treeFork": "派生新会话",
 	"treeForkAt": "从这里派生",
@@ -1522,6 +1524,8 @@ const zh = {
 /* ------------------------------------------------------------------ */
 
 const en: Record<keyof typeof zh, string> = {
+	editBusy: "Wait for the current response, compaction or branch switch before editing.",
+	editFailed: "Editing was cancelled or failed.",
 	"treeTitle": "Session tree",
 	"treeFork": "Fork session",
 	"treeForkAt": "Fork from here",

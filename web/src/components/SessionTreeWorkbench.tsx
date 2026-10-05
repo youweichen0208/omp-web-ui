@@ -80,7 +80,7 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 			requests.current.delete(message.reqId);
 			if (action?.type === "tree_get" && message.reqId !== getId.current) return;
 			if (action?.type === "tree_preview" && message.reqId !== previewId.current) return;
-			if (!action && !message.reqId.startsWith("command-") && !message.reqId.startsWith("edit-")) return;
+			if (!action && !message.reqId.startsWith("command-")) return;
 			if (message.type === "tree" && message.reqId === getId.current) { setNodes(message.nodes); setTruncated(message.truncated); setLoading(false); }
 			if (message.type === "tree_preview_result" && message.reqId === previewId.current) setPreview(message.entryCount);
 			if (message.type === "tree_content_result") {

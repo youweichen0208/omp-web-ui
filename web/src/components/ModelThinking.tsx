@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { FiCpu, FiSearch, FiZap } from "react-icons/fi";
-import type { ModelInfo, UiState } from "../types";
+import type { ClientMessage, ModelInfo, UiState } from "../types";
 import { Dropdown, DropdownItem } from "./Dropdown";
 import { useT } from "../i18n";
 
@@ -8,7 +8,8 @@ import { useT } from "../i18n";
 export type ModelThinkingMsg =
 	| { type: "list_models" }
 	| { type: "set_model"; modelId: string }
-	| { type: "set_thinking"; level: string };
+	| { type: "set_thinking"; level: string }
+	| Extract<ClientMessage, { type: "set_run_settings" }>;
 
 const THINKING_VALUES = [
 	"off",
@@ -24,7 +25,7 @@ const THINKING_VALUES = [
  *  stable while tokens stream in, so the shallow-compared memo() below keeps
  *  both toolbars idle during streaming. */
 interface Props {
-	state: Pick<UiState, "model" | "thinkingLevel" | "availableThinkingLevels" | "routedModel"> | null;
+	state: Pick<UiState, "model" | "thinkingLevel" | "availableThinkingLevels" | "routedModel" | "conversationId" | "runSettings"> | null;
 	models: ModelInfo[];
 	modelsLoading: boolean;
 	send: (msg: ModelThinkingMsg) => boolean;
@@ -88,6 +89,13 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 	const activeMode = modes.find((mode) => mode.values.includes(state?.thinkingLevel ?? "off")) ?? modes[0];
 	const thinkingLabel = (level: string): string =>
 		thinkingLevels.find((l) => l.value === level)?.label ?? level;
+
+	const runSettings = state?.runSettings && <div className="thinking-run-settings">
+		{(["autoCompaction", "autoRetry"] as const).map(key => <label key={key}>
+			<input type="checkbox" checked={state.runSettings![key]} onChange={event => send({ type: "set_run_settings", conversationId: state.conversationId, [key]: event.target.checked })} />
+			{t(key === "autoCompaction" ? "conversationAutoCompaction" : "conversationAutoRetry")}
+		</label>)}
+	</div>;
 
 	// Lazily fetch the model list when the dropdown opens for the first time.
 	useEffect(() => {
@@ -214,6 +222,7 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 					const value = mode.values.find((candidate) => !supportedThinking || supportedThinking.has(candidate));
 					return <DropdownItem key={mode.label} active={mode === activeMode} disabled={!value} title={value ? undefined : t("thinkingUnsupported")} onClick={() => { if (value && state?.thinkingLevel !== value) send({ type: "set_thinking", level: value }); setThinkingOpen(false); }}><span className="thinking-mode-option"><strong>{mode.label}</strong><small>{mode.description}</small></span></DropdownItem>;
 				})}
+				{runSettings}
 			</Dropdown></div> : <Dropdown
 				trigger={
 					<>
@@ -245,6 +254,7 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 						{l.label}
 					</DropdownItem>
 				))}
+				{runSettings}
 			</Dropdown>}
 		</>
 	);

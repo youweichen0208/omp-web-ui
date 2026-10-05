@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { UiRecovery } from "./protocol.js";
 
+export type RecoveryState = Omit<UiRecovery, "retry"> & { retry?: NonNullable<UiRecovery["retry"]> & { deadline: number } };
+
 /** Compaction and its summary retry have independent lifetimes. */
-export function recoveryEvent(state: UiRecovery, event: AgentSessionEvent, now = Date.now()): UiRecovery {
+export function recoveryEvent(state: RecoveryState, event: AgentSessionEvent, now = Date.now()): RecoveryState {
 	switch (event.type) {
 		case "compaction_start": return { ...state, compaction: { id: randomUUID(), reason: event.reason } };
 		case "compaction_end": return { ...state, compaction: undefined };
@@ -18,3 +20,18 @@ export function recoveryEvent(state: UiRecovery, event: AgentSessionEvent, now =
 	}
 }
 export function isRecovering(state: UiRecovery): boolean { return !!(state.compaction || state.retry || state.summary || state.branch); }
+
+/** Send durations, never compare clocks on different machines. Reconnection resamples the duration. */
+export function recoverySnapshot(state: RecoveryState, now = Date.now()): UiRecovery {
+	const { retry, summary, ...rest } = state;
+	const snapshot: UiRecovery = { ...rest };
+	if (retry) {
+		const { deadline, ...operation } = retry;
+		snapshot.retry = { ...operation, remainingMs: retry.phase === "waiting" ? Math.max(0, deadline - now) : 0 };
+	}
+	if (summary) {
+		const { deadline, ...operation } = summary;
+		snapshot.summary = { ...operation, remainingMs: summary.phase === "waiting" && deadline !== undefined ? Math.max(0, deadline - now) : 0 };
+	}
+	return snapshot;
+}

@@ -206,11 +206,12 @@ export interface UiModelInfo {
 	vision: boolean;
 }
 
+/** remainingMs is sampled by the server; deadline is filled locally by the browser only. */
 export interface UiRecovery {
 	branch?: { id: string };
 	compaction?: { id: string; reason: "manual" | "threshold" | "overflow" };
-	retry?: { id: string; phase: "waiting" | "running"; attempt: number; maxAttempts: number; deadline: number; error: string };
-	summary?: { id: string; source: "compaction" | "branchSummary"; phase: "waiting" | "running"; attempt?: number; maxAttempts?: number; deadline?: number; error?: string };
+	retry?: { id: string; phase: "waiting" | "running"; attempt: number; maxAttempts: number; remainingMs?: number; deadline?: number; error: string };
+	summary?: { id: string; source: "compaction" | "branchSummary"; phase: "waiting" | "running"; attempt?: number; maxAttempts?: number; remainingMs?: number; deadline?: number; error?: string };
 }
 
 export interface UiState {

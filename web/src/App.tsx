@@ -1,5 +1,5 @@
 import { SessionTreeWorkbench } from "./components/SessionTreeWorkbench";
-import { RecoveryStatus, ConversationRunSettings } from "./components/RecoveryStatus";
+import { RecoveryStatus } from "./components/RecoveryStatus";
 import { LinkedText } from "./components/LinkedText";
 import type { WikiConversationResult } from "./types";
 import { wikiRequest } from "./wiki-api";
@@ -803,9 +803,11 @@ export function App() {
 	const availableThinkingLevels = chat.state?.availableThinkingLevels;
 	const modelState = useMemo(
 		() =>
-			model
+			conversationState
 				? {
-						model,
+						model: model ?? null,
+						conversationId: conversationState.conversationId,
+						runSettings: conversationState.runSettings,
 						routedModel: conversationState?.routedModel,
 						thinkingLevel: thinkingLevel ?? "off",
 						availableThinkingLevels: availableThinkingLevels ?? [],
@@ -813,7 +815,7 @@ export function App() {
 				: null,
 		// Deps are the STABLE inner refs (server reuses them across snapshots),
 		// so the object identity survives token deltas and ChatInput's memo holds.
-		[model, thinkingLevel, availableThinkingLevels, conversationState?.routedModel],
+		[model, thinkingLevel, availableThinkingLevels, conversationState?.routedModel, conversationState?.conversationId, conversationState?.runSettings?.autoCompaction, conversationState?.runSettings?.autoRetry],
 	);
 
 	// A same-project history switch changes the owner without changing cwd.
@@ -949,7 +951,6 @@ export function App() {
 					onSoundChange={setSound}
 					onSoundPreview={(kind: SoundKind) => playSound(kind, sound)}
 				/>
-				<ConversationRunSettings state={conversationState} send={send} />
 				<RecoveryStatus state={conversationState} send={send} connected={chat.ready} />
 				{chat.pendingDialogs.filter(d => d.conversationId !== chat.activeConversationId).map(d => <button className="protocol-banner" key={d.id} onClick={() => {
 					if (wikiOpening.current || wikiWaiting.current) return;

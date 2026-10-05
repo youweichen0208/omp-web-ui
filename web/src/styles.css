@@ -10848,3 +10848,56 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .session-info > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .message-tree-controls { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--text-dim); }
+
+/* Icon palette: blue actions/completion, coral Git counts, yellow ongoing work. */
+:root {
+	--accent: #2f7aae;
+	--accent-soft: #e8f1f7;
+	--accent-fg: #fff;
+	--link: #2f7aae;
+	--coral-text: #a94336;
+	--coral-soft: #fce9e4;
+	--progress-text: #886411;
+	--progress-soft: #fff3cd;
+}
+:root[data-appearance="dark"] {
+	--accent: #2f7aae;
+	--accent-soft: #203e52;
+	--accent-fg: #fff;
+	--link: #82bfe7;
+	--coral-text: #f4ac9d;
+	--coral-soft: #4b302d;
+	--progress-text: #edc765;
+	--progress-soft: #463c22;
+}
+/* The source icon has ~23% padding; crop that padding so the colored mark itself is 24px. */
+.sidebar-logo { width: 24px; height: 24px; overflow: hidden; display: inline-block; flex: none; }
+.design-workspace .sidebar-brand .sidebar-logo img { width: 44px; height: 44px; max-width: none; margin: -10px; border-radius: 0; display: block; }
+.design-workspace :is(button, .btn, .chip, .session-item, .project-item, .file-item, .dd-item) { border-radius: 6px; }
+.design-workspace :is(input:not([type="checkbox"]):not([type="radio"]), textarea, .inputbox) { border-radius: 8px; }
+.design-workspace .view-switch button.active { color: var(--accent); }
+.design-workspace .inputbox .btn.send { background: var(--accent); border-color: var(--accent); color: white; }
+.design-workspace .session-item.active .session-dot { background: var(--accent); }
+.design-workspace .view-switch .tab-change-count,
+.design-workspace .panel-right .tree-filter,
+.design-workspace .panel-right .tree-filter[aria-pressed="true"],
+.tree-modified-count, .scm-files-count {
+	background: var(--coral-soft); color: var(--coral-text); border-radius: 6px;
+	padding: 2px 5px; font-style: normal; font-variant-numeric: tabular-nums;
+}
+.design-workspace .panel-right .tree-filter[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--coral-text); }
+.change-state.done, .task-progress-status.done, .task-step.done .task-step-mark,
+.task-plan-step.done .task-plan-mark, .todo-checklist-item.completed .todo-checklist-mark,
+.bash-step.done .bash-step-icon, .wiki-chat-tool.done summary > span { color: var(--accent); border-color: var(--accent); }
+.task-progress-track span.done, .read-file-head i.done { background: var(--accent); }
+.change-state.running, .task-progress-status.running, .task-plan-step.running,
+.task-plan-step.running .task-plan-step-duration, .bash-running-dot, .header-task-progress,
+.wiki-save-status.saving { color: var(--progress-text); }
+.task-step.running .task-step-mark { color: var(--progress-text) !important; border-color: var(--progress-text); }
+.task-plan-step.running .task-plan-mark { color: var(--progress-text); border-color: var(--progress-text); background: var(--progress-soft); }
+.session-dot.streaming { background: var(--progress-text); }
+.thinking-run-settings { border-top: 1px solid var(--border); padding: 8px 12px; }
+.thinking-run-settings label { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; color: var(--text); cursor: pointer; }
+.thinking-run-settings input { accent-color: var(--accent); }
+.workspace-stat-path { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-progress-track span.running { background: var(--progress-text); }
