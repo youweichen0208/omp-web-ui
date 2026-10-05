@@ -1,3 +1,5 @@
+import { remarkTextHighlight, textHighlightColor } from "./remark-text-highlight";
+import { richCodeText } from "./rich-code-text";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
 import { unified } from "unified";
@@ -25,7 +27,7 @@ export interface RichDocument {
 const parser = unified().use(remarkParse).use(remarkGfm);
 function codeFenceMarkdown(node: HTMLElement): string {
 	const code = node.querySelector("code");
-	const text = (code ?? node).textContent ?? "";
+	const text = richCodeText(code ?? node);
 	const detected = code?.className.match(/language-([^\s]+)/)?.[1] ?? "";
 	const lang = detected === "plaintext" ? "" : detected;
 	const fence = "`".repeat(Math.max(3, ...Array.from(text.matchAll(/`+/g), (m) => m[0].length + 1)));
@@ -42,6 +44,13 @@ const converter = new TurndownService({
 	},
 });
 converter.use(gfm);
+converter.addRule("textHighlight", {
+	filter: (node) => node.nodeName === "SPAN" && !!textHighlightColor((node as HTMLElement).style.backgroundColor),
+	replacement: (content, node) => {
+		const color = textHighlightColor((node as HTMLElement).style.backgroundColor)!;
+		return `<mark style="background-color: ${color.hex}">${content}</mark>`;
+	},
+});
 converter.addRule("highlightBlock", {
 	filter: (node) => node.nodeName === "BLOCKQUOTE" && node.hasAttribute("data-rich-highlight"),
 	replacement: (content) => "\n\n> [!NOTE]\n" + content.trim().split("\n").map((line) => "> " + line).join("\n") + "\n\n",
@@ -138,7 +147,7 @@ export function prepareRichDocument(source: string, wiki = false): RichDocument 
 		if (node.type === "heading" && node.depth === 1) firstHeading = false;
 		blocks.push({
 			raw, prefix: source.slice(end, start), protected: protectedBlock, hidden,
-			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={[rehypeHighlight]}>{(wiki ? renderWikiLinks(raw) : raw) + "\n\n" + definitions}</ReactMarkdown>),
+			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, remarkTextHighlight, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={[rehypeHighlight]}>{(wiki ? renderWikiLinks(raw) : raw) + "\n\n" + definitions}</ReactMarkdown>),
 		});
 		end = stop;
 	}

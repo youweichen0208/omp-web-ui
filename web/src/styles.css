@@ -10583,3 +10583,22 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 /* Wiki conversation initialization keeps the status readable beside the arrow. */
 .wiki-composer-controls .wiki-send:has(span) { width: auto; padding: 0 8px; gap: 4px; border-radius: 9px; font-size: 11px; white-space: nowrap; }
+
+/* Live fenced-code highlighting paints ranges without replacing editable text. */
+.fp-rich-document pre > code::highlight(rich-code-plain) { color: var(--wiki-code-fg, var(--code-fg)); }
+.fp-rich-document pre > code::highlight(rich-code-keyword) { color: var(--wiki-code-keyword, #a626a4); }
+.fp-rich-document pre > code::highlight(rich-code-string) { color: var(--wiki-code-string, #50732f); }
+.fp-rich-document pre > code::highlight(rich-code-number) { color: var(--wiki-code-number, #986801); }
+.fp-rich-document pre > code::highlight(rich-code-title) { color: var(--wiki-code-number, #326e9f); }
+.fp-rich-document pre > code::highlight(rich-code-comment) { color: var(--wiki-code-comment, #707070); }
+
+/* Rich-text selection highlights and slash aliases. */
+.fp-slash-menu kbd { margin-left: auto; color: var(--text-dim); font: 11px var(--mono); }
+.fp-highlight-label { flex: none; margin: 0 4px; color: var(--text-dim); font-size: 11px; }
+.fp-highlight-swatch span { width: 15px; height: 15px; border: 1px solid #0002; border-radius: 4px; background: var(--highlight-color); }
+.fp-highlight-yellow { --highlight-color: #fff3a3; }
+.fp-highlight-green { --highlight-color: #ccebc5; }
+.fp-highlight-blue { --highlight-color: #c8e4ff; }
+.fp-highlight-pink { --highlight-color: #ffd5e5; }
+.fp-highlight-purple { --highlight-color: #e5d5ff; }
+.md span:is([style*="background-color: rgb("], [style*="background-color:#"], [style*="background-color: #"]) { color: #242424; }

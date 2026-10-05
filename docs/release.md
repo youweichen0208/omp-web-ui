@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.16.0 Wiki 编辑增强
+
+`0.16.0` 为全部文档斜杠菜单指令增加拼音与首字母别名，补齐 H1–H6，支持选中文字背景标记；修复新建代码块实时高亮、换行与保存丢行问题。说明见 `.github/release-notes/v0.16.0.md`；本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。
+
 ## 0.15.2 Wiki 文档切换提速
 
 `0.15.2` 将正文读取与索引、引用和原生会话初始化分离，保留编辑草稿并处理快速导航与失败重试；同步包含 Wiki 阅读布局、代码配色和请求意图修正。说明见 `.github/release-notes/v0.15.2.md`；本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。

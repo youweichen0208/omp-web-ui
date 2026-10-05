@@ -1,3 +1,4 @@
+import { remarkTextHighlight } from "../remark-text-highlight";
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
@@ -24,7 +25,7 @@ interface MarkdownProps {
  *  be visually identical. */
 // remarkCjkAutolink 必须排在 remarkGfm 后面：它修的正是 gfm 自动链接把中文
 // 标点吞进 URL 的结果。
-export const remarkPlugins = [remarkGfm, remarkCjkAutolink, remarkHighlightBlock];
+export const remarkPlugins = [remarkGfm, remarkCjkAutolink, remarkHighlightBlock, remarkTextHighlight];
 export const rehypePlugins: PluggableList = [
 	[rehypeHighlight, { detect: true, ignoreMissing: true }],
 ];

@@ -1,9 +1,12 @@
+import { TEXT_HIGHLIGHT_COLORS } from "../remark-text-highlight";
 import { Fragment, memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare } from "react-icons/fi";
 import { markdownImageUrl } from "../markdown-image";
 import { withToken } from "../auth-token";
 import { getClientId } from "../use-chat";
+import { richCodeText } from "../rich-code-text";
 import { highlightLine } from "../hljs-lite";
+import { createRichCodeHighlighter } from "../rich-code-highlight";
 import { useT } from "../i18n";
 import { mountRichDocument, prepareRichDocument, readRichDocument } from "../rich-markdown";
 import type { RichDocument } from "../rich-markdown";
@@ -26,6 +29,31 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	useEffect(() => () => { upload.current?.abort(); }, []);
 
 	const root = useRef<HTMLDivElement>(null);
+	const codeHighlighter = useRef<ReturnType<typeof createRichCodeHighlighter> | null>(null);
+	useEffect(() => () => { codeHighlighter.current?.dispose(); codeHighlighter.current = null; }, []);
+	const paintCode = (code: HTMLElement) => {
+		codeHighlighter.current ??= createRichCodeHighlighter();
+		codeHighlighter.current.update(code);
+	};
+	const selectedCode = () => {
+		const selection = window.getSelection(), node = selection?.anchorNode;
+		const element = node instanceof Element ? node : node?.parentElement;
+		const code = element?.closest<HTMLElement>("pre > code");
+		return code && root.current?.contains(code) && selection?.focusNode && code.contains(selection.focusNode) ? code : null;
+	};
+	const [canHighlight, setCanHighlight] = useState(false);
+	const highlightSelection = () => {
+		const selection = window.getSelection();
+		if (!selection?.rangeCount || selection.isCollapsed || !root.current?.contains(selection.anchorNode) || !root.current.contains(selection.focusNode)) return null;
+		const range = selection.getRangeAt(0);
+		if ([...root.current.querySelectorAll("pre, code, [contenteditable=false]")].some(node => range.intersectsNode(node))) return null;
+		return range;
+	};
+	useEffect(() => {
+		const changed = () => setCanHighlight(!!highlightSelection());
+		document.addEventListener("selectionchange", changed);
+		return () => document.removeEventListener("selectionchange", changed);
+	}, []);
 	const documentState = useRef<RichDocument | null>(null);
 	const [menu, setMenu] = useState<{ query: string; x: number; y: number } | null>(null);
 	const [active, setActive] = useState(0);
@@ -61,6 +89,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	useLayoutEffect(() => {
 		root.current?.querySelectorAll<HTMLElement>("pre > code").forEach((code) => {
 			const pre = code.parentElement!;
+			if (wiki) pre.classList.add("codeblock");
 			let control = pre.querySelector<HTMLSelectElement>("select[data-code-language]");
 			if (!control) {
 				const chrome = document.createElement("span");
@@ -73,7 +102,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 				if (wiki) {
 					const copy = document.createElement("button"); copy.type = "button"; copy.textContent = t("copy");
 					copy.onmousedown = event => event.preventDefault();
-					copy.onclick = () => { void navigator.clipboard.writeText(code.textContent ?? ""); };
+					copy.onclick = () => { void navigator.clipboard.writeText(richCodeText(code)); };
 					chrome.append(copy);
 				}
 				pre.prepend(chrome);
@@ -87,6 +116,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			control.value = language;
 			control.disabled = readOnly;
 			control.setAttribute("aria-label", t("richCodeLanguage"));
+			paintCode(code);
 		});
 	}, [value, readOnly, t]);
 	useLayoutEffect(() => {
@@ -198,7 +228,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		// Language metadata is separate from native text editing. Do not replace the
 		// pre element: Chromium can inherit its old CODE wrapper during insertHTML.
 		code.className = `hljs language-${language || "plaintext"}`;
-		code.innerHTML = highlightLine(code.textContent ?? "", language === "toml" ? "ini" : language);
+		code.innerHTML = highlightLine(richCodeText(code), language === "toml" ? "ini" : language);
 		if (!code.textContent) code.append(document.createElement("br"));
 		root.current.focus();
 		const range = document.createRange();
@@ -223,20 +253,21 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		update();
 	};
 	const items = [
-		{ label: "richHeading", keywords: "heading title h2 标题", action: "formatBlock", argument: "h2" },
-		{ label: "richParagraph", keywords: "paragraph text 正文", action: "formatBlock", argument: "p" },
-		{ label: "richCodeBlock", keywords: "code fence 代码", action: "insertHTML", argument: "<pre><code data-slash-insert><br></code></pre><p><br></p>" },
-		{ label: "richHighlightBlock", keywords: "highlight note callout 高亮 提示", action: "insertHTML", argument: '<blockquote class="rich-highlight" data-rich-highlight="note"><p data-slash-insert><br></p></blockquote><p><br></p>' },
-		{ label: "richTable", keywords: "table 表格", action: "insertHTML", argument: `<table><thead><tr><th data-slash-insert>${t("richColumn")} 1</th><th>${t("richColumn")} 2</th></tr></thead><tbody><tr><td>…</td><td>…</td></tr></tbody></table><p><br></p>` },
-		{ label: "richList", keywords: "bullet list 列表", action: "insertUnorderedList" },
-		{ label: "richOrderedList", keywords: "number ordered 编号", action: "insertOrderedList" },
-		{ label: "richTaskList", keywords: "task todo checkbox 任务", action: "insertHTML", argument: '<ul><li><input type="checkbox"><span data-slash-insert> </span></li></ul><p><br></p>' },
-		{ label: "richQuote", keywords: "quote 引用", action: "formatBlock", argument: "blockquote" },
-		{ label: "richDivider", keywords: "divider horizontal rule 分隔线", action: "insertHTML", argument: "<hr><p><br></p>" },
+		...([1, 2, 3, 4, 5, 6] as const).map(level => ({ label: "richHeading", keywords: `heading header title h${level} bt${level} biaoti${level} 标题${level}`, alias: `bt${level}`, action: "formatBlock", argument: `h${level}` } as const)),
+		{ label: "richParagraph", alias: "zw", keywords: "paragraph text zw zhengwen 正文", action: "formatBlock", argument: "p" },
+		{ label: "richCodeBlock", alias: "dmk", keywords: "code fence dmk daimakuai 代码 代码块", action: "insertHTML", argument: "<pre><code data-slash-insert><br></code></pre><p><br></p>" },
+		{ label: "richHighlightBlock", alias: "glk", keywords: "highlight note callout glk gaoliangkuai ts tishi 高亮 提示", action: "insertHTML", argument: '<blockquote class="rich-highlight" data-rich-highlight="note"><p data-slash-insert><br></p></blockquote><p><br></p>' },
+		{ label: "richTable", alias: "bg", keywords: "table bg biaoge 表格", action: "insertHTML", argument: `<table><thead><tr><th data-slash-insert>${t("richColumn")} 1</th><th>${t("richColumn")} 2</th></tr></thead><tbody><tr><td>…</td><td>…</td></tr></tbody></table><p><br></p>` },
+		{ label: "richList", alias: "lb", keywords: "bullet list lb liebiao wxlb wuxuliebiao 列表 无序列表", action: "insertUnorderedList" },
+		{ label: "richOrderedList", alias: "bh", keywords: "number ordered bh bianhao yxlb youxuliebiao 编号 有序列表", action: "insertOrderedList" },
+		{ label: "richTaskList", alias: "rw", keywords: "task todo checkbox rw rwlb renwu renwuliebiao 任务", action: "insertHTML", argument: '<ul><li><input type="checkbox"><span data-slash-insert> </span></li></ul><p><br></p>' },
+		{ label: "richQuote", alias: "yy", keywords: "quote yy yinyong 引用", action: "formatBlock", argument: "blockquote" },
+		{ label: "richDivider", alias: "fgx", keywords: "divider horizontal rule fgx fengexian 分隔线", action: "insertHTML", argument: "<hr><p><br></p>" },
 	] as const;
 	const icons = { richHighlightBlock: <FiSquare />, richHeading: <span>H₂</span>, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <span>1.</span>, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
+	const itemLabel = (item: typeof items[number]) => item.label === "richHeading" ? `${t(item.label)} ${"argument" in item ? item.argument.slice(1) : ""}` : t(item.label);
 	const isBlock = (item: typeof items[number]) => item.action === "insertHTML";
-	const matches = items.filter((item) => `${t(item.label)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => Number(isBlock(a)) - Number(isBlock(b)));
+	const matches = items.filter((item) => `${itemLabel(item)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => Number(isBlock(a)) - Number(isBlock(b)));
 	const inspectSlash = () => {
 		if (readOnly) return closeMenu();
 		const selection = window.getSelection();
@@ -274,6 +305,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		const range = slashRange.current;
 		const item = matches[index];
 		if (readOnly || !item || !range || !root.current?.contains(range.startContainer)) return closeMenu();
+		const blockParent = range.startContainer.parentElement?.closest("p, h1, h2, h3, h4, h5, h6, td, th")?.parentElement;
 		root.current.focus();
 		const selection = window.getSelection();
 		selection?.removeAllRanges();
@@ -281,7 +313,8 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		closeMenu();
 		document.execCommand("delete");
 		command(item.action, "argument" in item ? item.argument : undefined);
-		const target = root.current.querySelector("[data-slash-insert]");
+		// Chromium can leave an empty formatted heading's caret in the preceding block.
+		const target = root.current.querySelector("[data-slash-insert]") ?? (item.action === "formatBlock" ? blockParent?.querySelector(item.argument) : null);
 		if (target) {
 			target.removeAttribute("data-slash-insert");
 			const caret = document.createRange();
@@ -310,6 +343,13 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 				<button type="button" title={tool.label} aria-label={tool.label} disabled={readOnly}
 					onMouseDown={(event) => event.preventDefault()} onClick={() => command(tool.action, tool.argument)}>{tool.icon}</button>
 			</Fragment>)}
+			<span className="fp-rich-toolbar-separator" aria-hidden="true" />
+			<span className="fp-highlight-label">{t("richTextHighlight")}</span>
+			{TEXT_HIGHLIGHT_COLORS.map(color => <button key={color.name} type="button" className={`fp-highlight-swatch fp-highlight-${color.name}`}
+				title={t(`richHighlight_${color.name}`)} aria-label={t(`richHighlight_${color.name}`)} disabled={readOnly || !canHighlight}
+				onMouseDown={event => event.preventDefault()} onClick={() => { if (highlightSelection()) command("hiliteColor", color.hex); }}><span /></button>)}
+			<button type="button" title={t("richHighlightClear")} aria-label={t("richHighlightClear")} disabled={readOnly || !canHighlight}
+				onMouseDown={event => event.preventDefault()} onClick={() => { if (highlightSelection()) command("hiliteColor", "transparent"); }}><FiMinus /></button>
 		</div>
 		{tableCell?.isConnected && !readOnly && <div className="fp-table-tools" role="toolbar" aria-label={t("richTableTools")}>
 			<button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => editTable("row")}>{t("richAddRow")}</button>
@@ -322,11 +362,11 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{uploading && <div className="fp-notice" role="status">{t("richImageUploading")}</div>}
 		{imageError && <div className="fp-notice" role="alert">{imageError}</div>}
 		{menu && !readOnly && <div className="fp-slash-menu" role="listbox" aria-label={t("richInsertMenu")} style={{ left: menu.x, top: menu.y }}>
-			{matches.length ? matches.map((item, index) => <Fragment key={item.label}>
+			{matches.length ? matches.map((item, index) => <Fragment key={item.alias}>
 				{(index === 0 || isBlock(item) !== isBlock(matches[index - 1])) && <div className="fp-slash-group" role="presentation">{t(isBlock(item) ? "richBlocksGroup" : "richTextGroup")}</div>}
 				<button type="button" role="option" aria-selected={index === active}
-				id={`fp-slash-option-${index}`} key={item.label} onMouseDown={(event) => event.preventDefault()} onClick={() => insert(index)}>
-				<span className="fp-slash-icon" aria-hidden="true">{icons[item.label]}</span><span>{t(item.label)}</span>
+				id={`fp-slash-option-${index}`} key={item.alias} onMouseDown={(event) => event.preventDefault()} onClick={() => insert(index)}>
+				<span className="fp-slash-icon" aria-hidden="true">{item.label === "richHeading" ? ("argument" in item ? item.argument.toUpperCase() : "H") : icons[item.label]}</span><span>{itemLabel(item)}</span><kbd aria-hidden="true">/{item.alias}</kbd>
 			</button></Fragment>) : <span>{t("richNoElements")}</span>}
 		</div>}
 		<div className="fp-markdown msg-text">
@@ -336,9 +376,13 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 					aria-expanded={!!menu} aria-autocomplete="list" aria-activedescendant={menu && matches.length ? `fp-slash-option-${active}` : undefined}
 					onBlur={closeMenu}
 					onCompositionStart={closeMenu}
-					onCompositionEnd={inspectSlash}
+					onCompositionEnd={() => { const code = selectedCode(); if (code) paintCode(code); update(); inspectSlash(); }}
 					onKeyUp={() => setTableCell(selectedCell())}
 					onKeyDown={(event) => {
+						if (event.key === "Enter" && !readOnly && !event.nativeEvent.isComposing) {
+							const code = selectedCode();
+							if (code) { event.preventDefault(); command("insertLineBreak"); return; }
+						}
 						if (event.key === "Tab" && !readOnly && !event.nativeEvent.isComposing) {
 							const cell = selectedCell();
 							if (cell) {
