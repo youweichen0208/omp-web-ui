@@ -285,31 +285,53 @@ export function App() {
 		return () => window.removeEventListener("pi-configure-radius", configure);
 	}, [chat.state?.cwd, send]);
 	const [view, setView] = useState<ViewName>("chat");
-	const [wikiFileRequest, setWikiFileRequest] = useState<{cwd:string;conversationId:string;path:string;token:string} | null>(null);
+	const [wikiFileRequest, setWikiFileRequest] = useState<{cwd:string;path:string;token:string} | null>(null);
+	const [wikiContentToken, setWikiContentToken] = useState<string | null>(null);
 	const [wikiPending, setWikiPending] = useState(false);
 	const [wikiTargetId, setWikiTargetId] = useState<string | null>(null);
-	useEffect(() => {
-		if (wikiTargetId === chat.state?.conversationId && wikiTargetId === chat.activeConversationId) {
-			wikiWaiting.current = null;
-			setWikiTargetId(null);
-		}
-	}, [wikiTargetId, chat.state?.conversationId, chat.activeConversationId]);
-	const wikiCurrent = useRef({ cwd: chat.state?.cwd, conversationId: chat.activeConversationId });
-	wikiCurrent.current = { cwd: chat.state?.cwd, conversationId: chat.activeConversationId };
+	const [wikiBoundToken, setWikiBoundToken] = useState<string | null>(null);
+	const [wikiSessionError, setWikiSessionError] = useState("");
+	const wikiProcessed = useRef<string | null>(null);
+	const wikiLatestToken = useRef(wikiFileRequest?.token);
+	wikiLatestToken.current = wikiFileRequest?.token;
+	const wikiCurrent = useRef({ cwd: chat.state?.cwd, conversationId: chat.activeConversationId, epoch: 0 });
+	if (wikiCurrent.current.cwd !== chat.state?.cwd) {
+		wikiCurrent.current.epoch++;
+		wikiWaiting.current = null;
+	}
+	wikiCurrent.current = { ...wikiCurrent.current, cwd: chat.state?.cwd, conversationId: chat.activeConversationId };
 	const openWikiDocument = useCallback(async (path: string) => {
 		const current = wikiCurrent.current;
-		if (!current.cwd || wikiOpening.current || wikiWaiting.current) return;
-		wikiOpening.current = true; setWikiPending(true);
-		try {
-			const result = await wikiRequest<WikiConversationResult>(current.cwd, "new-conversation", { path, conversationId: current.conversationId });
-			if (wikiCurrent.current.cwd !== current.cwd || ![current.conversationId, result.conversationId].includes(wikiCurrent.current.conversationId)) return;
+		if (!current.cwd) return;
+		setWikiSessionError("");
+		setWikiFileRequest({ cwd: current.cwd, path, token: randomUuid() });
+		setPreviewFile(null); setView("wiki"); setDrawer(null);
+	}, []);
+	useEffect(() => {
+		if (wikiWaiting.current) {
+			if (wikiWaiting.current !== chat.state?.conversationId || wikiWaiting.current !== chat.activeConversationId) return;
+			wikiWaiting.current = null;
+		}
+		const target = wikiFileRequest;
+		if (!target || wikiContentToken !== target.token || target.cwd !== chat.state?.cwd || wikiOpening.current || wikiProcessed.current === target.token || !chat.ready || switching) return;
+		wikiProcessed.current = target.token;
+		wikiOpening.current = true; setWikiPending(true); setWikiSessionError("");
+		const conversationId = chat.activeConversationId, epoch = wikiCurrent.current.epoch;
+		void wikiRequest<WikiConversationResult>(target.cwd, "new-conversation", { path: target.path, conversationId }).then(result => {
+			if (wikiCurrent.current.cwd !== target.cwd || wikiCurrent.current.epoch !== epoch) return;
 			wikiWaiting.current = result.conversationId;
 			setWikiTargetId(result.conversationId);
-			setWikiFileRequest({ cwd: current.cwd, conversationId: result.conversationId, path, token: randomUuid() });
-			setPreviewFile(null); setView("wiki"); setDrawer(null);
-		} catch (error) { pushNotice("error", (error as Error).message); }
-		finally { wikiOpening.current = false; setWikiPending(false); }
-	}, [pushNotice]);
+			setWikiBoundToken(target.token);
+		}).catch(error => {
+			if (wikiCurrent.current.cwd === target.cwd && wikiCurrent.current.epoch === epoch && wikiLatestToken.current === target.token) setWikiSessionError((error as Error).message);
+		}).finally(() => { wikiOpening.current = false; setWikiPending(false); });
+	}, [wikiFileRequest, wikiContentToken, chat.state?.cwd, chat.state?.conversationId, chat.activeConversationId, chat.ready, switching, wikiPending]);
+	const wikiConversationMatches = wikiBoundToken === wikiFileRequest?.token && wikiTargetId === chat.activeConversationId && wikiTargetId === chat.state?.conversationId;
+	const wikiSessionReady = chat.ready && !switching && !wikiPending && wikiConversationMatches;
+	useEffect(() => {
+		// Returning after a chat-side session switch needs a new document conversation.
+		if (view === "wiki" && chat.ready && !switching && !wikiPending && !wikiWaiting.current && wikiFileRequest && wikiFileRequest.cwd === chat.state?.cwd && wikiBoundToken === wikiFileRequest.token && wikiTargetId && wikiTargetId !== chat.activeConversationId) void openWikiDocument(wikiFileRequest.path);
+	}, [view, chat.ready, switching, wikiPending, wikiFileRequest, chat.state?.cwd, chat.activeConversationId, wikiBoundToken, wikiTargetId, openWikiDocument]);
 	const [commitJump, setCommitJump] = useState<{ hash: string; token: number } | null>(null);
 	const visited = useRef(new Set<ViewName>(["chat"]));
 	visited.current.add(view);
@@ -402,7 +424,7 @@ export function App() {
 		);
 	}, []);
 	const openPreview = useCallback((path: string, name: string) => {
-		if (switching || wikiOpening.current || wikiWaiting.current || !chat.state?.cwd) return;
+		if (switching || !chat.state?.cwd) return;
 		const cwd = chat.state.cwd;
 		const open = () => {
 			if (/\.(md|markdown)$/i.test(path)) {
@@ -1043,7 +1065,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && conversationState && <WikiWorkbench key={`${conversationState.cwd}:${chat.activeConversationId}`} cwd={conversationState.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === conversationState.cwd && wikiFileRequest.conversationId === chat.activeConversationId ? wikiFileRequest : null} messages={conversationState.messages} streaming={conversationState.isStreaming} live={conversationState.streamingMessage} model={conversationState.model} contextPercent={conversationState.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={chat.ready && !switching && !wikiPending && (!wikiTargetId || wikiTargetId === conversationState.conversationId)} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

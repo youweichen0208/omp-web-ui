@@ -5,7 +5,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import { decodeText, looksLikeText, previewKind } from "./text-sniff.js";
 import { wikiMetadata, wikiReferences, resolveWikiLink } from "./wiki-links.js";
 import { readWikiPdf } from "./wiki-pdf.js";
-import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory, WikiIndexStatus } from "./protocol.js";
+import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory, WikiIndexStatus, WikiDocumentContent, WikiDocumentReferences } from "./protocol.js";
 
 const MAX_FILE = 2 * 1024 * 1024;
 const MAX_SNAPSHOT = 64 * 1024 * 1024;
@@ -35,14 +35,17 @@ function kindOf(path: string, text: boolean): WikiEntry["kind"] {
 	if (previewKind(path) === "image") return "image";
 	return text || previewKind(path) === "text" ? "code" : "other";
 }
+type WikiIndex = { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean; status: WikiIndexStatus; references: Map<string, ReturnType<typeof wikiReferences>>; backlinks: Map<string, WikiDocument["backlinks"]> };
 export class WikiService {
 	private active = new Set<string>();
-	private cache = new Map<string, { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean; status: WikiIndexStatus }>();
+	private cache = new Map<string, WikiIndex>();
+	private scans = new Map<string, Promise<WikiIndex>>();
+	private generations = new Map<string, number>();
 	constructor(private dataDir: string) { mkdirSync(dataDir, { recursive: true }); }
 	private key(cwd: string) { return hash(realpathSync(cwd)); }
 	private folder(cwd: string) { const dir = join(this.dataDir, this.key(cwd)); mkdirSync(join(dir, "blobs"), { recursive: true }); return dir; }
 	busy(cwd: string) { return this.active.has(this.key(cwd)); }
-	invalidate(cwd: string) { this.cache.delete(this.key(cwd)); }
+	invalidate(cwd: string) { const key = this.key(cwd); this.cache.delete(key); this.generations.set(key, (this.generations.get(key) ?? 0) + 1); }
 	private history(cwd: string): StoredRevision[] {
 		const file = join(this.folder(cwd), "history.json");
 		return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
@@ -61,9 +64,35 @@ export class WikiService {
 		const retained = new Set(records.slice(-100).flatMap(r => Object.values(r.blobs).flatMap(b => [b.before, b.after]).filter(Boolean)));
 		for (const name of readdirSync(join(this.folder(cwd), "blobs"))) if (!retained.has(name)) rmSync(join(this.folder(cwd), "blobs", name), { force: true });
 	}
-	async index(cwd: string, fresh = false) {
+	async index(cwd: string, fresh = false): Promise<WikiIndex> {
 		const key = this.key(cwd), cached = this.cache.get(key);
-		if (!fresh && cached && Date.now() - cached.at < 3000) return cached;
+		if (!fresh && cached) {
+			if (Date.now() - cached.at >= 30000) void this.scan(cwd).catch(() => {});
+			return cached;
+		}
+		if (!fresh && this.scans.has(key)) {
+			const result = await this.scans.get(key)!;
+			return this.cache.has(key) ? result : this.scan(cwd);
+		}
+		// Forced snapshots must observe changes after any already running scan.
+		if (fresh && this.scans.has(key)) await this.scans.get(key);
+		return this.scan(cwd);
+	}
+	private scan(cwd: string): Promise<WikiIndex> {
+		const key = this.key(cwd), pending = this.scans.get(key);
+		if (pending) return pending;
+		const generation = this.generations.get(key) ?? 0;
+		const task = this.buildIndex(cwd).then(result => {
+			if ((this.generations.get(key) ?? 0) === generation) {
+				if (this.cache.size >= 8) this.cache.delete(this.cache.keys().next().value!);
+				this.cache.set(key, result);
+			}
+			return result;
+		}).finally(() => this.scans.delete(key));
+		this.scans.set(key, task);
+		return task;
+	}
+	private async buildIndex(cwd: string): Promise<WikiIndex> {
 		const entries: WikiEntry[] = [], texts = new Map<string, string>();
 		let limited = false, bytes = 0, visited = 0;
 		const status: WikiIndexStatus = { indexed: 0, total: 0, totalIsLowerBound: false, issues: [] };
@@ -96,9 +125,19 @@ export class WikiService {
 			}
 		};
 		await walk("", 0);
-		const result = { at: Date.now(), entries, texts, limited, status };
-		if (this.cache.size >= 8) this.cache.delete(this.cache.keys().next().value!);
-		this.cache.set(key, result); return result;
+		const paths = entries.map(e => e.path), references = new Map<string, ReturnType<typeof wikiReferences>>(), backlinks = new Map<string, WikiDocument["backlinks"]>();
+		for (const [source, body] of texts) {
+			const refs = wikiReferences(body); references.set(source, refs);
+			for (const ref of refs) {
+				const target = resolveWikiLink(source, ref.target, paths);
+				if (!target || target === source) continue;
+				const links = backlinks.get(target) ?? [];
+				links.push({ path: source, snippet: ref.snippet, line: ref.line }); backlinks.set(target, links);
+			}
+			// Let foreground document requests run between files.
+			await new Promise<void>(resolve => setImmediate(resolve));
+		}
+		return { at: Date.now(), entries, texts, limited, status, references, backlinks };
 	}
 	async directory(cwd: string, path: string, offset = 0): Promise<WikiDirectory> {
 		if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000) throw new Error("Invalid directory offset");
@@ -117,20 +156,25 @@ export class WikiService {
 		}
 		return { path, entries, ...(offset + 500 < children.length ? { nextOffset: offset + 500 } : {}) };
 	}
-	async state(cwd: string): Promise<WikiState> {
-		const index = await this.index(cwd), counts = new Map<string, number>();
+	async state(cwd: string, fresh = false): Promise<WikiState> {
+		const index = await this.index(cwd, fresh), counts = new Map<string, number>();
 		for (const entry of index.entries) for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
 		return { entries: index.entries, index: index.status, tags: [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)), revisions: this.history(cwd).reverse().map(({ blobs: _blobs, ...r }) => r), running: this.busy(cwd), limited: index.limited };
 	}
 	async document(cwd: string, path: string): Promise<WikiDocument> {
-		const abs = wikiPath(cwd, path), size = statSync(abs).size;
-		if (!statSync(abs).isFile()) throw new Error("Not a file");
+		return { ...await this.documentContent(cwd, path), ...await this.documentReferences(cwd, path) };
+	}
+	async documentReferences(cwd: string, path: string): Promise<WikiDocumentReferences> {
+		wikiPath(cwd, path);
+		return { backlinks: (await this.index(cwd)).backlinks.get(path) ?? [] };
+	}
+	async documentContent(cwd: string, path: string): Promise<WikiDocumentContent> {
+		const abs = wikiPath(cwd, path), info = statSync(abs), size = info.size;
+		if (!info.isFile()) throw new Error("Not a file");
 		const data = size <= MAX_FILE ? readFileSync(abs) : undefined;
 		const text = data && !/\.pdf$/i.test(path) && previewKind(path) !== "image" && looksLikeText(data) ? decodeText(data) : undefined;
 		const metadata = wikiMetadata(text ?? "");
-		const index = await this.index(cwd), paths = index.entries.map(e => e.path);
-		const backlinks = [...index.texts].flatMap(([source, body]) => source === path ? [] : wikiReferences(body).filter(ref => resolveWikiLink(source, ref.target, paths) === path).map(ref => ({ path: source, snippet: ref.snippet, line: ref.line })));
-		return { entry: { path, name: basename(path), size, modified: statSync(abs).mtimeMs, kind: kindOf(path, text !== undefined), tags: metadata.tags, title: metadata.title }, text, version: data ? hash(data) : "", editable: text !== undefined && Buffer.from(text).equals(data!), backlinks };
+		return { entry: { path, name: basename(path), size, modified: info.mtimeMs, kind: kindOf(path, text !== undefined), tags: metadata.tags, title: metadata.title }, text, version: data ? hash(data) : "", editable: text !== undefined && Buffer.from(text).equals(data!) };
 	}
 	async search(cwd: string, query: string): Promise<{ results: WikiSearchResult[]; limited: boolean }> {
 		const index = await this.index(cwd), q = query.trim().toLocaleLowerCase().slice(0, 200);

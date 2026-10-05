@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +16,34 @@ function fixture() {
 	return { root, cwd, service };
 }
 describe("Wiki workspace", () => {
+	it("reads editable content without waiting for an index and keeps references separate", async () => {
+		const { cwd, service } = fixture();
+		const original = service.index.bind(service);
+		let release!: () => void;
+		const gate = new Promise<void>(resolve => { release = resolve; });
+		const index = vi.spyOn(service, "index").mockImplementation(async () => { await gate; return original(cwd); });
+		const references = service.documentReferences(cwd, "notes.md");
+		const content = await service.documentContent(cwd, "notes.md");
+		expect(content.editable).toBe(true);
+		expect(content.text).toContain("# Notes");
+		expect(index).toHaveBeenCalledTimes(1);
+		release();
+		expect((await references).backlinks).toHaveLength(1);
+	});
+	it("coalesces concurrent scans, serves stale cache, and refreshes invalidated references", async () => {
+		const { cwd, service } = fixture();
+		const [a, b] = await Promise.all([service.index(cwd), service.index(cwd)]);
+		expect(a).toBe(b);
+		a.at = 0;
+		writeFileSync(join(cwd, "notes.md"), "# Changed");
+		expect(await service.index(cwd)).toBe(a);
+		service.invalidate(cwd);
+		writeFileSync(join(cwd, "new.md"), "[[notes]]");
+		const fresh = await service.index(cwd, true);
+		expect(fresh).not.toBe(a);
+		expect((await service.documentReferences(cwd, "notes.md")).backlinks.map(link => link.path)).toEqual(["index.md", "new.md"]);
+	});
+
 	it("indexes tags, full-text snippets, code references and backlinks", async () => {
 		const { cwd, service } = fixture();
 		const state = await service.state(cwd);

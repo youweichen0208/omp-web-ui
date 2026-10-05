@@ -10320,10 +10320,13 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 /* Wiki 19a — document-first reading, compact composer and quiet navigation. */
 .wiki-sidebar { width: 250px; }
-.wiki-document { max-width: 836px; padding-bottom: 160px; }
-.wiki-document-heading h1 { font-size: 32px; }
-.wiki-prose { line-height: 1.8; }
-.wiki-prose.md h2 { font-size: 21px; scroll-margin-top: 36px; }
+.wiki-document { max-width: 960px; padding: 52px 48px 160px; }
+.wiki-document-heading h1 { font-size: 36px; line-height: 1.3; font-weight: 700; letter-spacing: -.8px; margin-bottom: 20px; }
+.wiki-document-meta { font-size: 14px; gap: 14px; margin-bottom: 56px; }
+.wiki-prose { font-size: 17px; line-height: 1.9; }
+.wiki-prose.md p { margin: 20px 0; }
+.wiki-prose.md h2 { font-size: 25px; font-weight: 700; line-height: 1.45; margin: 40px 0 24px; scroll-margin-top: 36px; }
+.wiki-prose.md h3 { font-size: 21px; line-height: 1.5; margin: 30px 0 18px; }
 .wiki-toc { width: 200px; flex: none; padding: 40px 18px 20px 6px; overflow: auto; }
 .wiki-toc h2 { color: var(--text-faint); font-size: 12px; font-weight: 400; margin: 0 0 12px; }
 .wiki-toc button { display: block; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 5px 10px; margin-bottom: 5px; font-size: 12.5px; background: transparent; color: var(--text-dim); }
@@ -10368,8 +10371,8 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-index-issues code { overflow-wrap: anywhere; }
 .wiki-index-issues small { grid-column: 1 / -1; color: var(--amber); }
 .wiki-prose { --code-bg: var(--wiki-code-bg); --code-fg: var(--wiki-code-fg); --wiki-code-bg: oklch(0.975 0.004 80); --wiki-code-fg: #383530; --wiki-code-keyword: #a13760; --wiki-code-string: #4d7339; --wiki-code-number: #3b6fba; --wiki-code-comment: #7e8275; }
-.wiki-prose[data-code-theme="dark"] { --wiki-code-bg: oklch(0.22 0.008 80); --wiki-code-fg: #e5e1db; --wiki-code-keyword: #e7ab78; --wiki-code-string: #aed492; --wiki-code-number: #80bee2; --wiki-code-comment: #a3a094; }
-@media (prefers-color-scheme: dark) { .wiki-prose[data-code-theme="system"] { --wiki-code-bg: oklch(0.22 0.008 80); --wiki-code-fg: #e5e1db; --wiki-code-keyword: #e7ab78; --wiki-code-string: #aed492; --wiki-code-number: #80bee2; --wiki-code-comment: #a3a094; } }
+.wiki-prose[data-code-theme="dark"] { --wiki-code-bg: #1e1c18; --wiki-code-fg: #e5e1db; --wiki-code-keyword: #ff963f; --wiki-code-string: #aed492; --wiki-code-number: #55baf0; --wiki-code-comment: #a3a094; }
+@media (prefers-color-scheme: dark) { .wiki-prose[data-code-theme="system"] { --wiki-code-bg: #1e1c18; --wiki-code-fg: #e5e1db; --wiki-code-keyword: #ff963f; --wiki-code-string: #aed492; --wiki-code-number: #55baf0; --wiki-code-comment: #a3a094; } }
 .wiki-prose .codeblock { border: 1px solid var(--border-soft); border-radius: 8px; background: var(--wiki-code-bg); color: var(--wiki-code-fg); }
 .wiki-prose.md .codeblock pre { background: transparent; color: var(--wiki-code-fg); padding: 34px 18px 18px; border: 0; }
 .wiki-prose .codeblock .hljs { background: transparent; color: var(--wiki-code-fg); }
@@ -10384,12 +10387,14 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 /* Wiki uses the editable Markdown canvas without changing the reading layout. */
 .wiki-prose .fp-markdown { padding: 0; overflow: visible; background: transparent; color: inherit; font: inherit; --text: inherit; --text-dim: inherit; --link: var(--wiki-accent); --code-bg: var(--wiki-code-bg); --code-fg: var(--wiki-code-fg); }
-.wiki-prose .fp-rich-toolbar { border: 1px solid var(--border-soft); border-radius: 6px; margin: 0 0 16px; background: var(--bg); }
+.wiki-prose .fp-rich-toolbar { position: absolute; top: -46px; left: 0; max-width: 100%; z-index: 5; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--bg-elev); opacity: 0; pointer-events: none; }
+.wiki-prose .fp-rich-editor:focus-within > .fp-rich-toolbar { opacity: 1; pointer-events: auto; }
 .wiki-prose .fp-rich-document { min-height: 120px; }
-.wiki-prose .fp-rich-document h2 { font-size: 21px; }
-.wiki-prose .fp-markdown .fp-code-language { background: var(--wiki-code-bg); border-color: var(--border-soft); gap: 10px; }
-.wiki-prose .fp-code-language :is(select, button) { color: var(--wiki-code-fg); background: transparent; font: 12px var(--mono); border: 0; }
-.wiki-prose .fp-markdown .fp-rich-document pre.codeblock { padding-top: 40px; background: var(--wiki-code-bg); color: var(--wiki-code-fg); }
+
+.wiki-prose .fp-markdown .fp-code-language { top: 8px; right: 12px; left: auto; height: 26px; padding: 0; border: 0; background: transparent; gap: 8px; }
+.wiki-prose .fp-code-language :is(select, button) { color: var(--wiki-code-comment); background: transparent; font: 12px var(--mono); border: 0; }
+.wiki-prose .fp-markdown .fp-rich-document pre.codeblock { margin: 24px 0; padding: 40px 24px 22px; border: 0; border-radius: 12px; background: var(--wiki-code-bg); color: var(--wiki-code-fg); font-size: 15px; line-height: 1.75; }
+@media (max-width: 760px) { .wiki-prose { font-size: 16px; } .wiki-prose.md h2 { font-size: 22px; } .wiki-document-meta { font-size: 12px; gap: 10px; } .wiki-prose .fp-markdown .fp-rich-document pre.codeblock { padding-inline: 16px; font-size: 13px; } }
 .wiki-prose .fp-markdown .hljs-comment { color: var(--wiki-code-comment); }
 
 .wiki-prose .rich-block[hidden] { display: none; }
@@ -10575,3 +10580,6 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 }
 .wiki-context-chips .wiki-quoted-selection { flex-basis: 100%; max-width: 100%; white-space: normal; text-align: left; border-radius: 0; border-left: 2px solid var(--wiki-accent); background: var(--bg); }
 .wiki-quoted-selection span { max-height: 54px; overflow: auto; flex: 1; font-size: 12px; line-height: 1.6; }
+
+/* Wiki conversation initialization keeps the status readable beside the arrow. */
+.wiki-composer-controls .wiki-send:has(span) { width: auto; padding: 0 8px; gap: 4px; border-radius: 9px; font-size: 11px; white-space: nowrap; }

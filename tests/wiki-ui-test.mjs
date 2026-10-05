@@ -110,9 +110,10 @@ try {
 	await page.locator('.wiki-toc button').last().click();
 	await page.waitForFunction(() => document.querySelector('.wiki-toc button:last-child')?.getAttribute('aria-current') === 'location');
 	assert((await page.locator('.wiki-document-meta').innerText()).includes('分钟读完'));
-	const lightCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
+	const readingCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
 	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
-	await page.waitForFunction(light => getComputedStyle(document.querySelector('.wiki-prose .codeblock')).backgroundColor !== light, lightCode);
+	assert.equal(readingCode, "rgb(30, 28, 24)");
+	assert.equal(await page.locator(".wiki-prose .codeblock").evaluate(el => getComputedStyle(el).backgroundColor), readingCode);
 	assert.equal(await page.locator('.wiki-prose select[data-code-language]').first().inputValue(), 'js');
 	await page.locator('.wiki-scroll').evaluate(el => { el.scrollTo({ top: 0, behavior: 'instant' }); el.dispatchEvent(new Event('scroll')); });
 	await page.waitForFunction(() => document.querySelector('.wiki-toc button:first-of-type')?.getAttribute('aria-current') === 'location');
@@ -156,6 +157,7 @@ try {
 	await page.locator('.wiki-document h1:visible', { hasText: '参数配置' }).waitFor();
 	assert.equal(readFileSync(join(cwd, 'risk', 'guard.py'), 'utf8'), 'def check_stop(loss):\n    return loss >= 0.02\n');
 	assert.equal(await page.locator('.fp-editor').count(), 0, 'old preview unmounted on Markdown navigation');
+	await page.locator('.wiki-backlinks > button').waitFor();
 	assert.equal(await page.locator('.wiki-backlinks > button').count(), 1);
 	await page.locator('.wiki-backlinks > button').click();
 	await page.locator('.wiki-document h1:visible', { hasText: '风控规则' }).waitFor();
@@ -242,15 +244,14 @@ try {
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'dark');
 	const previousConversation = activeConversation, previousSession = activeSnapshot.sessionId, previousFile = activeSnapshot.sessionFile;
 	assert.equal(typeof previousConversation, "string");
-	await page.locator('.wiki-tree-row[title="交易系统"]').click();
+	if (await page.locator('.wiki-tree-row[title="交易系统"]').getAttribute('aria-expanded') !== 'true') await page.locator('.wiki-tree-row[title="交易系统"]').click();
 	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
 	holdSnapshots = true;
 	const newDocument = page.waitForResponse(response => response.url().endsWith('/api/wiki') && response.request().postDataJSON()?.action === 'new-conversation');
 	await page.locator('.wiki-tree-row[title="交易系统/参数配置.md"]').click();
 	assert.equal((await newDocument).status(), 200);
-	await page.locator('.wiki-chat-toggle').click();
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('must not send into the old conversation');
-	assert(await page.getByRole('button', { name: '发送', exact: true }).isDisabled(), 'wait for the new conversation snapshot before sending');
+	assert(await page.getByRole('button', { name: '会话准备中', exact: true }).isDisabled(), 'wait for the new conversation snapshot before sending');
 	releaseSnapshots();
 	await page.locator('.wiki-document-heading h1', { hasText: '参数配置' }).waitFor();
 	await page.locator('.wiki-chat-panel').waitFor();

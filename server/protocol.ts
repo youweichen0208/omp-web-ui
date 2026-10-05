@@ -1191,13 +1191,14 @@ export interface WikiEntry {
 	symlink?: boolean;
 }
 export interface WikiLink { path: string; snippet: string; line: number }
-export interface WikiDocument {
+export interface WikiDocumentContent {
 	entry: WikiEntry;
 	text?: string;
 	version: string;
 	editable: boolean;
-	backlinks: WikiLink[];
 }
+export interface WikiDocumentReferences { backlinks: WikiLink[] }
+export interface WikiDocument extends WikiDocumentContent, WikiDocumentReferences {}
 export interface WikiSearchResult extends WikiLink { kind: WikiEntry["kind"]; page?: number }
 export interface WikiChange {
 	path: string;

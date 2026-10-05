@@ -41,6 +41,12 @@ try {
 	assert.equal(media.status, 200); assert.match(media.headers.get('content-type'), /application\/pdf/);
 	assert.equal((await fetch(endpoint + '/api/wiki-media?' + new URLSearchParams({ clientId, cwd, path: '../outside.txt', token }))).status, 404);
 	const doc = await (await request('document', { path: 'note.md' })).json();
+	const content = await (await request('document-content', { path: 'note.md' })).json();
+	assert.equal(content.text, doc.text); assert.equal(content.version, doc.version); assert.equal(content.editable, true);
+	assert.equal('backlinks' in content, false, 'foreground response has no index dependency');
+	assert.deepEqual((await (await request('document-references', { path: 'note.md' })).json()).backlinks, doc.backlinks);
+	assert.equal((await request('document-content', { path: '../outside.txt' })).status, 400);
+	assert.equal((await request('document-references', { path: '../outside.txt' })).status, 400);
 	assert.equal((await request('write', { path: 'note.md', version: doc.version, text: '# saved' })).status, 200);
 	assert.equal((await request('write', { path: 'note.md', version: doc.version, text: '# stale' })).status, 400);
 	const history = await (await request('state')).json();
@@ -51,6 +57,8 @@ try {
 	assert.equal((await request('new-conversation', { path: '../outside.txt', conversationId: state.conversationId })).status, 400);
 	assert.equal((await request('new-conversation', { path: 'missing.md', conversationId: state.conversationId })).status, 400);
 	assert.equal((await request('new-conversation', { path: 'note.md', conversationId: 'stale' })).status, 400);
+	// A cold, asynchronous read survives a same-workspace native session switch.
+	const refreshing = request('refresh');
 	let conversationId = state.conversationId;
 	const identities = new Set([conversationId]);
 	for (let i = 0; i < 12; i++) {
@@ -60,6 +68,9 @@ try {
 		assert.equal(identities.has(conversationId), false, 'fresh native conversation even when outgoing chat was empty');
 		identities.add(conversationId);
 	}
+	assert.equal((await refreshing).status, 200);
+	assert.equal((await request('document-content', { path: 'note.md', conversationId: state.conversationId })).status, 200);
+	assert.equal((await request('prompt', { text: 'do not send', requestId: 'stale', conversationId: state.conversationId })).status, 400);
 	assert.equal((await request('new-conversation', { path: 'note.md', conversationId: state.conversationId })).status, 400, 'stale navigation cannot replace current session');
 	console.log('PASS Wiki HTTP auth/origin/workspace boundaries, PDF full-text/media, saves and persistent undo');
 } finally {

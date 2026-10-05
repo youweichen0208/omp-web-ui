@@ -24,7 +24,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 					if (conversationId !== cs.conversationId || service().quiesceInfo().quiesced) throw new Error("Conversation unavailable");
 					// Validate the target before leaving the current native session.
 					if (typeof path !== "string") throw new Error("Invalid path");
-					await wiki.document(cwd, path);
+					if (!statSync(wikiPath(cwd, path)).isFile()) throw new Error("Not a file");
 					if (!valid()) throw new Error("Conversation changed");
 					if (!await cs.newChat(true)) throw new Error("Could not create conversation");
 					if (cs.cwd !== cwd || cs.switchingWorkspace || cs.conversationId === conversationId) throw new Error("Could not create conversation");
@@ -33,10 +33,12 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 				case "open-info": { if (typeof path !== "string") throw new Error("Invalid path"); const absolute = wikiPath(cwd, path); if (!statSync(absolute).isFile()) throw new Error("Not a file"); result = { absolute }; break; }
 				case "state": result = await wiki.state(cwd); break;
 				case "directory": if (typeof path !== "string") throw new Error("Invalid path"); result = await wiki.directory(cwd, path, offset); break;
+				case "document-content": if (typeof path !== "string") throw new Error("Invalid path"); result = await wiki.documentContent(cwd, path); break;
+				case "document-references": if (typeof path !== "string") throw new Error("Invalid path"); result = await wiki.documentReferences(cwd, path); break;
 				case "document": if (typeof path !== "string") throw new Error("Invalid path"); result = await wiki.document(cwd, path); break;
 				case "change": if (typeof path !== "string" || typeof id !== "string") throw new Error("Invalid change"); result = wiki.change(cwd, id, path); break;
 				case "search": if (typeof query !== "string") throw new Error("Invalid query"); result = await wiki.search(cwd, query); break;
-				case "refresh": wiki.invalidate(cwd); result = await wiki.state(cwd); break;
+				case "refresh": wiki.invalidate(cwd); result = await wiki.state(cwd, true); break;
 				case "write":
 					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
 					if (![path, text, version].every(v => typeof v === "string")) throw new Error("Invalid save request");
@@ -60,7 +62,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 				}
 				default: throw new Error("Unknown Wiki action");
 			}
-			if (!valid()) { res.status(409).json({ error: "Workspace changed" }); return; }
+			if (cs.switchingWorkspace || cs.cwd !== cwd || (["prompt", "write", "restore"].includes(action) && !valid())) { res.status(409).json({ error: "Workspace changed" }); return; }
 			res.json(result);
 		} catch (error) { res.status(400).json({ error: (error as Error).message }); }
 	});
