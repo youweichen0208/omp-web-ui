@@ -95,7 +95,7 @@ try {
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.locator('.settings-tab[title="Extensions"]').click();
 		assert.equal(await page.locator('.set-row', { hasText: 'rpiv-todo' }).count(), 0, 'removed bundled todo must not return');
-		await page.locator('.extensions-panel .ext-header').getByRole('button', { name: '安装', exact: true }).waitFor();
+		await page.locator('.extensions-panel .ext-header').getByRole('button', { name: '从 npm / git 安装', exact: true }).waitFor();
 		await page.getByRole('button', { name: '系统提示词', exact: true }).click();
 		await page.locator('.system-prompt-panel .prompt-sections').waitFor();
 		await page.getByRole('button', { name: '原始文本', exact: true }).click();

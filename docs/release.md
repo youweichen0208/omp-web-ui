@@ -2,7 +2,13 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
-## 0.18.0 Wiki 编辑与 Extensions v3
+## 0.18.1 Wiki 编辑与 Extensions v3
+
+`0.18.1` 包含下述 Wiki 编辑与 Extensions v3 改进，并同步 Windows 工具栏回归的安装入口文案。说明见 `.github/release-notes/v0.18.1.md`；本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。
+
+## 0.18.0 构建候选（未公开）
+
+Windows 工具栏检查仍使用旧安装按钮文案，发布被阻断；保留草稿，以 0.18.1 完成修正后重新构建。
 
 `0.18.0` 实现第 7 版 Wiki 编辑设计与第 8 版 Extensions 列表设计：自动保存、保存冲突与桌面关闭保护，精简文档工具栏和请求改动展示，以及包目录展开详情、安装确认和失败重试。说明见 `.github/release-notes/v0.18.0.md`；本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。
 
