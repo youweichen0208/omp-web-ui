@@ -36,13 +36,13 @@ pi-web-ui server status|restart|stop|uninstall
 - `pi-<版本>-win-x64.exe`：免安装便携版，双击直接启动，没有安装向导，也不自动创建快捷方式。
 - `pi-<版本>-win-x64.zip`：解压后运行 `pi.exe`。
 
-Windows 打包使用 `win.signExecutable: false` 跳过签名，保留 EXE 图标和产品信息写入；不要设置 `signAndEditExecutable: false`，它会连资源编辑一起禁用。安装器、卸载器和应用使用 `build/icon.ico` 的紫色 π 图标。
+Windows 打包使用 `win.signExecutable: false` 跳过签名，保留 EXE 图标和产品信息写入；不要设置 `signAndEditExecutable: false`，它会连资源编辑一起禁用。安装器、卸载器和应用使用 `build/icon.ico` 的新款彩色 π 图标。
 
 ## 桌面版（Electron）
 
 不进 npm 发布包（`package.json` `files` 不含 `electron/`/`build/`）——桌面版走自己的发布渠道：
 push 一个 `v*` tag，`.github/workflows/release-desktop.yml` 会在 mac/win/linux 真机 runner 上
-各自构建并 `--publish always` 传到 [GitHub Releases](https://github.com/youweichen0208/pi-web-ui/releases)
+各自构建并 `--publish always` 传到 [GitHub Releases](https://github.com/youweichen0208/pi-harness/releases)
 （`electron-builder.yml` 里 `publish: provider: github` 已经配好，用的是 CI 自带的
 `GITHUB_TOKEN`，不需要额外配 secrets；当前不签名）。本地手动构建命令如下：
 
@@ -65,7 +65,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 - 主进程 `fork()` 一个隐藏子进程跑 `dist/server/index.js`（`ELECTRON_RUN_AS_NODE=1`，
   即用 Electron 自带的 Node 运行时跑纯 Node 代码，不是渲染进程）。
-- 桌面 Pi SDK 精确锁定为 1.0.2；终端 `pi update` 只更新外部 CLI。
+- 桌面 Pi SDK 精确锁定为 1.0.3；终端 `pi update` 只更新外部 CLI。
 - 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块。
 
 - 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
@@ -96,9 +96,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   rebuild 成 Electron 的 Node ABI，不需要手动 `electron-rebuild`；本机需要装好
   Xcode Command Line Tools（mac）/ Visual Studio Build Tools（win）。
 - 聊天任务清单与 Web 共用 `TodoChecklist`：连续更新合并、后续变化行及历史任务定位一起随 `web/dist` 构建进入桌面包。`tests/todo-chat-browser-test.mjs` 覆盖 Web 和 macOS/Windows 桌面外壳的 900px 布局、键盘跳转、历史折叠与清空后编号复用；它不替代原生安装包验证。
-- 图标：`build/icon.png`（1024×1024，从 `web/public/favicon.svg` 派生）+
-  `build/icon.ico`；electron-builder 打包时自动生成各平台格式，不需要手动出
-  `.icns`。
+- 图标：来自用户提供的 `icon-1a/1a-flat` 素材。`web/public/favicon.svg` 用于网页与侧栏，PNG 用于 favicon、触屏快捷方式及 Electron 窗口/托盘；`build/icon.png`（1024×1024）、`build/icon.ico`、`build/icon.icns` 用于桌面安装包。平台格式从同一 PNG 生成。
 - 自动更新：`electron-updater` 使用 GitHub Releases feed；安装版启动时检查版本，
   在「设置 → 组件更新」点击「自动更新」下载，显示进度后点击「重启并安装」。
   安装前系统对话框提示保存文件并确认，不在普通退出时自动安装。检查/下载错误在设置页显示，
@@ -129,11 +127,11 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 
 Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使用打包后的 Electron 加载懒加载 provider 并启动包内服务端）及 `tests/portable-relaunch-test.ps1`（首次启动、重复打开、原进程存活及模块保留），通过后才上传安装包；这些检查失败会阻断 Windows 发布。手动运行 `Verify Windows desktop build` 时传入 `release_tag`，可直接验证已发布的 ZIP、NSIS 和便携 EXE，无需重新构建。
 
-### Pi 1.0.2 原版 SDK
+### Pi 1.0.3 原版 SDK
 
 依赖安装前运行 `npm run check:lockfile`，验证 lockfile 下载地址全部使用 HTTPS npm 官方源，再运行 `npm ci`。常规 CI、桌面发布和 Windows 验证工作流均在每次安装前检查；不修改用户全局 npm 配置。
 
-不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。每个对话创建原生 SettingsManager，getDefaultTools() 原生返回 undefined 时才在读取时提供由公开 getter 解析的 `["+codemode", "+tool_search"]` 默认工具副本；不写入配置。对话级压缩/重试开关也仅在 getter 读取时应用内存覆盖，原生保存、reload 和信任切换均保留对话选择。已有原生选择（含空数组和禁用项）保持权威，不自动删除旧版已写入的值。MCP 使用原生 mcp.json，不配置外部服务器。
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.3。每个对话创建原生 SettingsManager，getDefaultTools() 原生返回 undefined 时才在读取时提供由公开 getter 解析的 `["+codemode", "+tool_search"]` 默认工具副本；不写入配置。对话级压缩/重试开关也仅在 getter 读取时应用内存覆盖，原生保存、reload 和信任切换均保留对话选择。已有原生选择（含空数组和禁用项）保持权威，不自动删除旧版已写入的值。MCP 使用原生 mcp.json，不配置外部服务器。
 
 ### Wiki 文件与 PDF
 

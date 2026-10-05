@@ -43,6 +43,7 @@ export class SettingsService {
 			});
 		} catch { /* The first session may still be attaching. */ }
 		this.host.emit({ type: "settings_state", settings: {
+			editResendNewSession: this.settings.editResendNewSession ?? false,
 			thinkingWrap: this.settings.thinkingWrap,
 			toolsWrap: this.settings.toolsWrap,
 			disabledPlugins: this.settings.disabledPlugins ?? [],

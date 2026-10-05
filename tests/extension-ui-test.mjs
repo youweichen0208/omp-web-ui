@@ -42,7 +42,7 @@ async function connect() {
  ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
  ws.on("message", raw => wire.push(JSON.parse(raw)));
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 35 });
+ send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 36 });
  await wait(m => m.type === "ready");
 }
 try {

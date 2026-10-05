@@ -31,6 +31,7 @@ const ALL = [
 	"component-updates-test",
 	"extensions-test",
 	"extension-ui-test",
+	"session-tree-test",
 	"tool-output-test",
 	"recovery-service-test",
 	"system-prompt-test",

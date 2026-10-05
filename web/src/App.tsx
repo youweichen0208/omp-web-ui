@@ -1,3 +1,4 @@
+import { SessionTreeWorkbench } from "./components/SessionTreeWorkbench";
 import { RecoveryStatus, ConversationRunSettings } from "./components/RecoveryStatus";
 import { LinkedText } from "./components/LinkedText";
 import type { WikiConversationResult } from "./types";
@@ -760,15 +761,15 @@ export function App() {
 		}
 	};
 
-	// Edit-and-re-ask: the server forks a new session at that message and re-asks
+	// Edit-and-re-ask: the server branches at that message and re-asks
 	// the edited text there (stable callback — Message is memoized). Attachments
-	// carry the question's original images (fork drops their aside cards) plus
+	// carry the question's original images (branching drops their aside cards) plus
 	// any newly pasted/dropped ones — same pipeline as a normal prompt.
 	const onEditMessage = useCallback(
-		(messageId: string, text: string, attachments?: PromptAttachment[]) => {
-			send({ type: "edit_message", messageId, text, attachments });
+		(messageId: string, text: string, attachments?: PromptAttachment[], options?: { entryId?: string; newSession?: boolean }) => {
+			send({ type: "edit_message", conversationId: chat.activeConversationId, messageId, text, attachments, ...options });
 		},
-		[send],
+		[send, chat.activeConversationId],
 	);
 
 	// Stable callbacks for memoized panels (LeftPanel/RightPanel/ChatInput/
@@ -1141,6 +1142,7 @@ export function App() {
 					onClose={() => setManageModelsOpen(false)}
 				/>
 			)}
+			<SessionTreeWorkbench state={conversationState} connected={chat.ready} send={send} />
 			{settingsOpen && (
 				<SettingsModal
 					chat={chat}

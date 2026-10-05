@@ -54,7 +54,7 @@ vscode-editor/
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-web-ui/tree/develop/dev/plugins/vscode-editor
+pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor
 pi-web-ui install dev/plugins/vscode-editor  # 或本地目录（开发态）
 # 可选：--data-dir <dir> 自定义数据目录（默认 ~/.pi-web）
 
@@ -62,7 +62,7 @@ pi-web-ui install dev/plugins/vscode-editor  # 或本地目录（开发态）
 pi-web-ui plugins                            # 列出已装插件与 id
 
 # ── 更新 ──
-pi-web-ui install https://github.com/youweichen0208/pi-web-ui/tree/develop/dev/plugins/vscode-editor --force
+pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor --force
                                              # --force 覆盖重装即更新
                                              # ⚠ 先备份插件目录里的 ssh-hosts.json 与
                                              #   工作区 .vscode/sftp.json（主机凭据/同步配置）

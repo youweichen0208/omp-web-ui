@@ -47,6 +47,7 @@ export function SettingsModal({ chat, send, onClose }: SettingsModalProps) {
 				<nav className="settings-rail" aria-label={t("settingsTitle")}><h2>{t("settingsTitle")}</h2>{tabs.map(item => <button key={item.id} title={item.label} className={`settings-tab${tab === item.id ? " active" : ""}`} onClick={() => { if(canLeave())setTab(item.id); }}><span className="settings-tab-icon">{item.icon}</span><span className="settings-tab-label">{item.label}{item.id === "updates" && extensionUpdates > 0 && <span className="ext-rail-badge">{extensionUpdates}</span>}</span></button>)}</nav>
 				<div className="modal-body"><div className="set-section">
 					{!settings ? <p>{t("loading")}</p> : <>
+						<label className="tree-edit-preference"><input type="checkbox" checked={settings.editResendNewSession ?? false} onChange={event => send({ type: "set_settings", editResendNewSession: event.target.checked })} />{t("treeEditNewSession")}</label>
 						{tab === "prompt" && chat.state && <SystemPromptPanel key={`${chat.state.cwd}:${chat.state.conversationId}`} cwd={chat.state.cwd} conversationId={chat.state.conversationId} />}
 						{tab === "skills" && chat.state && <SkillsPanel key={chat.state.cwd} cwd={chat.state.cwd} reload={() => send({ type: "extensions_reload" })} />}
 						{tab === "extensions" && chat.state?.cwd && <ExtensionsPanel key={chat.state.cwd} cwd={chat.state.cwd} onUpdateCount={setExtensionUpdates} reload={() => send({ type: "extensions_reload" })} />}

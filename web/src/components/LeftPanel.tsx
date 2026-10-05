@@ -199,6 +199,8 @@ export const LeftPanel = memo(function LeftPanel({
 								/>
 								<span className="session-info">
 									<span className="session-title">{conversationDisplayTitle(c.title, undefined, undefined, c.messageCount, locale)}</span>
+									{!!c.branchPoints && <small>{t("treeBranches", { n: c.branchPoints })}</small>}
+									{c.parentSessionPath && <small title={c.parentSessionPath}>{t("treeDerived", { name: sessions.find(parent => parent.path === c.parentSessionPath)?.name || c.parentSessionPath.split(/[\\/]/).pop() || "" })}</small>}
 								</span>
 								<span className="session-time">{formatModified(c.createdAt ?? Date.now(), t("yesterday"))}</span>
 							</button>
@@ -280,6 +282,8 @@ export const LeftPanel = memo(function LeftPanel({
 									/>
 									<span className="session-info">
 										<span className="session-title">{displayName(s)}</span>
+										{!!(conv?.branchPoints ?? s.branchPoints) && <small>{t("treeBranches", { n: conv?.branchPoints ?? s.branchPoints ?? 0 })}</small>}
+										{s.parentSessionPath && <small title={s.parentSessionPath}>{t("treeDerived", { name: sessions.find(parent => parent.path === s.parentSessionPath)?.name || s.parentSessionPath.split(/[\\/]/).pop() || "" })}</small>}
 									</span>
 									{s.source === "tui" && (
 										<span className="session-src" title={t("tuiTip")}>

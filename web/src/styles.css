@@ -10799,3 +10799,52 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 /* Conversation runtime controls */
 .conversation-run-settings { padding: 4px 16px; font-size: 12px; color: var(--text-secondary); }
 .conversation-run-settings label { display: inline-flex; align-items: center; gap: 6px; margin: 8px 16px 8px 0; }
+
+/* ---- Native session tree ---- */
+.session-tree-panel { position: fixed; inset: 54px 0 26px auto; width: min(460px, 100vw); z-index: 55; display: flex; flex-direction: column; background: var(--bg-elev); border-left: 1px solid var(--border); box-shadow: -8px 0 30px #0001; }
+.session-tree-panel header, .session-tree-panel footer { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--border); }
+.session-tree-panel header h2 { font-size: 15px; flex: 1; margin: 0; }
+.session-tree-panel footer { border-top: 1px solid var(--border); border-bottom: 0; justify-content: space-between; font-size: 12px; }
+.session-tree-panel button, .tree-dialog button, .tree-draft-restore button, .tree-siblings button { border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 5px; }
+.session-tree-panel button:hover, .tree-dialog button:hover { background: var(--bg-elev2); }
+.session-tree-controls { display: flex; gap: 8px; padding: 12px; }
+.session-tree-controls input { min-width: 0; flex: 1; }
+.session-tree-controls input, .session-tree-controls select, .tree-dialog input:not([type]), .tree-dialog textarea { border: 1px solid var(--border); border-radius: 6px; padding: 8px; color: var(--text); background: var(--bg); }
+.session-tree-list { flex: 1; overflow: auto; min-height: 0; }
+.tree-node { position: relative; padding: 9px 10px; border-left: 2px solid transparent; }
+.tree-node.active-path { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.tree-node.selected { outline: 1px solid var(--accent); outline-offset: -1px; }
+.tree-node.root-start:not(:first-child) { border-top: 1px solid var(--border); margin-top: 12px; }
+.tree-node-heading { display: flex; align-items: start; gap: 4px; }
+.tree-node-preview { flex: 1; min-width: 0; flex-direction: column; align-items: start !important; text-align: left; overflow-wrap: anywhere; }
+.tree-node-preview small { color: var(--text-dim); font-size: 10px; }
+.tree-node-preview span { font-size: 12px; line-height: 1.5; }
+.tree-node-actions { display: flex; flex-wrap: wrap; gap: 3px; margin-left: 25px; color: var(--text-dim); font-size: 11px; }
+.tree-label { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 3px 5px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); max-width: 150px; overflow-wrap: anywhere; }
+.tree-warning, .tree-empty { padding: 10px 14px; font-size: 12px; color: var(--text-dim); }
+.tree-warning { background: var(--bg-elev2); }
+.tree-modal-backdrop { position: fixed; inset: 0; background: #0005; z-index: 120; display: grid; place-items: center; padding: 20px; }
+.tree-dialog { width: min(520px, 100%); max-height: 85vh; overflow: auto; background: var(--bg-elev); color: var(--text); padding: 24px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 60px #0003; }
+.tree-dialog h3 { margin: 0 0 14px; }
+.tree-dialog label { display: flex; align-items: center; gap: 9px; padding: 8px 0; }
+.tree-dialog textarea { width: 100%; min-height: 100px; box-sizing: border-box; }
+.tree-dialog-actions { display: flex; justify-content: end; gap: 8px; margin-top: 18px; }
+.tree-content-dialog { width: min(850px, 100%); }
+.tree-content-dialog pre, .tree-draft-restore pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 55vh; overflow: auto; font-size: 12px; }
+.tree-siblings { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; margin-left: 8px; }
+.tree-siblings button { padding: 2px 7px; font-size: 20px; }
+.tree-edit-menu { position: relative; font-size: 12px; }
+.tree-edit-menu[open] button { position: absolute; bottom: 100%; left: 0; white-space: nowrap; background: var(--bg-elev); border: 1px solid var(--border); padding: 8px; z-index: 2; }
+.tree-edit-preference { display: flex; gap: 8px; padding: 10px 0 16px; font-size: 12px; }
+.tree-draft-restore { padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev2); font-size: 12px; }
+.tree-floating-error { position: fixed; right: 20px; bottom: 70px; z-index: 60; padding: 14px; background: var(--bg-elev2); border: 1px solid var(--border); border-radius: 8px; }
+
+.session-tree-panel button:disabled, .tree-dialog button:disabled, .tree-siblings button:disabled { opacity: .4; cursor: default; }
+.session-tree-panel button:focus-visible, .tree-dialog button:focus-visible, .tree-siblings button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tree-dialog button.primary { background: var(--accent); color: white; }
+.tree-node-actions button { font-size: 11px; }
+.tree-node-preview small { display: inline-flex; align-items: center; gap: 4px; }
+.tree-connector { position: absolute; left: 12px; top: 0; bottom: 0; pointer-events: none; background: repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px 12px); }
+.session-info > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.message-tree-controls { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--text-dim); }

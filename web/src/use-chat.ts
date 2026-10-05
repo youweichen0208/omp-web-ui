@@ -1,3 +1,4 @@
+import { emitTreeResponse, queueTreeDraft } from "./tree-events";
 import { discardExtensionEditor, queueExtensionEditor } from "./extension-editor";
 import type { UiMessage } from "./types";
 import { mergeLiveToolOutput } from "./live-tool-output";
@@ -1159,6 +1160,14 @@ export function useChat() {
 					break;
 				case "extension_ui_reset":
 					discardExtensionEditor(msg.conversationId);
+					break;
+				case "tree": case "tree_changed": case "tree_open": case "tree_content_result": case "tree_preview_result": case "tree_navigate_result":
+					if (msg.type === "tree_navigate_result") {
+						const restored = [...(msg.restoredQueue?.steering ?? []), ...(msg.restoredQueue?.followUp ?? [])];
+						if (msg.editorText && !msg.reqId.startsWith("edit-")) restored.push(msg.editorText);
+						queueTreeDraft({ id: msg.reqId, conversationId: msg.conversationId, text: restored.join("\n\n") });
+					}
+					emitTreeResponse(msg);
 					break;
 				case "extension_editor":
 					queueExtensionEditor(msg);

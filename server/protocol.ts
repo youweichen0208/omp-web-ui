@@ -76,7 +76,62 @@ export interface UiNestedToolCall {
 	error?: string;
 }
 
+export type TreeFilterMode = "default" | "no-tools" | "user-only" | "labeled-only" | "all";
+export interface UiTreeSiblings {
+	index: number;
+	count: number;
+	prevTarget?: string;
+	nextTarget?: string;
+}
+export interface UiTreeNode {
+	id: string;
+	parentId: string | null;
+	visibleParentId: string | null;
+	depth: number;
+	rootId: string;
+	kind: "user" | "assistant" | "tool" | "compaction" | "branchSummary" | "custom" | "model" | "thinking" | "info" | "contextEdit" | "label";
+	preview: string;
+	timestamp: number;
+	label?: string;
+	onActivePath: boolean;
+	isLeaf: boolean;
+	childCount: number;
+	toolName?: string;
+	model?: string;
+	stopReason?: "error" | "aborted";
+	summaryFromId?: string;
+}
+export interface UiTreeState {
+	revision: string;
+	leafId: string | null;
+	branchPoints: number;
+	rootCount: number;
+	filterMode: TreeFilterMode;
+	skipSummaryPrompt: boolean;
+	externallyModified: boolean;
+	busy: boolean;
+}
+export type TreeRequest =
+	| { type: "tree_get"; conversationId: string; reqId: string; filter?: TreeFilterMode; query?: string }
+	| { type: "tree_content"; conversationId: string; reqId: string; entryId: string }
+	| { type: "tree_preview"; conversationId: string; reqId: string; targetId: string }
+	| { type: "tree_navigate"; conversationId: string; reqId: string; targetId: string; summary: "none" | "default" | "custom"; customInstructions?: string; replaceInstructions?: boolean; label?: string; abortRunning?: boolean }
+	| { type: "tree_label"; conversationId: string; reqId: string; entryId: string; label: string | null }
+	| { type: "session_clone"; conversationId: string; reqId: string }
+	| { type: "session_fork"; conversationId: string; reqId: string; entryId: string; position: "before" | "at" }
+	| { type: "session_reopen"; conversationId: string; reqId: string };
+export type TreeResponse =
+	| { type: "tree"; conversationId: string; reqId: string; revision: string; leafId: string | null; nodes: UiTreeNode[]; truncated: boolean }
+	| { type: "tree_changed"; conversationId: string; revision: string; branchPoints: number }
+	| { type: "tree_open"; conversationId: string; mode: "tree" | "fork" }
+	| { type: "tree_content_result"; conversationId: string; reqId: string; entryId: string; content: string }
+	| { type: "tree_preview_result"; conversationId: string; reqId: string; entryCount?: number; commonAncestorId?: string | null }
+	| { type: "tree_navigate_result"; conversationId: string; reqId: string; status: "ok" | "cancelled" | "aborted" | "busy" | "error"; editorText?: string; restoredQueue?: { steering: string[]; followUp: string[] }; error?: string };
+
 export interface UiMessage {
+	entryId?: string;
+	siblings?: UiTreeSiblings;
+	label?: string;
 	/** Stable-ish id for React keys: u-<ts>-<seq> / a-<ts>-<seq> / t-<toolCallId>. */
 	id: string;
 	role: string;
@@ -152,12 +207,14 @@ export interface UiModelInfo {
 }
 
 export interface UiRecovery {
+	branch?: { id: string };
 	compaction?: { id: string; reason: "manual" | "threshold" | "overflow" };
 	retry?: { id: string; phase: "waiting" | "running"; attempt: number; maxAttempts: number; deadline: number; error: string };
 	summary?: { id: string; source: "compaction" | "branchSummary"; phase: "waiting" | "running"; attempt?: number; maxAttempts?: number; deadline?: number; error?: string };
 }
 
 export interface UiState {
+	tree?: UiTreeState;
 	recovery?: UiRecovery;
 	runSettings?: { autoCompaction: boolean; autoRetry: boolean };
 	clientId: string;
@@ -323,6 +380,7 @@ export interface NativeCodemodeSettings { version: string; path: string; mode: "
 export interface NativeMcpConfigState { path: string; paths?: { global: string; project: string }; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; inheritedAutoEnableCodemode?: boolean; }
 
 export type ClientMessage =
+	| TreeRequest
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
 	| { type: "node_request"; requestId: string; action: string; nodeId?: string; terminalId?: string; conversationId?: string; payload?: Record<string, unknown> }
 	| { type: "hello"; clientId: string; protocolVersion?: number }
@@ -399,9 +457,12 @@ export type ClientMessage =
 	/** Full patch of one commit. */
 	| { type: "scm_commit"; reqId: number; hash: string }
 	| { type: "new_chat" }
-	/** Edit a past user question and re-ask it (forks a new session at that point). */
+	/** Re-ask on an in-file branch by default; newSession overrides the saved UI preference. */
 	| {
 			type: "edit_message";
+			conversationId?: string;
+			entryId?: string;
+			newSession?: boolean;
 			messageId: string;
 			text: string;
 			/**
@@ -493,6 +554,7 @@ export type ClientMessage =
 	 *  session changes reload the runtime, while review changes affect the next review. */
 	| {
 			type: "set_settings";
+			editResendNewSession?: boolean;
 
 			/** Installed UI plugins hidden in the settings panel (UI-only toggle,
 			 *  never triggers a runtime reload). */
@@ -541,6 +603,8 @@ export type ClientMessage =
 // ---------------------------------------------------------------------------
 
 export interface SessionSummary {
+	branchPoints?: number;
+	parentSessionPath?: string;
 	path: string;
 	name?: string;
 	firstMessage: string;
@@ -816,6 +880,8 @@ export interface ProviderStatus {
  *  were displaced to the background while still streaming; background-finish
  *  keeps them listed, opening-and-leaving-without-continuing removes them. */
 export interface ConversationSummary {
+	branchPoints?: number;
+	parentSessionPath?: string;
 	id: string;
 	createdAt?: number;
 	/** Display title: first user prompt (truncated) or the default. */
@@ -886,6 +952,7 @@ export interface UiExtensionInfo {
 
 /** Full settings state pushed to the browser (settings_state). */
 export interface UiSettingsState {
+	editResendNewSession?: boolean;
 	thinkingWrap: boolean;
 	toolsWrap: boolean;
 	disabledPlugins: string[];
@@ -894,6 +961,7 @@ export interface UiSettingsState {
 	extensions: UiExtensionInfo[];
 }
 export type ServerMessage =
+	| TreeResponse
 	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[]; toolInfo?: NativeMcpTool[]; servers?: NativeMcpServerStatus[]; statusText?: string; codemode?: NativeCodemodeSettings; log?: string }
 	| { type: "node_event"; requestId?: string; event: string; nodeId?: string; terminalId?: string; conversationId?: string; data?: Record<string, unknown>; error?: string }
 	| {

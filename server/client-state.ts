@@ -5,6 +5,7 @@ import type { ProjectSummary } from "./protocol.js";
 
 /** Display-only settings; native agent configuration is managed by Pi. */
 export interface ClientSettings {
+	editResendNewSession?: boolean;
 	thinkingWrap: boolean;
 	toolsWrap: boolean;
 	disabledPlugins?: string[];
@@ -225,7 +226,7 @@ export class ClientStateStore {
 	/** Last-used settings-panel state for a client, or defaults. */
 	getSettings(clientId: string): ClientSettings {
 		const settings = this.load()[clientId]?.settings;
-		return { thinkingWrap: settings?.thinkingWrap ?? false, toolsWrap: settings?.toolsWrap ?? true, disabledPlugins: settings?.disabledPlugins ?? [] };
+		return { editResendNewSession: settings?.editResendNewSession ?? false, thinkingWrap: settings?.thinkingWrap ?? false, toolsWrap: settings?.toolsWrap ?? true, disabledPlugins: settings?.disabledPlugins ?? [] };
 	}
 
 	/** Persist the client's settings-panel state (partial merge). */
@@ -233,7 +234,7 @@ export class ClientStateStore {
 		const all = this.load();
 		const state = (all[clientId] ??= { projects: [] });
 		const current = this.getSettings(clientId);
-		state.settings = { thinkingWrap: partial.thinkingWrap ?? current.thinkingWrap, toolsWrap: partial.toolsWrap ?? current.toolsWrap, disabledPlugins: partial.disabledPlugins ?? current.disabledPlugins };
+		state.settings = { editResendNewSession: partial.editResendNewSession ?? current.editResendNewSession ?? false, thinkingWrap: partial.thinkingWrap ?? current.thinkingWrap, toolsWrap: partial.toolsWrap ?? current.toolsWrap, disabledPlugins: partial.disabledPlugins ?? current.disabledPlugins };
 		this.save();
 	}
 

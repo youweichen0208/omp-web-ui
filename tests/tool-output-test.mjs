@@ -28,7 +28,7 @@ try {
  ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
  const snapshot = new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error(logs)), 10000); ws.on("message", raw => { const m = JSON.parse(raw); if (m.type === "snapshot") { clearTimeout(timer); resolve(m.state); } }); });
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 35 }));
+ ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 36 }));
  const state = await snapshot;
  const result = state.messages.find(m => m.toolCallId === "large");
  assert.equal(result.details.exitCode, 0); assert.equal(result.details.fullOutputPath, path);

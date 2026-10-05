@@ -156,5 +156,5 @@ linux:
 publish:
   provider: github
   owner: youweichen0208
-  repo: omp-web-ui
+  repo: pi-harness
   releaseType: draft

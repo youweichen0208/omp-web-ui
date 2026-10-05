@@ -90,6 +90,7 @@ interface MessageListProps {
 		messageId: string,
 		text: string,
 		attachments?: PromptAttachment[],
+		options?: { entryId?: string; newSession?: boolean },
 	) => void;
 	/** Kill the running bash command from its tool card (agent run continues). */
 	onKillBash?: () => void;
@@ -777,6 +778,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							thinkingWrap={thinkingWrap}
 							isLast={m.id === lastId}
 							onEdit={onEdit}
+							conversationId={state.conversationId}
 							questionAttachments={questionAttachments.get(m.id)}
 							onCollapse={isExpandedOld ? collapse : undefined}
 						/>
@@ -798,6 +800,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						streaming={connected}
 						isLast
 						onEdit={onEdit}
+							conversationId={state.conversationId}
 						onKillBash={onKillBash}
 						toolsWrap={toolsWrap}
 						thinkingWrap={thinkingWrap}

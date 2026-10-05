@@ -94,7 +94,7 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 		try {
 			await resumed.bindExtensions({mode:"rpc"});
 			await resumed.extensionRunner.getCommand("mcp").handler("", resumed.extensionRunner.createCommandContext());
-			// Original Pi 1.0.2 resumes with its configured active loadout. Discovery remains native.
+			// Original Pi 1.0.3 resumes with its configured active loadout. Discovery remains native.
 			const search = resumed.getToolDefinition("tool_search");
 			assert(search, "native discovery remains available on resume");
 			await search.execute("resume-search", { query: "add" });

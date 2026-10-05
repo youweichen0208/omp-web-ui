@@ -229,7 +229,7 @@ function createWindow() {
 			contextIsolation: true,
 			additionalArguments: [`--pi-desktop-client-id=${clientId}`],
 		},
-		icon: join(__dirname, "icon.png"),
+		icon: join(ROOT, "web", "dist", "apple-touch-icon.png"),
 	});
 
 	const publishWindowState = () => {
@@ -381,7 +381,7 @@ ipcMain.handle("pi-window-state-read", (event) => {
 // ── 托盘 ──
 
 function createTray() {
-	const iconPath = join(__dirname, "icon.png");
+	const iconPath = join(ROOT, "web", "dist", "apple-touch-icon.png");
 	const icon = existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
 	tray = new Tray(icon.isEmpty() ? icon : icon.resize({ width: 16, height: 16 }));
 	tray.setToolTip("pi");

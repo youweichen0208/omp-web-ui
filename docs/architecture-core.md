@@ -2,7 +2,7 @@
 
 ## 原生上下文边界
 
-会话由 pi 1.0.2 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包，不添加宿主工具或提示词。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
+会话由 pi 1.0.3 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包，不添加宿主工具或提示词。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
 
 > 改代码前必读。本文档覆盖快照驱动、协议单源、安全边界、多对话并发等全局架构决策。
 
@@ -50,7 +50,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 - **默认只绑 loopback**（`PI_WEB_HOST`，默认 `127.0.0.1`）：本地个人工具不暴露到网络；局域网/容器需显式 `PI_WEB_HOST=0.0.0.0`（docker-compose.yml 已内置，Docker 端口映射才能工作）。
 - **WS 升级做 Origin/Host 同权威校验**（`server/index.ts` 的 `originAllowed`，`WebSocketServer({ noServer: true })` + 手动 `handleUpgrade`）：Origin 存在时其 hostname+**有效端口**必须与请求 Host 一致（浏览器里 `example-host:8445` 与 `example-host:9443` 是不同源）；非浏览器客户端（无 Origin）放行；`PI_WEB_ALLOW_ORIGINS` 白名单绕过（dev:server 已内置 `http://localhost:5173,http://127.0.0.1:5173`，反代场景自配）；`PI_WEB_ALLOW_HOSTS` 可选严格 hostname 白名单。**不要**加回「本地任意端口放行」——那正是提案要修的洞。
-- **quiesce 准入控制**（`AgentService.quiesce/unquiesce`）：进入排空后**拒绝一切新工作**——新 prompt（native slash 命令例外，纯配置无 token）、new_chat、edit_message fork、switch_session；存量运行继续跑完。已知 clientId 仍可 attach 看存量（发 notice 提示），**全新客户端 attach 抛 `QuiesceRejectedError` → index.ts 以 4403 关 WS**，浏览器重连循环在 unquiesce 后自动恢复。
+- **quiesce 准入控制**（`AgentService.quiesce/unquiesce`）：进入排空后**拒绝一切新工作**——新 prompt（native slash 命令例外，纯配置无 token）、new_chat、edit_message 分支/派生、switch_session；存量运行继续跑完。已知 clientId 仍可 attach 看存量（发 notice 提示），**全新客户端 attach 抛 `QuiesceRejectedError` → index.ts 以 4403 关 WS**，浏览器重连循环在 unquiesce 后自动恢复。
 - **控制 socket**（`server/control-socket.ts`）：CLI 的 `server status|quiesce|unquiesce` 经本地 mode-0600 unix socket / Windows 命名管道（`\\.\pipe\pi-web-ui-<port>`）与运行中进程通信，`status` 报告真实 socket 数（`noteSocketOpen/Close`，index.ts 维护）、active/pending 计数、quiesce 状态；无鉴权 HTTP 端点。
 - **provider headers 不下发浏览器**（`models_config` 不再携带 `headers` 字段，可能含 Authorization/API key）：`saveModelConfig` 保存时若 config 无 headers 则保留旧值（`prevHeaders`）。`UiProviderConfig.headers` 已从 protocol.ts / types.ts 删除，前端没有任何地方编辑 headers（仅 apiKey 经独立消息 `set_provider_api_key` 走浏览器）。
 - **dev 兼容**：vite :5173 代理 /ws 到 :8788 时 Origin(:5173) ≠ Host(:8788)，靠 `PI_WEB_ALLOW_ORIGINS`（dev:server 内置）放行，勿删。
@@ -70,7 +70,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 - 上限 `MAX_OPEN_CONVERSATIONS = 8` **按项目计**，超出时 new_chat 发 warning notice。
 - 所有对话共享**一个 ModelRuntime**（首个对话创建时播种，`makeRuntimeFactory` 传入复用）——顶栏换模型对全部对话生效。**消息序列化缓存（msgIds/uiMessageCache/签名）按对话隔离**：两个对话可能产生相同的 (role, timestamp) 键，共享会串号。
 - `snapshot` 带 `conversationId`；`conversations`（ServerMessage）推当前活动对话及当前项目已入列的后台对话。新对话尚未落盘时，活动项仍可在左栏显示；`switch_conversation`（ClientMessage）只在同项目内切换。
-- `switch_session`（恢复持久会话）会为目标会话创建独立 runtime，再按上述生命周期把当前对话移到后台；若目标会话已在运行列表中则直接复用其 conversation，绝不因打开历史记录中断当前生成。回归测试：`tests/switch-session-background-test.mjs`。`edit_message` 在**当前**对话内 fork；`dispose` 遍历销毁全部对话；attachSink 重连时补推 conversations。
+- `switch_session`（恢复持久会话）会为目标会话创建独立 runtime，再按上述生命周期把当前对话移到后台；若目标会话已在运行列表中则直接复用其 conversation，绝不因打开历史记录中断当前生成。回归测试：`tests/switch-session-background-test.mjs`。`edit_message` 默认在同一会话文件内分支重问，用户可选择派生新文件（见 [会话树](architecture-session-tree.md)）；`dispose` 遍历销毁全部对话；attachSink 重连时补推 conversations。
 - 前端：左栏「运行的对话」区（≥1 个时显示，活跃高亮、流式绿点），MessageList 以 conversationId 为 key 强制切换重挂载。
 - `/new` 直接调用 SDK `runtime.newSession()`：生成新的 SDK 会话 ID 和文件路径，旧会话历史与标题保留，可手动恢复；新会话的消息、上下文、用量和任务从空状态开始。Web 只复用 conversationId、终端并同步模型与思考档位，不复用旧会话文件、不自建重置分支、不扣减 SDK 统计基数。“新对话”按钮创建独立 runtime，允许原对话在后台继续。`/compact` 直接调用 SDK `session.compact(args || undefined)`，压缩规则与摘要由 SDK 负责。`conversations.activeId` 先于新快照到达时，消息、用量和任务进度只展示与活动对话 ID 匹配的快照；等待期间禁止发送，并安排 `get_state` 补取快照。回归：`tests/new-chat-context-test.mjs`（mock 模型 + 浏览器延迟快照，零 token）；`tests/native-session-commands-test.mjs` 复用无浏览器模式进入 CI，校验新会话身份、旧历史保留、取消、重复新建及重新打开。
 
@@ -152,3 +152,7 @@ serialize.ts 仅投影 edit 的 diff/firstChangedLine，以及 bash 的退出码
 ## Wiki 文档工作区
 
 Wiki 复用当前工作区，使用原生内存会话，离开后释放，不写入聊天历史；返回普通聊天时创建普通原生会话。输入范围可查看，文件改动记录保存在界面数据目录。修改用户消息构建、任务结束记录或文件恢复时读 [Wiki 架构](architecture-wiki.md)。
+
+## 原生会话树
+
+协议 v36 的树投影、原地切换、摘要与取消、label、编辑重问、派生、外部修改检测和草稿保护见 [会话树架构](architecture-session-tree.md)。原生 JSONL 是唯一事实来源，树请求按活动对话和 reqId 归属。

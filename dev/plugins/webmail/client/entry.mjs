@@ -353,7 +353,7 @@ export default {
 					new CustomEvent("pi-web-ui:plugin-run-command", {
 						detail: {
 							title: "webmail 更新",
-							command: "pi-web-ui install youweichen0208/pi-web-ui/tree/develop/dev/plugins/webmail --force",
+							command: "pi-web-ui install youweichen0208/pi-harness/tree/develop/dev/plugins/webmail --force",
 						},
 					}),
 				);

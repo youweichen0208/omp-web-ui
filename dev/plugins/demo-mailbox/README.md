@@ -24,7 +24,7 @@ demo-mailbox/
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-web-ui/tree/develop/dev/plugins/demo-mailbox
+pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/demo-mailbox
 pi-web-ui install dev/plugins/demo-mailbox   # 或本地目录
 
 # ── 查看 / 卸载 ──

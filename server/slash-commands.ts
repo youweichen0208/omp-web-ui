@@ -18,6 +18,7 @@ import type {  } from "./plugins.js";
 
 /** ClientSession 提供给本服务的宿主能力（窄接口，便于独立测试）。 */
 export interface SlashHost {
+	treeCommand?: (name: string, args: string, context: { conversationId: string; requestId: string }) => Promise<void>;
 	emit: (msg: ServerMessage) => void;
 	/** 当前工作目录（/cwd 无参数时回显）。 */
 	cwd: () => string;
@@ -50,6 +51,10 @@ export const NATIVE_COMMANDS: {
 	argumentHint?: string;
 	argumentHintEn?: string;
 }[] = [
+	{ name: "tree", description: "查看会话树与切换分支", descriptionEn: "Browse the session tree and switch branches" },
+	{ name: "clone", description: "复制当前分支为新会话", descriptionEn: "Clone this branch into a new session" },
+	{ name: "fork", description: "选择用户消息派生新会话", descriptionEn: "Choose a user message to fork" },
+	{ name: "name", description: "重命名当前会话", descriptionEn: "Rename this session", argumentHint: "<名称>", argumentHintEn: "<name>" },
 	{ name: "new", description: "新建会话，保留当前会话历史", descriptionEn: "Start a new session, keeping previous history" },
 	{ name: "model", description: "切换模型", descriptionEn: "Switch model", argumentHint: "[名称]", argumentHintEn: "[name]" },
 	{ name: "compact", description: "压缩上下文", descriptionEn: "Compact context", argumentHint: "[说明]", argumentHintEn: "[instructions]" },
@@ -140,6 +145,9 @@ export class SlashCommandsService {
 	 *  name is not a native command (the prompt falls through to the SDK). */
 	async exec(name: string, args: string, context: { conversationId: string; requestId: string }): Promise<boolean> {
 		switch (name) {
+			case "tree": case "clone": case "fork": case "name":
+				await this.host.treeCommand?.(name, args, context);
+				return true;
 			case "new":
 				await this.host.startNewSession();
 				return true;

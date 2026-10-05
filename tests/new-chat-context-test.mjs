@@ -300,7 +300,7 @@ try {
 		const content = typeof system?.content === "string" ? system.content : system?.content?.map(part => part.text ?? "").join("\n");
 		if (content !== nativePrompt) throw new Error("WebUI system prompt differs from native SDK");
 	}
-	console.log("✓ model requests have the same system prompt and active tools as an independent native pi 1.0.2 session");
+	console.log("✓ model requests have the same system prompt and active tools as an independent native pi 1.0.3 session");
 
 	if (requests.some((request) => request.messages.some((message) => message.content === "/new" || (Array.isArray(message.content) && message.content.some((part) => part.text === "/new"))))) throw new Error("/new was sent to the model");
 	if (JSON.stringify(chatRequests[1]).includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new leaked previous context into model request");

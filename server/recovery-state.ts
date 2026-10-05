@@ -13,8 +13,8 @@ export function recoveryEvent(state: UiRecovery, event: AgentSessionEvent, now =
 		case "summarization_retry_scheduled": return { ...state, summary: { id: randomUUID(), source: state.compaction ? "compaction" : "branchSummary", phase: "waiting", attempt: event.attempt, maxAttempts: event.maxAttempts, deadline: now + event.delayMs, error: event.errorMessage.slice(0, 500) } };
 		case "summarization_retry_attempt_start": return { ...state, summary: { ...state.summary, id: state.summary?.id ?? randomUUID(), source: event.source, phase: "running", deadline: undefined } };
 		case "summarization_retry_finished": return { ...state, summary: undefined };
-		case "agent_settled": return {};
+		case "agent_settled": return state.branch ? { branch: state.branch } : {};
 		default: return state;
 	}
 }
-export function isRecovering(state: UiRecovery): boolean { return !!(state.compaction || state.retry || state.summary); }
+export function isRecovering(state: UiRecovery): boolean { return !!(state.compaction || state.retry || state.summary || state.branch); }

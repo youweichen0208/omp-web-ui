@@ -21,7 +21,7 @@ pi-web-ui 界面插件，类似 [vscode-database-client](https://github.com/cwei
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-web-ui/tree/develop/dev/plugins/db-client
+pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client
 pi-web-ui install dev/plugins/db-client      # 或本地目录（开发态）
 # 可选：--data-dir <dir> 自定义数据目录（默认 ~/.pi-web）
 
@@ -29,7 +29,7 @@ pi-web-ui install dev/plugins/db-client      # 或本地目录（开发态）
 pi-web-ui plugins                            # 列出已装插件与 id
 
 # ── 更新 ──
-pi-web-ui install https://github.com/youweichen0208/pi-web-ui/tree/develop/dev/plugins/db-client --force
+pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client --force
                                              # --force 覆盖重装即更新
                                              # ⚠ 先备份插件目录里的 db-connections.json（连接凭据）
 

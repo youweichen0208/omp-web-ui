@@ -1,3 +1,4 @@
+import { navigateSibling } from "../tree-events";
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
 	FiChevronDown,
@@ -110,6 +111,7 @@ function editAttLabel(att: PromptAttachment, t: Translate): string {
 interface MessageProps {
 	todoViews?: ReadonlyMap<string, TodoPresentation>;
 	continuation?: boolean;
+	conversationId?: string;
 	message: UiMessage;
 	/** toolResult messages by toolCallId (precomputed in MessageList, memoized). */
 	toolResults: ReadonlyMap<string, UiMessage>;
@@ -127,6 +129,7 @@ interface MessageProps {
 		messageId: string,
 		text: string,
 		attachments?: PromptAttachment[],
+		options?: { entryId?: string; newSession?: boolean },
 	) => void;
 	/** Original attachments attached to this question (precomputed in MessageList
 	 *  from the attachment-card run that follows it): pasted/uploaded images
@@ -152,6 +155,7 @@ interface MessageProps {
 export const Message = memo(function Message({
 	todoViews,
 	continuation,
+	conversationId,
 	message,
 	toolResults,
 	retriedEditIds,
@@ -305,7 +309,7 @@ export const Message = memo(function Message({
 		setEditAttachments(questionAttachments ?? []);
 		setEditing(true);
 	};
-	const submitEdit = () => {
+	const submitEdit = (newSession?: boolean) => {
 		const text = draft.trim();
 		if (!text) return;
 		onEdit?.(
@@ -315,6 +319,7 @@ export const Message = memo(function Message({
 			// preserved — restoring the visual context the fork would drop; a
 			// text-only edit with none stays undefined.
 			editAttachments.length > 0 ? editAttachments : undefined,
+			{ entryId: message.entryId, newSession },
 		);
 		setEditing(false);
 	};
@@ -391,6 +396,7 @@ export const Message = memo(function Message({
 									: `${t("plugin")} · ${message.customType ?? t("unknown")}`
 						: roleLabel(message.role, t)}
 				</span>
+
 				{message.model && <span className="msg-model">{message.model}</span>}
 				{message.timestamp && (
 					<span className="msg-time" title={new Date(message.timestamp).toLocaleString()}>{formatTime(message.timestamp)}</span>
@@ -418,6 +424,10 @@ export const Message = memo(function Message({
 					</button>
 				)}
 			</div>
+			{(message.label || message.siblings) && <div className="message-tree-controls">
+				{message.label && <span className="tree-label">{message.label}</span>}
+				{message.siblings && conversationId && <span className="tree-siblings"><button aria-label={t("treePrevious")} disabled={!message.siblings.prevTarget || streaming} onClick={() => navigateSibling(conversationId, message.siblings!.prevTarget!)}>‹</button><span>{message.siblings.index} / {message.siblings.count}</span><button aria-label={t("treeNext")} disabled={!message.siblings.nextTarget || streaming} onClick={() => navigateSibling(conversationId, message.siblings!.nextTarget!)}>›</button></span>}
+			</div>}
 			<div className="msg-body">
 				{editing ? (
 					<div
@@ -514,6 +524,7 @@ export const Message = memo(function Message({
 							}}
 						/>
 						<div className="msg-editor-actions">
+							<details className="tree-edit-menu"><summary>{t("treeEditOptions")}</summary><button disabled={!draft.trim()} onClick={() => submitEdit(true)}>{t("treeFork")}</button></details>
 							<span className="msg-editor-hint">
 								<FiImage /> {t("editAttachmentHint")}
 							</span>
@@ -529,7 +540,7 @@ export const Message = memo(function Message({
 								className="chip primary"
 								disabled={!draft.trim()}
 								title={t("reaskFromHere")}
-								onClick={submitEdit}
+								onClick={() => submitEdit()}
 							>
 								<FiEdit3 /> {t("reaskFromHere")}
 							</button>

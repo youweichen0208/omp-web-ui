@@ -1,4 +1,7 @@
-import { createHash } from "node:crypto";
+import { SessionTreeController } from "./session-tree-controller.js";
+import { projectTree } from "./session-tree.js";
+import type { TreeRequest } from "./protocol.js";
+import { createHash, randomUUID } from "node:crypto";
 import { recoveryEvent, isRecovering } from "./recovery-state.js";
 import type { UiRecovery } from "./protocol.js";
 import { openToolOutput } from "./tool-output.js";
@@ -178,6 +181,9 @@ export { workspacePath };
  * never interrupts another conversation's in-flight run.
  */
 interface Conversation {
+	tree?: SessionTreeController;
+	treeProjectionRevision?: string;
+	treeEntryIds?: Map<string, string[]>;
 	recovery: UiRecovery;
 	webUi: WebUIContext;
 	/** Wiki conversations are temporary native in-memory sessions. */
@@ -858,6 +864,17 @@ export class ClientSession {
 			conv.webUi = new WebUIContext(msg => this.emit(msg), conv.id, () => `${conv.cwd} · ${conv.title}`);
 		}
 		conv.session = conv.runtime.session;
+		conv.tree ??= new SessionTreeController({
+			conversationId: conv.id, runtime: () => conv.runtime,
+			active: () => this.activeId === conv.id && this.convs.get(conv.id) === conv,
+			admitted: () => !this.quiesceBlocked(),
+			emit: message => this.emit(message),
+			changed: () => { this.scheduleSnapshot(); this.scheduleSessionsRefresh(); },
+			replaced: async () => { conv.treeProjectionRevision = undefined; conv.uiMessageCache.clear(); conv.title = conv.runtime.session.sessionManager.getSessionName() || conversationTitle(conv.runtime.session); await this.bindSession(conv); this.invalidateLists(); this.flushSnapshot(true); },
+			summary: operation => { conv.recovery = { ...conv.recovery, branch: operation, summary: !operation && conv.recovery.summary?.source === "branchSummary" ? undefined : conv.recovery.summary }; this.flushSnapshot(); },
+		});
+		conv.tree.bindFile();
+
 
 		if (!this.boundUiSessions.has(conv.session)) {
 			this.boundUiSessions.add(conv.session);
@@ -927,6 +944,7 @@ export class ClientSession {
 
 	private onEvent(conv: Conversation, event: AgentSessionEvent): void {
 		conv.recovery = recoveryEvent(conv.recovery, event);
+		if (event.type === "agent_settled" || event.type === "message_end") conv.tree?.refresh();
 
 		// Any SDK event proves the run is alive — feeds the stall watchdog below.
 		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: conv.runningToolNames.size ? "tool" : "model" });
@@ -1196,8 +1214,23 @@ export class ClientSession {
 	 *  what lets emitSnapshotNow detect append-only growth via identity walk. */
 	private currentMessages(): UiMessage[] {
 		const conv = this.conv;
+		const tree = conv.tree?.refresh();
+		const messageKey = (m: AgentMessage) => m.role === "toolResult" ? `t:${m.toolCallId}` : `${m.role}:${m.timestamp}:${contentFingerprint(m)}`;
+		if (tree && conv.treeProjectionRevision !== tree.revision) {
+			conv.treeEntryIds = new Map();
+			for (const entry of conv.session.sessionManager.buildSessionProjection().entries) for (const m of entry.messages) {
+				const key = messageKey(m), ids = conv.treeEntryIds.get(key) ?? [];
+				ids.push(entry.sourceEntry.id); conv.treeEntryIds.set(key, ids);
+			}
+			conv.treeProjectionRevision = tree.revision;
+		}
+		const occurrences = new Map<string, number>();
 		const rawMessages = conv.session.agent.state.messages
-			.map((m) => this.serializeCached(m))
+			.map((m) => {
+				const value = this.serializeCached(m);
+				const key = messageKey(m), index = occurrences.get(key) ?? 0; occurrences.set(key, index + 1);
+				return value ? conv.tree?.decorate(value, conv.treeEntryIds?.get(key)?.[index]) ?? value : null;
+			})
 			.filter((m): m is NonNullable<typeof m> => m !== null);
 		// Reuse the previous array when nothing changed: the element objects are
 		// cached (reference-stable) anyway, and a stable array reference lets the
@@ -1247,6 +1280,7 @@ export class ClientSession {
 			// stats are best-effort
 		}
 		return {
+			tree: conv.tree?.refresh(),
 			clientId: this.clientId,
 			cwd: this.cwd,
 			sessionId: this.session.sessionId,
@@ -1350,10 +1384,19 @@ export class ClientSession {
 	cancelRecovery(conversationId: string, operationId: string): void {
 		const conv = this.convs.get(conversationId);
 		if (!conv || conversationId !== this.activeId) return;
-		const { compaction, retry, summary } = conv.recovery;
-		if (summary?.id === operationId) { if (summary.source === "branchSummary") conv.session.abortBranchSummary(); else conv.session.abortCompaction(); }
+		const { compaction, retry, summary, branch } = conv.recovery;
+		if (branch?.id === operationId) conv.session.abortBranchSummary();
+		else if (summary?.id === operationId) { if (summary.source === "branchSummary") conv.session.abortBranchSummary(); else conv.session.abortCompaction(); }
 		else if (compaction?.id === operationId) conv.session.abortCompaction();
 		else if (retry?.id === operationId) conv.session.abortRetry();
+	}
+	async treeRequest(message: TreeRequest): Promise<void> {
+		const conv = this.convs.get(message.conversationId);
+		if (!conv?.tree || conv.id !== this.activeId) {
+			this.emit({ type: "tree_navigate_result", conversationId: message.conversationId, reqId: message.reqId, status: "error", error: "只能操作当前活动对话。" }); return;
+		}
+		await conv.tree.request(message);
+		this.flushSnapshot(true);
 	}
 	setRunSettings(message: Extract<ClientMessage, { type: "set_run_settings" }>): void {
 		const conv = this.convs.get(message.conversationId);
@@ -1658,7 +1701,18 @@ export class ClientSession {
 		cwd: () => this.cwd,
 		getSession: () => this.session,
 		startNewSession: () => this.startNewSession(),
-		setModel: (id) => this.setModel(id),
+		treeCommand: async (name, args, context) => {
+				const conv = this.conv;
+				if (conv.id !== context.conversationId) return;
+				if (name === "tree" || name === "fork") this.emit({ type: "tree_open", conversationId: conv.id, mode: name === "fork" ? "fork" : "tree" });
+				else if (name === "name") {
+					conv.tree?.assertWritable();
+					if (!args.trim()) { this.emitNotice("info", "用法：/name <名称>"); return; }
+					conv.session.setSessionName(args.trim().slice(0, 200)); conv.title = args.trim().slice(0, 200);
+					this.invalidateLists(); this.scheduleSessionsRefresh(); this.flushSnapshot();
+				} else await this.treeRequest({ type: "session_clone", conversationId: conv.id, reqId: `command-${context.requestId}` });
+			},
+			setModel: (id) => this.setModel(id),
 		setCwd: (path) => this.setCwd(path),
 		setThinking: (level) => this.setThinking(level),
 		refreshSessions: () => this.refreshSessions(),
@@ -1821,6 +1875,7 @@ export class ClientSession {
 			onAccepted?.(ok);
 		};
 		try {
+			if (!["tree", "fork"].includes(parseSlash(text)?.name ?? "")) conv.tree?.assertWritable();
 			const s = conv.session;
 			await flushPromptReload(s);
 			const promptReloadError=promptReloadStatus(s).reloadError;
@@ -2067,6 +2122,7 @@ export class ClientSession {
 
 	/** /new delegates session creation and history persistence to the SDK; the Web slot is reused. */
 	async startNewSession(): Promise<void> {
+		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (this.quiesceBlocked()) return;
 		const previous = this.conv;
 		const model = previous.session.model;
@@ -2076,6 +2132,7 @@ export class ClientSession {
 		if (result.cancelled) return;
 
 		previous.unsubscribe?.();
+		previous.tree?.dispose();
 
 		const conv = this.makeConversation(previous.runtime, previous.id, previous.terminals);
 		// IDs and delta sequence remain monotonic within this conversation.
@@ -2096,6 +2153,7 @@ export class ClientSession {
 	}
 
 	async newChat(fresh = false, wiki = false): Promise<boolean> {
+		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return false; }
 		if (this.creatingConversation) return false;
 		this.creatingConversation = true;
 		const previous = this.activeId;
@@ -2257,6 +2315,7 @@ export class ClientSession {
 		const conv = this.convs.get(id);
 		if (!conv || id === this.activeId) return Promise.resolve();
 
+		conv.tree?.dispose();
 		conv.webUi.dispose();
 		this.convs.delete(id);
 
@@ -2268,6 +2327,7 @@ export class ClientSession {
 
 	/** Switch the ACTIVE conversation without interrupting any other chat. */
 	async switchConversation(id: string): Promise<void> {
+		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (!this.convs.has(id) || id === this.activeId) return;
 		const displaced = this.displaceActive();
 		this.activeId = id;
@@ -2305,6 +2365,8 @@ export class ClientSession {
 				// session being replaced — report defaults
 			}
 			conversations.push({
+				branchPoints: conv.tree?.refresh().branchPoints,
+				parentSessionPath: conv.session.sessionManager.getHeader()?.parentSession,
 				id: conv.id,
 				createdAt: conv.createdAt,
 				title: conv.title,
@@ -2356,10 +2418,12 @@ export class ClientSession {
 				const infos = await SessionManager.list(cwd);
 				// SDK SessionInfo includes allMessagesText. Retain only UI summaries.
 				const sessions = new Map<string, SessionSummary>();
-				for (const info of infos) {
+				for (const info of infos.sort((a, b) => b.created.getTime() - a.created.getTime()).slice(0, 200)) {
 					const path = resolve(info.path);
 					sessions.set(path, {
 						path, name: info.name, firstMessage: info.firstMessage,
+						parentSessionPath: info.parentSessionPath,
+						branchPoints: projectTree(SessionManager.open(path)).branchPoints,
 						messageCount: info.messageCount, modified: info.modified.getTime(),
 						created: info.created.getTime(), source: "web",
 					});
@@ -2506,7 +2570,7 @@ export class ClientSession {
 				(conv) => conv.session.sessionFile === abs,
 			);
 			if (liveConv) {
-
+				liveConv.tree?.assertWritable();
 				liveConv.session.sessionManager.appendSessionInfo(trimmed);
 				liveConv.title = trimmed || conversationTitle(liveConv.session);
 				this.emitConversations();
@@ -2532,6 +2596,7 @@ export class ClientSession {
 	 * user opened history while it was streaming.
 	 */
 	async switchSession(path: string): Promise<void> {
+		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (this.quiesceBlocked()) return;
 		let openedRuntime: AgentSessionRuntime | null = null;
 		let openedTerminals: TerminalManager | null = null;
@@ -2644,22 +2709,14 @@ export class ClientSession {
 		return null;
 	}
 
-	/**
-	 * Edit a past user question and re-ask it: forks a NEW session file that
-	 * keeps everything up to (but not including) that question, then sends the
-	 * edited text there. The original thread is untouched and stays in the
-	 * session list, so nothing is ever lost.
-	 *
-	 * Attachments (attachments) travel through the SAME pipeline as prompt()
-	 * — the fork intentionally drops the original attachment asides because
-	 * they live on the old branch past the fork point, so the browser re-sends
-	 * the images it kept in the edit composer (original image blocks + any
-	 * newly pasted/dropped ones). Text-only edits pass undefined.
-	 */
+	/** Re-ask on a native in-file branch by default; an explicit choice or UI
+	 * preference preserves the separate-file fork behavior. Attachments travel
+	 * through prompt() again because their original asides remain on the old path. */
 	async editMessage(
 		messageId: string,
 		text: string,
 		attachments?: Parameters<ClientSession["prompt"]>[1],
+		options: { conversationId?: string; entryId?: string; newSession?: boolean } = {},
 	): Promise<void> {
 		if (this.quiesceBlocked()) return;
 		const trimmed = text.trim();
@@ -2672,7 +2729,9 @@ export class ClientSession {
 			this.flushSnapshot();
 			return;
 		}
-		const entryId = this.resolveUserMessageEntryId(messageId);
+		const conv = this.conv;
+		if (options.conversationId && options.conversationId !== conv.id) return;
+		const entryId = options.entryId ?? this.resolveUserMessageEntryId(messageId);
 		if (!entryId) {
 			this.emit({
 				type: "notice",
@@ -2687,27 +2746,21 @@ export class ClientSession {
 			// Preserve the model the user had selected — fork() seeds a new
 			// branch with the ModelRuntime default model otherwise.
 			const prevModel = this.session.agent.state.model ?? null;
-			const result = await this.runtime.fork(entryId);
-			if (result.cancelled) {
-				this.emit({
-					type: "notice",
-					level: "info",
-					text: "已取消编辑重问",
-				});
-				this.flushSnapshot();
-				return;
-			}
-			await this.bindSession();
-			// Restore the previously-selected model on the forked branch.
-			if (prevModel && this.sharedModelRuntime) {
-				try {
-					await this.session.setModel(prevModel);
-				} catch {
-					// model no longer resolvable — keep the default
-				}
+			conv.tree?.assertWritable();
+			const entry = conv.session.sessionManager.getEntry(entryId);
+			if (entry?.type !== "message" || entry.message.role !== "user") throw new Error("只能编辑用户消息。");
+			const newSession = options.newSession ?? this.settingsSvc.current.editResendNewSession ?? false;
+			let status = "error";
+			const context = { conversationId: conv.id, reqId: `edit-${randomUUID()}` };
+			await conv.tree?.request(newSession
+				? { type: "session_fork", ...context, entryId, position: "before" }
+				: { type: "tree_navigate", ...context, targetId: entryId, summary: "none" }, result => { status = result; });
+			if (status !== "ok" || this.conv !== conv) return;
+			if (newSession && prevModel && this.sharedModelRuntime) {
+				try { await conv.session.setModel(prevModel); } catch { /* Keep the runtime default if unavailable. */ }
 			}
 			await this.prompt(trimmed, attachments);
-			this.emit({
+			if (newSession) this.emit({
 				type: "notice",
 				level: "info",
 				text: "已从该问题重新提问（原对话保留在会话列表中）",
@@ -2804,6 +2857,7 @@ export class ClientSession {
 
 	async cycleModel(): Promise<void> {
 		try {
+			this.conv.tree?.assertWritable();
 			await this.session.cycleModel();
 		} catch (err) {
 			this.emit({
@@ -2828,6 +2882,7 @@ export class ClientSession {
 	get switchingWorkspace(): boolean { return this.cwdSwitchRunning; }
 
 	async setCwd(path: string, id?: string, source?: "ui"): Promise<void> {
+		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		return new Promise<void>((done) => {
 			if (this.cwdQueue) {
 				if (this.cwdQueue.id) this.emit({ type: "cwd_result", requestId: this.cwdQueue.id, cwd: this.cwd, ok: false, error: "superseded" });
@@ -2994,6 +3049,7 @@ export class ClientSession {
 	/** Switch to a specific model by "provider/id" (e.g. "anthropic/claude-sonnet-5"). */
 	async setModel(modelId: string): Promise<void> {
 		try {
+			this.conv.tree?.assertWritable();
 			const mr = this.runtime.services.modelRuntime;
 			const slash = modelId.indexOf("/");
 			if (slash <= 0 || slash === modelId.length - 1) {
@@ -3017,6 +3073,7 @@ export class ClientSession {
 	/** Set the thinking level for future turns. */
 	setThinking(level: string): void {
 		try {
+			this.conv.tree?.assertWritable();
 			this.session.setThinkingLevel(
 				level as Parameters<AgentSession["setThinkingLevel"]>[0],
 			);
@@ -3032,6 +3089,7 @@ export class ClientSession {
 
 	cycleThinking(): void {
 		try {
+			this.conv.tree?.assertWritable();
 			this.session.cycleThinkingLevel();
 		} catch (err) {
 			this.emit({
@@ -3092,7 +3150,7 @@ export class ClientSession {
 		this.files.unwatchDir();
 		this.files.unwatchGit();
 		this.providerAuth.cancel();
-		for (const conv of this.convs.values()) conv.webUi.dispose();
+		for (const conv of this.convs.values()) { conv.tree?.dispose(); conv.webUi.dispose(); }
 		this.bg.stop();
 		for (const conv of this.convs.values()) {
 

@@ -625,8 +625,11 @@ wss.on("connection", (ws) => {
 			case "new_chat":
 				void cs.newChat();
 				break;
+			case "tree_get": case "tree_content": case "tree_preview": case "tree_navigate": case "tree_label": case "session_clone": case "session_fork": case "session_reopen":
+				void cs.treeRequest(msg);
+				break;
 			case "edit_message":
-				void cs.editMessage(msg.messageId, msg.text, msg.attachments);
+				void cs.editMessage(msg.messageId, msg.text, msg.attachments, msg);
 				break;
 			case "cycle_model":
 				void cs.cycleModel();
@@ -819,6 +822,7 @@ wss.on("connection", (ws) => {
 			case "set_settings":
 				void cs.setSettings({
 
+					editResendNewSession: msg.editResendNewSession,
 					disabledPlugins: msg.disabledPlugins,
 
 					thinkingWrap: msg.thinkingWrap,

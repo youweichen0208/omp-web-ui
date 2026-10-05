@@ -1,6 +1,12 @@
 # 发布流程
 
-> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
+> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
+
+## 0.99.2 原生会话树、Pi 1.0.3 与新图标
+
+`0.99.2` 一并交付原生会话树的只读可视化、分支切换/摘要/书签、原地编辑重问及派生命令。SDK / pi-ai 精确锁定 1.0.3，原生提示词适配器同步校验该版本；会话树协议为 36。GitHub 仓库与桌面更新源改为 `youweichen0208/pi-harness`。网页和三平台打包图标统一使用 `icon-1a/1a-flat` 素材。npm 包名、CLI 命令与桌面应用标识沿用现有值。本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。说明见 `.github/release-notes/v0.99.2.md`。
+
+Pi 1.0.3 将 Azure provider 从 `azure-openai-responses` 改为 `azure`。使用该 provider 的用户需按上游说明更新原生 auth.json / models.json / settings.json 或重新登录；WebUI 不自动改写用户凭据。
 
 ## 0.99.1 对话设置与依赖安装修复
 
@@ -175,7 +181,7 @@ npm run build
 git add -A
 git commit -m "feat(files): <一句话描述>"
 
-# 4) 推送 GitHub（仓库公开：youweichen0208/pi-web-ui，分支 develop）
+# 4) 推送 GitHub（仓库公开：youweichen0208/pi-harness，分支 develop）
 git push origin develop
 
 # 5) 发布 npm（会自动跑 prepublishOnly 构建；scope 包必须 --access public）

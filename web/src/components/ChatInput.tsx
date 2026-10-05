@@ -1,3 +1,4 @@
+import { TreeDraftRestore } from "./TreeDraftRestore";
 import { useExtensionEditor } from "../extension-editor";
 import type { MutableRefObject } from "react";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "../current-file";
@@ -549,6 +550,7 @@ export const ChatInput = memo(function ChatInput({
 					</div>
 				</div>
 			)}
+			<TreeDraftRestore conversationId={activeConversationId} active={active} text={text} replace={setText} />
 			<div className={`inputbox${text.length > 0 ? " has-draft" : ""}`}>
 			{(attachments.length > 0 || autoFile) && (
 				<div className="attach-row">
