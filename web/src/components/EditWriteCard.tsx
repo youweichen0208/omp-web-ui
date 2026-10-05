@@ -31,6 +31,7 @@ function ChangeBody({ change }: { change: EditWriteChange }) {
 			remaining -= visible.length;
 			return <div className="change-hunk" key={index}><div className="change-hunk-head">{change.error ? change.kind === "write" ? t("changeAttemptedWrite") : t("changeOriginal") : change.kind === "write" ? t("changeWrittenLines", { n: change.added }) : change.fromArguments ? t("changeReplacement") : t("changeAtLine", { n: hunk.line })}{hunk.functionName && <span> · {hunk.functionName}</span>}</div><Lines lines={visible} path={change.path} /></div>;
 		})}
+		{change.diffTruncated && <div className="change-empty">{t("truncated")}</div>}
 		{allLines > 12 && <button type="button" className="change-more" onClick={() => setExpanded((value) => !value)}>{expanded ? t("collapseCode") : t("expandRemainingLines", { n: allLines - 12 })}</button>}
 	</div>;
 }

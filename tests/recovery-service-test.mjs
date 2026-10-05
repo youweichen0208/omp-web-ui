@@ -1,0 +1,43 @@
+// Inject native event fixtures at the host boundary; never call a model.
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ClientSession } from "../dist/server/agent-service.js";
+import { ClientStateStore } from "../dist/server/client-state.js";
+import { ThinkingDurationStore } from "../dist/server/thinking-timing.js";
+const root = mkdtempSync(join(tmpdir(), "pi-recovery-service-"));
+process.env.PI_CODING_AGENT_DIR = join(root, "agent"); mkdirSync(process.env.PI_CODING_AGENT_DIR);
+let cs;
+try {
+ cs = await ClientSession.create("recovery", root, new ClientStateStore(join(root, "state.json")), new ThinkingDurationStore(join(root, "thinking.json")));
+ const conv = cs.conv, wire = []; cs.attachSink(m => wire.push(m));
+ let aborts = 0, prompts = 0, compactions = 0, retries = 0, branches = 0;
+ cs.abort = async () => { aborts++; }; cs.prompt = async () => { prompts++; };
+ conv.session.abortCompaction = () => { compactions++; };
+ conv.session.abortRetry = () => { retries++; };
+ conv.session.abortBranchSummary = () => { branches++; };
+ cs.onEvent(conv, { type: "compaction_start", reason: "threshold" });
+ const first = conv.recovery.compaction.id;
+ conv.lastSdkEventAt = Date.now() - 240000; conv.stallNoticed = true;
+ await cs.retrySilentPrompt(conv.id, "fixture"); assert.equal(aborts, 0); assert.equal(prompts, 0);
+ cs.onEvent(conv, { type: "summarization_retry_scheduled", attempt: 1, maxAttempts: 3, delayMs: 10000, errorMessage: "529 overload" });
+ cs.flushSnapshot(); assert(wire.findLast(m => m.type === "snapshot").state.recovery.compaction);
+ cs.cancelRecovery(conv.id, "stale"); assert.equal(compactions, 0);
+ cs.cancelRecovery(conv.id, conv.recovery.summary.id); assert.equal(compactions, 1);
+ cs.onEvent(conv, { type: "summarization_retry_finished" }); assert.equal(conv.recovery.compaction.id, first);
+ cs.onEvent(conv, { type: "compaction_end", reason: "threshold", result: undefined, aborted: true, willRetry: false });
+ cs.onEvent(conv, { type: "compaction_start", reason: "manual" }); cs.cancelRecovery(conv.id, first); assert.equal(compactions, 1);
+ cs.onEvent(conv, { type: "agent_settled" }); assert.deepEqual(conv.recovery, {});
+ cs.onEvent(conv, { type: "auto_retry_start", attempt: 2, maxAttempts: 3, delayMs: 5000, errorMessage: "529 overload" });
+ cs.cancelRecovery(conv.id, conv.recovery.retry.id); assert.equal(retries, 1);
+ cs.onEvent(conv, { type: "auto_retry_end", success: false, attempt: 2, finalError: "aborted" });
+ cs.onEvent(conv, { type: "summarization_retry_scheduled", attempt: 1, maxAttempts: 3, delayMs: 1000, errorMessage: "529" });
+ cs.cancelRecovery(conv.id, conv.recovery.summary.id); assert.equal(branches, 1);
+ cs.onEvent(conv, { type: "agent_settled" });
+ const result = { role: "toolResult", toolName: "edit", toolCallId: "cache", timestamp: 1, isError: false, content: [{ type: "text", text: "success" }], details: { diff: "+42 first", firstChangedLine: 42 } };
+ conv.session.agent.state.messages.push(result);
+ const before = cs.currentMessages(); result.details.diff = "+42 updated";
+ const after = cs.currentMessages(); assert.notEqual(before, after); assert.equal(after.at(-1).details.diff, "+42 updated"); assert.equal(cs.currentMessages(), after);
+ console.log("PASS recovery snapshots, >3-minute compaction guard, summary/branch cancellation, stale operation IDs and metadata cache updates");
+} finally { await cs?.dispose(); rmSync(root, { recursive: true, force: true }); }

@@ -15,7 +15,7 @@ interface SettingsModalProps {
 		ready: boolean;
 		settings: UiSettingsState | null;
 		state?: { cwd: string; conversationId: string } | null;
-		dialog: { id: number; kind: "select" | "confirm" | "input"; title: string; args: unknown[] } | null;
+		dialog: { id: string; conversationId: string; kind: "select" | "confirm" | "input" | "editor"; title: string; args: unknown[] } | null;
 		update?: Omit<Extract<ServerMessage, { type: "update_status" }>, "type"> | null;
 		componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 	};

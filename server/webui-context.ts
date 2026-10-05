@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 /**
  * webui-context — 扩展 UI 桥：把扩展的 setWidget/setStatus/notify/select/
  * confirm/input 等调用桥接到浏览器（widgets/statuses/notice/dialog 消息）。
@@ -66,8 +67,8 @@ interface WidgetEntry {
 
 /**
  * Implements the subset of ExtensionUIContext that makes sense for a web UI.
- * TUI-only affordances (select/confirm/input dialogs, terminal input, custom
- * footer) are inert: dialogs resolve to cancellation instead of blocking.
+ * Dialogs bridge to the owning conversation; custom TUI components degrade
+ * immediately so extensions can choose their RPC fallback.
  */
 export class WebUIContext {
 	readonly theme = mockTheme;
@@ -75,8 +76,11 @@ export class WebUIContext {
 	private lastLines = new Map<string, string[]>();
 	private emit: (msg: ServerMessage) => void;
 
-	constructor(emit: (msg: ServerMessage) => void) {
-		this.emit = emit;
+	private disposed = false;
+	private title = "";
+	replayTitle(send: (message: ServerMessage) => void): void { send({ type: "extension_title", conversationId: this.conversationId, title: this.title }); }
+	constructor(emit: (msg: ServerMessage) => void, readonly conversationId = "", private source: string | (() => string) = conversationId) {
+		this.emit = msg => { if (!this.disposed) emit(msg); };
 	}
 
 	// -- widgets -------------------------------------------------------------
@@ -84,6 +88,8 @@ export class WebUIContext {
 	/** Matches ExtensionUIContext's overloaded setWidget exactly. */
 	setWidget: ExtensionUIContext["setWidget"] = (key, content, options) => {
 		void options;
+		if (this.disposed) return;
+		try { this.widgets.get(key)?.dispose?.(); } catch { /* best effort */ }
 		if (content === undefined) {
 			this.widgets.delete(key);
 			this.lastLines.delete(key);
@@ -103,7 +109,7 @@ export class WebUIContext {
 			}
 			this.widgets.set(key, {
 				render: (w) => comp?.render?.(w),
-				dispose: comp?.dispose,
+				dispose: () => comp?.dispose?.(),
 			});
 		} else {
 			this.widgets.set(key, { render: () => content });
@@ -132,7 +138,7 @@ export class WebUIContext {
 
 	private push(): void {
 		const widgets = this.snapshot();
-		this.emit({ type: "widgets", widgets });
+		this.emit({ type: "widgets", conversationId: this.conversationId, widgets });
 	}
 
 	/** Render all widgets to their current text lines (without emitting). */
@@ -155,7 +161,7 @@ export class WebUIContext {
 
 	// Pi wraps this context with object spread: UI callbacks are own properties.
 	notify = (message: string, type?: "info" | "warning" | "error"): void => {
-		this.emit({ type: "notice", level: type ?? "info", text: message });
+		this.emit({ type: "notice", conversationId: this.conversationId, level: type ?? "info", text: message });
 	}
 
 	// -- footer status (pi-lens "LSP Inactive", pi-cache-optimizer cache stats) --
@@ -163,6 +169,7 @@ export class WebUIContext {
 	private statuses = new Map<string, string>();
 
 	setStatus = (key: string, text: string | undefined): void => {
+		if (this.disposed) return;
 		if (text === undefined || text === "") {
 			this.statuses.delete(key);
 		} else {
@@ -176,7 +183,7 @@ export class WebUIContext {
 
 	private pushStatuses(): void {
 		this.emit({
-			type: "statuses",
+			type: "statuses", conversationId: this.conversationId,
 			statuses: [...this.statuses.entries()].map(([k, v]) => ({
 				key: k,
 				text: v,
@@ -191,61 +198,49 @@ export class WebUIContext {
 
 	// -- dialogs (select/confirm/input bridged to the browser) ---------------
 
-	private dialogSeq = 0;
-	private dialogMessages = new Map<number, Extract<ServerMessage, { type: "dialog" }>>();
+	private dialogMessages = new Map<string, Extract<ServerMessage, { type: "dialog" }>>();
+	private pendingDialogs = new Map<string, (value: string | boolean | null) => void>();
 	replayDialogs(send: (message: ServerMessage) => void): void { for (const message of this.dialogMessages.values()) send(message); }
-	private pendingDialogs = new Map<
-		number,
-		(value: string | boolean | null) => void
-	>();
 
-	select = (title: string, options: string[]): Promise<string | undefined> =>
-		this.openDialog("select", title, [options]) as Promise<string | undefined>;
-	confirm = (title: string, message: string): Promise<boolean> =>
-		this.openDialog("confirm", title, [message]) as Promise<boolean>;
-	input = (title: string, placeholder?: string, options?: { signal?: AbortSignal }): Promise<string | undefined> =>
-		this.openDialog("input", title, [placeholder ?? ""], options?.signal) as Promise<
-			string | undefined
-		>;
+	select: ExtensionUIContext["select"] = (title, options, config) => this.openDialog("select", title, [options], config) as Promise<string | undefined>;
+	confirm: ExtensionUIContext["confirm"] = (title, message, config) => this.openDialog("confirm", title, [message], config) as Promise<boolean>;
+	input: ExtensionUIContext["input"] = (title, placeholder, config) => this.openDialog("input", title, [placeholder ?? ""], config) as Promise<string | undefined>;
+	editor: ExtensionUIContext["editor"] = (title, prefill) => this.openDialog("editor", title, [prefill ?? ""]) as Promise<string | undefined>;
 
-	private openDialog(
-		kind: "select" | "confirm" | "input",
-		title: string,
-		args: unknown[],
-		signal?: AbortSignal,
-	): Promise<string | boolean | null> {
-		return new Promise((resolve) => {
-			const id = ++this.dialogSeq;
-			if (signal?.aborted) { resolve(null); return; }
+	private openDialog(kind: "select" | "confirm" | "input" | "editor", title: string, args: unknown[], options?: { signal?: AbortSignal; timeout?: number }): Promise<string | boolean | undefined> {
+		const cancelled = kind === "confirm" ? false : undefined;
+		if (this.disposed || options?.signal?.aborted) return Promise.resolve(cancelled);
+		return new Promise(resolve => {
+			const id = randomUUID();
+			let timer: ReturnType<typeof setTimeout> | undefined;
 			const abort = () => this.resolveDialog(id, null);
-			this.pendingDialogs.set(id, value => { signal?.removeEventListener("abort", abort); resolve(value); });
-			signal?.addEventListener("abort", abort, { once: true });
-			const message = { type: "dialog" as const, id, kind, title, args };
-			this.dialogMessages.set(id, message); this.emit(message);
+			this.pendingDialogs.set(id, value => {
+				clearTimeout(timer);
+				options?.signal?.removeEventListener("abort", abort);
+				resolve(value === null ? cancelled : value);
+			});
+			this.dialogMessages.set(id, { type: "dialog", conversationId: this.conversationId, source: typeof this.source === "function" ? this.source() : this.source, id, kind, title, args });
+			options?.signal?.addEventListener("abort", abort, { once: true });
+			if (options?.timeout !== undefined && Number.isFinite(options.timeout)) timer = setTimeout(abort, Math.max(0, options.timeout));
+			this.emit(this.dialogMessages.get(id)!);
 		});
 	}
 
-	/** Resolve a pending dialog with the user's choice (called from the client). */
-	resolveDialog(id: number, value: string | boolean | null): void {
-		const resolve = this.pendingDialogs.get(id);
-		if (resolve) {
-			this.pendingDialogs.delete(id);
-			this.dialogMessages.delete(id);
-			resolve(value);
-			this.emit({ type: "dialog_closed", id });
+	resolveDialog(id: string, value: string | boolean | null): void {
+		const message = this.dialogMessages.get(id);
+		if (!message) return;
+		if (value !== null) {
+			if (message.kind === "confirm" ? typeof value !== "boolean" : typeof value !== "string") return;
+			if (message.kind === "select" && !(message.args[0] as string[]).includes(value as string)) return;
 		}
+		const resolve = this.pendingDialogs.get(id)!;
+		this.pendingDialogs.delete(id);
+		this.dialogMessages.delete(id);
+		resolve(value);
+		this.emit({ type: "dialog_closed", conversationId: this.conversationId, id });
 	}
 
-	/** Close every pending dialog as cancelled (used when a goal wizard aborts —
-	 *  its unanswered browser dialogs must vanish, not linger). */
-	cancelPendingDialogs(): void {
-		for (const [id, resolve] of this.pendingDialogs) {
-			this.pendingDialogs.delete(id);
-			this.dialogMessages.delete(id);
-			resolve(null);
-			this.emit({ type: "dialog_closed", id });
-		}
-	}
+	cancelPendingDialogs(): void { for (const id of this.pendingDialogs.keys()) this.resolveDialog(id, null); }
 
 	// -- inert TUI-only affordances ------------------------------------------
 
@@ -256,13 +251,12 @@ export class WebUIContext {
 	setHiddenThinkingLabel = (): void => {};
 	setFooter = (): void => {};
 	setHeader = (): void => {};
-	setTitle = (): void => {};
+	setTitle = (title: string): void => { if (this.disposed) return; this.title = title; this.emit({ type: "extension_title", conversationId: this.conversationId, title }); };
 	custom = <T>(_factory: unknown, _done?: unknown): Promise<T> =>
-		new Promise<T>(() => {});
-	pasteToEditor = (): void => {};
-	setEditorText = (): void => {};
+		Promise.resolve(undefined as T);
+	pasteToEditor = (text: string): void => { this.setEditorText(text); };
+	setEditorText = (text: string): void => { this.emit({ type: "extension_editor", conversationId: this.conversationId, id: randomUUID(), text }); };
 	getEditorText = (): string => "";
-	editor = async (): Promise<string | undefined> => undefined;
 	addAutocompleteProvider = (): void => {};
 	setEditorComponent = (): void => {};
 	getEditorComponent = (): undefined => undefined;
@@ -283,11 +277,12 @@ export class WebUIContext {
 		}
 		this.widgets.clear();
 		this.lastLines.clear();
-		// Cancel any pending dialogs.
-		for (const [id, resolve] of this.pendingDialogs) {
-			resolve(null);
-			this.emit({ type: "dialog_closed", id });
-		}
-		this.pendingDialogs.clear();
+		this.cancelPendingDialogs();
+		this.statuses.clear();
+		this.push();
+		this.pushStatuses();
+		this.setTitle("");
+		this.emit({ type: "extension_ui_reset", conversationId: this.conversationId });
+		this.disposed = true;
 	}
 }

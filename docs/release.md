@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/omp-web-ui`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.0 原生工具与运行状态
+
+`0.99.0` 修复原生工具元数据与完整输出下载，隔离扩展 UI，补齐 RPC 交互并展示原生压缩/重试状态。Pi SDK / pi-ai 保持 1.0.2，协议升至 35。说明见 `.github/release-notes/v0.99.0.md`；本次发布 GitHub 源码和三平台桌面 Release，不发布 npm。
+
 ## 0.18.1 Wiki 编辑与 Extensions v3
 
 `0.18.1` 包含下述 Wiki 编辑与 Extensions v3 改进，并同步 Windows 工具栏回归的安装入口文案。说明见 `.github/release-notes/v0.18.1.md`；本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。

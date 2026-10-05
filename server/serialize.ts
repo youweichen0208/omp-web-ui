@@ -23,6 +23,44 @@ function truncate(
 	return { text: `${s.slice(0, cap)}\n\n… [truncated]`, truncated: true };
 }
 
+/** Only documented native result fields cross the wire. */
+export function toolExitCode(result: unknown, isError = false): number | undefined {
+	if (!result || typeof result !== "object") return undefined;
+	const r = result as { structuredContent?: { exit_code?: unknown }; details?: { exitCode?: unknown }; content?: { type: string; text?: string }[] };
+	for (const value of [r.structuredContent?.exit_code, r.details?.exitCode]) {
+		if (typeof value === "number" && Number.isSafeInteger(value)) return value;
+	}
+	if (!isError) return undefined;
+	const text = Array.isArray(r.content) ? r.content.filter(c => c?.type === "text" && typeof c.text === "string").map(c => c.text).join("\n") : "";
+	const match = text.match(/exited with code (-?\d+)/);
+	return match && Number.isSafeInteger(Number(match[1])) ? Number(match[1]) : undefined;
+}
+
+export function nativeToolDetails(name: string, result: unknown): Record<string, unknown> | undefined {
+	if (!result || typeof result !== "object") return undefined;
+	const r = result as { details?: Record<string, unknown>; structuredContent?: Record<string, unknown>; isError?: boolean };
+	const d = r.details;
+	const out: Record<string, unknown> = {};
+	if (name === "edit") {
+		if (typeof d?.diff === "string") { const bounded = truncate(d.diff, TOOL_OUTPUT_CAP); out.diff = bounded.text; out.diffTruncated = bounded.truncated; }
+		if (typeof d?.firstChangedLine === "number" && Number.isSafeInteger(d.firstChangedLine) && d.firstChangedLine > 0) out.firstChangedLine = d.firstChangedLine;
+	}
+	if (name === "bash") {
+		out.exitCode = toolExitCode(result, r.isError);
+		const path = r.structuredContent?.full_output_path ?? d?.fullOutputPath;
+		if (typeof path === "string" && path.length <= 4096) out.fullOutputPath = path;
+		if (d?.truncation && typeof d.truncation === "object") {
+			const source = d.truncation as Record<string, unknown>;
+			const truncation: Record<string, unknown> = {};
+			for (const key of ["truncated", "lastLinePartial"]) if (typeof source[key] === "boolean") truncation[key] = source[key];
+			for (const key of ["totalLines", "totalBytes", "outputLines", "outputBytes"]) if (typeof source[key] === "number" && Number.isSafeInteger(source[key]) && source[key] >= 0) truncation[key] = source[key];
+			if (source.truncatedBy === "lines" || source.truncatedBy === "bytes") truncation.truncatedBy = source.truncatedBy;
+			out.truncation = truncation;
+		}
+	}
+	return Object.keys(out).length ? out : undefined;
+}
+
 function serializeUserContent(
 	content: Extract<AgentMessage, { content: unknown }>["content"],
 ): UiContentBlock[] {
@@ -140,6 +178,7 @@ export function serializeMessage(
 				...(nestedCalls ? { nestedCalls: { complete: nestedComplete, calls: nestedCalls } } : {}),
 				toolCallId: m.toolCallId,
 				toolName: m.toolName,
+				details: nativeToolDetails(m.toolName, m),
 				...(m.toolName === "codemode" ? { codemode: codemodeDetails(m.details) } : {}),
 				isError: m.isError,
 				...(todo ? { todoSnapshot: {

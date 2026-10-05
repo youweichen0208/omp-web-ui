@@ -38,7 +38,7 @@ export function WorkingStatus({ label, phase, durationMs }: { label: string; pha
 
 /** Shared by chat and Wiki: identical waiting phases, tool activity and disconnect state. */
 export function ConversationWorkingStatus({ state, connected, silenceNotified, toolStatuses }: {
-	state: Pick<UiState, "messages" | "streamingMessage" | "isStreaming" | "conversationId" | "model">;
+	state: Pick<UiState, "messages" | "streamingMessage" | "isStreaming" | "conversationId" | "model" | "recovery">;
 	connected: boolean; silenceNotified: boolean; toolStatuses: ReadonlyMap<string, ToolStatus>;
 }) {
 	const t = useT();
@@ -54,6 +54,7 @@ export function ConversationWorkingStatus({ state, connected, silenceNotified, t
 	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
 	const awaitingFirstAssistant = state.isStreaming && !streamingHasContent && lastUserIndex >= 0 && !state.messages.slice(lastUserIndex + 1).some((message) => message.role === "assistant");
 	const showWorkingFooter = runningTool?.name !== "bash" && (!streamingHasContent || !!runningTool || !!completedTool);
+	if (state.recovery && Object.values(state.recovery).some(Boolean)) return null;
 	if (!state.isStreaming) return null;
 	if (!connected) return <div className="agent-working disconnected" role="status">{t("workDisconnected")}</div>;
 	if (awaitingFirstAssistant) {

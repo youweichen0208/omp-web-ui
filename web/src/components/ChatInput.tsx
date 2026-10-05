@@ -1,3 +1,4 @@
+import { useExtensionEditor } from "../extension-editor";
 import type { MutableRefObject } from "react";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "../current-file";
 import { mergeCurrentFile } from "../current-file";
@@ -16,6 +17,7 @@ import { UsagePopover } from "./UsagePopover";
  *  by the server when the persisted set is unchanged), so the shallow-compared
  *  memo() below skips this input bar on every text delta. */
 interface ChatInputProps {
+	active?: boolean;
 	/** Mirrors the preview panel: the file currently open there, or null.
 	 *  Drives the current-file chip above the composer. */
 	currentFile: CurrentFileContext | null;
@@ -78,6 +80,7 @@ interface ChatInputProps {
 }
 
 export const ChatInput = memo(function ChatInput({
+	active = true,
 	currentFile, contextReader, contextSaver,
 	stats,
 	ready, promptResult,
@@ -114,6 +117,7 @@ export const ChatInput = memo(function ChatInput({
 	const drafts = useRef(new Map<string, string>());
 	const draftKey = useRef(activeConversationId);
 	const [text, setText] = useState("");
+
 	useLayoutEffect(() => {
 		if (draftKey.current !== activeConversationId) {
 			if (text) drafts.current.set(draftKey.current, text);
@@ -123,6 +127,7 @@ export const ChatInput = memo(function ChatInput({
 			drafts.current.delete(activeConversationId);
 		}
 	}, [activeConversationId, text]);
+	useExtensionEditor(activeConversationId, active, setText);
 	useEffect(() => {
 		const pending = pendingSubmit.current;
 		if (!pending || promptResult?.requestId !== pending.id) return;

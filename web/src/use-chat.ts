@@ -1,3 +1,4 @@
+import { discardExtensionEditor, queueExtensionEditor } from "./extension-editor";
 import type { UiMessage } from "./types";
 import { mergeLiveToolOutput } from "./live-tool-output";
 import { useCallback, useEffect, useReducer, useRef, useState, useMemo } from "react";
@@ -37,6 +38,7 @@ import { PROTOCOL_VERSION } from "./protocol-version";
 export type ConnStatus = "connecting" | "open" | "closed";
 
 export interface Notice {
+	conversationId?: string;
 	id: number;
 	level: "info" | "warning" | "error";
 	text: string;
@@ -128,12 +130,10 @@ export interface ChatState {
 	/** Extension footer statuses (setStatus bridge). */
 	statuses: { key: string; text: string | undefined }[];
 	/** Active extension dialog (select/confirm/input) awaiting a response. */
-	dialog: {
-		id: number;
-		kind: "select" | "confirm" | "input";
-		title: string;
-		args: unknown[];
-	} | null;
+	dialog: Extract<ServerMessage, { type: "dialog" }> | null;
+	extensionUi: Record<string, { widgets?: ChatState["widgets"]; statuses?: ChatState["statuses"]; title?: string }>;
+	pendingDialogs: Extract<ServerMessage, { type: "dialog" }>[];
+
 	/** User command list from .pi/commands.json (terminal left panel). */
 	commands: CommandDef[];
 	commandsPath: string;
@@ -279,17 +279,8 @@ type Action =
 	  }
 	| { type: "component_updates"; result: Extract<ServerMessage, { type: "component_updates" }> }
 	| { type: "component_updates_start"; requestId: string; cwd: string; updating: boolean }
-	| { type: "widgets"; widgets: { key: string; lines: string[] }[] }
-	| { type: "statuses"; statuses: { key: string; text: string | undefined }[] }
-	| {
-			type: "dialog";
-			dialog: {
-				id: number;
-				kind: "select" | "confirm" | "input";
-				title: string;
-				args: unknown[];
-			} | null;
-	  }
+	| { type: "extension_ui"; message: Extract<ServerMessage, { type: "widgets" | "statuses" | "dialog" | "dialog_closed" | "extension_title" }> }
+
 	| { type: "commands"; commands: CommandDef[]; path: string }
 	| { type: "slash_commands"; commands: SlashCommandInfo[] }
 	| { type: "terminal_add"; meta: TerminalMeta }
@@ -429,6 +420,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return {
 				...state,
 				status: action.status,
+				pendingDialogs: action.status === "closed" ? [] : state.pendingDialogs,
+				extensionUi: action.status === "closed" ? {} : state.extensionUi,
 				// A new socket is not ready until its hello/ready round-trip completes.
 				ready: action.status === "open" ? state.ready : false,
 				agentSilence: action.status === "closed" ? null : state.agentSilence,
@@ -604,12 +597,13 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, componentUpdates: { ...action.result, items: action.result.items.length ? action.result.items : state.componentUpdates.items } };
 		case "update_status":
 			return { ...state, update: action.status };
-		case "widgets":
-			return { ...state, widgets: action.widgets };
-		case "statuses":
-			return { ...state, statuses: action.statuses };
-		case "dialog":
-			return { ...state, dialog: action.dialog };
+		case "extension_ui": {
+			const m = action.message;
+			if (m.type === "dialog") return { ...state, pendingDialogs: [...state.pendingDialogs.filter(d => d.id !== m.id), m] };
+			if (m.type === "dialog_closed") return { ...state, pendingDialogs: state.pendingDialogs.filter(d => d.id !== m.id || d.conversationId !== m.conversationId) };
+			return { ...state, extensionUi: { ...state.extensionUi, [m.conversationId]: { ...state.extensionUi[m.conversationId], ...(m.type === "widgets" ? { widgets: m.widgets } : m.type === "statuses" ? { statuses: m.statuses } : { title: m.title }) } } };
+		}
+
 		case "commands":
 			return {
 				...state,
@@ -744,6 +738,8 @@ export function useChat() {
 		update: null,
 		componentUpdates: null,
 		providerAuth: null,
+		extensionUi: {},
+		pendingDialogs: [],
 		widgets: [],
 		statuses: [],
 		dialog: null,
@@ -1009,11 +1005,11 @@ export function useChat() {
 					break;
 				}
 				case "notice": {
-					if (/MCP|mcp/i.test(msg.text)) window.dispatchEvent(new CustomEvent("pi-mcp-notice", { detail: msg.text }));
+					if ((!msg.conversationId || msg.conversationId === authoritative.current.activeConversationId) && /MCP|mcp/i.test(msg.text)) window.dispatchEvent(new CustomEvent("pi-mcp-notice", { detail: msg.text }));
 					const id = ++noticeId.current;
 					dispatch({
 						type: "notice",
-						notice: { id, level: msg.level, text: msg.text },
+						notice: { id, conversationId: msg.conversationId, level: msg.level, text: msg.text },
 					});
 					break;
 				}
@@ -1155,25 +1151,19 @@ export function useChat() {
 					dispatch({ type: "update_status", status: msg });
 					break;
 				case "widgets":
-					dispatch({ type: "widgets", widgets: msg.widgets });
-					break;
 				case "statuses":
-					dispatch({ type: "statuses", statuses: msg.statuses });
-					break;
 				case "dialog":
-					dispatch({
-						type: "dialog",
-						dialog: {
-							id: msg.id,
-							kind: msg.kind,
-							title: msg.title,
-							args: msg.args,
-						},
-					});
-					break;
 				case "dialog_closed":
-					dispatch({ type: "dialog", dialog: null });
+				case "extension_title":
+					dispatch({ type: "extension_ui", message: msg });
 					break;
+				case "extension_ui_reset":
+					discardExtensionEditor(msg.conversationId);
+					break;
+				case "extension_editor":
+					queueExtensionEditor(msg);
+					break;
+
 				case "terminal_output":
 					bridgeRef.current.write(
 						msg.conversationId ?? authoritative.current.activeConversationId,
@@ -1348,6 +1338,9 @@ export function useChat() {
 		setPendingEcho,
 		terminal: terminalApi,
 	};
+	const extension = chat.extensionUi[chat.activeConversationId];
+	useEffect(() => { document.title = extension?.title || "pi-web-ui"; }, [extension?.title]);
+	const scopedChat = { ...chat, notices: chat.notices.filter(n => !n.conversationId || n.conversationId === chat.activeConversationId), widgets: extension?.widgets ?? [], statuses: extension?.statuses ?? [], dialog: chat.pendingDialogs.find(d => d.conversationId === chat.activeConversationId) ?? null };
 	const displayChat = switching ? {
 		...chat,
 		state: switching.display?.state ?? null,
@@ -1358,7 +1351,7 @@ export function useChat() {
 		liveOutputs: new Map(),
 		toolStatuses: new Map(),
 		dialog: null,
-	} : { ...chat, ready: chat.ready && hasSnapshot, files: chat.files ?? cache.current.get(chat.state?.cwd ?? "")?.files ?? null };
+	} : { ...scopedChat, ready: chat.ready && hasSnapshot, files: chat.files ?? cache.current.get(chat.state?.cwd ?? "")?.files ?? null };
 	return {
 		...chatApi.current, chat: displayChat, switching: switching?.path ?? null, switchError };
 }

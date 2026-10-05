@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto";
+import { recoveryEvent, isRecovering } from "./recovery-state.js";
+import type { UiRecovery } from "./protocol.js";
+import { openToolOutput } from "./tool-output.js";
+import { nativeToolDetails, toolExitCode } from "./serialize.js";
 import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
 import { parseNativeMcpStatus } from "./native-mcp-presentation.js";
 import { codemodeDetails } from "./codemode-presentation.js";
 import { NativeMcpConfigService } from "./native-mcp-config.js";
 
 import type { ClientMessage } from "./protocol.js";
-import { ensureNativeToolDefaults, nativeToolExtensions } from "./native-tools.js";
+import { conversationSettings, setConversationRunSettings, nativeToolExtensions } from "./native-tools.js";
 import { ProviderAuthService } from "./provider-auth.js";
 import { packageManagerFor, updateTargets, checkComponents, componentRestartRequired, updateComponentPackage } from "./component-updates.js";
 import { toolOutputUpdate } from "./tool-output.js";
@@ -173,6 +178,8 @@ export { workspacePath };
  * never interrupts another conversation's in-flight run.
  */
 interface Conversation {
+	recovery: UiRecovery;
+	webUi: WebUIContext;
 	/** Wiki conversations are temporary native in-memory sessions. */
 	wiki?: boolean;
 	lastRunMessages?: Extract<AgentSessionEvent, { type: "agent_end" }>["messages"];
@@ -558,7 +565,7 @@ export class ClientSession {
 	}
 	get nativeModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
 	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piCheckCache = null; await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
-	private webUi = new WebUIContext((msg) => this.emit(msg));
+	private get webUi(): WebUIContext { return this.conv.webUi; }
 	private widgetsTimer: ReturnType<typeof setInterval> | null = null;
 	/** Model-stall watchdog interval (see startStallTimer). */
 	private stallTimer: ReturnType<typeof setInterval> | null = null;
@@ -704,11 +711,11 @@ export class ClientSession {
 	 */
 	private makeRuntimeFactory(): CreateAgentSessionRuntimeFactory {
 		return async ({ cwd, sessionManager }) => {
-			ensureNativeToolDefaults(this.agentDir);
 			const services = await createAgentSessionServices({
 				cwd,
 				agentDir: this.agentDir,
 				modelRuntime: this.sharedModelRuntime,
+				settingsManager: conversationSettings(cwd, this.agentDir),
 				resourceLoaderOptions: { extensionFactories: nativeToolExtensions() },
 			});
 			const created = await createAgentSessionFromServices({ services, sessionManager });
@@ -729,6 +736,8 @@ export class ClientSession {
 	): Conversation {
 		return {
 			id,
+			recovery: {},
+			webUi: new WebUIContext(msg => this.emit(msg), id, () => `${runtime.cwd} · ${this.convs.get(id)?.title ?? conversationTitle(runtime.session)}`),
 			title: runtime.session.sessionManager.getSessionName() || conversationTitle(runtime.session),
 
 			runtime,
@@ -792,16 +801,18 @@ export class ClientSession {
 		this.sinks.add(send);
 
 		this.providerAuth.replay();
-		this.webUi.replayDialogs(send);
+		for (const conv of this.convs.values()) {
+			conv.webUi.replayDialogs(send);
+			conv.webUi.replayTitle(send);
+			send({ type: "widgets", conversationId: conv.id, widgets: conv.webUi.snapshot() });
+			send({ type: "statuses", conversationId: conv.id, statuses: conv.webUi.statusSnapshot() });
+		}
 		for (const conv of this.convs.values()) if (conv.stallNoticed && conv.session.isStreaming) send({ type: "agent_silence", conversationId: conv.id, phase: "silent", since: conv.lastSdkEventAt, activity: conv.runningToolNames.size ? "tool" : "model" });
 		for (const msg of this.pendingNotices) send(msg);
 		this.pendingNotices = [];
 		// Replay current extension widgets (setWidget may have fired during
 		// session creation, before any socket was attached).
-		const widgets = this.webUi.snapshot();
-		if (widgets.length > 0) send({ type: "widgets", widgets });
-		const statuses = this.webUi.statusSnapshot();
-		if (statuses.length > 0) send({ type: "statuses", statuses });
+
 		// Reconnect: push the current project's running-conversation list so the
 		// left panel shows every background chat (a fresh socket never got the
 		// newChat/switch pushes).
@@ -839,15 +850,34 @@ export class ClientSession {
 	}
 
 	/** (Re)attach event plumbing to the ACTIVE conversation's session. */
+	private boundUiSessions = new WeakSet<AgentSession>();
 	private async bindSession(conv = this.conv): Promise<void> {
 		conv.unsubscribe?.();
+		if (conv.session !== conv.runtime.session) {
+			conv.webUi.dispose();
+			conv.webUi = new WebUIContext(msg => this.emit(msg), conv.id, () => `${conv.cwd} · ${conv.title}`);
+		}
 		conv.session = conv.runtime.session;
+
+		if (!this.boundUiSessions.has(conv.session)) {
+			this.boundUiSessions.add(conv.session);
+			const session = conv.session;
+			const reload = session.reload.bind(session);
+			session.reload = async options => {
+				conv.webUi.dispose();
+				conv.webUi = new WebUIContext(msg => this.emit(msg), conv.id, () => `${conv.cwd} · ${conv.title}`);
+				await reload({ ...options, beforeSessionStart: async () => {
+					session.extensionRunner.setUIContext(conv.webUi, "rpc");
+					await options?.beforeSessionStart?.();
+				} });
+			};
+		}
 
 		await conv.session.bindExtensions({
 			mode: "rpc",
-			uiContext: this.webUi,
+			uiContext: conv.webUi,
 			onError: (err) => {
-				this.emit({ type: "notice", level: "error", text: err.error });
+				this.emit({ type: "notice", conversationId: conv.id, level: "error", text: err.error });
 			},
 		});
 
@@ -866,7 +896,7 @@ export class ClientSession {
 	private startWidgetsTimer(): void {
 		if (this.widgetsTimer) return;
 		this.widgetsTimer = setInterval(() => {
-			if (!this.disposed) this.webUi.refresh();
+			if (!this.disposed) for (const conv of this.convs.values()) conv.webUi.refresh();
 		}, WIDGET_REFRESH_MS);
 	}
 
@@ -879,6 +909,7 @@ export class ClientSession {
 			const now = Date.now();
 			for (const conv of this.convs.values()) {
 				if (
+					!isRecovering(conv.recovery) &&
 					!conv.stallNoticed &&
 					conv.session.isStreaming &&
 					now - conv.lastSdkEventAt > STALL_NOTIFY_MS
@@ -895,6 +926,7 @@ export class ClientSession {
 	/** Cancel every watchdog of a conversation (removeConversation / dispose). */
 
 	private onEvent(conv: Conversation, event: AgentSessionEvent): void {
+		conv.recovery = recoveryEvent(conv.recovery, event);
 
 		// Any SDK event proves the run is alive — feeds the stall watchdog below.
 		if (conv.stallNoticed) this.emit({ type: "agent_silence", conversationId: conv.id, phase: "active", since: Date.now(), activity: conv.runningToolNames.size ? "tool" : "model" });
@@ -953,34 +985,7 @@ export class ClientSession {
 					...(durationMs !== undefined ? { durationMs } : {}),
 					isError: event.isError,
 				});
-				// The bash tool does not put its exit code in result.details — on
-				// failure it throws "Command exited with code N" and the agent
-				// wraps that into the error result text. Try details first (future
-				// tools / SDK changes), then parse the error text.
-				const details = (event.result as { details?: unknown })?.details;
-				let exitCode: number | undefined;
-				if (
-					typeof details === "object" &&
-					details !== null &&
-					typeof (details as { exitCode?: unknown }).exitCode === "number"
-				) {
-					exitCode = (details as { exitCode: number }).exitCode;
-				} else if (event.isError) {
-					const content = (event.result as { content?: unknown })?.content;
-					const text = Array.isArray(content)
-						? content
-								.map((c) =>
-									(typeof c === "object" &&
-										c !== null &&
-										(c as { type?: unknown }).type === "text")
-											? ((c as { text?: unknown }).text ?? "")
-											: "",
-								)
-								.join("\n")
-						: "";
-					const m = text.match(/exited with code (\d+)/);
-					if (m) exitCode = Number(m[1]);
-				}
+				const exitCode = toolExitCode(event.result, event.isError);
 				this.emit({
 					type: "tool_status",
 					conversationId: conv.id,
@@ -1123,6 +1128,8 @@ export class ClientSession {
 		// pushSessions no-ops unless the client opted in via list_sessions.
 	}
 
+	private toolContentIds = new WeakMap<object, number>();
+	private toolContentSeq = 0;
 	/** Serialize a persisted message with a STABLE id + cached object reference. */
 	private serializeCached(m: AgentMessage): UiMessage | null {
 		const conv = this.conv;
@@ -1141,7 +1148,16 @@ export class ClientSession {
 			n = conv.nextMsgId++;
 			conv.msgIds.set(key, n);
 		}
-		const cacheKey = `${key}#${n}`;
+		// Persisted content is immutable; inspect mutable projected metadata without
+		// rebuilding or hashing the potentially very large output on every snapshot.
+		let toolRevision = "";
+		if (m.role === "toolResult") {
+			let contentId = this.toolContentIds.get(m.content);
+			if (contentId === undefined) { contentId = ++this.toolContentSeq; this.toolContentIds.set(m.content, contentId); }
+			const metadata = serializeMessage({ ...m, content: [] }, n);
+			toolRevision = `:${contentId}:${createHash("sha256").update(JSON.stringify(metadata)).digest("hex")}`;
+		}
+		const cacheKey = `${key}#${n}${toolRevision}`;
 		const cached = conv.uiMessageCache.get(cacheKey);
 		if (cached) return cached;
 		// User-message id suffix is a 1-based count of user messages sharing
@@ -1158,6 +1174,7 @@ export class ClientSession {
 		const measured = conv.thinkingTimings.annotate(serializeMessage(m, seq), m.timestamp ?? 0);
 		const msg = this.thinkingDurationStore.annotate(measured, conv.session.sessionFile, m.timestamp ?? 0);
 		if (msg) {
+			if (m.role === "toolResult" && typeof nativeToolDetails(m.toolName, m)?.fullOutputPath === "string") msg.toolOutputUrl = `/api/tool-output?${new URLSearchParams({ clientId: this.clientId, conversationId: conv.id, toolCallId: m.toolCallId })}`;
 			conv.uiMessageCache.set(cacheKey, msg);
 			// Bound the cache (marathon sessions otherwise grow without limit;
 			// single messages can reach TEXT_CAP = 200K chars). Map iteration is
@@ -1187,9 +1204,9 @@ export class ClientSession {
 		// frontend memoize derived maps instead of rebuilding them every 60ms.
 		const sig = rawMessages.map((m) => m.id).join("\u0001");
 		const messages =
-			conv.lastMessagesSig === sig ? conv.lastMessagesArray : rawMessages;
+			conv.lastMessagesArray.length === rawMessages.length && rawMessages.every((m, i) => m === conv.lastMessagesArray[i]) ? conv.lastMessagesArray : rawMessages;
 		conv.lastMessagesSig = sig;
-		conv.lastMessagesArray = rawMessages;
+		conv.lastMessagesArray = messages;
 		return messages;
 	}
 
@@ -1247,6 +1264,8 @@ export class ClientSession {
 			streamingMessage,
 			taskProgress: deriveTaskProgress(conv.id, taskHistoryFromSession(conv.session.sessionManager, (message) => this.serializeCached(message)) ?? messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
 			isStreaming: this.session.isStreaming,
+			recovery: conv.recovery,
+			runSettings: { autoCompaction: conv.session.autoCompactionEnabled, autoRetry: conv.session.autoRetryEnabled },
 			model: model
 				? {
 						id: model.id,
@@ -1328,8 +1347,32 @@ export class ClientSession {
 	}
 
 	/** Resolve a browser-bridged dialog (select/confirm/input) for this session. */
-	resolveDialog(id: number, value: string | boolean | null): void {
-		this.webUi.resolveDialog(id, value);
+	cancelRecovery(conversationId: string, operationId: string): void {
+		const conv = this.convs.get(conversationId);
+		if (!conv || conversationId !== this.activeId) return;
+		const { compaction, retry, summary } = conv.recovery;
+		if (summary?.id === operationId) { if (summary.source === "branchSummary") conv.session.abortBranchSummary(); else conv.session.abortCompaction(); }
+		else if (compaction?.id === operationId) conv.session.abortCompaction();
+		else if (retry?.id === operationId) conv.session.abortRetry();
+	}
+	setRunSettings(message: Extract<ClientMessage, { type: "set_run_settings" }>): void {
+		const conv = this.convs.get(message.conversationId);
+		if (!conv || conv.id !== this.activeId) return;
+		setConversationRunSettings(conv.session.settingsManager, message);
+		this.flushSnapshot();
+	}
+
+	async downloadToolOutput(conversationId: string, toolCallId: string) {
+		const conv = this.convs.get(conversationId);
+		const result = conv?.session.messages.find(m => m.role === "toolResult" && m.toolCallId === toolCallId && m.toolName === "bash");
+		const path = result && nativeToolDetails("bash", result)?.fullOutputPath;
+		if (!conv || typeof path !== "string") throw new Error("Output unavailable");
+		return openToolOutput(conv.cwd, path);
+	}
+
+	resolveDialog(conversationId: string, id: string, value: string | boolean | null): void {
+		if (conversationId !== this.activeId) return;
+		this.convs.get(conversationId)?.webUi.resolveDialog(id, value);
 	}
 
 	/**
@@ -1873,12 +1916,16 @@ export class ClientSession {
 	/** Retry only a silent model request with no tool side effects in this turn. */
 	async retrySilentPrompt(conversationId: string, text: string): Promise<void> {
 		const conv = this.conv;
-		if (conv.id !== conversationId || !conv.stallNoticed || conv.toolsExecutedSincePrompt || conv.runningToolNames.size || !text.trim()) {
-			this.emit({ type: "notice", level: "warning", text: "当前运行状态已变化，无法自动重试；请检查对话后手动发送。" });
+		if (conv.id !== conversationId || isRecovering(conv.recovery) || !conv.stallNoticed || conv.toolsExecutedSincePrompt || conv.runningToolNames.size || !text.trim()) {
+			this.emit({ type: "notice", level: "warning", text: "当前运行状态已变化，无法手动重试；请检查对话后手动发送。" });
 			return;
 		}
+		const user = conv.session.messages.findLast(m => m.role === "user");
+		if (!user || user.role !== "user") return;
+		const original = typeof user.content === "string" ? user.content : user.content.every(b => b.type === "text") ? user.content.map(b => b.type === "text" ? b.text : "").join("\n") : undefined;
+		if (original !== text) return;
 		await this.abort();
-		if (this.conv.id !== conversationId) return;
+		if (this.conv !== conv || isRecovering(conv.recovery) || conv.toolsExecutedSincePrompt || conv.session.messages.findLast(m => m.role === "user")?.timestamp !== user.timestamp) return;
 		await this.prompt(text);
 	}
 
@@ -2001,6 +2048,9 @@ export class ClientSession {
 				},
 			);
 			conv.runtime = runtime;
+			conv.webUi.dispose();
+			conv.webUi = new WebUIContext(msg => this.emit(msg), conv.id, () => `${conv.cwd} · ${conv.title}`);
+			conv.recovery = {};
 			conv.session = runtime.session;
 			this.emit({ type: "notice", level: "warning", text: reason });
 			await this.bindSession();
@@ -2207,6 +2257,7 @@ export class ClientSession {
 		const conv = this.convs.get(id);
 		if (!conv || id === this.activeId) return Promise.resolve();
 
+		conv.webUi.dispose();
 		this.convs.delete(id);
 
 		conv.terminals.killAll();
@@ -3041,7 +3092,7 @@ export class ClientSession {
 		this.files.unwatchDir();
 		this.files.unwatchGit();
 		this.providerAuth.cancel();
-		this.webUi.dispose();
+		for (const conv of this.convs.values()) conv.webUi.dispose();
 		this.bg.stop();
 		for (const conv of this.convs.values()) {
 

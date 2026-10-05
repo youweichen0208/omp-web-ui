@@ -91,6 +91,7 @@ export interface UiMessage {
 	/** Present on toolResult messages; links to the assistant message's toolCall block. */
 	toolCallId?: string;
 	toolName?: string;
+	toolOutputUrl?: string;
 	isError?: boolean;
 	todoSnapshot?: UiTodoSnapshot;
 	nestedCalls?: { calls: UiNestedToolCall[]; complete: boolean };
@@ -150,7 +151,15 @@ export interface UiModelInfo {
 	vision: boolean;
 }
 
+export interface UiRecovery {
+	compaction?: { id: string; reason: "manual" | "threshold" | "overflow" };
+	retry?: { id: string; phase: "waiting" | "running"; attempt: number; maxAttempts: number; deadline: number; error: string };
+	summary?: { id: string; source: "compaction" | "branchSummary"; phase: "waiting" | "running"; attempt?: number; maxAttempts?: number; deadline?: number; error?: string };
+}
+
 export interface UiState {
+	recovery?: UiRecovery;
+	runSettings?: { autoCompaction: boolean; autoRetry: boolean };
 	clientId: string;
 	cwd: string;
 	sessionId: string;
@@ -424,7 +433,9 @@ export type ClientMessage =
 	| { type: "set_thinking"; level: string }
 	| { type: "set_cwd"; path: string; requestId?: string; source?: "ui" }
 	| { type: "complete_path"; path: string }
-	| { type: "dialog_response"; id: number; value: string | boolean | null }
+	| { type: "cancel_recovery"; conversationId: string; operationId: string }
+	| { type: "set_run_settings"; conversationId: string; autoCompaction?: boolean; autoRetry?: boolean }
+	| { type: "dialog_response"; conversationId: string; id: string; value: string | boolean | null }
 	// -- self-update ----------------------------------------------------------
 	/** Check the npm registry for a newer pi-web-ui version. */
 	| { type: "check_update" }
@@ -982,7 +993,7 @@ export type ServerMessage =
 	 *  and on request (get_commands). */
 	| { type: "slash_commands"; commands: SlashCommandInfo[] }
 	| { type: "reload_status"; conversationId: string; requestId: string; phase: "running" | "done"; timestamp: number; durationMs?: number; extensions?: number; skills?: number; prompts?: number; resources?: { extensions: string[]; skills: string[]; prompts: string[] }; errors?: { path: string; message: string }[] }
-	| { type: "notice"; level: "info" | "warning" | "error"; text: string }
+	| { type: "notice"; conversationId?: string; level: "info" | "warning" | "error"; text: string }
 	/** The watched git dir changed outside the panel (terminal commit,
 	 *  CLI, IDE) — the client should re-run its scm_status query. */
 	| { type: "scm_changed" }
@@ -1118,17 +1129,22 @@ export type ServerMessage =
 			type: "path_completions";
 			completions: { name: string; path: string; type: "dir" | "file" }[];
 	  }
-	| { type: "widgets"; widgets: { key: string; lines: string[] }[] }
-	| { type: "statuses"; statuses: { key: string; text: string | undefined }[] }
+	| { type: "widgets"; conversationId: string; widgets: { key: string; lines: string[] }[] }
+	| { type: "statuses"; conversationId: string; statuses: { key: string; text: string | undefined }[] }
 	| {
 			type: "dialog";
-			id: number;
-			kind: "select" | "confirm" | "input";
+			conversationId: string;
+			source: string;
+			id: string;
+			kind: "select" | "confirm" | "input" | "editor";
 			title: string;
 			args: unknown[];
 	  }
 	/** The server resolved (or abandoned) a dialog — the client must close it. */
-	| { type: "dialog_closed"; id: number }
+	| { type: "extension_ui_reset"; conversationId: string }
+	| { type: "extension_editor"; conversationId: string; id: string; text: string }
+	| { type: "extension_title"; conversationId: string; title: string }
+	| { type: "dialog_closed"; conversationId: string; id: string }
 	// -- self-update ----------------------------------------------------------
 	/** Result of a check_update run (current/latest from the npm registry). */
 	| {

@@ -36,7 +36,7 @@ describe("Pi 1.0 extension UI prompts", () => {
 		expect(wire.at(-1)).toMatchObject({type:"notice",text:"MCP status"});
 		const controller = new AbortController(); const pending = ui.input("Callback URL","",{signal:controller.signal});
 		ui.replayDialogs(msg => replay.push(msg)); expect(replay.at(-1)?.type).toBe("dialog");
-		controller.abort(); await expect(pending).resolves.toBeNull(); expect(wire.at(-1)?.type).toBe("dialog_closed");
+		controller.abort(); await expect(pending).resolves.toBeUndefined(); expect(wire.at(-1)?.type).toBe("dialog_closed");
 		const after: ServerMessage[] = []; ui.replayDialogs(msg => after.push(msg)); expect(after).toEqual([]);
 	});
 });

@@ -8,7 +8,8 @@ import { ConversationWorkingStatus } from "./WorkingStatus";
 import { WikiReadingDialog } from "./WikiReading";
 import { Markdown } from "./Markdown";
 
-export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, revisions, onViewChange, onUndo, onResend, error, conversationId, thinkingWrap, connected, silenceNotified }: {
+export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, revisions, onViewChange, onUndo, onResend, error, conversationId, thinkingWrap, connected, silenceNotified, recovery }: {
+	recovery?: import("../types").UiRecovery;
 	conversationId: string; thinkingWrap: boolean; connected: boolean; silenceNotified: boolean;
 	messages: UiMessage[]; live: UiMessage | null; streaming: boolean; toolStatuses: Map<string, ToolStatus>;
 	model?: UiModelInfo; contextPercent?: number | null; disabled: boolean; onNew: () => void; onClose: () => void;
@@ -85,7 +86,7 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 					{message.errorMessage && <p role="alert" className="wiki-chat-error">{message.errorMessage}</p>}
 				</div>;
 			})}
-			{streaming && <ConversationWorkingStatus state={{ messages, streamingMessage: live, isStreaming: streaming, conversationId, model: model ?? null }} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />}
+			{streaming && <ConversationWorkingStatus state={{ recovery, messages, streamingMessage: live, isStreaming: streaming, conversationId, model: model ?? null }} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />}
 		</div>
 		{actionError && <p role="alert">{actionError}</p>}
 		<footer>{composer}</footer>

@@ -14,6 +14,7 @@ export function AgentSilenceStatus({ chat, send }: { chat: ChatState; send: (mes
 		const timer = window.setInterval(() => setNow(Date.now()), 1000);
 		return () => window.clearInterval(timer);
 	}, [silence]);
+	if (chat.state?.recovery && Object.values(chat.state.recovery).some(Boolean)) return null;
 	if (!chat.ready || !silence || silence.conversationId !== chat.activeConversationId || !chat.state?.isStreaming) return null;
 	const seconds = Math.max(0, Math.floor((now - silence.since) / 1000));
 	const duration = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;

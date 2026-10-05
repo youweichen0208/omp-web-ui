@@ -305,13 +305,14 @@ try {
 	if (requests.some((request) => request.messages.some((message) => message.content === "/new" || (Array.isArray(message.content) && message.content.some((part) => part.text === "/new"))))) throw new Error("/new was sent to the model");
 	if (JSON.stringify(chatRequests[1]).includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new leaked previous context into model request");
 	if (client.state.stats.tokens.total !== 132) throw new Error("New session usage must count only its own response");
+	await client.waitForState(state => !state.isStreaming);
 	client.received = client.received.filter((message) => message.type !== "sessions");
 	client.send({ type: "list_sessions" });
 	const list = await client.waitForType("sessions", (message) => message.sessions.some((session) => session.path === historyPath));
 	if (list.sessions.find((session) => session.path === historyPath)?.name !== "Keep this conversation") throw new Error("/new changed the old session title");
 	const newPath = client.state.sessionFile;
 	const newId = client.state.sessionId;
-	if (list.sessions.length !== 2 || !list.sessions.some((session) => session.path === newPath)) throw new Error("Expected separate old and new sessions");
+	if (list.sessions.length !== 2 || !list.sessions.some((session) => session.path === newPath)) throw new Error(`Expected separate old and new sessions: ${JSON.stringify({ newPath, sessions: list.sessions.map(s => ({ path: s.path, name: s.name })) })}`);
 	const transcript = readFileSync(historyPath, "utf8");
 	if (!transcript.includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new must retain old history on disk");
 	if (JSON.stringify(JSON.parse(transcript.split("\n")[0])) !== JSON.stringify(originalHeader)) throw new Error("/new changed the old session header/creation time");

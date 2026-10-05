@@ -10795,3 +10795,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .extensions-v3 .ext-catalog-expand { border-radius: 0; }
 :root[data-appearance="dark"] .extensions-v3 .ext-type-filters button { background: transparent; }
 :root[data-appearance="dark"] .extensions-v3 .ext-type-filters button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ext-purple); }
+
+/* Conversation runtime controls */
+.conversation-run-settings { padding: 4px 16px; font-size: 12px; color: var(--text-secondary); }
+.conversation-run-settings label { display: inline-flex; align-items: center; gap: 6px; margin: 8px 16px 8px 0; }

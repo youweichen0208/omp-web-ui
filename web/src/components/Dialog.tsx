@@ -4,8 +4,9 @@ import { useT } from "../i18n";
 
 interface DialogProps {
 	dialog: {
-		id: number;
-		kind: "select" | "confirm" | "input";
+		id: string;
+		conversationId: string;
+		kind: "select" | "confirm" | "input" | "editor";
 		title: string;
 		args: unknown[];
 	};
@@ -23,11 +24,11 @@ export function Dialog({ dialog, send }: DialogProps) {
 	const [sel, setSel] = useState(0);
 
 	const respond = (value: string | boolean | null) => {
-		send({ type: "dialog_response", id: dialog.id, value });
+		send({ type: "dialog_response", conversationId: dialog.conversationId, id: dialog.id, value });
 	};
 
 	useEffect(() => {
-		setInputValue("");
+		setInputValue(dialog.kind === "editor" ? String(dialog.args[0] ?? "") : "");
 		setSel(0);
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") respond(null);
@@ -101,9 +102,9 @@ export function Dialog({ dialog, send }: DialogProps) {
 				</div>
 			)}
 
-			{dialog.kind === "input" && (
+			{(dialog.kind === "input" || dialog.kind === "editor") && (
 				<div className="dialog-body">
-					<input
+					{dialog.kind === "editor" ? <textarea className="dialog-input" rows={8} value={inputValue} autoFocus onChange={e => setInputValue(e.target.value)} /> : <input
 						className="dialog-input"
 						value={inputValue}
 						placeholder={message || t("inputPlaceholder")}
@@ -114,7 +115,7 @@ export function Dialog({ dialog, send }: DialogProps) {
 								respond(inputValue);
 							}
 						}}
-					/>
+					/>}
 					<div className="dialog-actions">
 						<button
 							type="button"

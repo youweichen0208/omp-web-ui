@@ -78,11 +78,11 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 ### 工具结束实时状态（`tool_status`）
 
-服务端 `onEvent` 监听 `tool_execution_start/end`（AI 调工具路径，注意区别于 `bash_execution_update`——那是 `!cmd`/终端直接执行路径专属）。`tool_execution_end` 触发时立即推 `tool_status`（toolCallId/toolName/isError/exitCode/durationMs），**先于** toolResult 快照落盘——浏览器 tool 卡片随即从「执行中」切到「已结束 · 等模型 · 耗时」，一眼区分「命令还在跑」vs「命令完了在等模型响应」。bash 工具的 details 不带 exitCode（成功时返回 truncation 信息，失败时错误文本含 `Command exited with code N`），服务端从错误文本正则提取；`tool_execution_start` 时刻记在 `conv.toolStartTimes`（按对话隔离）算真实执行耗时。前端 `toolStatuses` Map 在 toolResult 落盘（snapshot prune）后清除，回落到权威的 toolResult 状态。
+服务端 `onEvent` 监听 `tool_execution_start/end`（AI 调工具路径，注意区别于 `bash_execution_update`——那是 `!cmd`/终端直接执行路径专属）。`tool_execution_end` 触发时立即推 `tool_status`（toolCallId/toolName/isError/exitCode/durationMs），**先于** toolResult 快照落盘——浏览器 tool 卡片随即从「执行中」切到「已结束 · 等模型 · 耗时」，一眼区分「命令还在跑」vs「命令完了在等模型响应」。退出码统一优先读取 `structuredContent.exit_code`（含 0），其次是旧 `details.exitCode`，仅旧错误结果回退文本正则；`tool_execution_start` 时刻记在 `conv.toolStartTimes`（按对话隔离）算真实执行耗时。前端 `toolStatuses` Map 在 toolResult 落盘（snapshot prune）后清除，回落到权威的 toolResult 状态。
 
 ### 模型／工具静默状态（`agent_silence`）
 
-服务端在运行中连续 3 分钟没有 SDK 事件时，按 `conversationId` 推送 `agent_silence`，并根据正在执行的工具区分模型等待和工具运行。任意后续 SDK 事件会发送 `active` 清除状态；重连时重放仍有效的静默状态。浏览器把它放在输入框上方的状态行，同步输入框和底栏，并持续更新时间。浏览器只为纯文本、无工具调用的模型静默轮次提供自动重试；服务端再核对当前对话及工具记录，先完成中断再重新发送，以免重复执行工具副作用。WebSocket 心跳只表示浏览器与本机服务连接正常，不代表模型接口已响应。
+服务端在运行中连续 3 分钟没有 SDK 事件时，按 `conversationId` 推送 `agent_silence`，并根据正在执行的工具区分模型等待和工具运行。任意后续 SDK 事件会发送 `active` 清除状态；重连时重放仍有效的静默状态。浏览器把它放在输入框上方的状态行，同步输入框和底栏，并持续更新时间。浏览器只为纯文本、无工具调用的模型静默轮次提供用户点击的手动重试；宿主不自动重发。前后端排除原生压缩和重试阶段，服务端核对当前用户轮次及工具记录，中断后再次检查归属才发送。WebSocket 心跳只表示浏览器与本机服务连接正常，不代表模型接口已响应。
 
 ### 当前任务进度（`taskProgress`）
 
@@ -102,7 +102,23 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 
 ### 扩展 UI 桥
 
-扩展的 `setWidget/setStatus/notify/select/confirm/input` → `widgets/statuses/notice/dialog` 消息；对话框经 `dialog_response` 回传，Esc 视为取消。
+每个 Conversation 独立拥有 `WebUIContext`。widgets/statuses/notice/dialog、关闭事件、临时标题和输入替换均携带 conversationId。浏览器只显示当前对话的状态和弹窗，后台请求显示项目/对话来源，点击后经既有 Wiki/文件草稿保护切换。标题不改持久会话名称。
+
+弹窗 ID 使用 UUID。响应必须属于活动对话和当前 UI 上下文，且值符合请求类型；缺失归属、过期、重复、跨对话响应无效。协议 v35 要求旧页面刷新。select/confirm/input 支持 signal/timeout，confirm 取消返回 false，其他返回 undefined；提前 abort 不发弹窗，每个结束路径清理监听器/timer。editor 使用多行确认；custom 立即返回 undefined；getEditorText 返回空字符串。setEditorText/pasteToEditor 只替换所属对话草稿，不发送消息；浏览器按事件 ID 消费一次。
+
+断线不解决服务端请求。重连重放仍有效的弹窗、widget、status 和标题；浏览器重建展示状态。reload、会话替换及 Wiki/普通对话释放时取消旧弹窗、释放 widget 并使旧上下文失效。原生 reload 使用公开 beforeSessionStart/runner.setUIContext 接口绑定新上下文。
+
+### 原生恢复状态
+
+`recovery` 快照分别保存 compaction、auto retry 和 summary retry 的生命周期、操作 ID、原因、次数、截止时间和最长 500 字符错误。摘要重试结束只清理其子状态；agent_settled 清理整轮状态。切换及重连从权威快照恢复，恢复期间不触发静默提示或宿主重发。
+
+普通聊天和 Wiki 显示阶段与退避倒计时。取消携带 conversationId 和 operationId，仅匹配当前操作时调用原生 abortCompaction/abortRetry/abortBranchSummary。当前对话运行菜单的自动压缩和自动重试开关通过 SettingsManager.applyOverrides 生效，reload/信任变化后重放内存覆盖，新对话重新继承原生配置；切换开关不取消正在执行的操作。
+
+### 原生工具结果与下载
+
+serialize.ts 仅投影 edit 的 diff/firstChangedLine，以及 bash 的退出码、截断摘要和完整输出路径；diff 遵守 100,000 字符上限并标记截断。todo/codemode 保留专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
+
+`/api/tool-output` 受通用口令鉴权，参数仅为 clientId/conversationId/toolCallId。服务端从该对话权威 transcript 查找 bash 引用，只打开工作区内普通文件或系统临时目录的原生 `pi-bash-<16 hex>.log`；验证真实路径与文件类型，拒绝符号链接逃逸。下载使用已验证的文件句柄；已清理/不可用返回 404。浏览器不提供文件路径。
 
 `snapshot` 里 `streamingMessage` 是进行中的消息（60ms 粒度流式），`messages` 是已落盘的。
 

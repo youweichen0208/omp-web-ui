@@ -1,3 +1,4 @@
+import { withToken } from "../auth-token";
 import { CodemodeCard } from "./CodemodeCard";
 
 
@@ -376,9 +377,10 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	const output = view.result
 		? view.result.content.map((b) => (b.type === "text" ? b.text : "")).join("")
 		: (view.liveOutput ?? "");
-	const bashRun = block.name === "bash" ? parseLabeledBashSteps(block.argumentsText, output, done || waitingModel, isError, view.status?.exitCode) : null;
+	const nativeExitCode = (view.result?.details as { exitCode?: number } | undefined)?.exitCode ?? view.status?.exitCode;
+	const bashRun = block.name === "bash" ? parseLabeledBashSteps(block.argumentsText, output, done || waitingModel, isError, nativeExitCode) : null;
 	const bashDiagnostics = block.name === "bash" && isError && !bashRun ? parseBashDiagnostics(output) : [];
-	const bashExit = view.status?.exitCode ?? Number(/(?:exited with code\s*|exit(?:ed)?\s+)(\d+)/i.exec(output)?.[1] ?? NaN);
+	const bashExit = nativeExitCode ?? Number(/(?:exited with code\s*|exit(?:ed)?\s+)(\d+)/i.exec(output)?.[1] ?? NaN);
 	const outputLines = output.replace(/\r\n/g, "\n").split("\n");
 	if (outputLines.at(-1) === "") outputLines.pop();
 	const command = block.name === "bash" ? bashCommand(block.argumentsText) : null;
@@ -407,11 +409,10 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 	if (bashRun) statusLabel = bashRun.status === "partial" ? t("bashPartial", { ok: bashRun.completed, total: bashRun.steps.length }) : bashRun.status === "failed" ? t("bashFailed") : bashRun.status === "no-match" ? t("bashNoMatch") : bashRun.status === "running" ? `${t("bashRunning")}${elapsed ? ` · ${elapsed}s` : ""}` : `${t("done")}${duration ? ` · ${duration}` : ""}`;
 	else if (block.name === "bash" && isError) statusLabel = `${t("bashFailed")}${Number.isFinite(bashExit) ? ` · exit ${bashExit}` : ""}${bashDiagnostics.length ? ` · ${t("bashErrorCount", { n: bashDiagnostics.length })}` : ""}`;
 
-	// tool_status doesn't carry the exit code for successful bash runs (only
-	// failures embed "exited with code N" in the error text); show it when known.
+	// Live and historical results share the native exit-code projection.
 	const exitHint =
-		waitingModel && view.status?.exitCode !== undefined
-			? `exit ${view.status.exitCode}`
+		nativeExitCode !== undefined
+			? `exit ${nativeExitCode}`
 			: "";
 
 	const copyArgs = () => {
@@ -456,6 +457,14 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				</details>)}
 				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
 			</details>}
+			{view.result?.toolOutputUrl && <button className="btn" onClick={() => void (async () => {
+				try {
+					const response = await fetch(withToken(view.result!.toolOutputUrl!));
+					if (!response.ok) throw new Error(t("toolOutputUnavailable"));
+					const url = URL.createObjectURL(await response.blob());
+					const link = document.createElement("a"); link.href = url; link.download = "bash-output.log"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+				} catch { window.alert(t("toolOutputUnavailable")); }
+			})()}>{t("toolOutputDownload")}</button>}
 			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("downloadImage")}</a></div>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">

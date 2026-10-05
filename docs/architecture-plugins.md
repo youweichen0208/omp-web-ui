@@ -121,3 +121,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 验证：`codemode-mcp-test.mjs`（9204/9205、隔离配置和工作区、本地 mock 模型）验证真实 SDK 状态、凭据掩码、CAS、项目覆盖、配置生效、实时调用、部分失败、输出限制和图片安全；加 `--browser` 校验实际卡片、图片操作及设置交互。`native-tools-desktop-test.mjs` 覆盖 Node/Electron 的原生工具执行，`native-features-browser-test.mjs` 覆盖历史回退及 OAuth 界面。相关纯函数测试在 `tests/unit/codemode-presentation.test.ts`。
 
 原生 Pi 包与 standalone 扩展由设置 › Extensions 管理，接口、过滤恢复、作用域、目录与编辑规则见 [Extensions 架构](architecture-extensions.md)。这里的界面插件仍是独立的展示插件系统。
+
+## 原生默认值和可替换内置扩展
+
+Codemode/tool_search 默认值只覆盖每个对话的内存 SettingsManager，原生文件未声明 defaultTools 时生效。reload 和项目信任变化后通过公开 API 重放，不修改 SDK 或私有字段。codemode、tool-search、mcp 的 InlineExtension 标记 replaceable:true，用户扩展可以接管同名工具或命令。pi 1.0.2 未公开导出 llama.cpp 工厂，宿主暂不通过内部路径补装。

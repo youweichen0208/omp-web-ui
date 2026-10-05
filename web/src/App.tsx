@@ -1,3 +1,4 @@
+import { RecoveryStatus, ConversationRunSettings } from "./components/RecoveryStatus";
 import { LinkedText } from "./components/LinkedText";
 import type { WikiConversationResult } from "./types";
 import { wikiRequest } from "./wiki-api";
@@ -552,7 +553,7 @@ export function App() {
 	// -- sound notifications --------------------------------------------------
 	const [sound, setSound] = useState<SoundSettings>(loadSoundSettings);
 	const prevStreaming = useRef<boolean | null>(null);
-	const prevDialogId = useRef<number | null>(null);
+	const prevDialogId = useRef<string | null>(null);
 	const lastErrorNotice = useRef(0);
 	// Remembers a terminal-view click made before the WebSocket is ready.
 	const terminalOpenRequested = useRef(false);
@@ -947,6 +948,16 @@ export function App() {
 					onSoundChange={setSound}
 					onSoundPreview={(kind: SoundKind) => playSound(kind, sound)}
 				/>
+				<ConversationRunSettings state={conversationState} send={send} />
+				<RecoveryStatus state={conversationState} send={send} connected={chat.ready} />
+				{chat.pendingDialogs.filter(d => d.conversationId !== chat.activeConversationId).map(d => <button className="protocol-banner" key={d.id} onClick={() => {
+					if (wikiOpening.current || wikiWaiting.current) return;
+					const navigate = () => { if (rawSend({ type: "switch_conversation", id: d.conversationId })) setView("chat"); };
+					if (wikiGuard.current) wikiGuard.current(navigate);
+					else if (fileGuard.current) fileGuard.current(navigate);
+					else navigate();
+				}}>{t("pluginRequest")} · {d.source} · {d.title}</button>)}
+				{view === "wiki" && chat.dialog && <Dialog dialog={chat.dialog} send={send} />}
 				{switchError && <div className="protocol-banner" role="alert"><button onClick={() => send({ type: "set_cwd", path: switchError, source: "ui" })}>{t("retryProjectSwitch")}</button> {switchError}</div>}
 				{switching && <div className="protocol-banner" role="status">{t("switchingProject")} {switching}</div>}
 				{chat.protocolMismatch && (
@@ -994,6 +1005,7 @@ export function App() {
 								{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} />)}
 							</div>}
 							<ChatInput
+								active={view === "chat" && !wikiConversationMatches}
 								currentFile={!switching && currentFile?.cwd === chat.state?.cwd ? currentFile : null}
 								contextReader={contextReader}
 								contextSaver={contextSaver}
@@ -1072,7 +1084,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench recovery={conversationState?.recovery} key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

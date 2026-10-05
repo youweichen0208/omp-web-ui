@@ -131,7 +131,7 @@ Windows 发布先构建，再执行 `tests/packaged-server-start-test.mjs`（使
 
 ### Pi 1.0.2 原版 SDK
 
-不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。首次初始化未设置 defaultTools 的原生配置时，写入 `["+codemode", "+tool_search"]`；已有原生选择和项目设置保持权威。MCP 使用原生 mcp.json，不配置外部服务器。
+不应用 WebUI 的 SDK 补丁，恢复行为遵循 pi 1.0.2。每个对话创建原生 SettingsManager，生效配置未声明 defaultTools 时仅通过内存覆盖启用 `["+codemode", "+tool_search"]`；reload/信任变化后重新应用。已有原生选择（含空数组和禁用项）保持权威，不自动删除旧版已写入的值。MCP 使用原生 mcp.json，不配置外部服务器。
 
 ### Wiki 文件与 PDF
 

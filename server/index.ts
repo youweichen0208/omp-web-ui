@@ -189,6 +189,21 @@ app.post("/api/markdown-image", (req, res) => {
  * Content-Disposition: attachment so the browser saves it instead of
  * rendering. Path is validated against the workspace root either way.
  */
+app.get("/api/tool-output", async (req, res) => {
+	const { clientId, conversationId, toolCallId } = req.query;
+	if (typeof clientId !== "string" || typeof conversationId !== "string" || typeof toolCallId !== "string") { res.status(400).end("Invalid request"); return; }
+	try {
+		const cs = service.get(clientId);
+		if (!cs) throw new Error("Output unavailable");
+		const handle = await cs.downloadToolOutput(conversationId, toolCallId);
+		res.attachment("bash-output.log");
+		const stream = handle.createReadStream();
+		res.on("close", () => stream.destroy());
+		stream.on("error", () => res.destroy());
+		stream.pipe(res);
+	} catch { res.status(404).end("Full output unavailable or already cleaned up"); }
+});
+
 app.get("/api/file", async (req, res) => {
 	try {
 		const raw = typeof req.query.path === "string" ? req.query.path : "";
@@ -710,8 +725,12 @@ wss.on("connection", (ws) => {
 			case "check_update":
 				void cs.checkUpdate();
 				break;
+			case "cancel_recovery":
+				cs.cancelRecovery(msg.conversationId, msg.operationId); break;
+			case "set_run_settings":
+				cs.setRunSettings(msg); break;
 			case "dialog_response":
-				cs.resolveDialog(msg.id, msg.value);
+				cs.resolveDialog(msg.conversationId, msg.id, msg.value);
 				break;
 			case "install_pi_agent":
 				void cs.installPiAgent();

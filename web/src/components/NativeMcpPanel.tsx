@@ -8,7 +8,7 @@ import { MCP_EXPOSURES, effectiveMcpExposure, importMcpJson } from "../mcp-prese
 
 type Reply = Extract<ServerMessage, { type: "native_mcp_result" }>;
 type Action = Extract<ClientMessage, { type: "native_mcp_request" }>["action"];
-export function NativeMcpPanel({ cwd, send, dialog }: { dialog: { id: number; kind: "select" | "confirm" | "input"; title: string; args: unknown[] } | null; cwd: string; send: (msg: ClientMessage) => boolean }) {
+export function NativeMcpPanel({ cwd, send, dialog }: { dialog: { id: string; conversationId: string; kind: "select" | "confirm" | "input" | "editor"; title: string; args: unknown[] } | null; cwd: string; send: (msg: ClientMessage) => boolean }) {
 	const t = useT();
 	const [scope, setScope] = useState<"global" | "project">("global");
 	const [state, setState] = useState<NativeMcpConfigState>();

@@ -26,6 +26,7 @@ export interface EditWriteChange {
 	empty: boolean;
 	/** Replacement text from the completed tool call when the SDK supplied no diff. */
 	fromArguments?: boolean;
+	diffTruncated?: boolean;
 }
 
 const functionLine = /^\s*(?:(?:async\s+)?def\s+\w+|(?:export\s+)?(?:async\s+)?function\s+\w+|(?:public|private|protected)\s+\w+\s*\(|(?:async\s+)?\w+\s*\([^)]*\)\s*[:{])/;
@@ -78,7 +79,7 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 		const lines = content ? content.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n") : [];
 		return { path, kind: "write", added: error ? 0 : lines.length, removed: 0, firstChangedLine: 1, hunks: lines.length ? [{ line: 1, lines: lines.map((text, index) => ({ marker: "+", newLine: index + 1, text })) }] : [], error, errorText: error ? output : "", output, empty: !lines.length };
 	}
-	const details = result?.details as { diff?: unknown; firstChangedLine?: unknown } | undefined;
+	const details = result?.details as { diff?: unknown; firstChangedLine?: unknown; diffTruncated?: boolean } | undefined;
 	const diff = !error && typeof details?.diff === "string" ? details.diff : "";
 	let hunks = parseEditDiff(diff);
 	let fromArguments = false;
@@ -112,7 +113,7 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 		const missing = oldTexts.join("\n\n");
 		return { path, kind: "edit", added: 0, removed: 0, firstChangedLine: 1, hunks: missing ? [{ line: 1, lines: missing.replace(/\n$/, "").split("\n").map((text) => ({ marker: " ", text })) }] : [], error, errorText: output, output, empty: !missing };
 	}
-	return { path, kind: "edit", added: lines.filter((line) => line.marker === "+").length, removed: lines.filter((line) => line.marker === "-").length, firstChangedLine: typeof details?.firstChangedLine === "number" ? details.firstChangedLine : hunks[0]?.line ?? 1, hunks, error, errorText: "", output, empty: !hunks.length, fromArguments };
+	return { path, kind: "edit", added: lines.filter((line) => line.marker === "+").length, removed: lines.filter((line) => line.marker === "-").length, firstChangedLine: typeof details?.firstChangedLine === "number" ? details.firstChangedLine : hunks[0]?.line ?? 1, hunks, error, errorText: "", output, empty: !hunks.length, fromArguments, diffTruncated: details?.diffTruncated === true };
 }
 
 export function changeLineCount(block: UiToolCallBlock, result?: UiMessage): { added: number; removed: number } | null {

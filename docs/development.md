@@ -87,3 +87,5 @@ spawn 后记录 `server.pid`，测试收尾（含异常 catch 路径）用 `proc
 **测试脚本里禁止在 try 块内直接 `process.exit`**：`process.exit` 会跳过 `finally`，spawn 的 server 永远不会被杀 → 每次运行泄漏一个进程，下次跑同端口测试报 "port busy — abort"（steer-queue-smoke 踩过，已修：设 ok 标志 + finally 里杀进程并等端口释放再 exit）。
 
 原生上下文回归：`tests/new-chat-context-test.mjs` 用本地模拟模型核对 WebUI 与独立 pi 1.0.2 会话的系统提示词和工具列表，并覆盖新建、恢复及浏览器切换。`tests/settings-test.mjs` 检查显示偏好持久化与旧提示词覆盖参数失效。节点浏览器回归只验证手动终端、SFTP 与节点隔离，不创建节点代理。
+
+原生结果/运行状态回归：`extension-ui-test.mjs` 验证真实扩展的跨对话请求、重连、取消、reload 和内存设置（`--browser` 加测多行编辑、后台来源跳转及恢复阶段）；`tool-output-test.mjs` 验证真实 SDK 截断输出恢复、鉴权下载和路径限制；`recovery-service-test.mjs` 在宿主事件边界模拟压缩/529 退避、摘要取消、过期操作与元数据缓存。这三项均为零模型调用，纳入完整冒烟。
