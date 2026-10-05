@@ -23,6 +23,7 @@ function catalog(session:AgentSession,cwd:string,agentDir:string):PromptFileView
 		files.push({id:`${kind}:${scope}`,path,kind,scope,active:kind==="system"?!!systemPath&&resolve(systemPath)===resolve(path):appendPaths.includes(resolve(path)),editable:scope==="user"||session.settingsManager.isProjectTrusted(),tokens:0,content:"",version:"",exists:false});
 	}
 	for(const file of loader.getAgentsFiles().agentsFiles) files.push({id:`context:${hash(resolve(file.path))}`,path:resolve(file.path),kind:"context",scope:"context",active:true,editable:true,tokens:0,content:"",version:"",exists:true});
+	if(session.settingsManager.isProjectTrusted()&&!files.some(file=>file.kind==="context")&&!existsSync(join(cwd,"AGENTS.md")))files.push({id:"context:new",path:join(cwd,"AGENTS.md"),kind:"context",scope:"context",active:false,editable:true,tokens:0,content:"",version:"",exists:false});
 	for(const file of files)try{
 		Object.assign(file,read(file.path));
 		const loaded=file.kind==="context"?loader.getAgentsFiles().agentsFiles.find(f=>resolve(f.path)===file.path)?.content:file.active?(file.kind==="system"?loader.getSystemPrompt():loader.getAppendSystemPrompt().join("\n\n")):undefined;
@@ -53,7 +54,7 @@ export function writeSystemPromptFile(session:AgentSession,cwd:string,agentDir:s
 export function promptUsesFile(session:AgentSession,cwd:string,agentDir:string,path:string):boolean {
 	const identity=(file:string)=>{try{return realpathSync(file);}catch{return resolve(file);}};
 	const target=identity(path);
-	return catalog(session,cwd,agentDir).some(file=>resolve(file.path)===resolve(path)||identity(file.path)===target);
+	return session.settingsManager.isProjectTrusted()&&resolve(path)===join(cwd,"AGENTS.md")||catalog(session,cwd,agentDir).some(file=>resolve(file.path)===resolve(path)||identity(file.path)===target);
 }
 interface ReloadState { dirty:boolean; promise?:Promise<void>; error?:string; unsubscribe?:()=>void; refreshed:()=>void; }
 const reloads=new WeakMap<AgentSession,ReloadState>();

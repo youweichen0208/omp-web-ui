@@ -138,7 +138,7 @@ pi-web-ui/
 | `Dialog.tsx` | 扩展 `ui.select/confirm/input` → 浏览器弹窗 |
 | `ModelConfigModal.tsx` / `PiSetupModal.tsx` | models.json 管理 / 首次配置引导 |
 | `SystemPromptPanel.tsx` | 原生提示词分段、全文复制、SYSTEM/APPEND/上下文文件编辑；见 `docs/architecture-system-prompt.md` |
-| `SettingsModal.tsx` | 设置面板（原生提示词/技能/扩展/MCP/更新；默认打开原生提示词，各页使用 20a 紧凑分组列表，MCP 常用控件自动保存；见 docs/ui-design.md） |
+| `SettingsModal.tsx` | 设置面板（原生提示词/技能/扩展/MCP/更新；更新页不显示 pi-web-ui 本身；默认打开原生提示词，各页使用设置 v2 带用途说明的分组列表，MCP 常用控件自动保存；见 docs/ui-design.md） |
 | `BgTasksModal.tsx` | 后台任务弹窗：AI 启动的监听端口进程列表 |
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
@@ -151,7 +151,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.2，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能仅供查看；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.2，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能支持原生发现、筛选和启停（见 docs/architecture-extensions.md）；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 

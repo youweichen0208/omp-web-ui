@@ -311,7 +311,7 @@ export type McpExposure = "codemode" | "deferred" | "direct" | "hidden";
 export interface NativeMcpServerStatus { name: string; state: string; toolCount: number; detail: string; }
 export interface NativeMcpTool { name: string; exposure: string; description: string; readOnly?: boolean; destructive?: boolean; }
 export interface NativeCodemodeSettings { version: string; path: string; mode: "on" | "only"; inlineBudget: number; effectiveMode: "on" | "only"; effectiveInlineBudget: number; }
-export interface NativeMcpConfigState { path: string; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; inheritedAutoEnableCodemode?: boolean; }
+export interface NativeMcpConfigState { path: string; paths?: { global: string; project: string }; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; inheritedAutoEnableCodemode?: boolean; }
 
 export type ClientMessage =
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
@@ -828,6 +828,13 @@ export interface ConversationSummary {
 
 /** One loaded skill, with whether it is currently enabled. Disabled skills are
  *  excluded from the system prompt and from the /skill: command catalog. */
+/** Native discovery and versioned skill filters for the settings page. */
+export interface NativeSkillsState {
+	version: string;
+	paths: string[];
+	skills: (UiSkillInfo & { id: string; path: string; source: "user" | "project" | "temporary" | "package"; scope: "user" | "project" | "temporary"; canToggle: boolean; promptVisible: boolean })[];
+}
+
 export interface UiSkillInfo {
 	name: string;
 	description: string;
@@ -1191,6 +1198,7 @@ export interface WikiEntry {
 	symlink?: boolean;
 }
 export interface WikiLink { path: string; snippet: string; line: number }
+/** Responses for document-content and write; references load independently. */
 export interface WikiDocumentContent {
 	entry: WikiEntry;
 	text?: string;

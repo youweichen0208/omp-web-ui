@@ -328,6 +328,12 @@ export function App() {
 	}, [wikiFileRequest, wikiContentToken, chat.state?.cwd, chat.state?.conversationId, chat.activeConversationId, chat.ready, switching, wikiPending]);
 	const wikiConversationMatches = wikiBoundToken === wikiFileRequest?.token && wikiTargetId === chat.activeConversationId && wikiTargetId === chat.state?.conversationId;
 	const wikiSessionReady = chat.ready && !switching && !wikiPending && wikiConversationMatches;
+	const leavingWikiConversation = useRef<string | null>(null);
+	useEffect(() => {
+		// A late Wiki initialization must not turn ordinary chat into a Wiki transcript.
+		if (view !== "chat" || !wikiSessionReady || leavingWikiConversation.current === chat.activeConversationId) return;
+		if (rawSend({ type: "new_chat" })) leavingWikiConversation.current = chat.activeConversationId;
+	}, [view, wikiSessionReady, chat.activeConversationId, rawSend]);
 	useEffect(() => {
 		// Returning after a chat-side session switch needs a new document conversation.
 		if (view === "wiki" && chat.ready && !switching && !wikiPending && !wikiWaiting.current && wikiFileRequest && wikiFileRequest.cwd === chat.state?.cwd && wikiBoundToken === wikiFileRequest.token && wikiTargetId && wikiTargetId !== chat.activeConversationId) void openWikiDocument(wikiFileRequest.path);
@@ -993,7 +999,7 @@ export function App() {
 								stats={conversationState?.stats}
 								promptResult={chat.promptResult}
 								send={send}
-								ready={chat.ready && !!conversationState}
+								ready={chat.ready && !!conversationState && !(view === "chat" && (wikiPending || wikiConversationMatches))}
 								streaming={conversationState?.isStreaming ?? false}
 								silentActivity={chat.agentSilence?.conversationId === chat.activeConversationId ? chat.agentSilence.activity : null}
 										messages={conversationState?.messages ?? EMPTY_MESSAGES}
@@ -1126,8 +1132,6 @@ export function App() {
 				<SettingsModal
 					chat={chat}
 					send={send}
-					terminal={terminal}
-					onSwitchToTerminal={() => setView("terminal")}
 					onClose={() => setSettingsOpen(false)}
 				/>
 			)}

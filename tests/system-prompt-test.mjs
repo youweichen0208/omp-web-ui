@@ -70,7 +70,7 @@ try{
 		await page.goto(`http://127.0.0.1:${port}/?token=${token}`);
 		await page.getByRole("button",{name:"设置",exact:true}).first().click();await page.getByText("所有设置",{exact:true}).click();await page.getByRole("button",{name:"系统提示词",exact:true}).click();
 		const panel=page.locator(".system-prompt-panel");await panel.locator(".prompt-sections").waitFor();mkdirSync("tests/scratch",{recursive:true});await page.screenshot({path:"tests/scratch/system-prompt-default.png",fullPage:true});
-		await panel.getByRole("button",{name:"展开",exact:true}).click();await panel.locator(".prompt-rules li").first().waitFor();mkdirSync("tests/scratch",{recursive:true});await page.screenshot({path:"tests/scratch/system-prompt-sections.png",fullPage:true});await panel.getByRole("button",{name:"收起",exact:true}).click();
+		await panel.getByRole("button",{name:"展开",exact:true}).click();await panel.locator(".prompt-rule-group li").first().waitFor();mkdirSync("tests/scratch",{recursive:true});await page.screenshot({path:"tests/scratch/system-prompt-sections.png",fullPage:true});await panel.getByRole("button",{name:"收起",exact:true}).click();
 		await panel.getByRole("button",{name:"原始文本",exact:true}).click();assert((await panel.locator(".prompt-raw").textContent()).includes("<cwd>"));await panel.getByRole("button",{name:"分段视图",exact:true}).click();
 		const appendRow=panel.locator(".prompt-section").filter({has:page.locator(".prompt-label",{hasText:"追加提示词"})});await appendRow.getByRole("button",{name:"编辑",exact:true}).click();
 		await panel.getByRole("textbox",{name:"提示词文件内容"}).fill("BROWSER_APPEND_SENTINEL");await page.screenshot({path:"tests/scratch/system-prompt-editor.png",fullPage:true});

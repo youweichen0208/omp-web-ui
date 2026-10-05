@@ -26,7 +26,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 					if (typeof path !== "string") throw new Error("Invalid path");
 					if (!statSync(wikiPath(cwd, path)).isFile()) throw new Error("Not a file");
 					if (!valid()) throw new Error("Conversation changed");
-					if (!await cs.newChat(true)) throw new Error("Could not create conversation");
+					if (!await cs.newChat(true, true)) throw new Error("Could not create conversation");
 					if (cs.cwd !== cwd || cs.switchingWorkspace || cs.conversationId === conversationId) throw new Error("Could not create conversation");
 					res.json({ conversationId: cs.conversationId } satisfies WikiConversationResult); return;
 				}
@@ -42,7 +42,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 				case "write":
 					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
 					if (![path, text, version].every(v => typeof v === "string")) throw new Error("Invalid save request");
-					wiki.write(cwd, path, text, version); result = await wiki.document(cwd, path); break;
+					wiki.write(cwd, path, text, version); result = await wiki.documentContent(cwd, path); break;
 				case "restore":
 					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
 					if (typeof id !== "string" || typeof undo !== "boolean" || (path !== undefined && typeof path !== "string")) throw new Error("Invalid undo request");

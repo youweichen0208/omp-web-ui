@@ -23,6 +23,15 @@ async function fixture(trusted=true) {
 	return{root,cwd,agentDir,session,state,save};
 }
 describe("native system prompt file editing",()=>{
+	it("creates only the fixed missing project context and reloads it without adding messages", async()=>{
+		const f=await fixture();unlinkSync(join(f.cwd,"AGENTS.md"));await f.session.reload();
+		const candidate=f.state().files.find(file=>file.id==="context:new")!;
+		expect(candidate.path).toBe(join(f.cwd,"AGENTS.md"));expect(candidate.exists).toBe(false);
+		const path=writeSystemPromptFile(f.session,f.cwd,f.agentDir,candidate.id,candidate.version,"created context");
+		expect(promptUsesFile(f.session,f.cwd,f.agentDir,path)).toBe(true);
+		await queuePromptReload(f.session,()=>{});expect(f.state().raw).toContain("created context");expect(f.session.messages).toHaveLength(0);
+		expect(()=>writeSystemPromptFile(f.session,f.cwd,f.agentDir,candidate.id,candidate.version,"overwrite")).toThrow();
+	});
 	it("shows native sections and project priority; reload preserves conversation and adds no transcript message",async()=>{
 		const f=await fixture(),before=f.state(),id=f.session.sessionId,messages=f.session.messages.slice();
 		expect(before.opaque).toBe(false);expect(before.raw).toBe(f.session.systemPrompt);

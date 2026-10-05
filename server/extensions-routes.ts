@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync, renameSync, statSync, realpathSync } from "node:fs";
+import { nativeSkills } from "./skills-service.js";
+import { mkdirSync, readFileSync, writeFileSync, renameSync, statSync, realpathSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { killPidTree } from "./process-utils.js";
 import type { Express, Request } from "express";
@@ -62,6 +63,24 @@ export function installExtensionsRoutes(app: Express, service: () => AgentServic
 		if (!cs || cs.cwd !== cwd || cs.switchingWorkspace || service().quiesceInfo().quiesced) { res.status(409).json({ error: "Workspace unavailable" }); return; }
 		const agentDir = getAgentDir();
 		try {
+			if (action === "open-info" && req.body.id === "skills:user") {
+				const path = join(agentDir, "skills");
+				res.json({ absolute: existsSync(path) ? path : agentDir }); return;
+			}
+			if (action === "skills-list" || action === "skills-toggle") {
+				if (mutation || readers >= 4) throw Error("Package manager busy");
+				const change = action === "skills-toggle" ? req.body : undefined;
+				if (change && (typeof change.id !== "string" || typeof change.enabled !== "boolean" || typeof change.version !== "string")) throw Error("Invalid skill change");
+				if (change) mutation = randomUUID();
+				readers++;
+				try {
+					const valid = () => cs.cwd === cwd && !cs.switchingWorkspace && !service().quiesceInfo().quiesced;
+					const state = await nativeSkills(cwd, agentDir, change, valid);
+					if (!valid()) throw Error("Workspace changed");
+					res.json(state);
+				} finally { readers--; if (change) mutation = undefined; }
+				return;
+			}
 			if (action === "preferences") {
 				if (typeof req.body.enabled !== "boolean") throw Error("Invalid preference");
 				const path=join(agentDir,"webui-extensions.json"), previous=readJson(path);mkdirSync(agentDir,{recursive:true});writeFileSync(`${path}.tmp`,JSON.stringify({...previous,autoCheck:req.body.enabled}),{mode:0o600});renameSync(`${path}.tmp`,path);res.json({autoCheck:req.body.enabled});return;

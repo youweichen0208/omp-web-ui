@@ -102,11 +102,11 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ### Pi 1.0.2 MCP / Codemode 工作台
 
-设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全局/项目范围分别使用自己的文件版本；新增和导入在完成编辑后立即保存，启停、暴露方式和单工具覆盖修改后立即保存；高级 JSON 保留草稿，在离开输入框时保存。请求串行，期间禁用其他修改，仍使用原生版本校验、凭据掩码和会话生命周期；失败保留草稿并提供重试/重新加载，关闭和切页保护未完成编辑。Codemode 用分段选项并立即保存，已有非预设预算仍显示。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
+设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全局/项目范围分别使用自己的文件版本；新增和导入在完成编辑后立即保存，启停、暴露方式和单工具覆盖修改后立即保存；原始 JSON 从标题区「编辑 mcp.json」打开，保留草稿并由用户显式保存。请求串行，期间禁用其他修改，仍使用原生版本校验、凭据掩码和会话生命周期；失败保留草稿并提供重试/重新加载，关闭和切页保护未完成编辑。Codemode 用分段选项并立即保存，已有非预设预算仍显示。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
 
 1.0.1 的项目覆盖允许 `.pi/mcp.json` 中只写 `enabled`、`exposure`、`toolExposure`，沿用同名全局服务器的连接和凭据。Web 服务按 SDK 的规则校验覆盖，不复制凭据、不隐式授予项目信任。项目范围中可以为当前运行的全局服务器新增启停覆盖。
 
-官方 `/mcp` 在 RPC 模式输出连接状态，但会等待首次后台连接完成。Web 以每会话缓存、单飞查询适配此接口：配置立即返回，浏览器每 3 秒刷新；首次尚无状态时显示连接中，不阻塞输入。连接完成后使用官方状态，不从工具数量推断成功。完整原生诊断可展开；SDK 未提供结构化的额外 scope 状态，因此统一显示「需要登录」，不会猜测请求的权限。登录/退出/重连仍调用官方命令，远程 OAuth 回调与取消走原生 WebUI dialog。工具名称、annotations 和实际 exposure 来自 `session.getAllTools()`；单工具覆盖另写原生 `toolExposure`。
+官方 `/mcp` 在 RPC 模式输出连接状态，但会等待首次后台连接完成。Web 以每会话缓存、单飞查询适配此接口：配置立即返回，浏览器每 3 秒刷新；首次尚无状态时显示连接中，不阻塞输入。连接完成后使用官方状态，不从工具数量推断成功。服务诊断在对应服务行展开，完整日志通过标题区按需读取；SDK 未提供结构化的额外 scope 状态，因此统一显示「需要登录」，不会猜测请求的权限。登录/退出/重连仍调用官方命令，远程 OAuth 回调与取消走原生 WebUI dialog。工具名称、annotations 和实际 exposure 来自 `session.getAllTools()`；单工具覆盖另写原生 `toolExposure`。
 
 `codemode.mode`、`codemode.inlineBudget` 写入对应范围的 `settings.json`，保留未知字段并独立校验文件版本；界面显示当前会话实际生效值。`autoEnableCodemode` 写在 `mcp.json`，不代替 `defaultTools`，关闭自动启用不会关闭已经启用的工具。全部变更复用运行中会话的 `agent_settled` 延后 reload。`mcp.log` 按用户点击读取末尾 32,000 字符。
 

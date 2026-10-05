@@ -4,8 +4,9 @@ import { ExtensionsPanel } from "./ExtensionsPanel";
 import { useState, useEffect } from "react";
 import { FiX, FiSettings, FiCpu, FiPackage, FiBox, FiRefreshCw } from "react-icons/fi";
 import { useT } from "../i18n";
-import type { ClientMessage, ServerMessage, UiSettingsState, TerminalInfo } from "../types";
+import type { ClientMessage, ServerMessage, UiSettingsState } from "../types";
 import { NativeMcpPanel } from "./NativeMcpPanel";
+import { SkillsPanel } from "./SkillsPanel";
 import { randomUuid } from "../uuid";
 
 type Tab = "prompt" | "skills" | "extensions" | "native-mcp" | "updates";
@@ -19,12 +20,10 @@ interface SettingsModalProps {
 		componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
 	};
 	send: (message: ClientMessage) => boolean;
-	terminal: { create: (meta: TerminalInfo & { conversationId: string }) => void };
-	onSwitchToTerminal: () => void;
 	onClose: () => void;
 }
 
-export function SettingsModal({ chat, send, terminal, onSwitchToTerminal, onClose }: SettingsModalProps) {
+export function SettingsModal({ chat, send, onClose }: SettingsModalProps) {
 	const t = useT();
 	const [extensionUpdates,setExtensionUpdates]=useState(0);
 	const canLeave=()=>!document.querySelector('.ext-editor[data-dirty="true"], .prompt-editor[data-dirty="true"], .mcp-workbench[data-dirty="true"]')||window.confirm(t("extDiscard"));
@@ -45,14 +44,14 @@ export function SettingsModal({ chat, send, terminal, onSwitchToTerminal, onClos
 		<div className="modal settings-modal" role="dialog" aria-modal="true" aria-label={t("settingsTitle")} onClick={event => event.stopPropagation()}>
 			<div className="modal-head"><button className="icon-btn" aria-label={t("close")} onClick={close}><FiX /></button></div>
 			<div className="settings-layout">
-				<nav className="settings-rail" aria-label={t("settingsTitle")}><h2>{t("settingsTitle")}</h2>{tabs.map(item => <button key={item.id} title={item.label} className={`settings-tab${tab === item.id ? " active" : ""}`} onClick={() => { if(canLeave())setTab(item.id); }}><span className="settings-tab-icon">{item.icon}</span><span className="settings-tab-label">{item.label}{item.id === "extensions" && extensionUpdates > 0 && <span className="ext-rail-badge">{extensionUpdates}</span>}</span></button>)}</nav>
+				<nav className="settings-rail" aria-label={t("settingsTitle")}><h2>{t("settingsTitle")}</h2>{tabs.map(item => <button key={item.id} title={item.label} className={`settings-tab${tab === item.id ? " active" : ""}`} onClick={() => { if(canLeave())setTab(item.id); }}><span className="settings-tab-icon">{item.icon}</span><span className="settings-tab-label">{item.label}{item.id === "updates" && extensionUpdates > 0 && <span className="ext-rail-badge">{extensionUpdates}</span>}</span></button>)}</nav>
 				<div className="modal-body"><div className="set-section">
 					{!settings ? <p>{t("loading")}</p> : <>
 						{tab === "prompt" && chat.state && <SystemPromptPanel key={`${chat.state.cwd}:${chat.state.conversationId}`} cwd={chat.state.cwd} conversationId={chat.state.conversationId} />}
-						{tab === "skills" && <section className="settings-skills"><header className="settings-page-heading"><h2 className="settings-page-title">{t("settingsSkills")}</h2><span className="settings-count">{settings.skills.length}</span></header><div className="settings-group">{settings.skills.map(skill => <details className="settings-skill" key={skill.name}><summary><code>{skill.name}</code><span title={skill.description}>{skill.description}</span><small title={t("nativeResourcesManaged")}>{t("settingsLoaded")}</small></summary><p>{skill.description}</p></details>)}{!settings.skills.length && <p className="settings-empty">{t("settingsNoSkills")}</p>}</div></section>}
+						{tab === "skills" && chat.state && <SkillsPanel key={chat.state.cwd} cwd={chat.state.cwd} reload={() => send({ type: "extensions_reload" })} />}
 						{tab === "extensions" && chat.state?.cwd && <ExtensionsPanel key={chat.state.cwd} cwd={chat.state.cwd} onUpdateCount={setExtensionUpdates} reload={() => send({ type: "extensions_reload" })} />}
 						{tab === "native-mcp" && chat.state?.cwd && <NativeMcpPanel key={`${chat.state.cwd}:${chat.state.conversationId}`} cwd={chat.state.cwd} send={send} dialog={chat.dialog} />}
-						{tab === "updates" && <ComponentUpdatesPanel ready={chat.ready} cwd={chat.state?.cwd ?? ""} conversationId={chat.state?.conversationId ?? ""} updates={updates} appStatus={chat.update} send={send} terminal={terminal} onTerminal={()=>{onSwitchToTerminal();onClose();}} />}
+						{tab === "updates" && <ComponentUpdatesPanel cwd={chat.state?.cwd ?? ""} updates={updates} onUpdateCount={setExtensionUpdates} reload={() => send({ type: "extensions_reload" })} />}
 					</>}
 				</div></div>
 			</div>

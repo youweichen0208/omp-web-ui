@@ -47,7 +47,11 @@ try {
 	assert.deepEqual((await (await request('document-references', { path: 'note.md' })).json()).backlinks, doc.backlinks);
 	assert.equal((await request('document-content', { path: '../outside.txt' })).status, 400);
 	assert.equal((await request('document-references', { path: '../outside.txt' })).status, 400);
-	assert.equal((await request('write', { path: 'note.md', version: doc.version, text: '# saved' })).status, 200);
+	const saved = await request('write', { path: 'note.md', version: doc.version, text: '# saved' });
+	assert.equal(saved.status, 200);
+	const savedContent = await saved.json();
+	assert.equal(savedContent.text, '# saved');
+	assert.equal('backlinks' in savedContent, false, 'save response must not rebuild the reference index');
 	assert.equal((await request('write', { path: 'note.md', version: doc.version, text: '# stale' })).status, 400);
 	const history = await (await request('state')).json();
 	assert.equal(history.revisions.length, 1);

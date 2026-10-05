@@ -33,3 +33,9 @@ pi.dev 当前通过服务端 HTML 提供目录，没有依赖未公开 JSON API�
 - tests/unit/extensions.test.ts：原生过滤恢复、单文件开关、未信任项目、范围迁移、本地移除、配置冲突、目录文本解析。
 - tests/extensions-test.mjs：隔离配置和端口 9210，真实 SDK/HTTP 安装本地夹具、启停、卸载、编辑、鉴权和同源；`--browser` 覆盖中英文、安装确认、列表、目录、编辑与窄屏布局。目录 UI 使用确定性响应，真实 pi.dev 搜索另作联网验证。
 - 原生上下文边界沿用 tests/new-chat-context-test.mjs。
+
+## 设置 v2 的技能与更新
+
+技能页通过 `/api/extensions` 的 `skills-list` / `skills-toggle` 读取 `NativeSkillsState`，`skills-service.ts` 使用原生包管理器发现资源并读取技能元数据，不执行扩展入口、不安装缺失依赖。技能名称与描述可搜索，并按个人、项目和包筛选。桌面使用已有固定目录 IPC 展示个人技能目录（服务端固定 ID `skills:user`，目录不存在时展示 agentDir）；浏览器提供复制路径。开关写入所属范围的原生 `skills` 过滤器，包技能仅修改对应包的 skills 字段，保留 extensions/prompts/themes 等字段。空过滤数组的禁用基线在启用一个技能时保留，避免误启用同包其他技能。涉及多个技能的同一自定义资源目录保持只读；临时资源和未信任项目不能写入。请求沿用工作区、来源、JSON、quiesce 与配置版本校验，和包操作共用写入互斥。写入后由用户点击原生 reload 或新建会话生效。
+
+更新页复用 Extensions 的持久任务、更新所有包、检查和服务器自动检查偏好；管理页只保留安装、启停、编辑与重载。隐藏应用自己的 pi-web-ui 项和 standalone 文件；Pi 只展示 Desktop 内置版本，不允许独立升级锁定 SDK。自动检查在管理页进入后按已有六小时间隔执行；安装策略明确为手动，未增加后台安装行为。浏览器回归覆盖开关实际落盘、更新页项目过滤、MCP JSON 编辑以及 390px 布局。

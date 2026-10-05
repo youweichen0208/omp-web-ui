@@ -16,6 +16,38 @@ function fixture() {
 	return { root, cwd, service };
 }
 describe("Wiki workspace", () => {
+	it("snapshot traversal excludes history, symlinks and oversized files", async () => {
+		const { cwd, root } = fixture();
+		const data = join(cwd, "history");
+		const service = new WikiService(data);
+		writeFileSync(join(data, "private.txt"), "history must not snapshot itself");
+		writeFileSync(join(cwd, "large.bin"), Buffer.alloc(2 * 1024 * 1024 + 1));
+		writeFileSync(join(root, "outside.txt"), "outside");
+		symlinkSync(join(root, "outside.txt"), join(cwd, "link.txt"));
+		const snapshot = await service.begin(cwd);
+		expect(snapshot.files.has("history/private.txt")).toBe(false);
+		expect(snapshot.files.has("link.txt")).toBe(false);
+		expect(snapshot.files.has("large.bin")).toBe(false);
+		expect(snapshot.files.has("index.md")).toBe(true);
+		expect(snapshot.skipped).toEqual(expect.arrayContaining(["large.bin", "link.txt"]));
+		service.cancel(cwd);
+	});
+	it("captures fresh undo bytes without building a Markdown index before sending", async () => {
+		const { cwd, service } = fixture();
+		await service.index(cwd);
+		writeFileSync(join(cwd, "new.md"), "new before request");
+		const index = vi.spyOn(service, "index").mockRejectedValue(new Error("slow index must not delay prompt"));
+		const before = await service.begin(cwd);
+		expect(before.files.get("new.md")?.toString()).toBe("new before request");
+		writeFileSync(join(cwd, "new.md"), "changed by request");
+		await service.finish(cwd, before, "hello");
+		expect(index).not.toHaveBeenCalled();
+		index.mockRestore();
+		const history = await service.state(cwd);
+		service.restore(cwd, history.revisions[0].id, true);
+		expect(readFileSync(join(cwd, "new.md"), "utf8")).toBe("new before request");
+	});
+
 	it("reads editable content without waiting for an index and keeps references separate", async () => {
 		const { cwd, service } = fixture();
 		const original = service.index.bind(service);

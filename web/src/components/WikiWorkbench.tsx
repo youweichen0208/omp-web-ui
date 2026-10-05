@@ -172,11 +172,11 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 		setExpanded(prev => { const next = new Set(prev), parts = target.split("/"); for (let i = 1; i < parts.length; i++) next.add(parts.slice(0, i).join("/")); return next; });
 		if (target === path) void load(target, true);
 	});
-	const save = async (): Promise<boolean> => {
+	const save = async (refreshAfter = true): Promise<boolean> => {
 		if (!doc || doc.entry.path !== path) return false;
 		if (!dirty) return true;
 		setSaving(true); setError("");
-		try { const result = await wikiRequest<WikiDocumentContent>(cwd, "write", { path, text: draft, version: doc.version }); if (alive.current) { setDoc({ ...result, backlinks: doc.backlinks }); setDraft(result.text ?? ""); void refresh(true); } return true; }
+		try { const result = await wikiRequest<WikiDocumentContent>(cwd, "write", { path, text: draft, version: doc.version }); if (alive.current) { setDoc({ ...result, backlinks: doc.backlinks }); setDraft(result.text ?? ""); if (refreshAfter) void refresh(true); } return true; }
 		catch (e) { if (alive.current) setError((e as Error).message); return false; }
 		finally { if (alive.current) setSaving(false); }
 	};
@@ -215,11 +215,11 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	};
 	const submit = async () => {
 		if (!input.trim() || busy || (!path && !whole && !refs.length)) return;
-		if (dirty && !(await save())) return;
 		setSending(true); setError("");
 		try {
+			if (dirty && !(await save(false))) return;
 			await wikiRequest(cwd, "prompt", { text: promptText, requestId: randomUuid(), conversationId });
-			if (alive.current) { setInput(""); setSelection(""); setRefs([]); setPreviewPrompt(false); setScopeOpen(false); setComposerOpen(false); toggleChat(true); await refresh(); }
+			if (alive.current) { setInput(""); setSelection(""); setRefs([]); setPreviewPrompt(false); setScopeOpen(false); setComposerOpen(false); toggleChat(true); void refresh(); }
 		} catch (e) { if (alive.current) setError((e as Error).message); }
 		finally { if (alive.current) setSending(false); }
 	};
@@ -281,7 +281,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 						<button aria-pressed={allowCode} onClick={() => setAllowCode(v => !v)}>{t(allowCode ? "wikiMayEditCode" : "wikiDocumentsOnly")}</button>
 						<span className="wiki-mention-hints"><button onClick={() => { setInput(v => v + " @"); inputRef.current?.focus(); }}>{t("wikiReferenceHint")}</button></span>
 						{!chatOpen && <button className="wiki-collapse-composer" onClick={() => { setComposerOpen(false); setScopeOpen(false); }}>{t("wikiCollapseComposer")}</button>}
-						{streaming ? <button className="wiki-send" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-send" aria-label={t(ready ? "wikiSend" : "wikiSessionPreparing")} title={t(ready ? "wikiSend" : "wikiSessionPreparing")} disabled={busy || !input.trim() || (!path && !whole && !refs.length)} onClick={() => void submit()}>{!ready && <span>{t("wikiSessionPreparing")}</span>}<FiArrowUp /></button>}</div>
+						{streaming ? <button className="wiki-send" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-send" aria-label={t(!ready ? "wikiSessionPreparing" : sending ? "sending" : "wikiSend")} title={t(!ready ? "wikiSessionPreparing" : sending ? "sending" : "wikiSend")} disabled={busy || !input.trim() || (!path && !whole && !refs.length)} onClick={() => void submit()}>{(!ready || sending) && <span>{t(!ready ? "wikiSessionPreparing" : "sending")}</span>}<FiArrowUp /></button>}</div>
 					{previewPrompt && <pre className="wiki-prompt-preview">{promptText}</pre>}
 				</div>
 			</div>;

@@ -202,15 +202,39 @@ export class WikiService {
 		return { results: results.slice(0, 100), limited };
 	}
 	private async snapshot(cwd: string): Promise<Snapshot> {
-		const index = await this.index(cwd, true), files = new Map<string, Buffer>(), skipped: string[] = [];
-		let size = 0;
-		if (index.limited) skipped.push("Index limits reached; some files are not tracked");
-		for (const entry of index.entries) {
-			if (entry.kind === "directory") continue;
-			if (entry.size > MAX_FILE || size + entry.size > MAX_SNAPSHOT) { skipped.push(entry.path); continue; }
-			try { const abs = wikiPath(cwd, entry.path); if (lstatSync(abs).isSymbolicLink()) { skipped.push(entry.path); continue; } const data = await readFile(abs); files.set(entry.path, data); size += data.length; } catch { skipped.push(entry.path); }
-		}
-		return { files, skipped, limited: index.limited };
+		// Undo needs fresh bytes, not Markdown metadata, backlinks or a cached index.
+		// Walk independently so an in-flight search/index cannot hold up sending.
+		const files = new Map<string, Buffer>(), skipped: string[] = [];
+		const dataRoot = realpathSync(this.dataDir);
+		let size = 0, visited = 0, limited = false;
+		const skip = (path: string) => { skipped.push(path || "."); limited = true; };
+		const walk = async (path: string, depth: number): Promise<void> => {
+			if (depth > 32) { skip(path); return; }
+			let children;
+			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); }
+			catch { skip(path); return; }
+			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+			for (const child of children) {
+				if (IGNORED.has(child.name)) continue;
+				if (visited++ >= 20000) { skip(path); break; }
+				const p = path ? `${path}/${child.name}` : child.name;
+				try {
+					if (child.isSymbolicLink()) { skipped.push(p); continue; }
+					const absolute = wikiPath(cwd, p);
+					if (realpathSync(absolute) === dataRoot) continue;
+					const info = lstatSync(absolute);
+					if (info.isSymbolicLink()) { skipped.push(p); continue; }
+					if (info.isDirectory()) { await walk(p, depth + 1); continue; }
+					if (!info.isFile()) continue;
+					if (info.size > MAX_FILE || size + info.size > MAX_SNAPSHOT) { skip(p); continue; }
+					const data = await readFile(absolute);
+					if (data.length > MAX_FILE || size + data.length > MAX_SNAPSHOT) { skip(p); continue; }
+					files.set(p, data); size += data.length;
+				} catch { skip(p); }
+			}
+		};
+		await walk("", 0);
+		return { files, skipped, limited };
 	}
 	private record(cwd: string, before: Snapshot, after: Snapshot, author: "pi" | "user", title: string) {
 		const blobs: StoredRevision["blobs"] = {}, changes: WikiChange[] = [], skipped = [...new Set([...before.skipped, ...after.skipped])];

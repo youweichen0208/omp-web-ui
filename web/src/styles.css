@@ -10602,3 +10602,55 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .fp-highlight-pink { --highlight-color: #ffd5e5; }
 .fp-highlight-purple { --highlight-color: #e5d5ff; }
 .md span:is([style*="background-color: rgb("], [style*="background-color:#"], [style*="background-color: #"]) { color: #242424; }
+
+/* Settings v2: explain each control, group native details by source. */
+.settings-description { display: block; margin-top: 4px; color: var(--text-dim); font: 400 12px/1.5 var(--sans); white-space: normal; }
+.settings-intro { margin: -5px 0 20px; color: var(--text-dim); font: 12.5px/1.75 var(--sans); }
+.settings-group-title small, .settings-modal .ext-group-title small { margin-left: 12px; font: 400 12px/1.5 var(--sans); color: var(--text-faint); }
+.settings-modal .prompt-label { flex: 0 0 40%; }
+.settings-modal .prompt-section-line { min-height: 58px; }
+.settings-modal .prompt-heading { gap: 10px; margin-bottom: 14px; }
+.settings-modal .prompt-heading .prompt-token { white-space: normal; font-size: 12px; }
+.settings-modal .prompt-heading-actions { flex-shrink: 0; }
+.settings-modal .prompt-section-text { padding-left: 16px; }
+.settings-modal .prompt-rule-groups { margin: 0 16px; border-left: 2px solid color-mix(in srgb, var(--accent) 20%, transparent); padding: 0 0 12px 16px; }
+.prompt-rule-group { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 5px 0; font-size: 12.5px; line-height: 1.7; color: var(--text-dim); }
+.prompt-rule-group > span { font-family: var(--mono); overflow-wrap: anywhere; }
+.prompt-rule-group ul { list-style: none; padding: 0; margin: 0; }
+.prompt-rule-group li + li { margin-top: 5px; }
+.settings-modal .prompt-context-files { min-width: 0; }
+.settings-modal .mcp-setting-row > span { flex-basis: 65%; }
+.settings-modal .mcp-setting-row { min-height: 58px; }
+.settings-modal .mcp-scope-row { min-height: 58px; }
+.settings-paths { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--text-faint); font-size: 11.5px; margin-top: 18px; }
+.settings-paths code { font: 11px/1.6 var(--mono); overflow-wrap: anywhere; }
+.settings-list-row > .settings-switch { margin-left: auto; }
+.settings-modal .settings-list-row > :first-child { flex-basis: 65%; }
+.settings-modal .ext-update { background: var(--text); color: var(--bg-elev); border-radius: 5px; padding: 5px 10px; }
+.settings-modal .settings-tab-label { flex: 1; display: flex; align-items: center; justify-content: space-between; }
+.settings-modal .ext-rail-badge { width: 6px; height: 6px; min-width: 6px; padding: 0; overflow: hidden; color: transparent; background: var(--accent); border-radius: 50%; }
+.skills-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.skills-filters > input { min-width: 100px; flex: 1; border: 1px solid var(--border-soft); border-radius: 6px; background: transparent; color: var(--text); padding: 8px 10px; font: 13px var(--sans); }
+.settings-skill-row { display: flex; gap: 16px; align-items: center; min-height: 58px; padding: 10px 16px; }
+.settings-skill-row.disabled { opacity: .5; }
+.settings-skill-info { flex: 1; min-width: 0; }
+.settings-skill-info code { display: block; font: 13px var(--mono); overflow-wrap: anywhere; }
+.settings-skill-info small { display: block; font-size: 12px; color: var(--text-dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcp-json-dialog { width: min(720px, 90vw); }
+.mcp-json-dialog textarea { width: 100%; resize: vertical; min-height: 240px; font: 12px/1.6 var(--mono); background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); padding: 12px; }
+.mcp-json-dialog > code { display: block; overflow-wrap: anywhere; font-size: 11px; margin: 8px 0; }
+@media (max-width: 760px) {
+	.settings-modal .prompt-label { flex-basis: 100%; }
+	.prompt-rule-group { grid-template-columns: 72px minmax(0, 1fr); gap: 8px; }
+	.skills-filters { flex-wrap: wrap; }
+	.skills-filters > input { flex-basis: 100%; }
+	.settings-modal .mcp-setting-row > span { flex-basis: 100%; }
+	.settings-group-title small, .settings-modal .ext-group-title small { display: block; margin: 4px 0 0; }
+	.settings-modal .prompt-heading-actions { margin-left: 0; }
+	.settings-modal .settings-list-row { flex-wrap: wrap; }
+	.settings-modal .settings-list-row > :first-child { flex: 1; min-width: 150px; }
+	.settings-modal .mcp-scope-row { flex-wrap: wrap; }
+}
+
+.settings-modal .mcp-page-head > .settings-heading-actions { flex: none; margin-left: auto; }
+.settings-modal .settings-list-row, .settings-modal .ext-row-main { min-height: 48px; }

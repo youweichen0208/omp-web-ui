@@ -257,7 +257,7 @@ try {
 	await page.locator('.wiki-chat-panel').waitFor();
 	assert.notEqual(activeConversation, previousConversation, 'document switch creates a distinct native conversation');
 	assert.notEqual(activeSnapshot.sessionId, previousSession, 'native SDK session identity is distinct');
-	assert(readFileSync(previousFile, 'utf8').includes('请补充隔夜持仓规则'), 'outgoing conversation remains in native history');
+	assert(!previousFile && !activeSnapshot.sessionFile, 'Wiki conversations never create native history files');
 	assert(!(await page.locator('.wiki-chat-messages').innerText()).includes('已更新两个文档'), 'document switches start a fresh conversation');
 	assert((await page.locator('.wiki-context-chips').innerText()).includes('参数配置.md'));
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('仅确认当前文档');

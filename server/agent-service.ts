@@ -173,6 +173,8 @@ export { workspacePath };
  * never interrupts another conversation's in-flight run.
  */
 interface Conversation {
+	/** Wiki conversations are temporary native in-memory sessions. */
+	wiki?: boolean;
 	lastRunMessages?: Extract<AgentSessionEvent, { type: "agent_end" }>["messages"];
 	thinkingTimings: ThinkingTimings;
 	id: string;
@@ -1111,6 +1113,9 @@ export class ClientSession {
 		this.sessionsTimer = setTimeout(() => {
 			this.sessionsTimer = null;
 			if (this.disposed) return;
+			for (const conv of [...this.convs.values()]) {
+				if (conv.wiki && conv.id !== this.activeId && !conv.session.isStreaming && conv.terminals.list().length === 0) this.removeConversation(conv.id);
+			}
 			this.invalidateLists();
 			this.emitConversations();
 			void this.pushSessions();
@@ -1982,6 +1987,9 @@ export class ClientSession {
 			conv.unsubscribe?.();
 			conv.unsubscribe = undefined;
 
+			const manager = conv.session.sessionManager;
+			const header = manager.getHeader();
+			const wikiManager = conv.wiki ? SessionManager.inMemory(conv.cwd, undefined, [...(header ? [header] : []), ...manager.getEntries()]) : null;
 			conv.toolStartTimes.clear();
 			await conv.runtime.dispose();
 			const runtime = await createAgentSessionRuntime(
@@ -1989,7 +1997,7 @@ export class ClientSession {
 				{
 					cwd: conv.cwd,
 					agentDir: this.agentDir,
-					sessionManager: SessionManager.continueRecent(conv.cwd),
+					sessionManager: wikiManager ?? SessionManager.continueRecent(conv.cwd),
 				},
 			);
 			conv.runtime = runtime;
@@ -2021,6 +2029,7 @@ export class ClientSession {
 
 		const conv = this.makeConversation(previous.runtime, previous.id, previous.terminals);
 		// IDs and delta sequence remain monotonic within this conversation.
+		conv.wiki = previous.wiki;
 		conv.deltaSeq = previous.deltaSeq;
 		conv.nextMsgId = previous.nextMsgId;
 		conv.createdAt = previous.createdAt;
@@ -2036,15 +2045,15 @@ export class ClientSession {
 		void this.pushSlashCommands();
 	}
 
-	async newChat(fresh = false): Promise<boolean> {
+	async newChat(fresh = false, wiki = false): Promise<boolean> {
 		if (this.creatingConversation) return false;
 		this.creatingConversation = true;
 		const previous = this.activeId;
-		try { await this.createChat(fresh); return this.activeId !== previous; }
+		try { await this.createChat(fresh, wiki); return this.activeId !== previous; }
 		finally { this.creatingConversation = false; }
 	}
 
-	private async createChat(fresh: boolean): Promise<void> {
+	private async createChat(fresh: boolean, wiki = false): Promise<void> {
 		this.invalidateLists();
 		if (this.quiesceBlocked()) return;
 		// Reuse an already-open blank conversation instead of piling up new ones
@@ -2061,20 +2070,20 @@ export class ClientSession {
 			}
 		};
 		const active = this.conv;
-		if (!fresh && active && isBlank(active)) {
+		if (!fresh && active && !active.wiki && isBlank(active)) {
 			this.flushSnapshot();
 			return;
 		}
 		for (const conv of this.convs.values()) {
 			if (conv.id === this.activeId) continue;
-			if (!fresh && isBlank(conv)) {
+			if (!fresh && !conv.wiki && isBlank(conv)) {
 				await this.switchConversation(conv.id);
 				this.flushSnapshot();
 				return;
 			}
 		}
 		// Wiki opens a fresh session for each document. Retire the outgoing idle
-		// runtime after success; its native session file remains in history.
+		// runtime after success; temporary Wiki history is discarded with it.
 		const replaceActive = fresh && active && !active.session.isStreaming && active.terminals.list().length === 0 ? active : null;
 		// Cap is per project — conversations of other projects keep their own
 		// lists and don't consume this project's slots.
@@ -2104,10 +2113,11 @@ export class ClientSession {
 				{
 					cwd: this.cwd,
 					agentDir: this.agentDir,
-					sessionManager: SessionManager.create(this.cwd),
+					sessionManager: wiki ? SessionManager.inMemory(this.cwd) : SessionManager.create(this.cwd),
 				},
 			);
 			const conv = this.makeConversation(runtime, conversationId, terminals);
+			conv.wiki = wiki;
 			this.convs.set(conv.id, conv);
 			this.activeId = conv.id;
 			if (displaced) this.removeConversation(displaced.id);
@@ -2175,6 +2185,7 @@ export class ClientSession {
 			conv.listed = true;
 			return null;
 		}
+		if (conv.wiki) return conv;
 		if (conv.listed && conv.promptedSinceActive) return null;
 		// Idle and never continued this visit — still worth keeping warm
 		// (see above) unless doing so would push this project over its cap,
@@ -2228,6 +2239,9 @@ export class ClientSession {
 	private emitConversations(): void {
 		const conversations: ConversationSummary[] = [];
 		for (const conv of this.convs.values()) {
+			// Wiki history stays out of the project list. Keep only running Wiki
+			// tasks reachable so users can stop a background run.
+			if (conv.wiki && !conv.session.isStreaming) continue;
 			// Always include the active conversation. A fresh session has no
 			// transcript yet, so history cannot provide its sidebar row.
 			if (conv.cwd !== this.cwd || (!conv.listed && conv.id !== this.activeId)) continue;
@@ -2812,7 +2826,7 @@ export class ClientSession {
 			let target: Conversation | undefined;
 			for (const c of this.convs.values()) {
 				if (
-					c.cwd === abs &&
+					c.cwd === abs && !c.wiki &&
 					(!target || c.lastActiveAt > target.lastActiveAt)
 				) {
 					target = c;
