@@ -1,0 +1,125 @@
+{
+  "definition": "Isolated native session process, excludes MCP child RSS; three serial rounds with local model and stdio MCP",
+  "measurements": [
+    {
+      "round": 1,
+      "phase": "sdk-import",
+      "naturalRssPeakMiB": 127.84375,
+      "postGc": {
+        "heapMiB": 30.554405212402344,
+        "externalMiB": 3.800299644470215,
+        "handles": 1
+      }
+    },
+    {
+      "round": 1,
+      "phase": "native-tools-loaded",
+      "naturalRssPeakMiB": 130.140625,
+      "postGc": {
+        "heapMiB": 33.0548095703125,
+        "externalMiB": 3.8735713958740234,
+        "handles": 5
+      }
+    },
+    {
+      "round": 1,
+      "phase": "codemode-mcp-execute",
+      "naturalRssPeakMiB": 170.625,
+      "postGc": {
+        "heapMiB": 37.71330261230469,
+        "externalMiB": 5.7008161544799805,
+        "handles": 6
+      }
+    },
+    {
+      "round": 1,
+      "phase": "disposed",
+      "naturalRssPeakMiB": 170.625,
+      "postGc": {
+        "heapMiB": 37.20606231689453,
+        "externalMiB": 3.843027114868164,
+        "handles": 1
+      }
+    },
+    {
+      "round": 2,
+      "phase": "sdk-import",
+      "naturalRssPeakMiB": 127.984375,
+      "postGc": {
+        "heapMiB": 30.56500244140625,
+        "externalMiB": 3.793752670288086,
+        "handles": 1
+      }
+    },
+    {
+      "round": 2,
+      "phase": "native-tools-loaded",
+      "naturalRssPeakMiB": 130.921875,
+      "postGc": {
+        "heapMiB": 33.06584930419922,
+        "externalMiB": 3.8735713958740234,
+        "handles": 5
+      }
+    },
+    {
+      "round": 2,
+      "phase": "codemode-mcp-execute",
+      "naturalRssPeakMiB": 170.96875,
+      "postGc": {
+        "heapMiB": 37.715049743652344,
+        "externalMiB": 5.7008161544799805,
+        "handles": 6
+      }
+    },
+    {
+      "round": 2,
+      "phase": "disposed",
+      "naturalRssPeakMiB": 170.96875,
+      "postGc": {
+        "heapMiB": 37.20835876464844,
+        "externalMiB": 3.843027114868164,
+        "handles": 1
+      }
+    },
+    {
+      "round": 3,
+      "phase": "sdk-import",
+      "naturalRssPeakMiB": 128.078125,
+      "postGc": {
+        "heapMiB": 30.565994262695312,
+        "externalMiB": 3.8175315856933594,
+        "handles": 1
+      }
+    },
+    {
+      "round": 3,
+      "phase": "native-tools-loaded",
+      "naturalRssPeakMiB": 131.140625,
+      "postGc": {
+        "heapMiB": 33.06617736816406,
+        "externalMiB": 3.8735713958740234,
+        "handles": 5
+      }
+    },
+    {
+      "round": 3,
+      "phase": "codemode-mcp-execute",
+      "naturalRssPeakMiB": 170.859375,
+      "postGc": {
+        "heapMiB": 37.71564483642578,
+        "externalMiB": 5.7008161544799805,
+        "handles": 6
+      }
+    },
+    {
+      "round": 3,
+      "phase": "disposed",
+      "naturalRssPeakMiB": 170.859375,
+      "postGc": {
+        "heapMiB": 37.207305908203125,
+        "externalMiB": 3.843027114868164,
+        "handles": 1
+      }
+    }
+  ]
+}

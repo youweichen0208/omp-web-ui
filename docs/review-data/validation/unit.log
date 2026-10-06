@@ -1,0 +1,12 @@
+
+> @youweichen/pi-web-ui@0.99.8 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/youweichen/projects/pi-web-ui
+
+
+ Test Files  75 passed (75)
+      Tests  423 passed (423)
+   Start at  12:04:02
+   Duration  2.45s (transform 2.08s, setup 0ms, import 11.08s, tests 6.10s, environment 4ms)

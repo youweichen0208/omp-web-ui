@@ -1,0 +1,29 @@
+{
+  "sdk": "1.0.4",
+  "node": "v26.0.0",
+  "platform": "darwin/arm64",
+  "timestamp": "2026-10-06T05:52:14.780Z",
+  "cases": [
+    {
+      "id": "mcp-close-during-initialize",
+      "passed": true,
+      "shutdownMs": 4,
+      "childReapedBeforeCloseReturned": true,
+      "boundary": "native McpServerConnection and real stdio transport; no OAuth"
+    },
+    {
+      "id": "codemode-built-in-patch-settles",
+      "passed": true,
+      "toolResultError": false,
+      "toolExecutionEnd": true,
+      "agentSettled": true
+    },
+    {
+      "id": "codemode-read-image",
+      "passed": true,
+      "serializedImage": true,
+      "persistedImage": true,
+      "boundary": "SDK execution, Web serializer, original session-file readback; no browser assertion"
+    }
+  ]
+}

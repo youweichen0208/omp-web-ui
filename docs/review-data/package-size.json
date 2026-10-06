@@ -1,0 +1,94 @@
+{
+  "version": "0.99.8",
+  "sdk": "1.0.4",
+  "node": "v26.0.0",
+  "timestamp": "2026-10-06T05:51:30.353Z",
+  "definition": "logical file bytes, symlink bytes counted once by path; production dependency paths from npm ls --omit=dev --all, no fresh global install",
+  "npm": {
+    "compressedBytes": 2530145,
+    "unpackedBytes": 7450970,
+    "fileCount": 217
+  },
+  "productionDependencyBytes": 272170960,
+  "dependencyTreeExitCode": 0,
+  "dependencyTreeDiagnostic": "",
+  "webBuildBytes": 5976568,
+  "serverBuildBytes": 723232,
+  "localMacApplicationBytes": 473509610,
+  "localMacAllocatedBytes": 544333824,
+  "localMacAppProductionDependencyBytes": 185307187,
+  "installers": [
+    {
+      "path": "release/pi-0.99.8-mac-arm64.dmg",
+      "bytes": 169360747,
+      "sha256": "4c9874a97f8256365e727cccbbfec80b11ae5a6d4d1b4b7e992ef11d1a0cfc67"
+    },
+    {
+      "path": "release/pi-0.99.8-mac-arm64.zip",
+      "bytes": 175613876,
+      "sha256": "06b4ac9b5f11ddfd7d0f83c5175963f7eccf3f290ab8d902afc2aeaf487c77ad"
+    }
+  ],
+  "topProductionDirectories": [
+    {
+      "name": "node-pty",
+      "bytes": 65044613
+    },
+    {
+      "name": "pdfjs-dist",
+      "bytes": 34913648
+    },
+    {
+      "name": "@earendil-works/pi-coding-agent",
+      "bytes": 33383002
+    },
+    {
+      "name": "@napi-rs/canvas-darwin-arm64",
+      "bytes": 27987098
+    },
+    {
+      "name": "openai",
+      "bytes": 18477473
+    },
+    {
+      "name": "@google/genai",
+      "bytes": 11277335
+    },
+    {
+      "name": "esbuild",
+      "bytes": 10728893
+    },
+    {
+      "name": "@esbuild/darwin-arm64",
+      "bytes": 10591409
+    },
+    {
+      "name": "@anthropic-ai/sdk",
+      "bytes": 9503985
+    },
+    {
+      "name": "web-streams-polyfill",
+      "bytes": 9036205
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "bytes": 4077087
+    },
+    {
+      "name": "protobufjs",
+      "bytes": 3053104
+    },
+    {
+      "name": "@earendil-works/pi-tui",
+      "bytes": 2844564
+    },
+    {
+      "name": "@types/node",
+      "bytes": 2438452
+    },
+    {
+      "name": "@smithy/core",
+      "bytes": 1797416
+    }
+  ]
+}

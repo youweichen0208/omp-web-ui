@@ -1,0 +1,942 @@
+{
+  "mode": "electron",
+  "node": "v26.0.0",
+  "definition": "real click to content visible, enabled input and two requestAnimationFrame callbacks; warmed three short native histories",
+  "samples": [
+    {
+      "round": 1,
+      "scenario": "launch-to-ready",
+      "ms": 895.334458
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.40000009536743
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.700000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.800000071525574
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.40000009536743
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.600000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.700000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 1,
+      "scenario": "warm-project-click",
+      "ms": 24
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 9.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.5
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.5
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.09999990463257
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.700000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.200000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 14.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.199999928474426
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.5
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.900000095367432
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.700000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.700000047683716
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.600000023841858
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 15.900000095367432
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 14.899999976158142
+    },
+    {
+      "round": 1,
+      "scenario": "warm-view-click",
+      "ms": 16.799999952316284
+    },
+    {
+      "round": 2,
+      "scenario": "launch-to-ready",
+      "ms": 885.5607089999999
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.800000071525574
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.09999990463257
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 23.800000071525574
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 23.800000071525574
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.600000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.100000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 9.199999928474426
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16.90000009536743
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16.200000047683716
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 17.299999952316284
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.600000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 14.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 17.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16.600000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.100000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 17.399999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.799999952316284
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.600000023841858
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.599999904632568
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.900000095367432
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.5
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 14.199999928474426
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 16.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 2,
+      "scenario": "warm-view-click",
+      "ms": 15
+    },
+    {
+      "round": 3,
+      "scenario": "launch-to-ready",
+      "ms": 877.6249170000001
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 22.800000071525574
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 26
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.300000071525574
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.40000009536743
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.200000047683716
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.799999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.799999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.600000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.200000047683716
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 25.399999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.399999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.699999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.699999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 23.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.5
+    },
+    {
+      "round": 3,
+      "scenario": "warm-project-click",
+      "ms": 24.199999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 10.100000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.600000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.600000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.09999990463257
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.200000047683716
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.300000071525574
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.600000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.799999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.100000023841858
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 14.799999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 17.399999976158142
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.700000047683716
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 14.699999928474426
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.5
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 17.300000071525574
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.400000095367432
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 16.299999952316284
+    },
+    {
+      "round": 3,
+      "scenario": "warm-view-click",
+      "ms": 15.899999976158142
+    }
+  ],
+  "summary": [
+    {
+      "scenario": "launch-to-ready",
+      "n": 3,
+      "p50Ms": 885.5607089999999,
+      "p95Ms": 895.334458
+    },
+    {
+      "scenario": "warm-project-click",
+      "n": 90,
+      "p50Ms": 24.299999952316284,
+      "p95Ms": 24.800000071525574
+    },
+    {
+      "scenario": "warm-view-click",
+      "n": 90,
+      "p50Ms": 16,
+      "p95Ms": 17.299999952316284
+    }
+  ]
+}

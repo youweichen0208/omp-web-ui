@@ -1,0 +1,72 @@
+{
+  "sdk": "1.0.4",
+  "node": "v26.0.0",
+  "timestamp": "2026-10-06T05:52:13.917Z",
+  "boundary": "controlled ClientSession host; real serializeCached/currentMessages/emitSnapshotNow and native in-memory entries; no full service, tree decoration or UI",
+  "cases": [
+    {
+      "id": "cache-working-set",
+      "size": 64,
+      "snapshotTypes": [
+        "snapshot",
+        "snapshot_delta"
+      ],
+      "changedReferences": 0,
+      "changedIds": 0,
+      "userIdsBefore": [
+        "u-1700000000000-1",
+        "u-1700000000000-2"
+      ],
+      "userIdsAfter": [
+        "u-1700000000000-1",
+        "u-1700000000000-2"
+      ],
+      "fallbackResolvesAfterSecondSnapshot": true
+    },
+    {
+      "id": "cache-working-set",
+      "size": 4096,
+      "snapshotTypes": [
+        "snapshot",
+        "snapshot_delta"
+      ],
+      "changedReferences": 0,
+      "changedIds": 0,
+      "userIdsBefore": [
+        "u-1700000000000-1",
+        "u-1700000000000-2"
+      ],
+      "userIdsAfter": [
+        "u-1700000000000-1",
+        "u-1700000000000-2"
+      ],
+      "fallbackResolvesAfterSecondSnapshot": true
+    },
+    {
+      "id": "cache-working-set",
+      "size": 4100,
+      "snapshotTypes": [
+        "snapshot",
+        "snapshot"
+      ],
+      "changedReferences": 4100,
+      "changedIds": 2,
+      "userIdsBefore": [
+        "u-1700000000000-1",
+        "u-1700000000000-2"
+      ],
+      "userIdsAfter": [
+        "u-1700000000000-3",
+        "u-1700000000000-4"
+      ],
+      "fallbackResolvesAfterSecondSnapshot": false
+    },
+    {
+      "id": "same-timestamp-fingerprint-collision",
+      "duplicateUiId": true,
+      "sharedSerializedObject": true,
+      "secondFallbackResolvesFirstEntry": true,
+      "nativeEntryAttachmentOrderPreserved": true
+    }
+  ]
+}

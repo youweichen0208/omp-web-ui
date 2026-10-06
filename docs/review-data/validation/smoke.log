@@ -1,0 +1,588 @@
+
+> @youweichen/pi-web-ui@0.99.8 test:smoke
+> node tests/run-smoke.mjs
+
+
+▶ app-updater-test
+PASS updater download, progress, deduplication, explicit restart, errors, current and development mode
+
+▶ clear-provider-key-test
+  ✓ key stored in auth.json
+  ✓ auth.json entry removed
+  ✓ second clear → friendly notice
+  ✓ other entries untouched
+
+4 passed, 0 failed
+
+▶ component-updates-test
+PASS component versions, built-in restrictions, pinned sources, registry errors and update UI
+
+▶ extensions-test
+PASS native packages: auth/origin/cwd, list, toggle, preview, install, local remove, browser desktop/mobile
+
+▶ extension-ui-test
+PASS native extension UI isolation, validation, reconnect, timeout, reload, override command and memory settings
+
+▶ session-tree-test
+PASS native session tree: in-file edits, siblings, labels, summary success/failure/cancel, extension cancellation, busy guard, reconnect, external changes/reopen, clone/fork and commands
+
+▶ tool-output-test
+PASS authenticated native full output download, restored transcript, identity checks, cleanup and symlink rejection
+
+▶ recovery-service-test
+PASS recovery snapshots, >3-minute compaction guard, summary/branch cancellation, stale operation IDs and metadata cache updates
+
+▶ system-prompt-test
+PASS native prompt: scopes, CAS, reload, pending edits, conversation history, forceSystemPrompt, browser
+
+▶ conv-cwd-test
+ready
+✓ conv1 cwd = A — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-proj-a-R7DxQr
+✓ new_chat reuses the blank active conversation (same id) — c1 → c1
+✓ conv2 cwd = A
+✓ blank active conversation is listed once in the sidebar — 1 listed
+✓ set_cwd(B) → B gets its OWN conversation id — c1 → c2
+✓ convB cwd = B
+✓ UI project switch has no timeline event — []
+✓ file tree shows B's files
+✓ set_cwd(A) → reuse A conversation — c2 → c1
+✓ file tree shows A's files
+✓ set_cwd(B) again → reuse B conversation — c2 → c2
+✓ conversation summaries belong to B — 1 listed
+✓ workspace switches do not use toast notices
+✓ command switch produces conversation event — [{"cwd":"/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-proj-b-zdqX5x","timestamp":1791259483691}]
+--- conversation summaries ---
+  c2 title="新对话" cwd=/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-proj-b-zdqX5x
+--- notices ---
+
+ALL PASS
+
+▶ db-client-test
+· state ok（depsAvail 按驱动粒度）
+· conns_save ok（脱敏回显）
+· test ok
+· connect ok（connId=c1）
+· tables_list ok
+· describe ok
+· page 分页/排序 ok
+· query_exec 成功/失败路径 ok
+· 行编辑 update/insert/delete + 写语句 ok
+· disconnect + conn_closed 事件 ok
+· 重连/未知连接报错 ok
+· 静态服务/穿越拦截 ok
+· conns_delete 级联断开 ok
+
+✓ db-client-test 全部通过
+
+▶ fetch-models-test
+mock /models on :8956
+[srv]   control    : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-fetchmodels-r3Wr12/data/pi-web-ui.sock
+[srv]
+  ⚡ pi-web-ui — web chat for the pi coding agent
+    http://localhost:8955
+    workspace   : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-fetchmodels-r3Wr12/work
+    session dir : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-fetchmodels-r3Wr12/agent/sessions
+    pi SDK      : v1.0.4
+    bind        : 127.0.0.1:8955
+
+  · ready
+  ✓ happy path: ok + deduped sorted models with metadata
+  ✓ auth header sent (Bearer test-key)
+  ✓ authHeader=false: ok and no auth recorded on a NEW /models hit
+  ✓ /v1 fallback works
+  ✓ empty baseUrl → error
+  ✓ invalid baseUrl → error
+  ✓ non-http(s) baseUrl → error
+  ✓ empty model list → error
+  ✓ non-JSON body → error
+  ✓ 404 route → HTTP error surfaced
+  ✓ google format parsed (models/ prefix stripped, limits filled)
+  ✓ concurrent reqIds matched
+
+12 checks passed
+[srv]
+shutting down…
+
+▶ global-search-test
+✓ reqId 回显
+✓ ok:true — {"type":"search_files_result","cwd":"/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-gs-test-TloPe9/proj","reqId":42,"ok":true,"results":[{"path":"src/alpha-util.ts","name":"alpha-util.ts","ty
+✓ 命中 src/alpha-util.ts — alpha-util.ts
+✓ 相对路径为 src/alpha-util.ts — src/alpha-util.ts
+✓ node_modules 不进结果 — []
+✓ 目录 src 命中且 type=dir — [{"path":"src","name":"src","type":"dir"}]
+✓ 空 query 返回空列表
+
+▶ file-editor-protocol-test
+PASS versioned file WS protocol and editor context rejection
+
+▶ wiki-protocol-test
+PASS Wiki HTTP auth/origin/workspace boundaries, PDF full-text/media, saves and persistent undo
+
+▶ current-file-protocol-test
+PASS actual SDK/model protocol: ordinary, steer, followUp receive frozen editor snapshots and source; history/reask preserved; disk unchanged
+
+▶ left-panel-delete-test
+✓ list_sessions 命中两条种子会话 — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/agent/sessions/--var-folders-41-07yyp3_12jddkkthmflqkbgw0000gn-T-pi-web-lp-del-CsubvK-proj--/2026-08-04T00-00-00-000Z_del-target.jsonl,/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/agent/sessions/--var-folders-41-07yyp3_12jddkkthmflqkbgw0000gn-T-pi-web-lp-del-CsubvK-proj--/2026-08-04T00-00-00-000Z_del-keep.jsonl
+✓ 当前会话不能删除
+✓ 删除后文件从磁盘消失 — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/agent/sessions/--var-folders-41-07yyp3_12jddkkthmflqkbgw0000gn-T-pi-web-lp-del-CsubvK-proj--/2026-08-04T00-00-00-000Z_del-target.jsonl
+✓ 删除后列表不再包含该会话 — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/agent/sessions/--var-folders-41-07yyp3_12jddkkthmflqkbgw0000gn-T-pi-web-lp-del-CsubvK-proj--/2026-08-04T00-00-00-000Z_del-keep.jsonl
+✓ 另一条会话仍在
+✓ 越界删除返回错误提示 — 只能删除会话目录中的对话记录
+✓ 越界文件未被删除
+✓ 初始最近项目含 otherDir — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/proj,/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/other
+✓ 移除后最近项目不含 otherDir — /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-lp-del-CsubvK/proj
+✓ 移除只动 UI 状态，目录仍在磁盘
+✓ 重连后 otherDir 仍不在最近项目里
+
+▶ plugin-bgtask-test
+✓ 插件任务并入后台面板：{"taskId":"nightly","plugin":"worker","since":1791259510580,"name":"🌙 定时任务","status":"每 1h"}
+✓ task.update 刷新状态生效
+✓ kill taskId → stop 回调触发 + 移出列表
+✓ 未知 taskId 静默处理（进程存活）
+
+all ok
+
+▶ plugin-cwd-test
+✓ attach 时插件拿到服务端工作区 /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/cwd-proj-a-WOp3Jy
+✓ set_cwd 后插件收到新根 /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/cwd-proj-b-Q4QpOD
+✓ 同路径重复 set_cwd 幂等（无多余广播）
+
+all ok
+
+▶ plugin-http-test
+[server] [plugin:api] manifest 未声明 permissions（旧格式全权模式）——已放行 "http"；apiVersion 2 起将默认拒绝，请尽快声明
+✓ GET /plugins-api/api/ping → {"pong":true}
+✓ POST body 解析并透传 handler
+✓ 未注册/已注销路由 → 404
+[server] [plugin:api] http GET /boom failed: Error: 炸了
+    at file:///private/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-http-plugin-BWTTg4/plugins/api/index.mjs?e=0:11:44
+    at PluginManager.handleHttp (file:///Users/youweichen/projects/pi-web-ui/dist/server/plugins.js:313:13)
+    at file:///Users/youweichen/projects/pi-web-ui/dist/server/index.js:310:15
+    at Layer.handle [as handle_request] (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/layer.js:95:5)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:149:13)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:145:7)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:145:7)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:145:7)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:145:7)
+    at next (/Users/youweichen/projects/pi-web-ui/node_modules/express/lib/router/route.js:145:7)
+✓ 未知插件 → 404；handler 抛错 → 500
+
+all ok
+
+▶ native-tools-desktop-test
+PASS native MCP discovery, codemode worker, nested calls and deferred reload/resume
+
+▶ pi-104-prompt-contract-test
+PASS pi 1.0.4 Codemode on/only/on: native getter, model input, rule visibility and skills
+
+▶ pi-104-upstream-fixes-test
+{
+  "sdk": "1.0.4",
+  "node": "v26.0.0",
+  "platform": "darwin/arm64",
+  "timestamp": "2026-10-06T04:05:18.471Z",
+  "cases": [
+    {
+      "id": "mcp-close-during-initialize",
+      "passed": true,
+      "shutdownMs": 3,
+      "childReapedBeforeCloseReturned": true,
+      "boundary": "native McpServerConnection and real stdio transport; no OAuth"
+    },
+    {
+      "id": "codemode-built-in-patch-settles",
+      "passed": true,
+      "toolResultError": false,
+      "toolExecutionEnd": true,
+      "agentSettled": true
+    },
+    {
+      "id": "codemode-read-image",
+      "passed": true,
+      "serializedImage": true,
+      "persistedImage": true,
+      "boundary": "SDK execution, Web serializer, original session-file readback; no browser assertion"
+    }
+  ]
+}
+
+▶ codemode-mcp-test
+PASS Pi 1.0.4 MCP status, secrets, config conflicts, project overrides, native settings, live Codemode, failure effects, output limit, images
+
+▶ provider-auth-test
+PASS provider OAuth callbacks, stable device ID, credential isolation, cancellation and stale responses
+
+▶ model-config-preservation-test
+PASS production model editor preserves typed models and metadata; duplicate chat IDs do not mutate configuration
+
+▶ node-workbench-test
+✓ SSH trust, key change, authentication, terminal command/interrupt/truncation, SFTP and node isolation
+
+▶ plugin-settings-test
+✓ plugins 清单带 settingsSchema + 默认 settingsValues
+✓ plugin_settings 保存 → 落盘 + 重推回显
+✓ 越界值被拒（notice 报错）且已存值不变
+
+all ok
+
+▶ plugin-test
+✓ plugins list includes demo-mailbox with client entry
+✓ frontend-only plugin detected (client entry, no server code)
+✓ bad manifest skipped
+✓ plugin_message round-trips to plugin_data
+✓ host.notify delivers a system notice
+✓ host.sendTo targets only the addressed socket
+✓ set_settings echoes disabledPlugins toggle
+✓ plugins_reload bumps epoch (0 → 1) and re-pushes catalog
+✓ unknown/illegal pluginId silently ignored
+✓ /plugins/:id/client/* serves JS with correct Content-Type
+✓ server entry/manifest/path-traversal never exposed
+
+ALL PLUGIN TESTS PASSED
+
+▶ plugin-update-test
+✓ install 记录 sha=5fb3e8b86f4d
+✓ check-updates 报可更新
+✓ install --force 更新 + 自动备份 + sha 刷新 → 已是最新
+✓ --rollback 回滚 v1 + 备份清理
+✓ 回滚后 check-updates 重新报可更新
+all ok
+
+▶ preview-test
+✓ unknown extension text previews as text — kind=text
+✓ jsonl still text
+✓ binary zip gets hex dump — text=00000000  50 4b 03 04 00 01 02
+✓ NUL inside text-extension file → hex — text=00000000  61 62 00 63
+✓ image stays metadata-only
+✓ empty file previews as empty text
+
+ALL PASS
+
+▶ quiesce-test
+[1] server on :8911 (data=/var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-quiesce-8Ucwv9)
+  ✅ server started + control socket reachable
+
+[2] control socket: status
+  ✅ status ok
+  ✅ status has pid
+  ✅ status quiesced=false initially
+  ✅ status cwd=repo
+
+[3] Origin admission (HTTP-level)
+  ✅ cross-origin rejected (not open)
+  ✅ same-authority opens
+  ✅ same-authority got ready + snapshot
+  ✅ different-port origin rejected
+
+[4] headers stripped from models_config
+  ✅ models_config has no headers field
+
+[5] quiesce admission gate
+  ✅ quiesce command ok
+  ✅ status now quiesced=true
+  ✅ status quiescedSince present
+  ✅ existing client attaches while quiesced
+  ✅ prompt rejected with notice
+  ✅ brand-new client attach refused (closed)
+  ✅ brand-new client closed with 4403
+  ✅ unquiesce ok
+  ✅ status quiesced=false after unquiesce
+
+[6] unknown control command
+  ✅ unknown cmd → {ok:false}
+
+🎉 ALL PASS
+
+▶ recursive-watch-test
+✓ 深层变化推送 file_changed (path=)
+✓ node_modules 事件已过滤
+✓ 列出目录切换后 path 跟随 (deep)
+
+全部通过 ✅
+
+▶ refresh-models-test
+  ✓ refresh ok, added=1, total=2
+  ✓ manual fields preserved (name/contextWindow/input NOT overridden)
+  ✓ refresh #2 ok, added=1, total=3
+  ✓ new id appended with endpoint metadata (reasoning)
+  ✓ probe used saved apiKey (Bearer saved-secret-key)
+  ✓ unknown provider → ok:false with error
+
+6 passed, 0 failed
+
+▶ restart-handoff-test
+✓ instance A up
+✓ A answers health
+✓ B did not crash while A holds the port — exitCode=still running
+✓ B took over the port after A exited
+✓ B still alive — exitCode=null
+
+ALL PASS
+
+▶ native-session-commands-test
+✓ model requests have the same system prompt and active tools as an independent native pi 1.0.4 session
+✓ /new creates a new SDK identity, preserves old history, and reopens with its own context and usage
+✓ new_chat opens a separate conversation without stale UI during delayed snapshots
+✓ native /new starts empty; old history remains restorable; next request contains no old context
+
+▶ scm-features-test
+server up
+  ✓ status ok
+  ✓ current branch is main
+  ✓ local branch listed
+  ✓ remote branch listed with remote=origin
+  ✓ history absent from status payload
+  ✓ untracked text returned
+  ✓ untracked binary identified
+  ✓ untracked text capped at 512 KB
+  ✓ history ok
+  ✓ history has both commits
+  ✓ external commit pushed scm_changed
+  ✓ status sees the new commit's parent state (clean tree)
+
+12 passed, 0 failed
+
+▶ settings-test
+data-dir: /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-set-test-RfbUMs
+[srv]   control    : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-set-test-RfbUMs/pi-web-ui.sock
+[srv]
+  ⚡ pi-web-ui — web chat for the pi coding agent
+    http://localhost:8931
+    workspace   : /Users/youweichen/projects/pi-web-ui
+    session dir : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/pi-web-set-test-RfbUMs/agent/sessions
+    pi SDK      : v1.0.4
+    bind        : 127.0.0.1:8931
+
+  ✓ settings_state pushed on attach
+  ✓ has skills array
+  ✓ has extensions array
+  ✓ no bundled todo
+  ✓ native directory extension loaded
+  ✓ native standalone extension loaded
+  ✓ native prompt available
+  ✓ promptMode removed
+  ✓ customSystemPrompt removed
+  ✓ terminalToolsEnabled removed
+  ✓ visionBridgeEnabled removed
+  ✓ presets removed
+  ✓ display preferences round-trip
+  ✓ legacy prompt override ignored
+  ✓ display preferences survive reconnect
+  ✓ native prompt survives reconnect
+  ✓ extensions_reload re-pushes settings
+
+17 passed, 0 failed
+[srv]
+shutting down…
+
+▶ slash-commands-test
+[1] catalog on attach: 55 commands {"builtin":14,"extension":1,"skill":40}
+[2] get_commands re-request: 55 commands
+[3] /cwd valid → /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/slash-cwd-R8EkyQ
+[4] /cwd invalid → 切换工作目录失败：ENOENT: no such file or directory, stat '/nonexistent-zzz'
+[5] /model no-match → 没有匹配到模型：这个模型必然不存在xyz（可用模型见顶栏模型列表）
+[6] /help intercepted, no SDK leak
+[7] /new → active conversation c1…
+[8] /reload → catalog re-pushed (55 commands), extensions=3, skills=40, prompts=0, errors=0
+
+✅ SLASH-COMMAND CHECKS PASSED
+
+▶ snapshot-delta-test
+✓ ready received with protocolVersion=2
+✓ get_state returns FULL snapshot
+✓ full snapshot carries messages array + numeric rev
+✓ emission after native slash prompt arrived as delta — 1 new msg(s)
+✓ delta chains onto immediately preceding rev — 2 vs 2
+✓ delta state has NO messages field
+✓ delta appended is an array
+✓ delta state still carries conversationId/streamingMessage/stats/rev
+✓ rev chain continuous across all emissions
+✓ get_state after deltas returns full again
+
+▶ ssh-plugin-test
+[mock-ssh] 本地无 ssh2 依赖，回退 npm install…
+
+added 8 packages in 4s
+✓ attach 后主动收到插件状态推送（服务端唯一事实源）
+✓ state 初始返回，ssh2 依赖就绪
+✓ 本地文件读写正常（无 connId 直走 fs）
+✓ 空 host 校验拒绝
+✓ hosts_save 落盘 + 回显脱敏（password 不回传）
+✓ ssh-hosts.json 不再含明文密码（已迁入 host.secrets）
+✓ 加密机密文件 secrets.bin 已生成
+✓ 错误密码连接被拒（[client-authentication] All configured a…）
+✓ 连接成功 connId=c2
+✓ shell 打开并收到欢迎横幅
+✓ 终端输入回显正常
+✓ exec 输出与退出码 0
+✓ exec 非零退出码 + stderr 合并
+✓ 远程 list（connId 路由）sub, a.txt, big.bin
+✓ 远程 read 文本内容
+✓ 远程 read 二进制标记（NUL 嗅探）
+✓ 远程 write 写入后读回一致（UTF-8）
+✓ 远程 create 目录
+✓ 远程 rename
+✓ 远程 delete 文件
+✓ rename 非法名称拒绝
+✓ disconnect 触发 conn_closed 事件
+✓ hosts_delete
+✓ 未知 action 报错不崩
+✓ sync_get 初始未配置（configured:false + configPath）
+✓ sync_save 写入工作区 .vscode/sftp.json（remotePath/ignore 字段名）
+✓ sync_get 回读脱敏（hasPass，不回传明文密码）
+✓ sync_save 留空凭据沿用旧值
+✓ 相对路径远端根拒绝
+✓ sync_ensure 返回配置文件路径且不覆盖
+✓ sync down：远端文件下载到本地工作区
+✓ sync up：本地文件上传到远端
+✓ download：本地文件 base64 回传正确
+✓ download：路径越界拒绝
+✓ download 远端：单文件内容与文件名正确
+✓ download 远端：文件夹 tar.gz 打包内容正确
+✓ download 远端：路径越界拒绝
+
+▶ steer-queue-smoke
+[out]   control    : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/steer-queue-zLkein/pi-web-ui.sock
+[out]
+  ⚡ pi-web-ui — web chat for the pi coding agent
+    http://localhost:8921
+    workspace   : /Users/youweichen/projects/pi-web-ui
+    session dir : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/steer-agent-Z0KIfF/sessions
+    pi SDK      : v1.0.4
+    bind        : 127.0.0.1:8921
+
+OK: prompt(queue) 消息被服务端正常接收，dispatch/签名无异常（无模型时按预期提示发送失败）
+[out]
+shutting down…
+
+▶ switch-session-background-test
+✓ history switch leaves the active stream running in background
+✓ deleting a background streaming session is refused
+✓ background response completes and remains recoverable
+
+▶ terminal-smoke-test
+[srv]   control    : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/piweb-term-data-fl9j3z/pi-web-ui.sock
+[srv]
+  ⚡ pi-web-ui — web chat for the pi coding agent
+    http://localhost:20867
+    workspace   : /var/folders/41/07yyp3_12jddkkthmflqkbgw0000gn/T/piweb-term-qhJQfi
+    session dir : /Users/youweichen/.pi/agent/sessions
+    pi SDK      : v1.0.4
+    bind        : 127.0.0.1:20867
+
+server up
+ws connected
+ready received
+  ✓ agent has no WebUI terminal tools
+  ✓ agent has no bundled todo
+  ✓ list_commands returns empty list
+  ✓ commands path is <cwd>/.pi/commands.json
+  ✓ save_commands persisted
+  ✓ commands.json written on disk
+  ✓ disk format is {commands:[...]}
+  ✓ folder not skipped as a non-file attachment
+  ✓ no attachment error for the folder
+  ✓ persisted session appears in the conversation list
+  ✓ terminal_list identifies the active conversation
+  ✓ input echoes through PTY
+  ✓ run_command banner shown
+  ✓ ${pwd} resolved to session cwd
+  ✓ re-run banner appears
+  ✓ re-run executed
+  ✓ restarted shell accepts input
+  ✓ terminal_kill emits exit
+  ✓ shell exit emits terminal_exit
+  ✓ exited terminal name can be reused
+  ✓ run_command enforces terminal limit
+  ✓ Ctrl+ArrowUp = ESC[1;5A (not Ctrl+A)
+  ✓ Ctrl+Enter = ESC[13;5u (not Ctrl+E)
+  ✓ Ctrl+ArrowRight = ESC[1;5C
+  ✓ plain ArrowUp stays ESC[A
+  ✓ Alt+ArrowUp = ESC[1;3A
+  ✓ Ctrl+Shift+ArrowUp = ESC[1;6A
+  ✓ Shift+Tab = ESC[9;2u
+  ✓ plain Enter stays CR
+  ✓ Ctrl+C = 0x03
+  ✓ Alt+c = ESC c
+  ✓ unsupported key reports an error
+  ✓ Ctrl on a non-letter reports an error
+  ✓ terminal_create + run_command both reject an invalid id
+  ✓ hist-0 exited and moved to history
+  ✓ run_command of an exited id at the cap is rejected
+  ✓ server still alive after bogus messages
+  ✓ ConPTY cleanup has no uncaught AttachConsole error
+
+38 checks passed
+
+▶ version-handshake-test
+PASS ready.serverVersion is pi-web-ui v0.99.8
+
+▶ vscode-editor-plugin-test
+✓ plugins 清单含 vscode-editor（hasClient）
+✓ list 根目录：目录优先 + 忽略 node_modules
+✓ list 子目录 src/main.js
+✓ read 文本内容正确
+✓ read GBK 回退解码为「你好」
+✓ ../ 路径越界被拒绝
+✓ 拒绝删除根目录
+✓ write 原子落盘（自动补父目录）
+✓ create file（带子目录）
+✓ create dir + 重名报错
+✓ rename
+✓ rename 拒绝路径分隔符/..
+✓ flatlist 5 个相对路径
+✓ delete 目录递归删除
+✓ 未知 action 返回错误且进程存活
+✓ client/entry.mjs 静态服务 200 + JS Content-Type
+✓ /plugins/vscode-editor/%2e%2e/index.mjs 未暴露插件文件（text/html）
+✓ /plugins/vscode-editor/manifest.json 未暴露插件文件（text/html）
+
+===== 冒烟汇总 =====
+✓ app-updater-test
+✓ clear-provider-key-test
+✓ component-updates-test
+✓ extensions-test
+✓ extension-ui-test
+✓ session-tree-test
+✓ tool-output-test
+✓ recovery-service-test
+✓ system-prompt-test
+✓ conv-cwd-test
+✓ db-client-test
+✓ fetch-models-test
+✓ global-search-test
+✓ file-editor-protocol-test
+✓ wiki-protocol-test
+✓ current-file-protocol-test
+✓ left-panel-delete-test
+✓ plugin-bgtask-test
+✓ plugin-cwd-test
+✓ plugin-http-test
+✓ native-tools-desktop-test
+✓ pi-104-prompt-contract-test
+✓ pi-104-upstream-fixes-test
+✓ codemode-mcp-test
+✓ provider-auth-test
+✓ model-config-preservation-test
+✓ node-workbench-test
+✓ plugin-settings-test
+✓ plugin-test
+✓ plugin-update-test
+✓ preview-test
+✓ quiesce-test
+✓ recursive-watch-test
+✓ refresh-models-test
+✓ restart-handoff-test
+✓ native-session-commands-test
+✓ scm-features-test
+✓ settings-test
+✓ slash-commands-test
+✓ snapshot-delta-test
+✓ ssh-plugin-test
+✓ steer-queue-smoke
+✓ switch-session-background-test
+✓ terminal-smoke-test
+✓ version-handshake-test
+✓ vscode-editor-plugin-test
+
+46/46 通过

@@ -300,7 +300,7 @@ try {
 		const content = typeof system?.content === "string" ? system.content : system?.content?.map(part => part.text ?? "").join("\n");
 		if (content !== nativePrompt) throw new Error("WebUI system prompt differs from native SDK");
 	}
-	console.log("✓ model requests have the same system prompt and active tools as an independent native pi 1.0.3 session");
+	console.log("✓ model requests have the same system prompt and active tools as an independent native pi 1.0.4 session");
 
 	if (requests.some((request) => request.messages.some((message) => message.content === "/new" || (Array.isArray(message.content) && message.content.some((part) => part.text === "/new"))))) throw new Error("/new was sent to the model");
 	if (JSON.stringify(chatRequests[1]).includes("OLD_CONTEXT_SENTINEL")) throw new Error("/new leaked previous context into model request");
@@ -354,7 +354,7 @@ try {
 		if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("UI retained old messages while new_chat snapshot was delayed");
 		for (let i = 0; i < 20 && !resyncs; i++) await sleep(50);
 		if (!resyncs) throw new Error("Missing snapshot recovery request");
-		if (!(await page.locator(".status-messages").innerText()).includes("—")) throw new Error("Footer retained old message count");
+		if (!(await page.locator(".status-ctx").innerText()).includes("—")) throw new Error("Footer retained old context usage");
 		hold = false;
 		for (const wire of held) downstream.send(wire);
 		await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");

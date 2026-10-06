@@ -1,0 +1,4 @@
+✓ model requests have the same system prompt and active tools as an independent native pi 1.0.4 session
+✓ /new creates a new SDK identity, preserves old history, and reopens with its own context and usage
+✓ new_chat opens a separate conversation without stale UI during delayed snapshots
+✓ native /new starts empty; old history remains restorable; next request contains no old context

@@ -1,0 +1,28 @@
+{
+  "commitBeforeUpgrade": "a851a21cb9389adb5baad1fe3f98b17bae76b258",
+  "productionFiles": {
+    "package-lock.json": "ddf7fed4e41e4cae529ca449a4977523b14401516a587ccaba8d436e64e35cde",
+    "dist/server/system-prompt-view.js": "3b414f3b7f72016b8944180a85e66d428cfe3fdaf3cbaa1ca0fe94061dda7e8c",
+    "dist/server/native-prompt-template.js": "3c9998b649dda3ae13c2456cd44b6f8601713bfacf3ccab304fbfe338e5e91d9",
+    "web/dist/index.html": "28ab512d7ea57d725ae829a4f18e6219b8464eda1d1e1c85bae4020d55078bfc"
+  },
+  "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5\nBuildVersion:\t\t25F71\n",
+  "install": "npm run check:lockfile && npm ci; npm ls --omit=dev --all (exit 0)",
+  "protocol": 39,
+  "application": "0.99.8",
+  "piPackages": {
+    "node_modules/@earendil-works/chord": "1.0.4",
+    "node_modules/@earendil-works/pi-agent-core": "1.0.4",
+    "node_modules/@earendil-works/pi-ai": "1.0.4",
+    "node_modules/@earendil-works/pi-codemode": "1.0.4",
+    "node_modules/@earendil-works/pi-coding-agent": "1.0.4",
+    "node_modules/@earendil-works/pi-mcp": "1.0.4",
+    "node_modules/@earendil-works/pi-telemetry": "1.0.4",
+    "node_modules/@earendil-works/pi-tui": "1.0.4"
+  },
+  "repairedLockEntries": [
+    "esbuild and @esbuild/*: declared 0.28.2, old tarball 0.28.1; now 0.28.2",
+    "send: declared 0.20.0, old tarball 0.19.2; now 0.20.0"
+  ],
+  "packaging": "electron-builder --mac --publish never -c.electronDist=node_modules/electron/dist (41.10.7)"
+}

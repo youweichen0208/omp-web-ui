@@ -1,4 +1,4 @@
-/** Actual Pi 1.0.3: MCP management, Codemode execution, output limits and image saves. Zero paid tokens. */
+/** Actual Pi 1.0.4: MCP management, Codemode execution, output limits and image saves. Zero paid tokens. */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -133,6 +133,6 @@ try {
   assert.deepEqual(errors, []); await browser.close(); browser = undefined;
   console.log('PASS real browser Codemode tabs, call window, native images, attachment, MCP tools, saved settings, mobile layout');
  }
- console.log('PASS Pi 1.0.3 MCP status, secrets, config conflicts, project overrides, native settings, live Codemode, failure effects, output limit, images');
+ console.log('PASS Pi 1.0.4 MCP status, secrets, config conflicts, project overrides, native settings, live Codemode, failure effects, output limit, images');
 } catch (error) { console.error(logs.slice(-4000)); throw error; }
 finally { await browser?.close(); ws?.terminate(); server.kill(); if (server.exitCode === null) await new Promise(r => server.once('exit', r)); mock.closeAllConnections(); await new Promise(r => mock.close(r)); rmSync(root, { recursive: true, force: true }); }

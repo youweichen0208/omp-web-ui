@@ -38,7 +38,7 @@ import { StringDecoder } from "node:string_decoder";
 
 export const toolOutputId = (path: string) => createHash("sha256").update(path).digest("hex");
 
-/** Native 1.0.3 model-facing markers, not arbitrary paths from browser requests. */
+/** Native 1.0.4 model-facing markers, not arbitrary paths from browser requests. */
 export function outputReferences(text: string): string[] {
 	return [...text.matchAll(/\[Image saved to ([^\r\n]+?) \(image\/(?:png|jpeg|gif|webp), [^\r\n]*?\)\]|\[Binary resource [^\r\n]*? saved to ([^\r\n]+?)\]/g)].map(m => m[1] ?? m[2]);
 }

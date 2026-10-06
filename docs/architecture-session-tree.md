@@ -1,6 +1,6 @@
 # 原生会话树
 
-会话条目、label 和分支仍由 pi SDK 1.0.3 的 SessionManager 保存在原生 JSONL 中。WebUI 不建立树存储、不迁移旧的派生会话。协议版本 39。
+会话条目、label 和分支仍由 pi SDK 1.0.4 的 SessionManager 保存在原生 JSONL 中。WebUI 不建立树存储、不迁移旧的派生会话。协议版本 39。
 
 ## 投影与读取
 

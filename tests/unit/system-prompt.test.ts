@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentSessionServices, createAgentSessionFromServices, SessionManager, SettingsManager, ProjectTrustStore } from "@earendil-works/pi-coding-agent";
 import { getSystemPromptState, writeSystemPromptFile, queuePromptReload, flushPromptReload, promptReloadStatus, promptUsesFile } from "../../server/system-prompt-files.js";
-import { nativePromptText } from "../../server/system-prompt-view.js";
+import { nativePromptText, promptView } from "../../server/system-prompt-view.js";
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{for(const f of cleanup.splice(0).reverse())f();});
 async function fixture(trusted=true) {
@@ -23,6 +23,29 @@ async function fixture(trusted=true) {
 	return{root,cwd,agentDir,session,state,save};
 }
 describe("native system prompt file editing",()=>{
+	it("attributes rules only to declared tools and preserves indirectly readable skills", async()=>{
+		const f = await fixture();
+		const native = f.session as unknown as { _runSystemPromptOptions?: import("@earendil-works/pi-coding-agent").BuildSystemPromptOptions };
+		const shared = "Shared tool and extension rule";
+		try {
+			for (const hiddenTools of [["read", "bash"], []]) {
+				native._runSystemPromptOptions = {
+					cwd: f.cwd, selectedTools: ["read", "bash"], hiddenTools,
+					toolSnippets: { read: "Read fixture files", bash: "Run fixture commands" },
+					toolGuidelines: { bash: [shared, "Hidden bash rule"] }, promptGuidelines: [shared],
+					skills: [{ name: "fixture", description: "Fixture skill", filePath: join(f.cwd, "SKILL.md"), baseDir: f.cwd, sourceInfo: { path: join(f.cwd, "SKILL.md"), source: "fixture", scope: "project", origin: "top-level" }, disableModelInvocation: false }],
+				};
+				const view = promptView(f.session, f.cwd);
+				expect(view.opaque).toBe(false);
+				expect(view.raw).toBe(f.session.systemPrompt);
+				expect(view.raw).toBe(nativePromptText(native._runSystemPromptOptions));
+				expect(view.sections.find(section => section.name === "skills")?.text).toContain("Fixture skill");
+				expect(view.rules.find(rule => rule.text === shared)?.kind).toBe(hiddenTools.length ? "extension" : "tool");
+				expect(view.rules.some(rule => rule.text === "Hidden bash rule")).toBe(!hiddenTools.length);
+				expect(view.sections.find(section => section.name === "tools")?.text.includes("Run fixture commands")).toBe(!hiddenTools.length);
+			}
+		} finally { native._runSystemPromptOptions = undefined; }
+	});
 	it("creates only the fixed missing project context and reloads it without adding messages", async()=>{
 		const f=await fixture();unlinkSync(join(f.cwd,"AGENTS.md"));await f.session.reload();
 		const candidate=f.state().files.find(file=>file.id==="context:new")!;

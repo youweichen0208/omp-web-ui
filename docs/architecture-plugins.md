@@ -100,7 +100,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 界面插件只提供 Web 展示及用户交互，不向代理注册工具、斜杠命令或提示词。代理扩展和 MCP 由 pi 原生配置加载。
 
-### Pi 1.0.3 MCP / Codemode 工作台
+### Pi 1.0.4 MCP / Codemode 工作台
 
 设置页「MCP 与 Codemode」直接维护原生配置，连接状态按需要处理的项目优先排序。全局/项目范围分别使用自己的文件版本；新增和导入在完成编辑后立即保存，启停、暴露方式和单工具覆盖修改后立即保存；原始 JSON 从标题区「编辑 mcp.json」打开，保留草稿并由用户显式保存。请求串行，期间禁用其他修改，仍使用原生版本校验、凭据掩码和会话生命周期；失败保留草稿并提供重试/重新加载，关闭和切页保护未完成编辑。Codemode 用分段选项并立即保存，已有非预设预算仍显示。导入支持 Claude/Cursor、VS Code 和 OpenCode JSON，拒绝重名覆盖及未转换的 `${input:...}`。Codex TOML 需要先转换为 `mcpServers` JSON。
 
@@ -124,4 +124,4 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 ## 原生默认值和可替换内置扩展
 
-每个对话的 SettingsManager 在 getDefaultTools() 读取时优先使用原生返回值，仅 undefined 时返回由 SettingsManager.inMemory 公开 getter 解析的 Codemode/tool_search 默认列表，每次返回副本。显式空数组、禁用项和项目配置保留原生语义；getSettings() 保留原生配置。对话压缩/重试开关同样由 getter 读取内存覆盖，不包装 reload/信任方法，不改变原生 setter、持久化和加载错误处理，不修改 SDK 或私有字段。codemode、tool-search、mcp 的 InlineExtension 标记 replaceable:true，用户扩展可以接管同名工具或命令。pi 1.0.3 未公开导出 llama.cpp 工厂，宿主暂不通过内部路径补装。
+每个对话的 SettingsManager 在 getDefaultTools() 读取时优先使用原生返回值，仅 undefined 时返回由 SettingsManager.inMemory 公开 getter 解析的 Codemode/tool_search 默认列表，每次返回副本。显式空数组、禁用项和项目配置保留原生语义；getSettings() 保留原生配置。对话压缩/重试开关同样由 getter 读取内存覆盖，不包装 reload/信任方法，不改变原生 setter、持久化和加载错误处理，不修改 SDK 或私有字段。codemode、tool-search、mcp 的 InlineExtension 标记 replaceable:true，用户扩展可以接管同名工具或命令。pi 1.0.4 未公开导出 llama.cpp 工厂，宿主暂不通过内部路径补装。

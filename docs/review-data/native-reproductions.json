@@ -1,0 +1,31 @@
+{
+  "sdk": "1.0.4",
+  "node": "v26.0.0",
+  "platform": "darwin/arm64",
+  "timestamp": "2026-10-06T05:52:14.242Z",
+  "cases": [
+    {
+      "id": "force-reset-session-ownership",
+      "reproduced": true,
+      "boundary": "real ClientSession and SDK; direct recovery invocation, no stalled provider",
+      "restoredWrongSession": true,
+      "restoredOtherOpenSession": true,
+      "resetConversationHasSubscriber": false
+    },
+    {
+      "id": "reload-result-ownership",
+      "reproduced": true,
+      "boundary": "real SlashCommandsService, controlled session host",
+      "reportedConversation": "A",
+      "reportedSkills": [
+        "B-only"
+      ]
+    },
+    {
+      "id": "reload-missing-shared-mutex",
+      "reproduced": true,
+      "boundary": "real prompt-file queue and SlashCommandsService; controlled reload, does not prove actual SDK corruption",
+      "concurrentReloadCalls": 2
+    }
+  ]
+}

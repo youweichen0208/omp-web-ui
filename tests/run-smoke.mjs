@@ -47,6 +47,8 @@ const ALL = [
 	"plugin-cwd-test",
 	"plugin-http-test",
 	"native-tools-desktop-test",
+	"pi-104-prompt-contract-test",
+	"pi-104-upstream-fixes-test",
 	"codemode-mcp-test",
 	"provider-auth-test",
 	"model-config-preservation-test",

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 
 test.each([
 	["https://registry.npmjs.org/uuid/-/uuid-14.0.2.tgz", true],
+	["https://registry.npmjs.org/uuid/-/uuid-14.0.1.tgz", false],
 	["https://registry.npmmirror.com/uuid/-/uuid-14.0.2.tgz", false],
 	["http://registry.npmjs.org/uuid/-/uuid-14.0.2.tgz", false],
 	["https://registry.npmjs.org.example.com/uuid.tgz", false],
@@ -18,7 +19,7 @@ test.each([
 			"": { name: "fixture" },
 			"node_modules/local": { link: true, resolved: "packages/local" },
 			"node_modules/good": { resolved: "https://registry.npmjs.org/good/-/good-1.0.0.tgz" },
-			"node_modules/uuid": { resolved },
+			"node_modules/uuid": { version: "14.0.2", resolved },
 		} }));
 		const result = spawnSync(process.execPath, [resolve("scripts/check-lockfile.mjs"), path], { encoding: "utf8" });
 		expect(result.status).toBe(valid ? 0 : 1);

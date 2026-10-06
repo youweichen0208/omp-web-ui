@@ -12,6 +12,9 @@ try {
 		try {
 			const url = new URL(entry.resolved);
 			valid = url.protocol === "https:" && url.host === "registry.npmjs.org" && !url.username && !url.password;
+			if (valid && typeof entry.version === "string") {
+				valid = decodeURIComponent(url.pathname).endsWith(`-${entry.version}.tgz`);
+			}
 		} catch { /* Report malformed URLs along with non-official sources. */ }
 		if (!valid) {
 			console.error(`${name || "(root)"}: invalid resolved URL ${JSON.stringify(entry.resolved)}`);
@@ -19,7 +22,7 @@ try {
 		}
 	}
 	if (failures) process.exitCode = 1;
-	else console.log("Lockfile download URLs use the official HTTPS npm registry.");
+	else console.log("Lockfile download URLs use the official HTTPS npm registry and match declared versions.");
 } catch (error) {
 	console.error(`Lockfile check failed: ${error.message}`);
 	process.exitCode = 1;

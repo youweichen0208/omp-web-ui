@@ -1,0 +1,5 @@
+PASS Markdown parser dependencies resolve inside the packaged app
+PASS packaged SQLite worker: table and row data
+PASS packaged server: /Users/youweichen/projects/pi-web-ui/release/mac-arm64/pi.app/Contents/Resources/app
+PASS native MCP discovery, codemode worker, nested calls and deferred reload/resume
+PASS provider OAuth callbacks, stable device ID, credential isolation, cancellation and stale responses

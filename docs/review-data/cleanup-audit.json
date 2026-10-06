@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-10-06T05:51:30.820Z",
+  "observedPidCount": 572,
+  "definition": "All sampled descendants, checked after benchmark exit; excludes later PID reuse; cannot detect processes never sampled",
+  "remaining": [],
+  "reused": []
+}

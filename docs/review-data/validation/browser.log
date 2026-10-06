@@ -1,0 +1,9 @@
+PASS native prompt: scopes, CAS, reload, pending edits, conversation history, forceSystemPrompt, browser
+PASS actual SDK/model protocol: ordinary, steer, followUp receive frozen editor snapshots and source; history/reask preserved; disk unchanged
+PASS native session tree: in-file edits, siblings, labels, summary success/failure/cancel, extension cancellation, busy guard, reconnect, external changes/reopen, clone/fork and commands; browser tree and draft protection
+PASS native extension UI isolation, validation, reconnect, timeout, reload, override command and memory settings, browser multiline editor, background navigation and recovery phases
+PASS real browser Codemode tabs, call window, native images, attachment, MCP tools, saved settings, mobile layout
+PASS Pi 1.0.4 MCP status, secrets, config conflicts, project overrides, native settings, live Codemode, failure effects, output limit, images
+PASS zh: nested tool history, tool image, OAuth response and cancellation
+PASS en: nested tool history, tool image, OAuth response and cancellation
+PASS desktop restores project list and active folder after relaunch and reload

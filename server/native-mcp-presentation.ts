@@ -1,6 +1,6 @@
 import type { NativeMcpServerStatus } from "./protocol.js";
 
-/** Pi's official non-TUI /mcp output is the status API in 1.0.3. Keep unknown lines visible. */
+/** Pi's official non-TUI /mcp output is the status API in 1.0.4. Keep unknown lines visible. */
 export function parseNativeMcpStatus(text: string): NativeMcpServerStatus[] {
 	const servers: NativeMcpServerStatus[] = [];
 	for (const line of text.split("\n")) {
