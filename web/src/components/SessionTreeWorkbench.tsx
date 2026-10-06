@@ -1,3 +1,5 @@
+import { ToolOutputDownload } from "./ToolOutputDownload";
+import { getClientId } from "../use-chat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiGitBranch, FiX, FiChevronRight, FiChevronDown, FiTag, FiCopy, FiArchive } from "react-icons/fi";
 import type { ClientMessage, TreeFilterMode, TreeRequest, TreeResponse, UiState, UiTreeNode } from "../types";
@@ -18,7 +20,7 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 	const [navigate, setNavigate] = useState<Navigate>();
 	const [preview, setPreview] = useState<number>();
 	const [label, setLabel] = useState<{ id: string; value: string }>();
-	const [content, setContent] = useState<{ id: string; text: string }>();
+	const [content, setContent] = useState<{ id: string; text: string; toolCallId?: string }>();
 	const [error, setError] = useState("");
 	const [waiting, setWaiting] = useState(false);
 	const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 	}, [request]);
 	const choose = useCallback((targetId: string, quick = false) => {
 		const current = stateRef.current;
-		if (!current || current.tree?.externallyModified) return;
+		if (!current || current.tree?.verifying || current.tree?.externallyModified) return;
 		const intent: Navigate = { targetId, summary: "none", customInstructions: "", abortRunning: false };
 		if ((quick || current.tree?.skipSummaryPrompt) && !current.isStreaming) { execute(intent); return; }
 		setNavigate(intent); setPreview(undefined); setError("");
@@ -84,8 +86,8 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 			if (message.type === "tree" && message.reqId === getId.current) { setNodes(message.nodes); setTruncated(message.truncated); setLoading(false); }
 			if (message.type === "tree_preview_result" && message.reqId === previewId.current) setPreview(message.entryCount);
 			if (message.type === "tree_content_result") {
-				if (action?.copy) void navigator.clipboard.writeText(message.content).catch(() => setContent({ id: message.entryId, text: message.content }));
-				else setContent({ id: message.entryId, text: message.content });
+				if (action?.copy) void navigator.clipboard.writeText(message.content).catch(() => setContent({ id: message.entryId, text: message.content, toolCallId: message.toolCallId }));
+				else setContent({ id: message.entryId, text: message.content, toolCallId: message.toolCallId });
 			}
 			if (message.type === "tree_navigate_result") {
 				const isMutation = message.reqId === mutationId.current;
@@ -110,12 +112,13 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 		});
 	}, [nodes, folded]);
 	const mutate = (message: TreeRequest) => { setWaiting(true); setError(""); request(message); };
-	const disabled = !connected || waiting || state?.tree?.busy || state?.tree?.externallyModified;
+	const disabled = !connected || waiting || state?.tree?.busy || state?.tree?.verifying || state?.tree?.externallyModified;
 	const context = () => ({ conversationId: state?.conversationId ?? "", reqId: randomUuid() });
 	return <>
 		{open && <aside className="session-tree-panel" aria-label={t("treeTitle")}>
 			<header><FiGitBranch /><h2>{t(mode === "fork" ? "treeFork" : "treeTitle")}</h2><button onClick={() => setOpen(false)} aria-label={t("close")}><FiX /></button></header>
 			<div className="session-tree-controls"><select aria-label={t("treeFilter")} value={mode === "fork" ? "user-only" : filter} disabled={mode === "fork"} onChange={e => setFilter(e.target.value as TreeFilterMode)}>{(["default", "no-tools", "user-only", "labeled-only", "all"] as const).map(value => <option key={value} value={value}>{t(`treeFilter_${value}`)}</option>)}</select><input aria-label={t("treeSearch")} placeholder={t("treeSearch")} value={query} onChange={e => setQuery(e.target.value)} /></div>
+			{state?.tree?.verifying && <div role="status">{t("treeVerifying")}</div>}
 			{state?.tree?.externallyModified && <div className="tree-warning" role="alert"><p>{t("treeExternal")}</p><button disabled={!connected || waiting || state.isStreaming} onClick={() => mutate({ type: "session_reopen", ...context() })}>{t("treeReopen")}</button></div>}
 			{error && <p role="alert" className="tree-warning">{error}</p>}
 			{truncated && <p className="tree-warning">{t("treeTruncated")}</p>}
@@ -131,7 +134,7 @@ export function SessionTreeWorkbench({ state, connected, send }: { state: UiStat
 		</aside>}
 		{!open && error && <div className="tree-floating-error" role="alert">{error}<button onClick={() => setError("")} aria-label={t("close")}><FiX /></button></div>}
 		{navigate && !waiting && <div className="tree-modal-backdrop"><section className="tree-dialog" role="dialog" aria-modal="true" aria-label={t("treeNavigate")}><h3>{t("treeNavigate")}</h3>{preview !== undefined && <p>{t("treePreviewCount", { n: preview })}</p>}{(["none", "default", "custom"] as const).map(value => <label key={value}><input type="radio" name="tree-summary" value={value} checked={navigate.summary === value} disabled={waiting} onChange={() => setNavigate({ ...navigate, summary: value })} />{t(`treeSummary_${value}`)}</label>)}{navigate.summary === "custom" && <textarea aria-label={t("treeInstructions")} placeholder={t("treeInstructions")} value={navigate.customInstructions} onChange={e => setNavigate({ ...navigate, customInstructions: e.target.value })} />}{state?.isStreaming && <label><input type="checkbox" checked={navigate.abortRunning} onChange={e => setNavigate({ ...navigate, abortRunning: e.target.checked })} />{t("treeStopConfirm")}</label>}{error && <p role="alert">{error}</p>}<div className="tree-dialog-actions"><button disabled={waiting} onClick={() => setNavigate(undefined)}>{t("cancel")}</button><button className="primary" disabled={disabled || (!!state?.isStreaming && !navigate.abortRunning)} onClick={() => execute(navigate)}>{t("treeNavigate")}</button></div></section></div>}
-		{label && <div className="tree-modal-backdrop"><form className="tree-dialog" role="dialog" aria-modal="true" aria-label={t("treeLabel")} onSubmit={event => { event.preventDefault(); mutate({ type: "tree_label", ...context(), entryId: label.id, label: label.value.trim() || null }); }}><h3>{t("treeLabel")}</h3><input autoFocus maxLength={200} aria-label={t("treeLabel")} value={label.value} onChange={e => setLabel({ ...label, value: e.target.value })} /><p>{t("treeLabelClear")}</p>{error && <p role="alert">{error}</p>}<div className="tree-dialog-actions"><button type="button" onClick={() => setLabel(undefined)}>{t("cancel")}</button><button className="primary" disabled={waiting || !connected || state?.tree?.externallyModified}>{t("save")}</button></div></form></div>}
-		{content && <div className="tree-modal-backdrop"><section className="tree-dialog tree-content-dialog" role="dialog" aria-modal="true" aria-label={t("treeContent")}><h3>{t("treeContent")}</h3><pre>{content.text}</pre><button onClick={() => setContent(undefined)}>{t("close")}</button></section></div>}
+		{label && <div className="tree-modal-backdrop"><form className="tree-dialog" role="dialog" aria-modal="true" aria-label={t("treeLabel")} onSubmit={event => { event.preventDefault(); mutate({ type: "tree_label", ...context(), entryId: label.id, label: label.value.trim() || null }); }}><h3>{t("treeLabel")}</h3><input autoFocus maxLength={200} aria-label={t("treeLabel")} value={label.value} onChange={e => setLabel({ ...label, value: e.target.value })} /><p>{t("treeLabelClear")}</p>{error && <p role="alert">{error}</p>}<div className="tree-dialog-actions"><button type="button" onClick={() => setLabel(undefined)}>{t("cancel")}</button><button className="primary" disabled={waiting || !connected || state?.tree?.verifying || state?.tree?.externallyModified}>{t("save")}</button></div></form></div>}
+		{content && <div className="tree-modal-backdrop"><section className="tree-dialog tree-content-dialog" role="dialog" aria-modal="true" aria-label={t("treeContent")}><h3>{t("treeContent")}</h3><pre>{content.text}</pre>{content.toolCallId && state && <ToolOutputDownload url={`/api/tool-output?${new URLSearchParams({ clientId: getClientId(), conversationId: state.conversationId, toolCallId: content.toolCallId })}`} />}<button onClick={() => setContent(undefined)}>{t("close")}</button></section></div>}
 	</>;
 }

@@ -109,6 +109,7 @@ export interface UiTreeState {
 	filterMode: TreeFilterMode;
 	skipSummaryPrompt: boolean;
 	externallyModified: boolean;
+	verifying: boolean;
 	busy: boolean;
 }
 export type TreeRequest =
@@ -124,9 +125,9 @@ export type TreeResponse =
 	| { type: "tree"; conversationId: string; reqId: string; revision: string; leafId: string | null; nodes: UiTreeNode[]; truncated: boolean }
 	| { type: "tree_changed"; conversationId: string; revision: string; branchPoints: number }
 	| { type: "tree_open"; conversationId: string; mode: "tree" | "fork" }
-	| { type: "tree_content_result"; conversationId: string; reqId: string; entryId: string; content: string }
+	| { type: "tree_content_result"; conversationId: string; reqId: string; entryId: string; content: string; toolCallId?: string }
 	| { type: "tree_preview_result"; conversationId: string; reqId: string; entryCount?: number; commonAncestorId?: string | null }
-	| { type: "tree_navigate_result"; conversationId: string; reqId: string; status: "ok" | "cancelled" | "aborted" | "busy" | "error"; editorText?: string; restoredQueue?: { steering: string[]; followUp: string[] }; error?: string };
+	| { type: "tree_navigate_result"; conversationId: string; reqId: string; status: "ok" | "cancelled" | "aborted" | "busy" | "error"; editorText?: string; restoredQueue?: { steering: string[]; followUp: string[]; images?: { data: string; mimeType: string }[] }; error?: string };
 
 export interface UiMessage {
 	entryId?: string;
@@ -209,7 +210,8 @@ export interface UiModelInfo {
 /** remainingMs is sampled by the server; deadline is filled locally by the browser only. */
 export interface UiRecovery {
 	branch?: { id: string };
-	compaction?: { id: string; reason: "manual" | "threshold" | "overflow" };
+	compaction?: { id: string; reason: "manual" | "threshold" | "overflow"; tokensBefore?: number };
+	lastCompaction?: { id: string; reason: "manual" | "threshold" | "overflow"; status: "completed" | "aborted" | "error"; tokensBefore?: number; tokensAfter?: number; error?: string };
 	retry?: { id: string; phase: "waiting" | "running"; attempt: number; maxAttempts: number; remainingMs?: number; deadline?: number; error: string };
 	summary?: { id: string; source: "compaction" | "branchSummary"; phase: "waiting" | "running"; attempt?: number; maxAttempts?: number; remainingMs?: number; deadline?: number; error?: string };
 }
@@ -381,6 +383,8 @@ export interface NativeCodemodeSettings { version: string; path: string; mode: "
 export interface NativeMcpConfigState { path: string; paths?: { global: string; project: string }; scope: "global" | "project"; version: string; document: Record<string, unknown>; trusted: boolean; inheritedAutoEnableCodemode?: boolean; }
 
 export type ClientMessage =
+	| { type: "recall_queue"; conversationId: string; requestId: string }
+	| { type: "queue_recall_ack"; conversationId: string; requestId: string }
 	| TreeRequest
 	| { type: "native_mcp_request"; requestId: string; cwd: string; scope: "global" | "project"; action: "get" | "save" | "trust" | "command" | "radius" | "codemode" | "log"; codemode?: { mode: "on" | "only"; inlineBudget: number }; version?: string; document?: Record<string, unknown>; command?: "status" | "login" | "logout" | "reconnect"; name?: string }
 	| { type: "node_request"; requestId: string; action: string; nodeId?: string; terminalId?: string; conversationId?: string; payload?: Record<string, unknown> }
@@ -962,6 +966,7 @@ export interface UiSettingsState {
 	extensions: UiExtensionInfo[];
 }
 export type ServerMessage =
+	| { type: "queue_recalled"; conversationId: string; requestId: string; text: string; images: { data: string; mimeType: string }[] }
 	| TreeResponse
 	| { type: "native_mcp_result"; requestId: string; cwd: string; state?: NativeMcpConfigState; error?: string; pending?: boolean; tools?: string[]; toolInfo?: NativeMcpTool[]; servers?: NativeMcpServerStatus[]; statusText?: string; codemode?: NativeCodemodeSettings; log?: string }
 	| { type: "node_event"; requestId?: string; event: string; nodeId?: string; terminalId?: string; conversationId?: string; data?: Record<string, unknown>; error?: string }

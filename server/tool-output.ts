@@ -15,14 +15,14 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
-/** Open only a transcript-referenced workspace file or native bash spill file. */
+/** Open only a transcript-referenced workspace file or native bash/MCP/codemode spill file. */
 export async function openToolOutput(cwd: string, path: string) {
 	const root = await realpath(cwd);
 	const candidate = resolve(cwd, path);
 	const canonical = await realpath(candidate);
 	const rel = relative(root, canonical);
 	const workspace = rel !== ".." && !rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) && !isAbsolute(rel);
-	const temporary = dirname(canonical) === await realpath(tmpdir()) && /^pi-bash-[a-f0-9]{16}\.log$/.test(basename(canonical));
+	const temporary = dirname(canonical) === await realpath(tmpdir()) && /^pi-(?:bash-[a-f0-9]{16}\.log|(?:mcp|codemode)-[a-f0-9]{16}\.txt)$/.test(basename(canonical));
 	if (!workspace && !temporary) throw new Error("Output unavailable");
 	if ((await lstat(candidate)).isSymbolicLink()) throw new Error("Output unavailable");
 	const handle = await open(canonical, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));

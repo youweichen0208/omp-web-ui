@@ -5,17 +5,23 @@ import type { UiRecovery } from "./protocol.js";
 export type RecoveryState = Omit<UiRecovery, "retry"> & { retry?: NonNullable<UiRecovery["retry"]> & { deadline: number } };
 
 /** Compaction and its summary retry have independent lifetimes. */
-export function recoveryEvent(state: RecoveryState, event: AgentSessionEvent, now = Date.now()): RecoveryState {
+export function recoveryEvent(state: RecoveryState, event: AgentSessionEvent, now = Date.now(), contextTokens?: number): RecoveryState {
 	switch (event.type) {
-		case "compaction_start": return { ...state, compaction: { id: randomUUID(), reason: event.reason } };
-		case "compaction_end": return { ...state, compaction: undefined };
+		case "compaction_start": return { ...state, lastCompaction: undefined, compaction: { id: randomUUID(), reason: event.reason, tokensBefore: contextTokens } };
+		case "compaction_end": return { ...state, compaction: undefined, lastCompaction: {
+			id: state.compaction?.id ?? randomUUID(), reason: event.reason,
+			status: event.aborted ? "aborted" : event.result ? "completed" : "error",
+			tokensBefore: event.result?.tokensBefore ?? state.compaction?.tokensBefore,
+			tokensAfter: event.result && !event.aborted ? contextTokens : undefined,
+			error: event.errorMessage?.slice(0, 500),
+		} };
 		case "auto_retry_start": return { ...state, retry: { id: randomUUID(), phase: "waiting", attempt: event.attempt, maxAttempts: event.maxAttempts, deadline: now + event.delayMs, error: event.errorMessage.slice(0, 500) } };
 		case "agent_start": return state.retry ? { ...state, retry: { ...state.retry, phase: "running" } } : state;
 		case "auto_retry_end": return { ...state, retry: undefined };
 		case "summarization_retry_scheduled": return { ...state, summary: { id: randomUUID(), source: state.compaction ? "compaction" : "branchSummary", phase: "waiting", attempt: event.attempt, maxAttempts: event.maxAttempts, deadline: now + event.delayMs, error: event.errorMessage.slice(0, 500) } };
 		case "summarization_retry_attempt_start": return { ...state, summary: { ...state.summary, id: state.summary?.id ?? randomUUID(), source: event.source, phase: "running", deadline: undefined } };
 		case "summarization_retry_finished": return { ...state, summary: undefined };
-		case "agent_settled": return state.branch ? { branch: state.branch } : {};
+		case "agent_settled": return { ...(state.branch ? { branch: state.branch } : {}), ...(state.lastCompaction ? { lastCompaction: state.lastCompaction } : {}) };
 		default: return state;
 	}
 }

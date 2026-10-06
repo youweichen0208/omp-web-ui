@@ -1,3 +1,4 @@
+import { ToolOutputDownload } from "./ToolOutputDownload";
 import { withToken } from "../auth-token";
 import { CodemodeCard } from "./CodemodeCard";
 
@@ -457,14 +458,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				</details>)}
 				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
 			</details>}
-			{view.result?.toolOutputUrl && <button className="btn" onClick={() => void (async () => {
-				try {
-					const response = await fetch(withToken(view.result!.toolOutputUrl!));
-					if (!response.ok) throw new Error(t("toolOutputUnavailable"));
-					const url = URL.createObjectURL(await response.blob());
-					const link = document.createElement("a"); link.href = url; link.download = "bash-output.log"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-				} catch { window.alert(t("toolOutputUnavailable")); }
-			})()}>{t("toolOutputDownload")}</button>}
+			{view.result?.toolOutputUrl && <ToolOutputDownload url={view.result.toolOutputUrl} />}
 			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("downloadImage")}</a></div>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">

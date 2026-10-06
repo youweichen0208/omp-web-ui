@@ -12,7 +12,7 @@
 | `reference` | 仅路径 | 发 `<file path="..." size="..."/>`，模型按需用 read 工具读 |
 | `lines` | 选中行 | 发 `<file path="..." lines="2-3">```选中行```</file>`，只读该范围（读取上限 2MB，超限降级 reference） |
 
-附件作为独立 custom message（`prompt-delivery.ts` 在 SDK 预检通过后入队的 file asides）发送，渲染成可折叠卡片。客户端 `stripFileWrapper` 的正则要兼容 `lines="..."` 属性。
+新附件与问题合并为一条原生用户输入，图片通过 SDK images 参数发送。历史独立 custom file 卡片仍可渲染和编辑恢复；其 `stripFileWrapper` 正则兼容 `lines="..."` 属性。
 
 **消息序列化缓存按 `role:timestamp` 为 key——同一 prompt 的多个 aside 同毫秒创建会碰撞，必须靠内容指纹（`contentFingerprint`）区分，否则只有第一个渲染（已修，勿回退）。**
 
@@ -81,3 +81,7 @@ Wiki 使用同一个富文本编辑器的专用编辑态：自动保存、H1–H
 ### bash 完整输出
 
 工具结果下载使用独立 `/api/tool-output`，浏览器只提供客户端/对话/工具调用 ID。受鉴权的服务端查找原生结果引用并校验普通文件及真实路径，允许工作区或 SDK 临时输出；清理后返回不可用。详细边界与测试见 architecture-core.md。
+
+## 原生队列中的附件
+
+协议 v38 起，新发送的文件上下文与问题合并为同一条原生用户消息，图片使用 prompt 的 images 参数，避免 one-at-a-time 模式下附件落到另一轮。新消息的编辑文本包含其冻结文件内容；原生用户图片及历史独立附件卡继续恢复。附件构建仍执行原有工作区、大小、编辑器快照与上传路径校验。撤回全部待发消息通过草稿保护回填原始文本和 WebUI 图片，详见核心架构的待发撤回章节。

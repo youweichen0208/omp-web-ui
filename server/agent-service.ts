@@ -1,8 +1,10 @@
+import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import { SessionTreeController } from "./session-tree-controller.js";
 import { SessionBranchCounts } from "./session-file-read.js";
 import type { TreeRequest } from "./protocol.js";
 import { createHash, randomUUID } from "node:crypto";
 import { recoveryEvent, isRecovering, recoverySnapshot, type RecoveryState } from "./recovery-state.js";
+import { Readable } from "node:stream";
 import { openToolOutput } from "./tool-output.js";
 import { nativeToolDetails, toolExitCode } from "./serialize.js";
 import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
@@ -16,7 +18,7 @@ import { ProviderAuthService } from "./provider-auth.js";
 import { packageManagerFor, updateTargets, checkComponents, componentRestartRequired, updateComponentPackage } from "./component-updates.js";
 import { toolOutputUpdate } from "./tool-output.js";
 import { ThinkingTimings, ThinkingDurationStore } from "./thinking-timing.js";
-import { deliverPrompt } from "./prompt-delivery.js";
+import { deliverPrompt, recallPending } from "./prompt-delivery.js";
 import type { PromptAttachment } from "./protocol.js";
 import { validateEditorSnapshots } from "./editor-snapshot.js";
 
@@ -804,6 +806,7 @@ export class ClientSession {
 	/** Add a socket to this client's broadcast set; flushes buffered startup notices. */
 	attachSink(send: (msg: ServerMessage) => void): void {
 		this.sinks.add(send);
+		for (const result of this.recalledQueues.values()) send(result);
 
 		this.providerAuth.replay();
 		for (const conv of this.convs.values()) {
@@ -942,7 +945,8 @@ export class ClientSession {
 	/** Cancel every watchdog of a conversation (removeConversation / dispose). */
 
 	private onEvent(conv: Conversation, event: AgentSessionEvent): void {
-		conv.recovery = recoveryEvent(conv.recovery, event);
+		const contextTokens = event.type === "compaction_start" ? conv.session.getContextUsage()?.tokens ?? undefined : event.type === "compaction_end" && event.result ? conv.session.messages.reduce((total, message) => total + estimateTokens(message), 0) : undefined;
+		conv.recovery = recoveryEvent(conv.recovery, event, Date.now(), contextTokens);
 		if (event.type === "agent_settled" || event.type === "message_end") conv.tree?.refresh();
 
 		// Any SDK event proves the run is alive — feeds the stall watchdog below.
@@ -1035,8 +1039,8 @@ export class ClientSession {
 				break;
 			}
 			case "queue_update":
-				conv.queueSteering = [...event.steering];
-				conv.queueFollowUp = [...event.followUp];
+				conv.queueSteering = event.steering.map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
+				conv.queueFollowUp = event.followUp.map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
 				break;
 			// A run finished or a new entry was persisted — keep the session list fresh
 			// (new chat + first message, completed turns, compaction, etc.).
@@ -1191,7 +1195,7 @@ export class ClientSession {
 		const measured = conv.thinkingTimings.annotate(serializeMessage(m, seq), m.timestamp ?? 0);
 		const msg = this.thinkingDurationStore.annotate(measured, conv.session.sessionFile, m.timestamp ?? 0);
 		if (msg) {
-			if (m.role === "toolResult" && typeof nativeToolDetails(m.toolName, m)?.fullOutputPath === "string") msg.toolOutputUrl = `/api/tool-output?${new URLSearchParams({ clientId: this.clientId, conversationId: conv.id, toolCallId: m.toolCallId })}`;
+			if (m.role === "toolResult") msg.toolOutputUrl = `/api/tool-output?${new URLSearchParams({ clientId: this.clientId, conversationId: conv.id, toolCallId: m.toolCallId })}`;
 			conv.uiMessageCache.set(cacheKey, msg);
 			// Bound the cache (marathon sessions otherwise grow without limit;
 			// single messages can reach TEXT_CAP = 200K chars). Map iteration is
@@ -1404,12 +1408,33 @@ export class ClientSession {
 		this.flushSnapshot();
 	}
 
+	private readonly recalledQueues = new Map<string, Extract<ServerMessage, { type: "queue_recalled" }>>();
+	acknowledgeQueueRecall(conversationId: string, requestId: string): void {
+		if (this.recalledQueues.get(requestId)?.conversationId === conversationId) this.recalledQueues.delete(requestId);
+	}
+	recallQueue(conversationId: string, requestId: string): void {
+		const conv = this.convs.get(conversationId);
+		if (!conv || conversationId !== this.activeId) return;
+		const previous = this.recalledQueues.get(requestId);
+		if (previous) { this.emit(previous); return; }
+		if (this.recalledQueues.size >= 8) { this.emitNotice("warning", "请先接收已撤回的消息，再继续撤回。"); return; }
+		const restored = recallPending(conv.session);
+		const result: Extract<ServerMessage, { type: "queue_recalled" }> = { type: "queue_recalled", conversationId, requestId, text: [...restored.steering, ...restored.followUp].join("\n\n"), images: restored.images };
+		this.recalledQueues.set(requestId, result);
+		this.emit(result);
+		this.flushSnapshot();
+	}
+
 	async downloadToolOutput(conversationId: string, toolCallId: string) {
 		const conv = this.convs.get(conversationId);
-		const result = conv?.session.messages.find(m => m.role === "toolResult" && m.toolCallId === toolCallId && m.toolName === "bash");
-		const path = result && nativeToolDetails("bash", result)?.fullOutputPath;
-		if (!conv || typeof path !== "string") throw new Error("Output unavailable");
-		return openToolOutput(conv.cwd, path);
+		if (!conv) throw new Error("Output unavailable");
+		// Context projection omits pre-compaction records. Native entries retain them.
+		const result = conv.session.sessionManager.getEntries().flatMap(entry => entry.type === "message" && entry.message.role === "toolResult" && entry.message.toolCallId === toolCallId ? [entry.message] : []).at(-1)
+			?? conv.session.messages.find(m => m.role === "toolResult" && m.toolCallId === toolCallId);
+		if (!result || result.role !== "toolResult") throw new Error("Output unavailable");
+		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
+		if (typeof path === "string") return openToolOutput(conv.cwd, path);
+		return { createReadStream: () => Readable.from(result.content.filter(part => part.type === "text").map(part => part.text + "\n")) };
 	}
 
 	resolveDialog(conversationId: string, id: string, value: string | boolean | null): void {
@@ -1900,8 +1925,7 @@ export class ClientSession {
 				conv.title = temporary.length > 30 ? `${temporary.slice(0, 30)}…` : temporary;
 				this.emitConversations();
 			}
-			// Attach files as independent context messages (asides) so the
-			// user message stays clean; they render as separate attachment cards.
+			// Bundle file context with the question as one native queue item.
 			const asides = await buildAttachmentMessages(
 				{
 					cwd: this.cwd,
@@ -2758,9 +2782,12 @@ export class ClientSession {
 				? { type: "session_fork", ...context, entryId, position: "before" }
 				: { type: "tree_navigate", ...context, targetId: entryId, summary: "none" }, result => { status = result; });
 			if (status !== "ok" || this.conv !== conv) return;
+			await conv.tree?.waitForVerification();
 			if (newSession && prevModel && this.sharedModelRuntime) {
 				try { await conv.session.setModel(prevModel); } catch { /* Keep the runtime default if unavailable. */ }
 			}
+			await conv.tree?.waitForVerification();
+			if (this.conv !== conv) return;
 			await this.prompt(trimmed, attachments);
 			if (newSession) this.emit({
 				type: "notice",

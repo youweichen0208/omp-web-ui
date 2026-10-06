@@ -1173,9 +1173,13 @@ export function useChat() {
 						} });
 						const restored = [...(msg.restoredQueue?.steering ?? []), ...(msg.restoredQueue?.followUp ?? [])];
 						if (msg.editorText && !msg.reqId.startsWith("edit-")) restored.push(msg.editorText);
-						queueTreeDraft({ id: msg.reqId, conversationId: msg.conversationId, text: restored.join("\n\n") });
+						queueTreeDraft({ id: msg.reqId, conversationId: msg.conversationId, text: restored.join("\n\n"), images: msg.restoredQueue?.images });
 					}
 					emitTreeResponse(msg);
+					break;
+				case "queue_recalled":
+					queueTreeDraft({ id: msg.requestId, conversationId: msg.conversationId, text: msg.text, images: msg.images });
+					ws.send(JSON.stringify({ type: "queue_recall_ack", conversationId: msg.conversationId, requestId: msg.requestId }));
 					break;
 				case "extension_editor":
 					queueExtensionEditor(msg);

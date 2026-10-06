@@ -196,7 +196,7 @@ app.get("/api/tool-output", async (req, res) => {
 		const cs = service.get(clientId);
 		if (!cs) throw new Error("Output unavailable");
 		const handle = await cs.downloadToolOutput(conversationId, toolCallId);
-		res.attachment("bash-output.log");
+		res.attachment("tool-output.txt");
 		const stream = handle.createReadStream();
 		res.on("close", () => stream.destroy());
 		stream.on("error", () => res.destroy());
@@ -728,6 +728,10 @@ wss.on("connection", (ws) => {
 			case "check_update":
 				void cs.checkUpdate();
 				break;
+			case "queue_recall_ack":
+				cs.acknowledgeQueueRecall(msg.conversationId, msg.requestId); break;
+			case "recall_queue":
+				cs.recallQueue(msg.conversationId, msg.requestId); break;
 			case "cancel_recovery":
 				cs.cancelRecovery(msg.conversationId, msg.operationId); break;
 			case "set_run_settings":

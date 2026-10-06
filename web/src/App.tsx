@@ -1,3 +1,4 @@
+import { randomUuid } from "./uuid";
 import { SessionTreeWorkbench } from "./components/SessionTreeWorkbench";
 import { RecoveryStatus } from "./components/RecoveryStatus";
 import { LinkedText } from "./components/LinkedText";
@@ -63,7 +64,6 @@ import { skillAwarePreview } from "./skill-block";
 import { FiAlertCircle, FiAlertTriangle, FiInfo, FiX } from "react-icons/fi";
 import type { Notice } from "./use-chat";
 import { fileToProcessedImage, isRasterImage, type ProcessedImage } from "./image-paste";
-import { randomUuid } from "./uuid";
 import { keepNonPreviewAttachments } from "./preview-attachments";
 import {
 	loadSoundSettings,
@@ -1013,6 +1013,8 @@ export function App() {
 								contextSaver={contextSaver}
 								stats={conversationState?.stats}
 								promptResult={chat.promptResult}
+								verifying={conversationState?.tree?.verifying}
+								pendingCount={(conversationState?.queue.steering.length ?? 0) + (conversationState?.queue.followUp.length ?? 0)}
 								send={send}
 								ready={chat.ready && !!conversationState && !(view === "chat" && (wikiPending || wikiConversationMatches))}
 								streaming={conversationState?.isStreaming ?? false}

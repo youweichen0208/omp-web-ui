@@ -1,3 +1,4 @@
+import { recallPending } from "./prompt-delivery.js";
 import { SessionTailValidator } from "./session-file-read.js";
 import { randomUUID } from "node:crypto";
 import { existsSync, watch, type FSWatcher } from "node:fs";
@@ -38,8 +39,9 @@ export class SessionTreeController {
 		const path = this.session.sessionFile;
 		if (path === this.watchPath) return;
 		this.watcher?.close(); this.watcher = undefined;
+		this.validator?.dispose();
 		this.watchPath = path; this.external = false; this.revision = "";
-		this.validator = path ? new SessionTailValidator(path, this.session.sessionManager) : undefined;
+		this.validator = path ? new SessionTailValidator(path, this.session.sessionManager, () => { this.checkExternal(); this.host.changed(); }) : undefined;
 		if (path && existsSync(dirname(path))) {
 			this.watcher = watch(dirname(path), { persistent: false }, (_event, file) => {
 				if (!file || file.toString() === basename(path)) this.checkExternal();
@@ -50,18 +52,28 @@ export class SessionTreeController {
 	}
 	checkExternal(): void {
 		if (!this.watchPath || this.external) return;
-		if (this.validator?.check(this.session.sessionManager)) return;
+		const valid = this.validator?.check(this.session.sessionManager);
+		if (valid === undefined) { this.host.changed(); return; }
+		if (valid) return;
 		this.external = true;
 		if (!this.session.isIdle) void this.session.abort().catch(() => {});
 		this.host.changed();
 	}
+	async waitForVerification(): Promise<void> {
+		const validator = this.validator, session = this.session;
+		await validator?.verify(session.sessionManager);
+		if (this.validator !== validator || this.session !== session) throw new Error("对话已切换，请重新操作。");
+		this.assertWritable();
+	}
 	assertWritable(): void {
 		this.checkExternal();
 		if (this.external) throw new Error("会话文件已被外部修改，请重新打开后继续。");
+		if (this.validator?.checking) throw new Error("正在校验会话文件，请稍后重试。");
 		if (this.operation) throw new Error("等待当前压缩或切换完成。");
 	}
 	refresh(): UiTreeState {
 		this.bindFile();
+		this.checkExternal();
 		const sm = this.session.sessionManager;
 		const revision = treeRevision(sm);
 		if (revision !== this.revision) {
@@ -72,7 +84,7 @@ export class SessionTreeController {
 			this.revision = revision;
 			this.host.emit({ type: "tree_changed", conversationId: this.host.conversationId, revision, branchPoints: tree.branchPoints });
 		}
-		return { revision, leafId: sm.getLeafId(), ...this.counts, filterMode: this.session.settingsManager.getTreeFilterMode(), skipSummaryPrompt: this.session.settingsManager.getBranchSummarySkipPrompt(), externallyModified: this.external, busy: this.operation || this.session.isCompacting };
+		return { revision, leafId: sm.getLeafId(), ...this.counts, filterMode: this.session.settingsManager.getTreeFilterMode(), skipSummaryPrompt: this.session.settingsManager.getBranchSummarySkipPrompt(), externallyModified: this.external, verifying: this.validator?.checking ?? false, busy: this.operation || this.session.isCompacting };
 	}
 	decorate(message: UiMessage, entryId?: string): UiMessage {
 		if (!entryId) return message;
@@ -86,7 +98,7 @@ export class SessionTreeController {
 	}
 	async request(request: TreeRequest, onResult?: (status: string) => void): Promise<void> {
 		const context = { conversationId: this.host.conversationId, reqId: request.reqId };
-		let restoredQueue: { steering: string[]; followUp: string[] } | undefined;
+		let restoredQueue: { steering: string[]; followUp: string[]; images?: { data: string; mimeType: string }[] } | undefined;
 		let ownsOperation = false;
 		const reply = (status: "ok" | "cancelled" | "aborted" | "busy" | "error", extra: { editorText?: string; error?: string } = {}) => { onResult?.(status); this.host.emit({ type: "tree_navigate_result", ...context, status, restoredQueue, ...extra }); };
 		const session = this.session;
@@ -97,6 +109,7 @@ export class SessionTreeController {
 				if (!this.host.active() || this.session !== session) throw new Error("对话已切换，请重新操作。");
 				this.checkExternal();
 				if (this.external) throw new Error("会话文件已被外部修改，请重新打开后继续。");
+				if (this.validator?.checking) throw new Error("正在校验会话文件，请稍后重试。");
 			};
 			if (request.type === "tree_get") {
 				const filter = request.filter ?? session.settingsManager.getTreeFilterMode();
@@ -107,7 +120,7 @@ export class SessionTreeController {
 			if (request.type === "tree_content") {
 				const entry = sm.getEntry(request.entryId);
 				if (!entry) throw new Error("Entry not found");
-				this.host.emit({ type: "tree_content_result", ...context, entryId: entry.id, content: treeEntryContent(entry) }); return;
+				this.host.emit({ type: "tree_content_result", ...context, entryId: entry.id, content: treeEntryContent(entry), toolCallId: entry.type === "message" && entry.message.role === "toolResult" ? entry.message.toolCallId : undefined }); return;
 			}
 			if (request.type === "tree_preview") {
 				if (!sm.getEntry(request.targetId)) throw new Error("Entry not found");
@@ -141,8 +154,9 @@ export class SessionTreeController {
 				if (!sm.getEntry(request.targetId)) throw new Error("Entry not found");
 				if (!["none", "default", "custom"].includes(request.summary)) throw new Error("Invalid summary mode");
 				if (!session.isIdle) {
-					restoredQueue = session.clearQueue();
+					restoredQueue = recallPending(session);
 					await session.abort(); // SDK abort waits for idle / agent_settled, not agent_end.
+					await this.validator?.verify(sm); // Validate the final records written by our own abort.
 					validate();
 					if (!session.isIdle) { reply("busy"); return; }
 				}
@@ -165,5 +179,5 @@ export class SessionTreeController {
 			this.refresh(); this.host.changed();
 		}
 	}
-	dispose(): void { this.watcher?.close(); this.watcher = undefined; }
+	dispose(): void { this.validator?.dispose(); this.watcher?.close(); this.watcher = undefined; }
 }

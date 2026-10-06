@@ -57,10 +57,11 @@ async function connect() {
 	ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
 	ws.on("message", raw => { const m = JSON.parse(raw); wire.push(m); if (m.type === "snapshot") state = m.state; if (m.type === "snapshot_delta" && state) state = { ...state, ...m.state, messages: [...state.messages, ...m.appended] }; });
 	await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
-	send({ type: "hello", clientId: "tree-test", protocolVersion: 37 }); send({ type: "get_state" });
+	send({ type: "hello", clientId: "tree-test", protocolVersion: 38 }); send({ type: "get_state" });
 	await wait(() => state);
 }
 async function request(type, fields = {}) {
+	if (!["tree_get", "tree_content", "tree_preview", "session_reopen"].includes(type)) await wait(() => !state.tree?.verifying);
 	const reqId = `test-${++sequence}`;
 	const start = wire.length;
 	send({ type, reqId, conversationId: state.conversationId, ...fields });
@@ -69,9 +70,10 @@ async function request(type, fields = {}) {
 	return result;
 }
 async function prompt(text) {
+	await wait(() => !state.tree?.verifying);
 	const count = state.messages.length;
 	send({ type: "prompt", text });
-	await wait(() => state.messages.length > count && state.messages.at(-1)?.role === "assistant" && !state.isStreaming);
+	await wait(() => state.messages.length > count && state.messages.at(-1)?.role === "assistant" && !state.isStreaming && !state.tree?.verifying);
 }
 function entries() { return readFileSync(state.sessionFile, "utf8").trim().split("\n").map(JSON.parse); }
 try {
@@ -129,6 +131,8 @@ try {
 	await wait(() => state.isStreaming);
 	// Metadata-only changes must not abort a live response or turn it read-only.
 	utimesSync(originalFile, new Date(), new Date(Date.now() + 10000));
+	await sleep(100);
+	await wait(() => !state.tree?.verifying);
 	result = await request("tree_label", { entryId: rootAnswer, label: "after-touch" });
 	assert.equal(result.status, "ok");
 	await sleep(150);
@@ -160,13 +164,13 @@ try {
 	holdNext = true; send({ type: "prompt", text: "held before external write" });
 	await wait(() => state.isStreaming);
 	const cli = SessionManager.open(originalFile); cli.appendLabelChange(rootAnswer, "from-cli");
-	await wait(() => state.tree.externallyModified && !state.isStreaming);
+	await wait(() => state.tree.externallyModified && !state.isStreaming && !state.tree?.verifying);
 	result = await request("tree_label", { entryId: rootAnswer, label: "blocked" }); assert.equal(result.status, "error");
 	const externalLength = readFileSync(originalFile).length;
 	send({ type: "rename_session", path: originalFile, name: "blocked rename" });
 	await wait(() => wire.some(m => m.type === "notice" && m.text.includes("重命名会话失败")));
 	assert.equal(readFileSync(originalFile).length, externalLength);
-	result = await request("session_reopen"); assert.equal(result.status, "ok"); await wait(() => !state.tree.externallyModified);
+	result = await request("session_reopen"); assert.equal(result.status, "ok"); await wait(() => !state.tree.externallyModified && !state.tree.verifying);
 	result = await request("tree_get", { filter: "labeled-only", query: "from-cli" }); assert(result.nodes.some(n => n.id === rootAnswer));
 	result = await request("session_clone"); assert.equal(result.status, "ok"); await wait(() => state.sessionFile !== originalFile);
 	assert.equal(entries()[0].parentSession, originalFile);
@@ -233,6 +237,18 @@ try {
 		send({ type: "edit_message", conversationId: state.conversationId, messageId: busyEdit.id, entryId: busyEdit.entryId, text: "blocked edit" });
 		await page.getByText("编辑重问暂不可用，请等待当前回复、压缩或切换完成。", { exact: true }).waitFor();
 		send({ type: "cancel_recovery", conversationId: state.conversationId, operationId: state.recovery.compaction.id }); await wait(() => !state.recovery?.compaction);
+		await wait(() => !state.tree?.verifying);
+		holdNext = true; send({ type: "prompt", text: "browser held reply" }); await wait(() => state.isStreaming && !state.tree?.verifying);
+		send({ type: "prompt", text: "browser recalled question", queue: true }); await wait(() => state.queue.followUp.length === 1);
+		await page.locator(".inputbox textarea").fill("existing draft");
+		await page.locator(".recall-queue:visible").click();
+		await page.waitForSelector(".tree-draft-restore");
+		assert.equal(await page.locator(".inputbox textarea").inputValue(), "existing draft");
+		await page.getByRole("button", { name: "追加到草稿" }).click();
+		assert((await page.locator(".inputbox textarea").inputValue()).includes("browser recalled question"));
+		await wait(() => state.queue.followUp.length === 0);
+		await request("tree_navigate", { targetId: rootAnswer, summary: "none", abortRunning: true });
+		assert(!state.messages.some(m => m.role === "user" && m.content.some(b => b.text === "browser recalled question")));
 		await page.screenshot({ path: "/tmp/pi-session-tree-browser.png", fullPage: true });
 	}
 	// Both the explicit secondary action and the saved preference retain file forks.

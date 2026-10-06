@@ -1,5 +1,7 @@
-import { closeSync, fstatSync, openSync, readSync, statSync, type Stats } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { statSync, type Stats } from "node:fs";
+import { open, readFile, stat, type FileHandle } from "node:fs/promises";
+import { setImmediate as yieldLoop } from "node:timers/promises";
+import { Worker } from "node:worker_threads";
 import { StringDecoder } from "node:string_decoder";
 import { isDeepStrictEqual } from "node:util";
 import { parseSessionEntries, type SessionManager } from "@earendil-works/pi-coding-agent";
@@ -13,22 +15,52 @@ export class SessionTailValidator {
 	private previous?: Stats;
 	private verified = new Set<string>();
 	private invalid = false;
+	private missing = false;
+	private disposed = false;
+	private pending?: Promise<boolean>;
+	private worker?: Worker;
+	get checking() { return !!this.pending; }
+	dispose() { this.disposed = true; void this.worker?.terminate(); }
+	async ready(): Promise<boolean> { return this.pending ?? !this.invalid; }
+	async verify(source: Source): Promise<boolean> { return this.check(source) ?? this.ready(); }
 	/** Includes baseline I/O; callers can measure subsequent reads by subtracting the initial value. */
 	bytesRead = 0;
-	constructor(private path: string, source: Source) {
+	constructor(private path: string, source: Source, private changed: () => void = () => {}) {
 		this.check(source);
 	}
-	check(source: Source): boolean {
-		if (this.invalid) return false;
-		const valid = this.validate(source);
-		this.invalid = !valid;
-		return valid;
-	}
-	private validate(source: Source): boolean {
-		let fd: number | undefined;
-		let observed = false;
+	check(source: Source): boolean | undefined {
+		if (this.invalid || this.disposed) return false;
+		if (this.pending) return undefined;
 		try {
 			const current = statSync(this.path);
+			if (this.previous && stamp(this.previous) === stamp(current)) return true;
+		} catch (error) { if (this.missing && (error as NodeJS.ErrnoException).code === "ENOENT") return true; }
+		const finish = (valid: boolean) => {
+			this.pending = undefined;
+			if (this.disposed) return false;
+			this.invalid = !valid;
+			this.changed();
+			return valid;
+		};
+		this.pending = this.validate(source).then(finish, () => finish(false));
+		return undefined;
+	}
+	private compareInWorker(request: { text: string } | { native: unknown }): Promise<{ id?: unknown; equal?: boolean }> {
+		const worker = this.worker ??= new Worker(new URL(import.meta.url.endsWith(".ts") ? "./session-record-worker.ts" : "./session-record-worker.js", import.meta.url), { execArgv: process.execArgv.filter(arg => !arg.startsWith("--watch")) });
+		return new Promise((resolve, reject) => {
+			const cleanup = () => { worker.off("message", message); worker.off("error", failed); worker.off("exit", exited); };
+			const failed = (error: Error) => { cleanup(); reject(error); };
+			const exited = () => failed(new Error("Record validation cancelled"));
+			const message = (result: { id?: unknown; equal?: boolean; error?: boolean }) => { cleanup(); if (result.error) reject(new Error("Invalid session record")); else resolve(result); };
+			worker.once("message", message); worker.once("error", failed); worker.once("exit", exited);
+			worker.postMessage(request);
+		});
+	}
+	private async validate(source: Source): Promise<boolean> {
+		let handle: FileHandle | undefined;
+		let observed = false;
+		try {
+			const current = await stat(this.path);
 			observed = true;
 			const previous = this.previous;
 			if (previous && stamp(previous) === stamp(current)) return true;
@@ -38,47 +70,69 @@ export class SessionTailValidator {
 			const expected = full ? [source.getHeader(), ...source.getEntries()] : undefined;
 			const added = new Set<string>();
 			let index = 0;
-			const accept = (line: string): boolean => {
+			const accept = async (line: string): Promise<boolean> => {
 				if (!line.trim()) return true;
-				const entry = JSON.parse(line);
-				if (full) {
-					if (!matches(expected![index], entry)) return false;
-				} else if (!matches(source.getEntry(entry.id), entry) || this.verified.has(entry.id)) return false;
+				let id: unknown, equal: boolean;
+				if (line.length > 256 * 1024) {
+					({ id } = await this.compareInWorker({ text: line }));
+					const native = full ? expected![index] : typeof id === "string" ? source.getEntry(id) : undefined;
+					equal = (await this.compareInWorker({ native })).equal === true;
+				} else {
+					const entry = JSON.parse(line); id = entry?.id;
+					equal = matches(full ? expected![index] : typeof id === "string" ? source.getEntry(id) : undefined, entry);
+				}
+				if (!equal || (!full && typeof id === "string" && this.verified.has(id))) return false;
 				if (!(full && index === 0)) {
-					if (typeof entry.id !== "string" || added.has(entry.id)) return false;
-					added.add(entry.id);
+					if (typeof id !== "string" || added.has(id)) return false;
+					added.add(id);
 				}
 				index++;
 				return true;
 			};
-			fd = openSync(this.path, "r");
-			if (stamp(fstatSync(fd)) !== stamp(current)) return false;
+			handle = await open(this.path, "r");
+			const opened = await handle.stat();
+			if (stamp(opened) !== stamp(current)) {
+				if (opened.ino !== current.ino || opened.dev !== current.dev || opened.size < current.size) return false;
+				await handle.close(); handle = undefined;
+				return this.disposed ? false : this.validate(source);
+			}
 			const buffer = Buffer.alloc(64 * 1024), decoder = new StringDecoder("utf8");
 			let position = offset;
 			let fragments: string[] = [];
 			while (position < current.size) {
-				const n = readSync(fd, buffer, 0, Math.min(buffer.length, current.size - position), position);
+				if (this.disposed) return false;
+				const { bytesRead: n } = await handle.read(buffer, 0, Math.min(buffer.length, current.size - position), position);
 				if (!n) return false;
 				position += n; this.bytesRead += n;
 				const text = decoder.write(buffer.subarray(0, n));
 				let start = 0, newline: number;
 				while ((newline = text.indexOf("\n", start)) !== -1) {
 					fragments.push(text.slice(start, newline));
-					if (!accept(fragments.join(""))) return false;
+					if (!await accept(fragments.join(""))) return false;
 					fragments = [];
 					start = newline + 1;
 				}
 				if (start < text.length) fragments.push(text.slice(start));
+				await yieldLoop();
+			}
+			const after = await stat(this.path);
+			if (stamp(await handle.stat()) !== stamp(current) || stamp(after) !== stamp(current)) {
+				if (after.ino !== current.ino || after.dev !== current.dev || after.size < current.size) return false;
+				await handle.close(); handle = undefined;
+				// Native writes may continue during metadata verification. Retry against
+				// the new snapshot instead of treating our own append as a conflict.
+				return this.disposed ? false : this.validate(source);
 			}
 			if (decoder.end() || fragments.length || !index || (expected && index !== expected.length)) return false;
-			if (stamp(fstatSync(fd)) !== stamp(current) || stamp(statSync(this.path)) !== stamp(current)) return false;
 			if (full) this.verified = added;
 			else for (const id of added) this.verified.add(id);
 			this.previous = current;
+			this.missing = false;
 			return true;
 		} catch (error) {
-			return !observed && !this.previous && (error as NodeJS.ErrnoException).code === "ENOENT";
-		} finally { if (fd !== undefined) closeSync(fd); }
+			this.missing = !observed && !this.previous && (error as NodeJS.ErrnoException).code === "ENOENT";
+			return this.missing;
+		} finally { await handle?.close(); if (this.worker) { const worker = this.worker; this.worker = undefined; await worker.terminate(); } }
 	}
 }
 

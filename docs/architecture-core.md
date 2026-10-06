@@ -116,9 +116,9 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 
 ### 原生工具结果与下载
 
-serialize.ts 仅投影 edit 的 diff/firstChangedLine，以及 bash 的退出码、截断摘要和完整输出路径；diff 遵守 100,000 字符上限并标记截断。todo/codemode 保留专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
+serialize.ts 投影 edit 的 diff/firstChangedLine、bash 的退出码和截断摘要，以及工具结果的完整输出路径；diff 遵守 100,000 字符上限并标记截断。todo/codemode 保留专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
 
-`/api/tool-output` 受通用口令鉴权，参数仅为 clientId/conversationId/toolCallId。服务端从该对话权威 transcript 查找 bash 引用，只打开工作区内普通文件或系统临时目录的原生 `pi-bash-<16 hex>.log`；验证真实路径与文件类型，拒绝符号链接逃逸。下载使用已验证的文件句柄；已清理/不可用返回 404。浏览器不提供文件路径。
+`/api/tool-output` 受通用口令鉴权，参数仅为 clientId/conversationId/toolCallId。服务端从该对话原生 SessionManager 全部条目查找工具结果，覆盖压缩前及分支历史；有溢出文件引用时，只打开工作区内普通文件或系统临时目录的原生 `pi-bash-<16 hex>.log`、`pi-mcp-<16 hex>.txt`、`pi-codemode-<16 hex>.txt`；验证真实路径与文件类型，拒绝符号链接逃逸。下载使用已验证的文件句柄；已清理/不可用返回 404。浏览器不提供文件路径。没有溢出文件引用时下载会话里原始文本块，保留未截断的正文；引用文件已删除时明确返回不可用，不把截断正文冒充完整输出。普通工具、Codemode 卡片和树节点全文面板共用下载按钮。
 
 `snapshot` 里 `streamingMessage` 是进行中的消息（60ms 粒度流式），`messages` 是已落盘的。
 
@@ -155,6 +155,16 @@ Wiki 复用当前工作区，使用原生内存会话，离开后释放，不写
 
 ## 原生会话树
 
-协议 v37 的树投影、原地切换、摘要与取消、label、编辑重问、派生、外部修改检测和草稿保护见 [会话树架构](architecture-session-tree.md)。原生 JSONL 是唯一事实来源，树请求按活动对话和 reqId 归属。
+协议 v38 的树投影、原地切换、摘要与取消、label、编辑重问、派生、外部修改检测和草稿保护见 [会话树架构](architecture-session-tree.md)。原生 JSONL 是唯一事实来源，树请求按活动对话和 reqId 归属。
 
 重试倒计时：服务端仅内部保留 deadline，快照通过 `recoverySnapshot` 采样 remainingMs，不下发绝对时间。浏览器接收完整或增量快照时，用 performance.now() 建立本地截止时间；重连重新采样，不依赖两端系统时钟一致。
+
+### 待发撤回与附件分组（协议 v38）
+
+每个问题及其文件上下文合为一条原生用户输入，图片通过 SDK prompt(images) 附加；尊重用户的 steeringMode/followUpMode，不直接改写 agent 队列模式。扩展命令保留原始文本并交由 SDK 拦截。历史独立 custom file 卡片继续兼容；新消息编辑时保留问题内部的文件上下文及图片。队列快照每条仅展示前 2000 字符，取回内容使用原生完整文本。
+
+输入框的“撤回全部待发消息”发送 conversationId/requestId，服务端只允许活动对话调用公开 clearQueue，不中断当前回复。公开 SDK 无单条删除接口，暂不提供单条撤回。宿主仅临时跟踪尚未消费的 WebUI 图片，以便与原生返回文本一起恢复；不建立第二套运行队列。结果 queue_recalled 经现有草稿保护选择替换、追加或保留，并按对话隔离；浏览器确认 queue_recall_ack 前服务端保留结果，断线重连重放，同一 requestId 幂等。内存待确认结果最多 8 份，达到上限拒绝新的撤回，避免丢失此前取回内容。
+
+### 压缩结果展示
+
+压缩状态展示 manual/threshold/overflow 的本地化原因及可用的压缩前 token 数。compaction_end 保留 completed/aborted/error 结果供快照与重连恢复；成功时以前置 result.tokensBefore 和 SDK estimateTokens 对重建后上下文的估算展示变化，压缩后数值标记 ≈。取消或失败不展示虚假的压缩后数值。完成结果不是恢复中，不提供取消按钮，可在浏览器关闭提示。SDK agent_settled 仍是运行结束的唯一判据。

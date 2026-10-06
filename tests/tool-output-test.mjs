@@ -1,6 +1,7 @@
 // Native truncated output survives transcript reload and is downloaded by identity, never a browser path.
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -19,6 +20,13 @@ const manager = SessionManager.create(cwd);
 manager.appendMessage({ role: "user", content: "fixture", timestamp: 1 });
 manager.appendMessage({ role: "assistant", content: [{ type: "toolCall", id: "large", name: "bash", arguments: { command: "fixture" } }], api: "openai-completions", provider: "fixture", model: "fixture", stopReason: "toolUse", timestamp: 2, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } });
 manager.appendMessage({ role: "toolResult", toolCallId: "large", toolName: "bash", isError: false, timestamp: 3, ...output });
+const spillPaths = [join(tmpdir(), `pi-mcp-${randomBytes(8).toString("hex")}.txt`), join(tmpdir(), `pi-codemode-${randomBytes(8).toString("hex")}.txt`)];
+for (const [i, toolName] of ["mcp__fixture__large", "codemode"].entries()) {
+ writeFileSync(spillPaths[i], "full " + toolName);
+ manager.appendMessage({ role: "toolResult", toolCallId: toolName, toolName, isError: false, timestamp: 4 + i, content: [{ type: "text", text: "truncated" }], details: { fullOutputPath: spillPaths[i] } });
+}
+const kept = manager.appendMessage({ role: "user", content: "after compaction", timestamp: 6 });
+manager.appendCompaction("summary", kept, 9000);
 const token = "fixture-token";
 const server = spawn(process.execPath, ["dist/server/index.js"], { env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(root, "data"), PI_CODING_AGENT_DIR: agent, PI_WEB_TOKEN: token }, stdio: ["ignore", "pipe", "pipe"] });
 let logs = ""; server.stderr.on("data", d => logs += d); server.stdout.on("data", () => {});
@@ -28,14 +36,35 @@ try {
  ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
  const snapshot = new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error(logs)), 10000); ws.on("message", raw => { const m = JSON.parse(raw); if (m.type === "snapshot") { clearTimeout(timer); resolve(m.state); } }); });
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 37 }));
+ ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 38 }));
  const state = await snapshot;
- const result = state.messages.find(m => m.toolCallId === "large");
- assert.equal(result.details.exitCode, 0); assert.equal(result.details.fullOutputPath, path);
- const url = `http://127.0.0.1:${port}${result.toolOutputUrl}`;
+ assert(!state.messages.some(m => m.toolCallId === "large"));
+ const url = `http://127.0.0.1:${port}/api/tool-output?${new URLSearchParams({ clientId: "download-test", conversationId: state.conversationId, toolCallId: "large" })}`;
  assert.equal((await fetch(url)).status, 401);
  const headers = { Authorization: `Bearer ${token}` };
  assert.equal(await (await fetch(url, { headers })).text(), "output-line\n".repeat(10000));
+ for (const tool of ["mcp__fixture__large", "codemode"]) assert.equal(await (await fetch(url.replace("toolCallId=large", "toolCallId=" + tool), { headers })).text(), "full " + tool);
+ if (process.argv.includes("--browser")) {
+  const { chromium } = await import("playwright-core");
+  const { CHROME_PATH } = await import("./lib/chrome.mjs");
+  const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
+  try {
+   const page = await browser.newPage();
+   await page.addInitScript(() => sessionStorage.setItem("pi-web-client-id", "download-test"));
+   await page.goto(`http://127.0.0.1:${port}/?token=${token}`);
+   await page.locator(".setup-modal .modal-close").click();
+   await page.getByRole("button", { name: "会话树", exact: true }).click();
+   await page.getByRole("combobox", { name: "过滤节点" }).selectOption("all");
+   for (const toolCallId of ["large", "mcp__fixture__large", "codemode"]) {
+    const entry = manager.getEntries().find(e => e.type === "message" && e.message.role === "toolResult" && e.message.toolCallId === toolCallId);
+    await page.locator(`[data-entry-id="${entry.id}"] .tree-node-preview`).click();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "下载完整输出", exact: true }).click();
+    assert.equal(readFileSync(await (await downloaded).path(), "utf8"), toolCallId === "large" ? "output-line\n".repeat(10000) : "full " + toolCallId);
+    await page.locator(".tree-content-dialog").getByRole("button", { name: "关闭", exact: true }).click();
+   }
+  } finally { await browser.close(); }
+ }
  assert.equal((await fetch(url.replace("toolCallId=large", "toolCallId=forged") + `&path=${encodeURIComponent(path)}`, { headers })).status, 404);
  assert.equal((await fetch(url.replace("conversationId=" + state.conversationId, "conversationId=forged"), { headers })).status, 404);
  rmSync(path); assert.equal((await fetch(url, { headers })).status, 404);
@@ -43,4 +72,4 @@ try {
  assert.equal((await fetch(url, { headers })).status, 404);
  console.log("PASS authenticated native full output download, restored transcript, identity checks, cleanup and symlink rejection");
 } catch (error) { console.error(error); process.exitCode = 1; }
-finally { ws?.close(); const exit = new Promise(resolve => server.once("exit", resolve)); server.kill(); await exit; rmSync(path, { force: true }); rmSync(root, { recursive: true, force: true }); }
+finally { ws?.close(); const exit = new Promise(resolve => server.once("exit", resolve)); server.kill(); await exit; rmSync(path, { force: true }); for (const spill of spillPaths) rmSync(spill, { force: true }); rmSync(root, { recursive: true, force: true }); }

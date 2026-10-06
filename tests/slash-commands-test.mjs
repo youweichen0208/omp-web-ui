@@ -198,7 +198,8 @@ async function main() {
 	console.log("[6] /help intercepted, no SDK leak");
 
 	// --- 6. /new resets the current conversation and emits its summary ---
-	c.send({ type: "prompt", text: "/new" });
+	c.send({ type: "prompt", text: "/new", requestId: "new-command" });
+	await c.wait(m => m.type === "prompt_result" && m.requestId === "new-command");
 	const newChat = await c.wait((m) => m.type === "conversations", 6000);
 	if (!newChat.activeId) {
 		throw new Error("FAIL: /new did not emit the current conversation");
@@ -206,6 +207,10 @@ async function main() {
 	console.log(`[7] /new → active conversation ${newChat.activeId.slice(0, 8)}…`);
 
 	// --- 8. /reload re-discovers resources and re-pushes the catalog ---
+	// Like the browser, wait for the newly bound file's asynchronous validation
+	// before issuing a command that can write settings/session entries.
+	c.send({ type: "get_state" });
+	await c.wait(m => (m.type === "snapshot" || m.type === "snapshot_delta") && norm(m.state?.cwd ?? "") === norm(TMP_CWD) && m.state?.tree?.verifying === false);
 	const reloadRequestId = `reload-${Date.now()}`;
 	c.send({ type: "prompt", text: "/reload", requestId: reloadRequestId });
 	const running = await c.wait((m) => m.type === "reload_status" && m.requestId === reloadRequestId && m.phase === "running", 8000);

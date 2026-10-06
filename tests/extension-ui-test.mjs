@@ -42,7 +42,7 @@ async function connect() {
  ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
  ws.on("message", raw => wire.push(JSON.parse(raw)));
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 37 });
+ send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 38 });
  await wait(m => m.type === "ready");
 }
 try {
@@ -146,9 +146,14 @@ try {
   assert(sent.some(m => m.type === "cancel_recovery" && m.operationId === "summary-retry" && m.conversationId === a));
   assert.equal(sent.filter(m => m.type === "retry_silent_prompt").length, beforeRetry);
   browserSocket.send(JSON.stringify({ type: "snapshot", state: { ...recoveryState, rev: recoveryState.rev + 1, recovery: { compaction: recoveryState.recovery.compaction } } }));
-  await page.getByText("正在压缩", { exact: true }).waitFor();
+  await page.getByText(/正在压缩.*上下文超限/).waitFor();
   browserSocket.send(JSON.stringify({ type: "snapshot", state: { ...snapshot, rev: recoveryState.rev + 2, recovery: {} } }));
-  await page.getByText("正在压缩", { exact: true }).waitFor({ state: "hidden" });
+  await page.getByText(/正在压缩/).waitFor({ state: "hidden" });
+  browserSocket.send(JSON.stringify({ type: "snapshot", state: { ...snapshot, rev: recoveryState.rev + 3, recovery: { lastCompaction: { id: "completed", reason: "manual", status: "completed", tokensBefore: 8000, tokensAfter: 400 } } } }));
+  await page.getByText(/压缩完成.*手动压缩.*8,000.*≈400/).waitFor();
+  assert.equal(await page.locator('.agent-silence button', { hasText: "取消" }).count(), 0);
+  await page.locator('.agent-silence button', { hasText: "关闭" }).click();
+  await page.getByText(/压缩完成/).waitFor({ state: "hidden" });
  }
  console.log("PASS native extension UI isolation, validation, reconnect, timeout, reload, override command and memory settings" + (browser ? ", browser multiline editor, background navigation and recovery phases" : ""));
 } catch (error) { console.error(error); process.exitCode = 1; }

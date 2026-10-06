@@ -1,56 +1,64 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { ImageContent } from "@earendil-works/pi-ai";
 
 type Aside = { message: Parameters<AgentSession["sendCustomMessage"]>[0] };
-const groupedSessions = new WeakSet<AgentSession>();
+type Pending = { text: string; images: ImageContent[] };
+const imagesBySession = new WeakMap<AgentSession, { steering: Pending[]; followUp: Pending[] }>();
 
-/** nextTurn is not consumed by steer/followUp. Queue file cards only after
- * SDK preflight succeeds, alongside their question, and drain them together. */
-export async function deliverPrompt(
-	session: AgentSession, text: string, asides: Aside[], queue: boolean,
-	acknowledge: (ok: boolean) => void,
-): Promise<void> {
-	let unsubscribeStart: (() => void) | undefined;
-	const enqueue = (followUp: boolean) => {
-		if (!asides.length) return;
-		if (!groupedSessions.has(session)) {
-			groupedSessions.add(session);
-			const { steeringMode, followUpMode } = session.agent;
-			session.agent.steeringMode = "all";
-			session.agent.followUpMode = "all";
-			const unsubscribe = session.subscribe((event) => {
-				if (event.type !== "agent_settled") return;
-				session.agent.steeringMode = steeringMode;
-				session.agent.followUpMode = followUpMode;
-				groupedSessions.delete(session);
-				unsubscribe();
-			});
-		}
-		for (const aside of asides) {
-			const message = { ...aside.message, role: "custom" as const, timestamp: Date.now() };
-			if (followUp) session.agent.followUp(message);
-			else session.agent.steer(message);
-		}
+/** A question and its attachments occupy ONE native queue item. Never override
+ * the user's queue modes or enqueue context that could reach another prompt. */
+export function promptWithAttachments(text: string, asides: Aside[]) {
+	const content = asides.flatMap(({ message }) => typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content);
+	// Native skill/template parsing separates the command from arguments with a
+	// literal space. Keep that separator when attaching context to a bare command.
+	const question = content.some(block => block.type === "text") && /^\/\S+$/.test(text) ? `${text} ` : text;
+	return {
+		text: [question, ...content.flatMap(block => block.type === "text" ? [block.text] : [])].join("\n\n"),
+		images: content.filter((block): block is ImageContent => block.type === "image"),
 	};
-	try {
-		await session.prompt(text, {
-			streamingBehavior: queue ? "followUp" : "steer",
-			preflightResult: (disposition) => {
-				const ok = disposition !== "handled";
-				if (ok && asides.length) {
-					if (session.isStreaming) enqueue(queue);
-					else {
-						// Normal prompts start the loop after preflight. The first queue
-						// poll is after their user message; extension-only commands do
-						// not start a loop and must not leave stale file context behind.
-						unsubscribeStart = session.subscribe((event) => {
-							if (event.type !== "agent_start") return;
-							unsubscribeStart?.();
-							enqueue(false);
-						});
-					}
+}
+
+export async function deliverPrompt(session: AgentSession, text: string, asides: Aside[], queue: boolean, acknowledge: (ok: boolean) => void): Promise<void> {
+	// Extension commands run immediately and own their input/turn. Preserve the
+	// original command text instead of turning attachments into command arguments.
+	const command = text.startsWith("/") ? session.extensionRunner.getCommand(text.slice(1).split(/\s/, 1)[0]) : undefined;
+	const input = promptWithAttachments(text, command ? [] : asides);
+	let pending = imagesBySession.get(session);
+	if (!pending) {
+		pending = { steering: [], followUp: [] }; imagesBySession.set(session, pending);
+		const records = pending;
+		const unsubscribe = session.subscribe(event => {
+			if (event.type === "queue_update") {
+				// SDK consumes the first matching text. Keep the remaining suffix
+				// for duplicate prompts, including prompts without image attachments.
+				for (const lane of ["steering", "followUp"] as const) {
+					const counts = new Map<string, number>();
+					for (const text of event[lane]) counts.set(text, (counts.get(text) ?? 0) + 1);
+					records[lane] = records[lane].slice().reverse().filter(record => {
+						const count = counts.get(record.text) ?? 0; counts.set(record.text, count - 1); return count > 0;
+					}).reverse();
 				}
-				acknowledge(ok);
-			},
+			}
+			if (event.type === "agent_settled") { imagesBySession.delete(session); unsubscribe(); }
 		});
-	} finally { unsubscribeStart?.(); }
+	}
+	await session.prompt(input.text, {
+		images: input.images, streamingBehavior: queue ? "followUp" : "steer",
+		preflightResult: disposition => {
+			if (disposition === "queued") {
+				const lane = queue ? "followUp" : "steering";
+				const native = queue ? session.getFollowUpMessages() : session.getSteeringMessages();
+				const accepted = native.at(-1);
+				if (accepted !== undefined) pending![lane].push({ text: accepted, images: input.images });
+			}
+			acknowledge(disposition !== "handled");
+		},
+	});
+}
+
+/** Snapshot attachments before clearQueue emits the empty native queue. */
+export function recallPending(session: AgentSession) {
+	const pending = imagesBySession.get(session);
+	const images = pending ? [...pending.steering, ...pending.followUp].flatMap(record => record.images) : [];
+	return { ...session.clearQueue(), images };
 }

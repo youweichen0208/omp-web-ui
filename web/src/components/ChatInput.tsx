@@ -29,6 +29,8 @@ interface ChatInputProps {
 	stats?: UiState["stats"];
 	promptResult: Extract<ServerMessage, { type: "prompt_result" }> | null;
 	ready: boolean;
+	verifying?: boolean;
+	pendingCount?: number;
 	streaming: boolean;
 	silentActivity?: "model" | "tool" | null;
 	/** Persisted messages (stable reference while unchanged) — used by /copy. */
@@ -86,7 +88,7 @@ export const ChatInput = memo(function ChatInput({
 	active = true,
 	currentFile, contextReader, contextSaver,
 	stats,
-	ready, promptResult,
+	ready, promptResult, verifying, pendingCount = 0,
 	streaming,
 	silentActivity,
 	messages,
@@ -312,6 +314,7 @@ export const ChatInput = memo(function ChatInput({
 	}, [text]);
 
 	const submit = (queue = false) => {
+		if (verifying) { onNotice("info", t("treeVerifying")); return; }
 		const trimmed = text.trim();
 		const hasRawAttach = attachments.some((a) => a.imageData || a.fileData);
 		if (pendingSubmit.current || !connected || (!trimmed && !hasRawAttach)) return;
@@ -419,11 +422,12 @@ export const ChatInput = memo(function ChatInput({
 	// row); CSS hides whichever set doesn't apply at the current width.
 	const renderActions = () => (
 		<div className="inputbox-actions">
+			{pendingCount > 0 && <button type="button" className="btn recall-queue" disabled={!connected} onClick={() => send({ type: "recall_queue", conversationId: activeConversationId, requestId: randomUuid() })}>{t("recallQueue")} ({pendingCount})</button>}
 			{streaming ? (
 				<>
 					{text.trim() && <>
-						<button type="button" className="btn supplement" title={t("supplementTip")} disabled={!connected} onClick={() => submit(true)}>{t("supplement")}</button>
-						<button type="button" className="btn steer" disabled={!connected} onClick={() => submit(false)}>{t("steerSend")}</button>
+						<button type="button" className="btn supplement" title={t("supplementTip")} disabled={!connected || verifying} onClick={() => submit(true)}>{t("supplement")}</button>
+						<button type="button" className="btn steer" disabled={!connected || verifying} onClick={() => submit(false)}>{t("steerSend")}</button>
 					</>}
 					<button
 						type="button"
@@ -444,7 +448,7 @@ export const ChatInput = memo(function ChatInput({
 					className="btn send"
 					title={t("sendTip")}
 					disabled={
-						!connected ||
+						!connected || verifying ||
 						(!text.trim() &&
 							!attachments.some((a) => a.imageData || a.fileData))
 					}
@@ -552,7 +556,10 @@ export const ChatInput = memo(function ChatInput({
 					</div>
 				</div>
 			)}
-			<TreeDraftRestore conversationId={activeConversationId} active={active} text={text} replace={setText} />
+			<TreeDraftRestore conversationId={activeConversationId} active={active} text={text} replace={setText} restoreImages={images => onAddImageFiles(images.map((image, index) => {
+				const bytes = Uint8Array.from(atob(image.data), char => char.charCodeAt(0));
+				return new File([bytes], `recalled-${index}.${image.mimeType.split("/")[1] ?? "png"}`, { type: image.mimeType });
+			}))} />
 			<div className={`inputbox${text.length > 0 ? " has-draft" : ""}`}>
 			{(attachments.length > 0 || autoFile) && (
 				<div className="attach-row">
