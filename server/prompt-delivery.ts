@@ -10,7 +10,7 @@ const imagesBySession = new WeakMap<AgentSession, { steering: Pending[]; followU
  * the user's queue modes or enqueue context that could reach another prompt. */
 export function promptWithAttachments(text: string, asides: Aside[]) {
 	const content = asides.flatMap(({ message }) => typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content);
-	// Native skill/template parsing separates the command from arguments with a
+	// Native skill parsing separates the command from arguments with a
 	// literal space. Keep that separator when attaching context to a bare command.
 	const question = content.some(block => block.type === "text") && /^\/\S+$/.test(text) ? `${text} ` : text;
 	return {
@@ -23,7 +23,7 @@ export async function deliverPrompt(session: AgentSession, text: string, asides:
 	// Extension commands run immediately and own their input/turn. Preserve the
 	// original command text instead of turning attachments into command arguments.
 	const command = text.startsWith("/") ? session.extensionRunner.getCommand(text.slice(1).split(" ", 1)[0]) : undefined;
-	const template = !command && text.startsWith("/") && session.promptTemplates.some(t => t.name === text.slice(1).split(" ", 1)[0]) && asides.some(({ message }) => typeof message.content === "string" || message.content.some(b => b.type === "text"));
+	const template = !command && text.startsWith("/") && session.promptTemplates.some(t => t.name === text.slice(1).split(/\s/, 1)[0]) && asides.some(({ message }) => typeof message.content === "string" || message.content.some(b => b.type === "text"));
 	if (command) {
 		let failed = false;
 		const off = session.extensionRunner.onError(error => { if (error.event === "command") failed = true; });

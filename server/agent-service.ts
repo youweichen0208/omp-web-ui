@@ -6,7 +6,7 @@ import type { TreeRequest } from "./protocol.js";
 import { createHash, randomUUID } from "node:crypto";
 import { recoveryEvent, isRecovering, recoverySnapshot, type RecoveryState } from "./recovery-state.js";
 import { Readable } from "node:stream";
-import { openToolOutput, toolOutputManifest } from "./tool-output.js";
+import { openToolOutput, toolOutputManifest, toolOutputId } from "./tool-output.js";
 import { nativeToolDetails, toolExitCode } from "./serialize.js";
 import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
 import { parseNativeMcpStatus } from "./native-mcp-presentation.js";
@@ -1439,16 +1439,16 @@ export class ClientSession {
 		const { conv, result } = this.toolResultForDownload(conversationId, toolCallId);
 		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
 		const text = result.content.filter(part => part.type === "text").map(part => part.text).join("\n");
-		return toolOutputManifest(conv.cwd, text, typeof path === "string" ? path : undefined);
+		return toolOutputManifest(conv.cwd, result.toolName, text, typeof path === "string" ? path : undefined);
 	}
 	async downloadToolOutput(conversationId: string, toolCallId: string, outputId?: string) {
 		const { conv, result } = this.toolResultForDownload(conversationId, toolCallId);
-		if (outputId) {
+		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
+		if (outputId && !(typeof path === "string" && outputId === toolOutputId(path))) {
 			const output = (await this.listToolOutputs(conversationId, toolCallId)).find(output => output.id === outputId);
 			if (!output) throw Object.assign(new Error("Output access denied"), { code: "EACCES" });
 			return { name: output.name, handle: await openToolOutput(conv.cwd, output.path) };
 		}
-		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
 		if (typeof path === "string") return { name: path.split(/[\\/]/).pop()!, handle: await openToolOutput(conv.cwd, path) };
 		return { name: "tool-output.txt", handle: { createReadStream: () => Readable.from(result.content.filter(part => part.type === "text").map(part => part.text + "\n")) } };
 	}

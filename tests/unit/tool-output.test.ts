@@ -54,12 +54,44 @@ it("collects multiple native binary/image references from full output and preser
 		const full = join(tmpdir(), `pi-codemode-${randomBytes(8).toString("hex")}.txt`); paths.push(full);
 		const text = `[Binary resource fixture://blob (application/octet-stream, 4 B) saved to ${paths[0]}]\n` + paths.slice(1, 5).map((path, i) => `[Image saved to ${path} (image/${["png", "jpeg", "gif", "webp"][i]}, 4 B)]`).join("\n");
 		await writeFile(full, text);
-		const manifest = await toolOutputManifest(cwd, text, full);
+		const manifest = await toolOutputManifest(cwd, "codemode", text, full);
 		expect(manifest).toHaveLength(6); expect(new Set(manifest.map(o => o.id)).size).toBe(6);
 		expect(manifest.filter(o => o.default).map(o => o.path)).toEqual([full]);
-		expect((await toolOutputManifest(cwd, text)).every(o => !o.default)).toBe(true);
-		expect(await toolOutputManifest(cwd, "truncated", full)).toEqual(manifest);
+		expect((await toolOutputManifest(cwd, "codemode", text)).every(o => !o.default)).toBe(true);
+		expect(await toolOutputManifest(cwd, "codemode", "truncated", full)).toEqual(manifest);
 		await rm(paths[0]); await symlink(paths[1], paths[0]);
 		await expect(openToolOutput(cwd, paths[0])).rejects.toMatchObject({ code: "EACCES" });
 	} finally { for (const path of paths) await rm(path, { force: true }); await rm(cwd, { recursive: true, force: true }); }
+});
+
+
+it("never interprets marker-shaped Bash/PowerShell or arbitrary tool output", async () => {
+	const cwd = await mkdtemp(join(tmpdir(), "pi-log-unit-"));
+	try {
+		const full = join(cwd, "large.log");
+		const text = `[Image saved to ${join(cwd, "fake.png")} (image/png, 1 B)]`;
+		await writeFile(full, text);
+		for (const name of ["bash", "powershell", "custom-tool"]) {
+			expect(await toolOutputManifest(cwd, name, text, full)).toHaveLength(1);
+			expect(await toolOutputManifest(cwd, name, text)).toEqual([]);
+		}
+		for (const name of ["codemode", "mcp__fixture__tool", "read_mcp_resource"]) expect(await toolOutputManifest(cwd, name, text, full)).toHaveLength(2);
+	} finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+it("bounds spill scanning and preserves split UTF-8 and markers across 64 KiB reads", async () => {
+	const cwd = await mkdtemp(join(tmpdir(), "pi-scan-unit-"));
+	try {
+		const full = join(cwd, "full.txt");
+		const marker = (name: string) => `[Image saved to ${join(cwd, name)} (image/png, 1 B)]`;
+		const first = marker("你好.png"), last = marker("last.png"), outside = marker("outside.png");
+		const prefix = "x".repeat(65536 - Buffer.byteLength(first.slice(0, first.indexOf("你"))) - 1) + first + "\n";
+		const cap = 8 * 1024 * 1024;
+		await writeFile(full, prefix + "x".repeat(cap - Buffer.byteLength(prefix) - Buffer.byteLength(last)) + last + outside);
+		const manifest = await toolOutputManifest(cwd, "codemode", "", full);
+		expect(manifest.map(f => f.name)).toEqual(["full.txt", "你好.png", "last.png"]);
+		// A marker crossing the cap must not be emitted as a shortened path.
+		await writeFile(full, "x".repeat(cap - 20) + outside);
+		expect(await toolOutputManifest(cwd, "codemode", "", full)).toHaveLength(1);
+	} finally { await rm(cwd, { recursive: true, force: true }); }
 });

@@ -50,7 +50,7 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 	const { createAgentSession, DefaultResourceLoader, SettingsManager, SessionManager } = await import(pathToFileURL(join(root, 'node_modules/@earendil-works/pi-coding-agent/dist/index.js')));
 	const { createAssistantMessageEventStream } = await import(pathToFileURL(join(root, 'node_modules/@earendil-works/pi-ai/dist/index.js')));
 	const { expandNativeTemplate } = await import(pathToFileURL(join(root, 'dist/server/native-prompt-template.js')));
-	assert.equal(await expandNativeTemplate('/fixture "one two" three', [{ name: 'fixture', content: '$1 / $2', description: '', filePath: '', sourceInfo: {} }]), 'one two / three');
+	for (const separator of [' ', '\n', '\t', '\r\n']) assert.equal(await expandNativeTemplate(`/fixture${separator}"one two" three`, [{ name: 'fixture', content: '$1 / $2', description: '', filePath: '', sourceInfo: {} }]), 'one two / three');
 	const { nativeToolExtensions } = await import(pathToFileURL(join(root, 'dist/server/native-tools.js')));
 	assert.match(readFileSync(join(root, 'node_modules/@earendil-works/pi-coding-agent/docs/codemode.md'), 'utf8'), /generateImages/);
 	const cwd = process.env.PI_NATIVE_TOOLS_WORKER, agentDir = process.env.PI_CODING_AGENT_DIR;

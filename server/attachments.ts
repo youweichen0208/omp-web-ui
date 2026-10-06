@@ -20,6 +20,14 @@ import {
 } from "./text-sniff.js";
 import { saveUpload, uploadsRoot } from "./uploads.js";
 
+/** Keep the outer fence longer than every backtick run in the frozen content. */
+function inlineFile(path: string, text: string, lines?: string): string {
+	let length = 3;
+	for (const match of text.matchAll(/`+/g)) length = Math.max(length, match[0].length + 1);
+	const fence = "`".repeat(length);
+	return `\n<file path="${path}"${lines ? ` lines="${lines}"` : ""}>\n${fence}\n${text}\n${fence}\n</file>`;
+}
+
 /** buildAttachmentMessages 所需的会话侧上下文。 */
 export interface AttachmentContext {
 	/** 当前工作区（相对路径解析根）。 */
@@ -88,7 +96,7 @@ export async function buildAttachmentMessages(
 					content: [
 						{
 							type: "text",
-							text: `\n<file path="${wirePath}">\n\`\`\`\n${decodeText(buf)}\n\`\`\`\n</file>`,
+							text: inlineFile(wirePath, decodeText(buf)),
 						},
 					],
 					display: true,
@@ -446,7 +454,7 @@ export async function buildAttachmentMessages(
 					content: [
 						{
 							type: "text",
-							text: `\n<file path="${rel}">\n\`\`\`\n${decodeText(buf)}\n\`\`\`\n</file>`,
+							text: inlineFile(rel, decodeText(buf)),
 						},
 					],
 					display: true,
@@ -522,7 +530,7 @@ export async function buildAttachmentMessages(
 					content: [
 						{
 							type: "text",
-							text: `\n<file path="${rel}" lines="${start}-${end}">\n\`\`\`\n${selected}\n\`\`\`\n</file>`,
+							text: inlineFile(rel, selected, `${start}-${end}`),
 						},
 					],
 					display: true,

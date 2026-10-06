@@ -21,6 +21,10 @@ mkdirSync(workdir, { recursive: true });
 mkdirSync(dataDir, { recursive: true });
 mkdirSync(agentDir, { recursive: true });
 
+const markdown = '# Markdown attachment\n```ts\nconst s = "a  b";\n```\n';
+writeFileSync(join(workdir, "guide.md"), markdown);
+mkdirSync(join(agentDir, "prompts"));
+writeFileSync(join(agentDir, "prompts", "review.md"), "Review carefully: $@");
 const requests = [];
 writeFileSync(join(workdir, "note.txt"), "disk original");
 assert.equal(await portUp(PORT), false);
@@ -199,7 +203,7 @@ try {
 	await client.waitForState((s) => Boolean(s.conversationId));
 	client.send({ type: "set_model", modelId: "main/switch-session-mock" });
 	await client.waitForState((s) => s.model?.id === "switch-session-mock");
-	const sendDraft = (requestId, draft, queue = false) => client.send({ type: "prompt", requestId, queue, text: requestId, attachments: [{ path: "note.txt", editorSnapshot: { cwd: workdir, text: draft, dirty: true } }] });
+	const sendDraft = (requestId, draft, queue = false) => client.send({ type: "prompt", requestId, queue, text: requestId, attachments: [{ path: "note.txt", editorSnapshot: { cwd: workdir, text: draft, dirty: true } }, { path: "guide.md", mode: "inline" }] });
 	sendDraft("normal", "DRAFT_NORMAL");
 	assert.equal((await client.waitForType("prompt_result", (m) => m.requestId === "normal")).ok, true);
 	await client.waitForMessage((m) => m.role === "assistant");
@@ -229,13 +233,16 @@ try {
 	const originalText = originalQuestion.content.filter(b => b.type === "text").map(b => b.text).join("\n");
 	assert(originalText.includes("DRAFT_NORMAL"));
 	assert.equal(originalQuestion.questionText, "normal");
-	assert.equal(originalQuestion.userAttachments.length, 1);
+	assert.equal(originalQuestion.userAttachments.length, 2);
+	assert.equal(originalQuestion.userAttachments[1].preview, markdown);
+	rmSync(join(workdir, "guide.md"));
 	rmSync(join(workdir, "note.txt"));
 	client.send({ type: "edit_message", messageId: originalQuestion.id, text: "reask original", attachments: originalQuestion.userAttachments.map(({path, mode, nativeRef}) => ({path, mode, nativeRef})) });
 	for (let n = 0; n < 200 && requests.length < 5; n++) await sleep(50);
 	assert.equal(requests.length, 5);
 	assert(JSON.stringify(requests[4]).includes("DRAFT_NORMAL"));
 	assert(!JSON.stringify(requests[4]).includes("DRAFT_FOLLOWUP"));
+	assert(JSON.stringify(requests[4]).includes(JSON.stringify(markdown).slice(1, -1)));
 	writeFileSync(join(workdir, "note.txt"), "disk changed");
 	await client.waitForState(s => !s.isStreaming && !s.tree?.verifying);
 	client.send({ type: "prompt", text: "SLOW" });
@@ -271,6 +278,19 @@ try {
 	assert(!client.received.some(m => m.type === "queue_recalled"), "acknowledged recall is not replayed");
 	assert(!JSON.stringify(requests).includes("RECALLED_DRAFT"));
 
+	writeFileSync(join(workdir, "guide.md"), markdown);
+	for (const [index, separator] of [" ", "\n", "\t", "\r\n"].entries()) {
+		const count = requests.length;
+		const requestId = `template-${index}`;
+		client.send({ type: "prompt", requestId, text: `/review${separator}"one two" three`, attachments: [{ path: "guide.md", mode: "inline" }] });
+		assert.equal((await client.waitForType("prompt_result", m => m.requestId === requestId)).ok, true);
+		for (let n = 0; n < 200 && requests.length === count; n++) await sleep(50);
+		assert.equal(requests.length, count + 1);
+		const content = requests.at(-1).messages.at(-1).content;
+		const text = typeof content === "string" ? content : content.filter(b => b.type === "text").map(b => b.text).join("\n");
+		assert(text.startsWith("Review carefully: one two three")); assert(text.includes(markdown));
+		await client.waitForState(s => !s.isStreaming && !s.tree?.verifying);
+	}
 	if (process.argv.includes("--browser")) {
 		const { chromium } = await import("playwright-core");
 		const { CHROME_PATH } = await import("./lib/chrome.mjs");
@@ -282,10 +302,13 @@ try {
 			const card = page.locator(".user-attachment-card").first();
 			await card.waitFor(); await card.locator("summary").click();
 			assert((await card.locator("pre").textContent()).includes("DRAFT_NORMAL"));
+			const markdownCard = page.locator(".user-attachment-card").nth(1);
+			await markdownCard.locator("summary").click();
+			assert.equal(await markdownCard.locator("pre").textContent(), markdown);
 			await page.getByRole("button", { name: "编辑重问", exact: true }).first().click();
 			const editor = page.locator(".msg textarea");
 			assert.equal(await editor.inputValue(), "reask original");
-			assert.equal(await page.locator(".msg-editor-img.file-chip").count(), 1);
+			assert.equal(await page.locator(".msg-editor-img.file-chip").count(), 2);
 		} finally { await browser.close(); }
 	}
 	console.log("PASS actual SDK/model protocol: ordinary, steer, followUp receive frozen editor snapshots and source; history/reask preserved; disk unchanged");

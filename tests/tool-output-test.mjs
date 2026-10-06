@@ -1,7 +1,7 @@
 // Native truncated output survives transcript reload and is downloaded by identity, never a browser path.
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
+import { randomBytes, createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, truncateSync, createReadStream } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -32,6 +32,9 @@ const binaryText = `[Binary resource fixture://data.bin (application/octet-strea
 const binaryFull = join(tmpdir(), `pi-codemode-${randomBytes(8).toString("hex")}.txt`);
 writeFileSync(binaryFull, binaryText); spillPaths.push(binaryFull);
 manager.appendMessage({ role: "toolResult", toolCallId: "multi", toolName: "codemode", isError: false, timestamp: 5, content: [{ type: "text", text: "truncated" }], details: { fullOutputPath: binaryFull } });
+const hugeLog = join(tmpdir(), `pi-bash-${randomBytes(8).toString("hex")}.log`);
+writeFileSync(hugeLog, binaryText); truncateSync(hugeLog, 600 * 1024 * 1024); spillPaths.push(hugeLog);
+for (const toolName of ["bash", "powershell"]) manager.appendMessage({ role: "toolResult", toolCallId: "huge-" + toolName, toolName, isError: false, timestamp: 5, content: [{ type: "text", text: binaryText }], structuredContent: { full_output_path: hugeLog } });
 const kept = manager.appendMessage({ role: "user", content: "after compaction", timestamp: 6 });
 manager.appendCompaction("summary", kept, 9000);
 const token = "fixture-token";
@@ -60,6 +63,22 @@ try {
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from([0, 255, 128, 10]));
  }
  assert.equal((await fetch(multiUrl + "&outputId=forged", { headers })).status, 403);
+ // The sparse 600 MiB log exceeds V8's string limit: manifest lookup must not decode it.
+ const expected = createHash("sha256");
+ for await (const chunk of createReadStream(hugeLog)) expected.update(chunk);
+ const expectedHash = expected.digest("hex");
+ for (const tool of ["bash", "powershell"]) {
+  const hugeUrl = url.replace("toolCallId=large", "toolCallId=huge-" + tool);
+  const response = await fetch(hugeUrl.replace("/api/tool-output?", "/api/tool-output-list?"), { headers });
+  assert.equal(response.status, 200);
+  const files = await response.json(); assert.equal(files.length, 1); assert(files[0].default);
+  for (const suffix of ["", "&outputId=" + files[0].id]) {
+   const download = await fetch(hugeUrl + suffix, { headers }); assert.equal(download.status, 200);
+   const hash = createHash("sha256"); let bytes = 0;
+   for await (const chunk of download.body) { bytes += chunk.length; hash.update(chunk); }
+   assert.equal(bytes, 600 * 1024 * 1024); assert.equal(hash.digest("hex"), expectedHash);
+  }
+ }
  if (process.argv.includes("--browser")) {
   const { chromium } = await import("playwright-core");
   const { CHROME_PATH } = await import("./lib/chrome.mjs");

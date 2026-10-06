@@ -46,18 +46,18 @@ test.each(["one-at-a-time", "all"] as const)("native templates expand before fro
 	try {
 		vi.spyOn(session, "isStreaming", "get").mockReturnValue(true);
 		await session.bindExtensions({});
-		for (const content of ["$@", "$1 / $2", "no arguments"]) {
+		for (const separator of [" ", "\n", "\t", "\r\n"]) for (const content of ["$@", "$1 / $2", "no arguments"]) {
 			vi.spyOn(session, "promptTemplates", "get").mockReturnValue([{ name: "fixture", content, description: "fixture", filePath: join(root, "fixture.md"), sourceInfo: { path: root, source: "fixture", scope: "user", origin: "top-level" } }]);
 			const frozen = '\n<file path="a.txt">\n```\n  "quoted"  \n$@\n```\n</file>';
 			for (const queue of [true, false]) {
-				await deliverPrompt(session, '/fixture "one two" three', [{ message: { customType: "file", display: true, content: frozen } }], queue, () => {});
+				await deliverPrompt(session, `/fixture${separator}"one two" three`, [{ message: { customType: "file", display: true, content: [{ type: "text", text: frozen }, { type: "image", mimeType: "image/png", data: "aGVsbG8=" }] } }], queue, () => {});
 				const messages = queue ? session.getFollowUpMessages() : session.getSteeringMessages();
 				expect(messages[0]).toBe((content === "$@" ? "one two three" : content === "$1 / $2" ? "one two / three" : content) + "\n\n" + frozen);
 			}
 			expect(inputs.slice(-2)).toEqual([...session.getFollowUpMessages(), ...session.getSteeringMessages()]);
-			recallPending(session);
+			expect(recallPending(session).images).toHaveLength(2);
 		}
-		expect(inputs).toHaveLength(6);
+		expect(inputs).toHaveLength(24);
 	} finally { session.dispose(); vi.restoreAllMocks(); rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -76,5 +76,11 @@ test("extension failure is acknowledged without consuming attachments or calling
 		const ack = vi.fn();
 		await deliverPrompt(session, "/fixture", [{ message: { customType: "file", display: true, content: "unconsumed" } }], false, ack);
 		expect(ack).toHaveBeenCalledExactlyOnceWith(false, false); expect(calls).toBe(1); expect(input).not.toHaveBeenCalled(); expect(session.pendingMessageCount).toBe(0);
+		vi.spyOn(session, "isStreaming", "get").mockReturnValue(true);
+		for (const separator of ["\n", "\t", "\r\n"]) {
+			await deliverPrompt(session, `/fixture${separator}args`, [{ message: { customType: "file", display: true, content: "frozen" } }], false, ack);
+			expect(recallPending(session).steering).toEqual(["must not run\n\nfrozen"]);
+		}
+		expect(calls).toBe(1); expect(input).toHaveBeenCalledTimes(3);
 	} finally { session.dispose(); vi.restoreAllMocks(); rmSync(root, { recursive: true, force: true }); }
 });

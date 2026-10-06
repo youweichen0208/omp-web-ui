@@ -11,7 +11,7 @@ export function toolOutputUpdate(partial: unknown): OutputUpdate | null {
 }
 
 import { constants } from "node:fs";
-import { lstat, open, realpath } from "node:fs/promises";
+import { lstat, open, realpath, type FileHandle } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -34,23 +34,54 @@ export async function openToolOutput(cwd: string, path: string) {
 }
 
 import { createHash } from "node:crypto";
+import { StringDecoder } from "node:string_decoder";
+
+export const toolOutputId = (path: string) => createHash("sha256").update(path).digest("hex");
 
 /** Native 1.0.3 model-facing markers, not arbitrary paths from browser requests. */
 export function outputReferences(text: string): string[] {
 	return [...text.matchAll(/\[Image saved to ([^\r\n]+?) \(image\/(?:png|jpeg|gif|webp), [^\r\n]*?\)\]|\[Binary resource [^\r\n]*? saved to ([^\r\n]+?)\]/g)].map(m => m[1] ?? m[2]);
 }
-export async function toolOutputManifest(cwd: string, text: string, fullPath?: string) {
+/** Bound I/O as well as memory; the final partial line may contain complete markers. */
+async function scanOutputReferences(handle: FileHandle): Promise<string[]> {
+	const limit = 8 * 1024 * 1024;
+	const buffer = Buffer.alloc(64 * 1024), decoder = new StringDecoder("utf8");
+	const paths: string[] = [];
+	let position = 0, fragments: string[] = [];
+	while (position < limit) {
+		const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, limit - position), position);
+		if (!bytesRead) break;
+		position += bytesRead;
+		const text = decoder.write(buffer.subarray(0, bytesRead));
+		let start = 0, newline: number;
+		while ((newline = text.indexOf("\n", start)) !== -1) {
+			fragments.push(text.slice(start, newline));
+			for (const path of outputReferences(fragments.join(""))) paths.push(path);
+			fragments = [];
+			start = newline + 1;
+		}
+		if (start < text.length) fragments.push(text.slice(start));
+	}
+	// Do not flush an incomplete UTF-8 sequence at the scan limit.
+	for (const path of outputReferences(fragments.join(""))) paths.push(path);
+	return paths;
+}
+
+export async function toolOutputManifest(cwd: string, toolName: string, text: string, fullPath?: string) {
 	const paths = new Set<string>();
 	if (fullPath) paths.add(fullPath);
-	for (const path of outputReferences(text)) paths.add(path);
-	if (fullPath) {
-		let handle;
-		try {
-			handle = await openToolOutput(cwd, fullPath);
-			for (const path of outputReferences(await handle.readFile("utf8"))) paths.add(path);
-		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-		} finally { await handle?.close(); }
+	const nativeResources = toolName === "codemode" || toolName === "read_mcp_resource" || /^mcp__.+?__.+$/.test(toolName);
+	if (nativeResources) {
+		for (const path of outputReferences(text)) paths.add(path);
+		if (fullPath) {
+			let handle;
+			try {
+				handle = await openToolOutput(cwd, fullPath);
+				for (const path of await scanOutputReferences(handle)) paths.add(path);
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+			} finally { await handle?.close(); }
+		}
 	}
-	return [...paths].map(path => ({ id: createHash("sha256").update(path).digest("hex"), name: basename(path), path, default: path === fullPath }));
+	return [...paths].map(path => ({ id: toolOutputId(path), name: basename(path), path, default: path === fullPath }));
 }

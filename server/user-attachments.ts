@@ -16,10 +16,21 @@ export function parseUserAttachments(text: string): { text: string; attachments:
 		const ref = line.match(/^<(?:file|folder) path="([^"<>]+)"(?: size="\d+")? \/>$/);
 		if (ref) { found.push({ start: i, end: i, value: { path: ref[1], mode: "reference", raw: line, preview: line } }); continue; }
 		const file = line.match(/^<file path="([^"<>]+)"(?: lines="([1-9]\d*)-([1-9]\d*)")?>$/);
-		if (file && lines[i + 1] === "```") {
-			let end = i + 2;
-			while (end < lines.length && lines[end] !== "```") end++;
-			if (lines[end + 1] !== "</file>") continue;
+		const opening = lines[i + 1];
+		if (file && /^`{3,}$/.test(opening ?? "")) {
+			const endings: number[] = [];
+			for (let j = i + 2; j < lines.length; j++) {
+				// Legacy content has no escaping. Never swallow another host block
+				// to repair a missing/ambiguous terminator in the current block.
+				if (opening === "```" && lines[j - 1] === "" && /^(?:<(?:file|folder) path="|Current editor file: )/.test(lines[j])) break;
+				if (lines[j] !== opening) continue;
+				if (lines[j + 1] === "</file>") endings.push(j);
+				// Longer fences are generated collision-free; only legacy triples
+				// need to scan beyond an embedded closing code fence.
+				if (opening !== "```") break;
+			}
+			if (endings.length !== 1) return { text, attachments: [] };
+			const end = endings[0];
 			found.push({ start: i, end: end + 1, value: { path: file[1], mode: file[2] ? "lines" : "inline", raw: "\n" + lines.slice(i, end + 2).join("\n"), preview: lines.slice(i + 2, end).join("\n") } });
 			i = end + 1; continue;
 		}
