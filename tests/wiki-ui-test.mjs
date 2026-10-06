@@ -30,7 +30,7 @@ const mock = createServer(async (req, res) => {
 		{ path: 'README.md', content: readFileSync(join(cwd, 'README.md'), 'utf8') + '\n## 隔夜持仓\n\n隔夜持仓的止损阈值按开盘价重新计算。\n' },
 		{ path: '交易系统/参数配置.md', content: '# 参数配置\n\n#风控\n\n新增 overnight_reset: true\n' },
 	];
-	const confirmation = JSON.stringify(payload.messages.filter(m => m.role === 'user')).includes('仅确认当前文档');
+	const confirmation = /仅确认当前文档|总结这篇文档/.test(JSON.stringify(payload.messages.filter(m => m.role === 'user')));
 	const chunks = confirmation ? [[{ role: 'assistant', content: '当前文档已确认。' }, null], [{}, 'stop']] : afterTools ? [[{ role: 'assistant', reasoning_content: '先核对文档范围和已完成的修改。' }, null], [{ content: '已更新两个文档。跳过 guard.py：本次未授权修改代码。' }, null], [{ content: '\n\n- **第 2 节补充建议**：可以明确仓位上限的例外。\n- **第 99 节不存在**：不应出现跳转。\n\n需要我继续吗？' }, null], [{}, 'stop']] : [[{ role: 'assistant', tool_calls: writeCalls.map((args, index) => ({ index, id: `wiki-write-${index}`, type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } })) }, null], [{}, 'tool_calls']];
 	if (!afterTools) await new Promise(r => setTimeout(r, 1200));
 	for (const [delta, finish_reason] of chunks) {
@@ -71,7 +71,7 @@ try {
 	assert.equal(await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).count(), 0);
 	await page.locator('.file-name', { hasText: 'README.md' }).click();
 	await page.locator('.wiki-document h1:visible', { hasText: '风控规则' }).waitFor();
-	assert.equal(await page.locator('.wiki-workbench').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 35, 41)');
+	assert.equal(await page.locator('.wiki-workbench').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 36, 35)');
 	assert.equal(await page.locator('.wiki-sidebar').evaluate(el => Math.round(el.getBoundingClientRect().width)), 250);
 	await page.locator('.wiki-chat-panel').waitFor();
 	assert.equal(Math.round((await page.locator('.wiki-chat-panel').boundingBox()).width), 400);
@@ -242,6 +242,7 @@ try {
 	assert((await page.locator('.wiki-chat-messages').innerText()).includes('需要我继续吗？'));
 	await page.screenshot({ path: '/tmp/pi-wiki-chat-desktop.png' });
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
+	await page.waitForFunction(() => getComputedStyle(document.querySelector('.wiki-view-tab')).backgroundColor === getComputedStyle(document.querySelector('.wiki-workbench')).backgroundColor);
 	await page.screenshot({ path: '/tmp/pi-wiki-chat-desktop-light.png' });
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'dark');
 	const previousConversation = activeConversation, previousSession = activeSnapshot.sessionId, previousFile = activeSnapshot.sessionFile;
@@ -312,6 +313,22 @@ try {
 	await page.locator('.wiki-chat-empty').waitFor();
 	await page.locator('.wiki-document-heading h1', { hasText: '风控规则' }).waitFor();
 	assert.equal(await page.locator('.wiki-chat-answer').count(), 0, 'new native conversation clears the panel');
+	assert.equal(await page.getByRole('tab', { name: 'Wiki', exact: true }).getAttribute('aria-selected'), 'true');
+	assert.equal(await page.locator('.wiki-quick-questions button').count(), 2);
+	const empty = await page.locator('.wiki-chat-empty').boundingBox(), footer = await page.locator('.wiki-chat-panel footer').boundingBox();
+	assert(footer.y - empty.y - empty.height < 60, 'empty state sits next to the composer');
+	await page.getByRole('button', { name: '发送', exact: true }).waitFor();
+	assert.equal(await page.getByRole('button', { name: '发送', exact: true }).isDisabled(), true);
+	await page.screenshot({path:'tests/scratch/brand-wiki-dark.png'});
+	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
+	await page.waitForFunction(() => getComputedStyle(document.querySelector('.wiki-view-tab')).backgroundColor === getComputedStyle(document.querySelector('.wiki-workbench')).backgroundColor);
+	await page.screenshot({path:'tests/scratch/brand-wiki-light.png'});
+	assert.equal(await page.locator('.wiki-workbench').evaluate(el => getComputedStyle(el).getPropertyValue('--wiki-accent').trim()), '#2f7aae');
+	await page.getByRole('button', {name:'总结这篇文档', exact:true}).click();
+	await page.locator('.wiki-chat-answer', {hasText:'当前文档已确认'}).waitFor();
+	const quickPrompt = JSON.stringify(requests.at(-1).messages.filter(m => m.role === 'user'));
+	assert(quickPrompt.includes('总结这篇文档') && quickPrompt.includes('README.md'));
+	assert(!quickPrompt.includes('参数配置.md'), 'quick question scope is only the current document');
 	assert(wikiConversations.length > 8, 'can browse more documents than the runtime limit');
 	assert.equal(new Set(wikiConversations).size, wikiConversations.length, 'each document navigation receives a fresh native conversation');
 	assert.deepEqual(errors, []);

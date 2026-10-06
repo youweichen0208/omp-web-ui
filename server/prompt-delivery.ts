@@ -1,3 +1,4 @@
+import { expandNativeTemplate } from "./native-prompt-template.js";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ImageContent } from "@earendil-works/pi-ai";
 
@@ -18,11 +19,18 @@ export function promptWithAttachments(text: string, asides: Aside[]) {
 	};
 }
 
-export async function deliverPrompt(session: AgentSession, text: string, asides: Aside[], queue: boolean, acknowledge: (ok: boolean) => void): Promise<void> {
+export async function deliverPrompt(session: AgentSession, text: string, asides: Aside[], queue: boolean, acknowledge: (ok: boolean, commandExecuted?: boolean) => void): Promise<void> {
 	// Extension commands run immediately and own their input/turn. Preserve the
 	// original command text instead of turning attachments into command arguments.
-	const command = text.startsWith("/") ? session.extensionRunner.getCommand(text.slice(1).split(/\s/, 1)[0]) : undefined;
-	const input = promptWithAttachments(text, command ? [] : asides);
+	const command = text.startsWith("/") ? session.extensionRunner.getCommand(text.slice(1).split(" ", 1)[0]) : undefined;
+	const template = !command && text.startsWith("/") && session.promptTemplates.some(t => t.name === text.slice(1).split(" ", 1)[0]) && asides.some(({ message }) => typeof message.content === "string" || message.content.some(b => b.type === "text"));
+	if (command) {
+		let failed = false;
+		const off = session.extensionRunner.onError(error => { if (error.event === "command") failed = true; });
+		try { await session.prompt(text); acknowledge(!failed, !failed); } finally { off(); }
+		return;
+	}
+	const input = promptWithAttachments(template ? await expandNativeTemplate(text, session.promptTemplates) : text, command ? [] : asides);
 	let pending = imagesBySession.get(session);
 	if (!pending) {
 		pending = { steering: [], followUp: [] }; imagesBySession.set(session, pending);
@@ -43,6 +51,7 @@ export async function deliverPrompt(session: AgentSession, text: string, asides:
 		});
 	}
 	await session.prompt(input.text, {
+		expandPromptTemplates: !template,
 		images: input.images, streamingBehavior: queue ? "followUp" : "steer",
 		preflightResult: disposition => {
 			if (disposition === "queued") {

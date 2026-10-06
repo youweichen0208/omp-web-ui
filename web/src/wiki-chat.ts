@@ -40,3 +40,13 @@ export function wikiSectionIndex(headings: string[], section: number): number {
 export function wikiHeadingTexts(text: string): string[] {
 	return parser.parse(text).children.flatMap(node => node.type === "heading" && node.depth === 2 ? [node.children.map(plain).join("")] : []);
 }
+
+/** Headings in code examples do not count; a parent with subsections is not empty. */
+export function wikiHasEmptySections(text: string): boolean {
+	const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+	const nodes = parser.parse(body).children;
+	return nodes.some((node, index) => {
+		const next = nodes[index + 1];
+		return node.type === "heading" && (!next || (next.type === "heading" && next.depth <= node.depth));
+	});
+}

@@ -168,11 +168,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 				{!git?.notRepo && <span className="workspace-stat-label">{t("workspaceBranch")}</span>}
 				<span className="status-branch-name">{branchLabel}</span>
 			</span>
-			<span className="status-sep">·</span>
-
-			<span className="status-item status-messages" title={t("sessionMessages")}>
-				<span className="workspace-stat-label">{t("messages")}</span><span>{current ? s.totalMessages : "—"}</span>
-			</span>
 
 			{chat.statuses.length > 0 && (
 				<>

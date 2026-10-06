@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.6 附件、输出下载与品牌对齐
+
+修复模板附件与原生队列投递、扩展命令附件保留、会话尾部校验闪烁；新增原生消息附件卡片和冻结内容重问恢复、多文件工具输出清单与二进制下载。按第 13 版设计包统一蓝色品牌、方正圆角、无底板标志与 Wiki 快捷提问。SDK 保持 1.0.3，协议升至 39。本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。说明见 `.github/release-notes/v0.99.6.md`。
+
 ## 0.99.5 会话校验与运行体验完善
 
 会话文件基线与元数据核对改为异步分块，超长记录通过 worker 校验；新增全部待发消息撤回与草稿保护，尊重原生队列模式。完整工具输出下载覆盖压缩前历史及 MCP/Codemode，压缩状态显示原因及前后 token 数。SDK 保持 1.0.3，协议升至 38。本次发布 GitHub 源码与三平台桌面 Release；说明见 `.github/release-notes/v0.99.5.md`。

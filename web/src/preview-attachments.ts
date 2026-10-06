@@ -6,6 +6,7 @@ export function keepNonPreviewAttachments<T extends {
 	isDir?: boolean;
 	imageData?: string;
 	fileData?: string;
+	nativeRef?: unknown;
 }>(items: T[]): T[] {
-	return items.filter((item) => item.mode === "lines" || item.isDir || item.imageData || item.fileData || !item.path);
+	return items.filter((item) => item.nativeRef || item.mode === "lines" || item.isDir || item.imageData || item.fileData || !item.path);
 }

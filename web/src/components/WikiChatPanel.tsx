@@ -8,8 +8,9 @@ import { ConversationWorkingStatus } from "./WorkingStatus";
 import { WikiReadingDialog } from "./WikiReading";
 import { Markdown } from "./Markdown";
 
-export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, revisions, onViewChange, onUndo, onResend, error, conversationId, thinkingWrap, connected, silenceNotified, recovery }: {
+export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, contextPercent, disabled, onNew, onClose, canJump, jump, composer, quickQuestions, onQuickQuestion, revisions, onViewChange, onUndo, onResend, error, conversationId, thinkingWrap, connected, silenceNotified, recovery }: {
 	recovery?: import("../types").UiRecovery;
+	quickQuestions: string[]; onQuickQuestion: (question: string) => void;
 	conversationId: string; thinkingWrap: boolean; connected: boolean; silenceNotified: boolean;
 	messages: UiMessage[]; live: UiMessage | null; streaming: boolean; toolStatuses: Map<string, ToolStatus>;
 	model?: UiModelInfo; contextPercent?: number | null; disabled: boolean; onNew: () => void; onClose: () => void;
@@ -54,11 +55,11 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 			if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
 			else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
 		}}>
-		<header><span className="wiki-chat-brand">π</span><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null && contextPercent > 0 ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
+		<header><img className="wiki-chat-brand" src="/brand-mark.svg" alt="" /><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null && contextPercent > 0 ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
 		{error}
-		<div className="wiki-chat-messages" ref={scroll} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
+		<div className={`wiki-chat-messages${!transcript.length ? " empty" : ""}`} ref={scroll} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
 			{transcript.length > limit && <button className="wiki-chat-earlier" onClick={() => { follow.current = false; setLimit(n => n + 60); }}>{t("wikiEarlierMessages")}</button>}
-			{!transcript.length && <p className="wiki-chat-empty">{t("wikiChatEmpty")}</p>}
+			{!transcript.length && <div className="wiki-chat-empty"><p>{t("wikiChatEmpty")}</p><div className="wiki-quick-questions">{quickQuestions.map(question => <button key={question} disabled={disabled || !connected || streaming} onClick={() => onQuickQuestion(question)}>{question}</button>)}</div></div>}
 			{transcript.slice(-limit).map(message => {
 				if (!["user", "assistant"].includes(message.role)) return null;
 				const original = message.content.filter(b => b.type === "text").map(b => "text" in b ? b.text : "").join("\n");

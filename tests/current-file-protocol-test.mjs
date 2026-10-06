@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { portUp } from "./lib/port-utils.mjs";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { realpathSync } from "node:fs";
@@ -228,12 +228,15 @@ try {
 	assert(originalQuestion);
 	const originalText = originalQuestion.content.filter(b => b.type === "text").map(b => b.text).join("\n");
 	assert(originalText.includes("DRAFT_NORMAL"));
-	client.send({ type: "edit_message", messageId: originalQuestion.id, text: originalText.replace(/^normal/, "reask original") });
+	assert.equal(originalQuestion.questionText, "normal");
+	assert.equal(originalQuestion.userAttachments.length, 1);
+	rmSync(join(workdir, "note.txt"));
+	client.send({ type: "edit_message", messageId: originalQuestion.id, text: "reask original", attachments: originalQuestion.userAttachments.map(({path, mode, nativeRef}) => ({path, mode, nativeRef})) });
 	for (let n = 0; n < 200 && requests.length < 5; n++) await sleep(50);
 	assert.equal(requests.length, 5);
 	assert(JSON.stringify(requests[4]).includes("DRAFT_NORMAL"));
 	assert(!JSON.stringify(requests[4]).includes("DRAFT_FOLLOWUP"));
-	assert.equal(readFileSync(join(workdir, "note.txt"), "utf8"), "disk original");
+	writeFileSync(join(workdir, "note.txt"), "disk changed");
 	await client.waitForState(s => !s.isStreaming && !s.tree?.verifying);
 	client.send({ type: "prompt", text: "SLOW" });
 	await client.waitForState(s => s.isStreaming);
@@ -268,10 +271,28 @@ try {
 	assert(!client.received.some(m => m.type === "queue_recalled"), "acknowledged recall is not replayed");
 	assert(!JSON.stringify(requests).includes("RECALLED_DRAFT"));
 
+	if (process.argv.includes("--browser")) {
+		const { chromium } = await import("playwright-core");
+		const { CHROME_PATH } = await import("./lib/chrome.mjs");
+		const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
+		try {
+			const page = await browser.newPage();
+			await page.addInitScript(() => sessionStorage.setItem("pi-web-client-id", "current-file-protocol"));
+			await page.goto(`http://127.0.0.1:${PORT}`);
+			const card = page.locator(".user-attachment-card").first();
+			await card.waitFor(); await card.locator("summary").click();
+			assert((await card.locator("pre").textContent()).includes("DRAFT_NORMAL"));
+			await page.getByRole("button", { name: "编辑重问", exact: true }).first().click();
+			const editor = page.locator(".msg textarea");
+			assert.equal(await editor.inputValue(), "reask original");
+			assert.equal(await page.locator(".msg-editor-img.file-chip").count(), 1);
+		} finally { await browser.close(); }
+	}
 	console.log("PASS actual SDK/model protocol: ordinary, steer, followUp receive frozen editor snapshots and source; history/reask preserved; disk unchanged");
 } finally {
 	client?.ws.close();
 	server.kill("SIGTERM");
 	await new Promise((resolve) => server.once("exit", resolve));
 	await new Promise((resolve) => mock.close(resolve));
+	rmSync(base, { recursive: true, force: true });
 }

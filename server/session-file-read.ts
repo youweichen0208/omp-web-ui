@@ -20,6 +20,8 @@ export class SessionTailValidator {
 	private pending?: Promise<boolean>;
 	private worker?: Worker;
 	get checking() { return !!this.pending; }
+	private blockingCheck = false;
+	get blocking() { return this.checking && this.blockingCheck; }
 	dispose() { this.disposed = true; void this.worker?.terminate(); }
 	async ready(): Promise<boolean> { return this.pending ?? !this.invalid; }
 	async verify(source: Source): Promise<boolean> { return this.check(source) ?? this.ready(); }
@@ -31,15 +33,17 @@ export class SessionTailValidator {
 	check(source: Source): boolean | undefined {
 		if (this.invalid || this.disposed) return false;
 		if (this.pending) return undefined;
+		this.blockingCheck = true;
 		try {
 			const current = statSync(this.path);
+			this.blockingCheck = !this.previous || current.size <= this.previous.size || current.ino !== this.previous.ino || current.dev !== this.previous.dev;
 			if (this.previous && stamp(this.previous) === stamp(current)) return true;
 		} catch (error) { if (this.missing && (error as NodeJS.ErrnoException).code === "ENOENT") return true; }
 		const finish = (valid: boolean) => {
 			this.pending = undefined;
 			if (this.disposed) return false;
 			this.invalid = !valid;
-			this.changed();
+			if (this.blockingCheck || !valid) this.changed();
 			return valid;
 		};
 		this.pending = this.validate(source).then(finish, () => finish(false));

@@ -150,6 +150,7 @@ export function TopBar({
 							<FiSettings aria-hidden="true" /><span className="workspace-menu-label">{t("allSettings")}</span>
 						</DropdownItem>
 						<div className="dd-header workspace-menu-section">{t("quickActions")}</div>
+						<DropdownItem onClick={() => { setMoreOpen(false); openSessionTree(); }}><FiGitBranch aria-hidden="true" /><span className="workspace-menu-label">{t("treeTitle")}</span></DropdownItem>
 						<DropdownItem
 							onClick={() => {
 								setMoreOpen(false);
@@ -198,7 +199,7 @@ export function TopBar({
 				>
 					<FiMenu />
 				</button>
-				<img className="brand-logo" src="/favicon.svg" alt="" />
+				<img className="brand-logo" src="/brand-mark.svg" alt="" />
 				<span className="brand-name">pi-web-ui</span>
 				{desktopAPI && (
 					<span className="desktop-window-title" title={chat.state?.cwd ?? ""}>
@@ -212,7 +213,6 @@ export function TopBar({
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
 			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
-				<button type="button" className="icon-btn" onClick={openSessionTree} title={t("treeTitle")} aria-label={t("treeTitle")}><FiGitBranch /></button>
 				<div
 					className="view-switch"
 					role="tablist"
@@ -230,6 +230,7 @@ export function TopBar({
 						<FiMessageSquare />
 						<span>{t("chat")}</span>
 					</button>
+					{view === "wiki" && <button type="button" role="tab" aria-selected="true" className="active wiki-view-tab"><span>Wiki</span></button>}
 					<button
 						type="button"
 						role="tab"

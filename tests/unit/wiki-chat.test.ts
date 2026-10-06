@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wikiReplyParts, wikiSectionIndex, wikiHeadingTexts } from "../../web/src/wiki-chat.js";
+import { wikiReplyParts, wikiSectionIndex, wikiHeadingTexts, wikiHasEmptySections } from "../../web/src/wiki-chat.js";
 
 describe("Wiki reply presentation", () => {
 	it("keeps prose and final questions around titled suggestions", () => {
@@ -25,4 +25,13 @@ describe("Wiki reply presentation", () => {
 	it("indexes rendered H2 headings, not code examples", () => {
 		expect(wikiHeadingTexts("## First **section**\n\n```md\n## Example\n```\n\nSecond\n------")).toEqual(["First section", "Second"]);
 	});
+});
+
+
+it("offers section completion only for empty headings outside code", () => {
+	expect(wikiHasEmptySections("# Title\n\n## Empty")).toBe(true);
+	expect(wikiHasEmptySections("## Empty\n\n## Full\nBody")).toBe(true);
+	expect(wikiHasEmptySections("# Title\n\n## Full\nBody")).toBe(false);
+	expect(wikiHasEmptySections("---\ntitle: Title\n---\n# Title\n\n## Full\nBody")).toBe(false);
+	expect(wikiHasEmptySections("```md\n## Example\n```" )).toBe(false);
 });

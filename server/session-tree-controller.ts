@@ -1,3 +1,4 @@
+import { parseUserAttachments } from "./user-attachments.js";
 import { recallPending } from "./prompt-delivery.js";
 import { SessionTailValidator } from "./session-file-read.js";
 import { randomUUID } from "node:crypto";
@@ -26,6 +27,7 @@ export class SessionTreeController {
 	private validator?: SessionTailValidator;
 	private external = false;
 	private operation = false;
+	private disposed = false;
 	private revision = "";
 	private counts = { branchPoints: 0, rootCount: 0 };
 	private metadata = new Map<string, Pick<UiMessage, "entryId" | "label" | "siblings">>();
@@ -52,8 +54,9 @@ export class SessionTreeController {
 	}
 	checkExternal(): void {
 		if (!this.watchPath || this.external) return;
+		const wasBlocking = this.validator?.blocking;
 		const valid = this.validator?.check(this.session.sessionManager);
-		if (valid === undefined) { this.host.changed(); return; }
+		if (valid === undefined) { if (!wasBlocking && this.validator?.blocking) this.host.changed(); return; }
 		if (valid) return;
 		this.external = true;
 		if (!this.session.isIdle) void this.session.abort().catch(() => {});
@@ -62,13 +65,13 @@ export class SessionTreeController {
 	async waitForVerification(): Promise<void> {
 		const validator = this.validator, session = this.session;
 		await validator?.verify(session.sessionManager);
-		if (this.validator !== validator || this.session !== session) throw new Error("对话已切换，请重新操作。");
+		if (this.disposed || !this.host.active() || this.validator !== validator || this.session !== session) throw new Error("对话已切换，请重新操作。");
 		this.assertWritable();
 	}
 	assertWritable(): void {
 		this.checkExternal();
 		if (this.external) throw new Error("会话文件已被外部修改，请重新打开后继续。");
-		if (this.validator?.checking) throw new Error("正在校验会话文件，请稍后重试。");
+		if (this.validator?.blocking) throw new Error("正在校验会话文件，请稍后重试。");
 		if (this.operation) throw new Error("等待当前压缩或切换完成。");
 	}
 	refresh(): UiTreeState {
@@ -84,7 +87,7 @@ export class SessionTreeController {
 			this.revision = revision;
 			this.host.emit({ type: "tree_changed", conversationId: this.host.conversationId, revision, branchPoints: tree.branchPoints });
 		}
-		return { revision, leafId: sm.getLeafId(), ...this.counts, filterMode: this.session.settingsManager.getTreeFilterMode(), skipSummaryPrompt: this.session.settingsManager.getBranchSummarySkipPrompt(), externallyModified: this.external, verifying: this.validator?.checking ?? false, busy: this.operation || this.session.isCompacting };
+		return { revision, leafId: sm.getLeafId(), ...this.counts, filterMode: this.session.settingsManager.getTreeFilterMode(), skipSummaryPrompt: this.session.settingsManager.getBranchSummarySkipPrompt(), externallyModified: this.external, verifying: this.validator?.blocking ?? false, busy: this.operation || this.session.isCompacting };
 	}
 	decorate(message: UiMessage, entryId?: string): UiMessage {
 		if (!entryId) return message;
@@ -93,6 +96,15 @@ export class SessionTreeController {
 		const cached = this.decorated.get(message);
 		if (cached?.key === key) return cached.value;
 		const value = { ...message, ...metadata };
+		const entry = this.session.sessionManager.getEntry(entryId);
+		if (entry?.type === "message" && (entry.message.role === "user" || (entry.message.role === "custom" && entry.message.customType === "file"))) {
+			const content = entry.message.content;
+			const parsed = parseUserAttachments(typeof content === "string" ? content : content.filter(b => b.type === "text").map(b => b.text).join("\n"));
+			if (parsed.attachments.length) {
+				value.questionText = parsed.text;
+				value.userAttachments = parsed.attachments.map((a, index) => ({ path: a.path, mode: a.mode, preview: a.preview.slice(0, 12000), nativeRef: { entryId, index } }));
+			}
+		}
 		this.decorated.set(message, { key, value });
 		return value;
 	}
@@ -109,7 +121,7 @@ export class SessionTreeController {
 				if (!this.host.active() || this.session !== session) throw new Error("对话已切换，请重新操作。");
 				this.checkExternal();
 				if (this.external) throw new Error("会话文件已被外部修改，请重新打开后继续。");
-				if (this.validator?.checking) throw new Error("正在校验会话文件，请稍后重试。");
+				if (this.validator?.blocking) throw new Error("正在校验会话文件，请稍后重试。");
 			};
 			if (request.type === "tree_get") {
 				const filter = request.filter ?? session.settingsManager.getTreeFilterMode();
@@ -179,5 +191,5 @@ export class SessionTreeController {
 			this.refresh(); this.host.changed();
 		}
 	}
-	dispose(): void { this.validator?.dispose(); this.watcher?.close(); this.watcher = undefined; }
+	dispose(): void { this.disposed = true; this.validator?.dispose(); this.watcher?.close(); this.watcher = undefined; }
 }

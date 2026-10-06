@@ -1,3 +1,4 @@
+import { resolveNativeAttachments } from "./user-attachments.js";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import { SessionTreeController } from "./session-tree-controller.js";
 import { SessionBranchCounts } from "./session-file-read.js";
@@ -5,7 +6,7 @@ import type { TreeRequest } from "./protocol.js";
 import { createHash, randomUUID } from "node:crypto";
 import { recoveryEvent, isRecovering, recoverySnapshot, type RecoveryState } from "./recovery-state.js";
 import { Readable } from "node:stream";
-import { openToolOutput } from "./tool-output.js";
+import { openToolOutput, toolOutputManifest } from "./tool-output.js";
 import { nativeToolDetails, toolExitCode } from "./serialize.js";
 import { flushPromptReload, getSystemPromptState, promptReloadStatus, promptUsesFile, queuePromptReload, writeSystemPromptFile } from "./system-prompt-files.js";
 import { parseNativeMcpStatus } from "./native-mcp-presentation.js";
@@ -1425,16 +1426,31 @@ export class ClientSession {
 		this.flushSnapshot();
 	}
 
-	async downloadToolOutput(conversationId: string, toolCallId: string) {
+	private toolResultForDownload(conversationId: string, toolCallId: string) {
 		const conv = this.convs.get(conversationId);
-		if (!conv) throw new Error("Output unavailable");
+		if (!conv) throw Object.assign(new Error("Output access denied"), { code: "EACCES" });
 		// Context projection omits pre-compaction records. Native entries retain them.
 		const result = conv.session.sessionManager.getEntries().flatMap(entry => entry.type === "message" && entry.message.role === "toolResult" && entry.message.toolCallId === toolCallId ? [entry.message] : []).at(-1)
 			?? conv.session.messages.find(m => m.role === "toolResult" && m.toolCallId === toolCallId);
-		if (!result || result.role !== "toolResult") throw new Error("Output unavailable");
+		if (!result || result.role !== "toolResult") throw Object.assign(new Error("Output access denied"), { code: "EACCES" });
+		return { conv, result };
+	}
+	async listToolOutputs(conversationId: string, toolCallId: string) {
+		const { conv, result } = this.toolResultForDownload(conversationId, toolCallId);
 		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
-		if (typeof path === "string") return openToolOutput(conv.cwd, path);
-		return { createReadStream: () => Readable.from(result.content.filter(part => part.type === "text").map(part => part.text + "\n")) };
+		const text = result.content.filter(part => part.type === "text").map(part => part.text).join("\n");
+		return toolOutputManifest(conv.cwd, text, typeof path === "string" ? path : undefined);
+	}
+	async downloadToolOutput(conversationId: string, toolCallId: string, outputId?: string) {
+		const { conv, result } = this.toolResultForDownload(conversationId, toolCallId);
+		if (outputId) {
+			const output = (await this.listToolOutputs(conversationId, toolCallId)).find(output => output.id === outputId);
+			if (!output) throw Object.assign(new Error("Output access denied"), { code: "EACCES" });
+			return { name: output.name, handle: await openToolOutput(conv.cwd, output.path) };
+		}
+		const path = nativeToolDetails(result.toolName, result)?.fullOutputPath;
+		if (typeof path === "string") return { name: path.split(/[\\/]/).pop()!, handle: await openToolOutput(conv.cwd, path) };
+		return { name: "tool-output.txt", handle: { createReadStream: () => Readable.from(result.content.filter(part => part.type === "text").map(part => part.text + "\n")) } };
 	}
 
 	resolveDialog(conversationId: string, id: string, value: string | boolean | null): void {
@@ -1892,20 +1908,21 @@ export class ClientSession {
 	): Promise<void> {
 		const conv = this.conv;
 		let acknowledged = false;
-		const acknowledge = (ok: boolean) => {
+		const acknowledge = (ok: boolean, commandExecuted?: boolean) => {
 			if (acknowledged) return;
 			acknowledged = true;
-			if (requestId) this.emit({ type: "prompt_result", requestId, ok });
+			if (requestId) this.emit({ type: "prompt_result", requestId, conversationId: conv.id, ok, commandExecuted, attachmentsConsumed: ok && !commandExecuted });
 			onAccepted?.(ok);
 		};
 		try {
-			if (!["tree", "fork"].includes(parseSlash(text)?.name ?? "")) conv.tree?.assertWritable();
+			if (!["tree", "fork"].includes(parseSlash(text)?.name ?? "")) await conv.tree?.waitForVerification();
 			const s = conv.session;
 			await flushPromptReload(s);
 			const promptReloadError=promptReloadStatus(s).reloadError;
 			if(promptReloadError)throw new Error(`Native prompt reload failed: ${promptReloadError}`);
-			if (this.conv !== conv) throw new Error("Conversation changed");
-			validateEditorSnapshots(this.cwd, attachments);
+			if (this.conv !== conv || conv.session !== s) throw new Error("Conversation changed");
+			const extensionCommand = text.startsWith("/") && s.extensionRunner.getCommand(text.slice(1).split(" ", 1)[0]);
+			if (!extensionCommand) { attachments = resolveNativeAttachments(s, attachments); validateEditorSnapshots(this.cwd, attachments); }
 			// Native slash commands (see NATIVE_COMMANDS) are executed here and
 			// never reach the SDK. Extension / skill / template commands fall
 			// through — AgentSession.prompt() handles those itself.
@@ -1934,8 +1951,10 @@ export class ClientSession {
 
 					session: this.session,
 				},
-				attachments,
+				extensionCommand ? undefined : attachments,
 			);
+			await conv.tree?.waitForVerification();
+			if (this.conv !== conv || conv.session !== s) throw new Error("Conversation changed");
 			if (!s.isStreaming) { conv.toolsExecutedSincePrompt = false; conv.lastTaskEndedAt = undefined; }
 			await deliverPrompt(s, text, asides, queue, acknowledge);
 		} catch (err) {
@@ -1943,6 +1962,7 @@ export class ClientSession {
 			this.emit({
 				type: "notice",
 				level: "error",
+				conversationId: conv.id,
 				text: `提示发送失败：${(err as Error).message}`,
 			});
 		}
@@ -2768,6 +2788,7 @@ export class ClientSession {
 			return;
 		}
 		try {
+			attachments = resolveNativeAttachments(conv.session, attachments);
 			validateEditorSnapshots(this.cwd, attachments);
 			// Preserve the model the user had selected — fork() seeds a new
 			// branch with the ModelRuntime default model otherwise.

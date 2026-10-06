@@ -130,6 +130,8 @@ export type TreeResponse =
 	| { type: "tree_navigate_result"; conversationId: string; reqId: string; status: "ok" | "cancelled" | "aborted" | "busy" | "error"; editorText?: string; restoredQueue?: { steering: string[]; followUp: string[]; images?: { data: string; mimeType: string }[] }; error?: string };
 
 export interface UiMessage {
+	questionText?: string;
+	userAttachments?: { path: string; mode: "inline" | "lines" | "reference"; preview: string; nativeRef: { entryId: string; index: number } }[];
 	entryId?: string;
 	siblings?: UiTreeSiblings;
 	label?: string;
@@ -340,6 +342,7 @@ export interface SlashCommandInfo {
  *  workspace-path attachments (inline/reference/lines), raw pasted/dropped
  *  images (imageData) and raw uploaded files (fileData). */
 export interface PromptAttachment {
+	nativeRef?: { entryId: string; index: number };
 	editorSnapshot?: { cwd: string; text: string; dirty: boolean; version?: string };
 	path: string;
 	mode?: "inline" | "reference" | "lines";
@@ -1109,7 +1112,7 @@ export type ServerMessage =
 	 *  (path = the listed directory; unknown/unsupported fs falls back to the
 	 *  10s polling). */
 	| { type: "file_changed"; path: string }
-	| { type: "prompt_result"; requestId: string; ok: boolean }
+	| { type: "prompt_result"; requestId: string; ok: boolean; conversationId?: string; commandExecuted?: boolean; attachmentsConsumed?: boolean }
 	| { type: "file_result"; operation: "read" | "write"; requestId?: string; cwd: string; path: string; ok: boolean; version?: string; error?: string; conflict?: boolean }
 	| {
 			type: "file_content";

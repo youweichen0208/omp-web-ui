@@ -26,6 +26,6 @@ export function mergeCurrentFile(attachments: PromptAttachment[], current: Promp
 		}
 		return parts.join("/");
 	};
-	return [...attachments.filter((a) => a.mode === "lines" || a.imageData || a.fileData || a.uploadPath ||
+	return [...attachments.filter((a) => a.nativeRef || a.mode === "lines" || a.imageData || a.fileData || a.uploadPath ||
 		normalize(a.path) !== normalize(current.path)), current];
 }

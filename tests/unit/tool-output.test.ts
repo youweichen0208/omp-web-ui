@@ -35,3 +35,31 @@ describe("SDK tool output → wire update → live output", () => {
 		expect(visible.length).toBeLessThan(200100);
 	});
 });
+
+import { mkdtemp, writeFile, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { openToolOutput, toolOutputManifest } from "../../server/tool-output.js";
+it("collects multiple native binary/image references from full output and preserves bytes", async () => {
+	const cwd = await mkdtemp(join(tmpdir(), "pi-download-unit-"));
+	const paths: string[] = [];
+	try {
+		for (const [prefix, ext] of [["mcp", "bin"], ["codemode", "png"], ["codemode", "jpg"], ["codemode", "gif"], ["codemode", "webp"], ["powershell", "log"]]) {
+			const path = join(tmpdir(), `pi-${prefix}-${randomBytes(8).toString("hex")}.${ext}`); paths.push(path);
+			await writeFile(path, Buffer.from([0, 255, 128, 10]));
+			const handle = await openToolOutput(cwd, path);
+			try { expect(await handle.readFile()).toEqual(Buffer.from([0, 255, 128, 10])); } finally { await handle.close(); }
+		}
+		const full = join(tmpdir(), `pi-codemode-${randomBytes(8).toString("hex")}.txt`); paths.push(full);
+		const text = `[Binary resource fixture://blob (application/octet-stream, 4 B) saved to ${paths[0]}]\n` + paths.slice(1, 5).map((path, i) => `[Image saved to ${path} (image/${["png", "jpeg", "gif", "webp"][i]}, 4 B)]`).join("\n");
+		await writeFile(full, text);
+		const manifest = await toolOutputManifest(cwd, text, full);
+		expect(manifest).toHaveLength(6); expect(new Set(manifest.map(o => o.id)).size).toBe(6);
+		expect(manifest.filter(o => o.default).map(o => o.path)).toEqual([full]);
+		expect((await toolOutputManifest(cwd, text)).every(o => !o.default)).toBe(true);
+		expect(await toolOutputManifest(cwd, "truncated", full)).toEqual(manifest);
+		await rm(paths[0]); await symlink(paths[1], paths[0]);
+		await expect(openToolOutput(cwd, paths[0])).rejects.toMatchObject({ code: "EACCES" });
+	} finally { for (const path of paths) await rm(path, { force: true }); await rm(cwd, { recursive: true, force: true }); }
+});

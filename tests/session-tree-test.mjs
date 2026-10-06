@@ -57,7 +57,7 @@ async function connect() {
 	ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
 	ws.on("message", raw => { const m = JSON.parse(raw); wire.push(m); if (m.type === "snapshot") state = m.state; if (m.type === "snapshot_delta" && state) state = { ...state, ...m.state, messages: [...state.messages, ...m.appended] }; });
 	await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
-	send({ type: "hello", clientId: "tree-test", protocolVersion: 38 }); send({ type: "get_state" });
+	send({ type: "hello", clientId: "tree-test", protocolVersion: 39 }); send({ type: "get_state" });
 	await wait(() => state);
 }
 async function request(type, fields = {}) {
@@ -197,6 +197,7 @@ try {
 		await page.waitForFunction(() => document.querySelectorAll(".thinking-run-settings input")[1]?.checked);
 		await retryToggle.click(); await wait(() => !state.runSettings.autoRetry);
 		await page.keyboard.press("Escape");
+		await page.getByRole("button", { name: "设置", exact: true }).click();
 		await page.getByRole("button", { name: "会话树", exact: true }).click();
 		await page.waitForSelector(".session-tree-panel .tree-node");
 		await page.getByRole("combobox", { name: "过滤节点" }).selectOption("user-only");

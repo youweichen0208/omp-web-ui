@@ -138,12 +138,12 @@ export const ChatInput = memo(function ChatInput({
 		if (!pending || promptResult?.requestId !== pending.id) return;
 		pendingSubmit.current = null;
 		if (!promptResult.ok) return;
-		onSent(pending.conversation, pending.attachments);
+		if (promptResult.attachmentsConsumed !== false) onSent(pending.conversation, pending.attachments);
 		if (pending.conversation === activeConversationId) {
 			setText((value) => value === pending.text ? "" : value);
-			if (pending.text.trim() !== "/reload") setPendingEcho(activeConversationId, pending.text.trim());
+			if (!promptResult.commandExecuted && pending.text.trim() !== "/reload") setPendingEcho(activeConversationId, pending.text.trim());
 		} else {
-			drafts.current.delete(pending.conversation);
+			if (drafts.current.get(pending.conversation) === pending.text) drafts.current.delete(pending.conversation);
 		}
 	}, [promptResult, activeConversationId, onSent, setPendingEcho]);
 	useEffect(() => { if (!ready) pendingSubmit.current = null; }, [ready]);
@@ -316,6 +316,7 @@ export const ChatInput = memo(function ChatInput({
 	const submit = (queue = false) => {
 		if (verifying) { onNotice("info", t("treeVerifying")); return; }
 		const trimmed = text.trim();
+		const extensionCommand = slashCommands.some(c => c.source === "extension" && c.name === trimmed.slice(1).split(" ", 1)[0]) && trimmed.startsWith("/");
 		const hasRawAttach = attachments.some((a) => a.imageData || a.fileData);
 		if (pendingSubmit.current || !connected || (!trimmed && !hasRawAttach)) return;
 		// Client-side slash commands (never sent to the server).
@@ -346,7 +347,7 @@ export const ChatInput = memo(function ChatInput({
 			let outgoing: PromptAttachment[] = attachments.map(({ key, isDir, ...attachment }) => attachment);
 			// 当前文件 chip：发送时才取编辑器快照（含未保存修改），并取代同路径的
 			// 整文件附件 — chip 始终只指向当前打开的文件，不随历史累积。
-			if (autoFile) {
+			if (autoFile && !extensionCommand) {
 				const snapshot = contextReader.current?.(autoFile.id);
 				if (!snapshot?.editorSnapshot || snapshot.path !== autoFile.path || snapshot.editorSnapshot.cwd !== autoFile.cwd) {
 					onNotice("error", t("currentFileUnavailable"));
@@ -366,7 +367,7 @@ export const ChatInput = memo(function ChatInput({
 		// 发送即保存：携带当前文件且草稿未保存时，先落盘再发送（磁盘 == 快照 ==
 		// 模型的工作基准）。落盘冲突/失败由编辑器的冲突 UI 呈现且不回调 —
 		// 本次发送被挡住，输入内容保留；保存中无法启动同样阻止。
-		if (autoFile) {
+		if (autoFile && !extensionCommand) {
 			const preview = contextReader.current?.(autoFile.id);
 			// 尺寸预检放在落盘之前：发不出去的快照不值得写盘。
 			if (preview?.editorSnapshot && new TextEncoder().encode(preview.editorSnapshot.text).length > 512 * 1024) {
@@ -561,6 +562,7 @@ export const ChatInput = memo(function ChatInput({
 				return new File([bytes], `recalled-${index}.${image.mimeType.split("/")[1] ?? "png"}`, { type: image.mimeType });
 			}))} />
 			<div className={`inputbox${text.length > 0 ? " has-draft" : ""}`}>
+			{promptResult?.commandExecuted && promptResult.conversationId === activeConversationId && attachments.length > 0 && <div role="status">{t("commandAttachmentsRetained")}</div>}
 			{(attachments.length > 0 || autoFile) && (
 				<div className="attach-row">
 					{autoFile && <span className="attach-chip current-file" title={`${autoFile.cwd}/${autoFile.path}`}>

@@ -312,7 +312,7 @@ export const LeftPanel = memo(function LeftPanel({
 	);
 	return (
 		<aside className="panel panel-left">
-			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/favicon.svg" alt="" /></span><strong>pi-web-ui</strong></div>
+			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/brand-mark.svg" alt="" /></span><strong>pi-web-ui</strong></div>
 			<div className="sidebar-new"><button type="button" onClick={onNewChat}><span><FiPlus />{t("newChat")}</span><kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}N</kbd></button></div>
 			<div className="panel-projects">
 				{/* 加项目收进分组标题行：它是个偶尔用一次的动作，不值得在列表

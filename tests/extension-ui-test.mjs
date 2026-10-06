@@ -1,6 +1,6 @@
 // Zero-model regression: real native extension callbacks across two conversations.
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -19,6 +19,8 @@ writeFileSync(join(agent, "auth.json"), JSON.stringify({ fixture: { type: "api_k
 const settings = JSON.stringify({ defaultProvider: "fixture", defaultModel: "fixture", retry: { enabled: true }, compaction: { enabled: true } });
 writeFileSync(join(agent, "settings.json"), settings);
 writeFileSync(join(agent, "extensions/ui.ts"), `export default function(pi) {
+ let calls = 0;
+ pi.registerCommand("fixture-retain", { handler: async (args, ctx) => { calls++; await new Promise(resolve => setTimeout(resolve, 400)); ctx.ui.notify("retain-call:" + calls); if(args === "fail") throw new Error("fixture failure"); } });
  pi.registerCommand("fixture-ui", { handler: async (args, ctx) => {
   const ui = ctx.ui; ui.setWidget("same", [args]); ctx.ui.setStatus("same", args); ctx.ui.setTitle("title-" + args);
   pi.sendMessage({customType:"fixture", content:"fixture-" + args, display:true});
@@ -42,13 +44,22 @@ async function connect() {
  ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
  ws.on("message", raw => wire.push(JSON.parse(raw)));
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 38 });
+ send({ type: "hello", clientId: "extension-ui-test", protocolVersion: 39 });
  await wait(m => m.type === "ready");
 }
 try {
  for (let n = 0; n < 100 && !(await portUp(PORT)); n++) await sleep(100);
  await connect();
  const a = (await wait(m => m.type === "snapshot")).state.conversationId;
+ const attachments = [{path:"missing", editorSnapshot:{cwd:"/wrong",text:"must not validate",dirty:true}}, {path:"",name:"not-uploaded.txt",fileData:"aGVsbG8="}];
+ send({type:"prompt",text:"/fixture-retain",requestId:"retain-ok",attachments});
+ const accepted = await wait(m => m.type === "prompt_result" && m.requestId === "retain-ok");
+ assert.equal(accepted.ok,true); assert.equal(accepted.commandExecuted,true); assert.equal(accepted.attachmentsConsumed,false); assert.equal(accepted.conversationId,a);
+ assert.equal(existsSync(join(root,"data","uploads","extension-ui-test")),false);
+ send({type:"prompt",text:"/fixture-retain fail",requestId:"retain-fail",attachments});
+ assert.equal((await wait(m => m.type === "prompt_result" && m.requestId === "retain-fail")).ok,false);
+ assert.equal(wire.filter(m => m.type === "notice" && m.text.startsWith("retain-call:")).length,2);
+
  send({ type: "prompt", text: "/fixture-ui A" });
  const da = await wait(m => m.type === "dialog" && m.title === "permission-A");
  assert.equal(da.conversationId, a);
@@ -122,6 +133,17 @@ try {
   await page.addInitScript(() => sessionStorage.setItem("pi-web-client-id", "extension-ui-test"));
   await page.goto(`http://127.0.0.1:${PORT}`);
   await page.waitForSelector(".inputbox textarea");
+  const composer = page.locator(".inputbox textarea");
+  await page.locator('.inputbox input[type="file"]').setInputFiles({name:"retain.txt",mimeType:"text/plain",buffer:Buffer.from("frozen upload")});
+  await composer.fill("/fixture-retain"); await page.locator(".inputbox .btn.send:visible").click();
+  await page.getByText("命令已执行，附件未发送，已保留在输入框。", {exact:true}).waitFor();
+  assert.equal(await composer.inputValue(), ""); assert.equal(await page.locator(".attach-chip.file").count(), 1);
+  await composer.fill("/fixture-retain fail"); await page.locator(".inputbox .btn.send:visible").click(); await sleep(650);
+  assert.equal(await composer.inputValue(), "/fixture-retain fail"); assert.equal(await page.locator(".attach-chip.file").count(), 1);
+  await composer.fill("/fixture-retain"); await page.locator(".inputbox .btn.send:visible").click(); await composer.fill("new draft");
+  await page.locator('.inputbox input[type="file"]').setInputFiles({name:"new.txt",mimeType:"text/plain",buffer:Buffer.from("new upload")});
+  await sleep(650); assert.equal(await composer.inputValue(), "new draft"); assert.equal(await page.locator(".attach-chip.file").count(), 2);
+  assert.equal(existsSync(join(root,"data","uploads","extension-ui-test")),false);
   send({ type: "prompt", text: "/fixture-editor" });
   await page.waitForSelector('[data-dialog-kind="editor"] textarea');
   assert.equal(await page.locator('[data-dialog-kind="editor"] textarea').inputValue(), "first\nsecond");

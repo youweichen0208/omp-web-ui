@@ -34,6 +34,47 @@ test.each(["one-at-a-time", "all"] as const)("attachments stay inside their nati
 		recallPending(session);
 		await session.bindExtensions({});
 		await deliverPrompt(session, "/fixture", [{ message: { customType: "file", display: true, content: "must not become command arguments" } }], false, accepted);
-		expect(commands).toBe(1); expect(accepted).toHaveBeenLastCalledWith(false); expect(session.pendingMessageCount).toBe(0);
+		expect(commands).toBe(1); expect(accepted).toHaveBeenLastCalledWith(true, true); expect(session.pendingMessageCount).toBe(0);
+	} finally { session.dispose(); vi.restoreAllMocks(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test.each(["one-at-a-time", "all"] as const)("native templates expand before frozen attachments in %s mode", async mode => {
+	const root = mkdtempSync(join(tmpdir(), "pi-template-unit-"));
+	const inputs: string[] = [];
+	const services = await createAgentSessionServices({ cwd: root, agentDir: root, settingsManager: SettingsManager.inMemory({ steeringMode: mode, followUpMode: mode }), resourceLoaderOptions: { extensionFactories: [{ name: "input-fixture", factory: pi => { pi.on("input", async event => { inputs.push(event.text); return { action: "continue" }; }); } }] } });
+	const { session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(root) });
+	try {
+		vi.spyOn(session, "isStreaming", "get").mockReturnValue(true);
+		await session.bindExtensions({});
+		for (const content of ["$@", "$1 / $2", "no arguments"]) {
+			vi.spyOn(session, "promptTemplates", "get").mockReturnValue([{ name: "fixture", content, description: "fixture", filePath: join(root, "fixture.md"), sourceInfo: { path: root, source: "fixture", scope: "user", origin: "top-level" } }]);
+			const frozen = '\n<file path="a.txt">\n```\n  "quoted"  \n$@\n```\n</file>';
+			for (const queue of [true, false]) {
+				await deliverPrompt(session, '/fixture "one two" three', [{ message: { customType: "file", display: true, content: frozen } }], queue, () => {});
+				const messages = queue ? session.getFollowUpMessages() : session.getSteeringMessages();
+				expect(messages[0]).toBe((content === "$@" ? "one two three" : content === "$1 / $2" ? "one two / three" : content) + "\n\n" + frozen);
+			}
+			expect(inputs.slice(-2)).toEqual([...session.getFollowUpMessages(), ...session.getSteeringMessages()]);
+			recallPending(session);
+		}
+		expect(inputs).toHaveLength(6);
+	} finally { session.dispose(); vi.restoreAllMocks(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test("extension failure is acknowledged without consuming attachments or calling input", async () => {
+	const root = mkdtempSync(join(tmpdir(), "pi-command-unit-"));
+	const input = vi.fn(); let calls = 0;
+	const services = await createAgentSessionServices({ cwd: root, agentDir: root, settingsManager: SettingsManager.inMemory(), resourceLoaderOptions: { extensionFactories: [{ name: "fixture", factory: pi => {
+		pi.on("input", input);
+		pi.registerCommand("fixture", { description: "fixture", handler: async () => { calls++; throw new Error("fixture failure"); } });
+	} }] } });
+	const { session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(root) });
+	try {
+		await session.bindExtensions({});
+		vi.spyOn(session, "promptTemplates", "get").mockReturnValue([{ name: "fixture", content: "must not run", description: "", filePath: "", sourceInfo: { path: root, source: "fixture", scope: "user", origin: "top-level" } }]);
+		const ack = vi.fn();
+		await deliverPrompt(session, "/fixture", [{ message: { customType: "file", display: true, content: "unconsumed" } }], false, ack);
+		expect(ack).toHaveBeenCalledExactlyOnceWith(false, false); expect(calls).toBe(1); expect(input).not.toHaveBeenCalled(); expect(session.pendingMessageCount).toBe(0);
 	} finally { session.dispose(); vi.restoreAllMocks(); rmSync(root, { recursive: true, force: true }); }
 });

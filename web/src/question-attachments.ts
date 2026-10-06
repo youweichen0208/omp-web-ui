@@ -58,6 +58,7 @@ export function collectQuestionAttachments(
 		content: readonly unknown[];
 		details?: unknown;
 		customType?: string;
+		userAttachments?: { path: string; mode: "inline" | "lines" | "reference"; nativeRef: { entryId: string; index: number } }[];
 	}[],
 ): Map<string, EditPromptAttachment[]> {
 	const m = new Map<string, EditPromptAttachment[]>();
@@ -66,7 +67,7 @@ export function collectQuestionAttachments(
 		if (msg.role !== "user" || !msg.id) continue;
 		// Own image blocks first (sessions where prompt(images) put them into
 		// the user content itself).
-		const atts: EditPromptAttachment[] = [];
+		const atts: EditPromptAttachment[] = (msg.userAttachments ?? []).map(a => ({ path: a.path, mode: a.mode, nativeRef: a.nativeRef }));
 		pushImageAttachments(atts, msg.content);
 		// Then the attachment-card run that follows this question (stops at
 		// any other message kind — assistant/toolResult/next user/etc.).
@@ -77,6 +78,7 @@ export function collectQuestionAttachments(
 			messages[j].customType === "file";
 			j++
 		) {
+			if (messages[j].userAttachments?.length) { atts.push(...messages[j].userAttachments!.map(a => ({ path: a.path, mode: a.mode, nativeRef: a.nativeRef }))); continue; }
 			const details = (messages[j].details ?? {}) as {
 				editorSnapshot?: EditPromptAttachment["editorSnapshot"];
 				mode?: string;

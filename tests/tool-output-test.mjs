@@ -25,6 +25,13 @@ for (const [i, toolName] of ["mcp__fixture__large", "codemode"].entries()) {
  writeFileSync(spillPaths[i], "full " + toolName);
  manager.appendMessage({ role: "toolResult", toolCallId: toolName, toolName, isError: false, timestamp: 4 + i, content: [{ type: "text", text: "truncated" }], details: { fullOutputPath: spillPaths[i] } });
 }
+const binaries = ["bin", "png", "jpg", "gif", "webp"].map((ext, i) => join(tmpdir(), `pi-${i ? "codemode" : "mcp"}-${randomBytes(8).toString("hex")}.${ext}`));
+for (const path of binaries) writeFileSync(path, Buffer.from([0, 255, 128, 10]));
+spillPaths.push(...binaries);
+const binaryText = `[Binary resource fixture://data.bin (application/octet-stream, 4 B) saved to ${binaries[0]}]\n` + binaries.slice(1).map((path, i) => `[Image saved to ${path} (image/${["png", "jpeg", "gif", "webp"][i]}, 4 B)]`).join("\n");
+const binaryFull = join(tmpdir(), `pi-codemode-${randomBytes(8).toString("hex")}.txt`);
+writeFileSync(binaryFull, binaryText); spillPaths.push(binaryFull);
+manager.appendMessage({ role: "toolResult", toolCallId: "multi", toolName: "codemode", isError: false, timestamp: 5, content: [{ type: "text", text: "truncated" }], details: { fullOutputPath: binaryFull } });
 const kept = manager.appendMessage({ role: "user", content: "after compaction", timestamp: 6 });
 manager.appendCompaction("summary", kept, 9000);
 const token = "fixture-token";
@@ -36,7 +43,7 @@ try {
  ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`);
  const snapshot = new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error(logs)), 10000); ws.on("message", raw => { const m = JSON.parse(raw); if (m.type === "snapshot") { clearTimeout(timer); resolve(m.state); } }); });
  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
- ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 38 }));
+ ws.send(JSON.stringify({ type: "hello", clientId: "download-test", protocolVersion: 39 }));
  const state = await snapshot;
  assert(!state.messages.some(m => m.toolCallId === "large"));
  const url = `http://127.0.0.1:${port}/api/tool-output?${new URLSearchParams({ clientId: "download-test", conversationId: state.conversationId, toolCallId: "large" })}`;
@@ -44,6 +51,15 @@ try {
  const headers = { Authorization: `Bearer ${token}` };
  assert.equal(await (await fetch(url, { headers })).text(), "output-line\n".repeat(10000));
  for (const tool of ["mcp__fixture__large", "codemode"]) assert.equal(await (await fetch(url.replace("toolCallId=large", "toolCallId=" + tool), { headers })).text(), "full " + tool);
+ const multiUrl = url.replace("toolCallId=large", "toolCallId=multi");
+ const list = await (await fetch(multiUrl.replace("/api/tool-output?", "/api/tool-output-list?"), { headers })).json();
+ assert.equal(list.length, 6); assert(list.every(item => !item.path));
+ for (const item of list.slice(1)) {
+  const response = await fetch(multiUrl + "&outputId=" + item.id, { headers });
+  assert.equal(response.status, 200); assert(response.headers.get("content-disposition").includes(item.name));
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from([0, 255, 128, 10]));
+ }
+ assert.equal((await fetch(multiUrl + "&outputId=forged", { headers })).status, 403);
  if (process.argv.includes("--browser")) {
   const { chromium } = await import("playwright-core");
   const { CHROME_PATH } = await import("./lib/chrome.mjs");
@@ -53,7 +69,8 @@ try {
    await page.addInitScript(() => sessionStorage.setItem("pi-web-client-id", "download-test"));
    await page.goto(`http://127.0.0.1:${port}/?token=${token}`);
    await page.locator(".setup-modal .modal-close").click();
-   await page.getByRole("button", { name: "会话树", exact: true }).click();
+   await page.getByRole("button", { name: "设置", exact: true }).click();
+		await page.getByRole("button", { name: "会话树", exact: true }).click();
    await page.getByRole("combobox", { name: "过滤节点" }).selectOption("all");
    for (const toolCallId of ["large", "mcp__fixture__large", "codemode"]) {
     const entry = manager.getEntries().find(e => e.type === "message" && e.message.role === "toolResult" && e.message.toolCallId === toolCallId);
@@ -63,13 +80,22 @@ try {
     assert.equal(readFileSync(await (await downloaded).path(), "utf8"), toolCallId === "large" ? "output-line\n".repeat(10000) : "full " + toolCallId);
     await page.locator(".tree-content-dialog").getByRole("button", { name: "关闭", exact: true }).click();
    }
+   const multiEntry = manager.getEntries().find(e => e.type === "message" && e.message.role === "toolResult" && e.message.toolCallId === "multi");
+   await page.locator(`[data-entry-id="${multiEntry.id}"] .tree-node-preview`).click();
+   await page.getByRole("button", { name: "下载完整输出", exact: true }).click();
+   await page.locator(".tool-output-files").waitFor();
+   const downloaded = page.waitForEvent("download");
+   await page.getByRole("button", { name: list[1].name, exact: true }).click();
+   const binary = await downloaded;
+   assert.equal(binary.suggestedFilename(), list[1].name);
+   assert.deepEqual(readFileSync(await binary.path()), Buffer.from([0,255,128,10]));
   } finally { await browser.close(); }
  }
- assert.equal((await fetch(url.replace("toolCallId=large", "toolCallId=forged") + `&path=${encodeURIComponent(path)}`, { headers })).status, 404);
- assert.equal((await fetch(url.replace("conversationId=" + state.conversationId, "conversationId=forged"), { headers })).status, 404);
+ assert.equal((await fetch(url.replace("toolCallId=large", "toolCallId=forged") + `&path=${encodeURIComponent(path)}`, { headers })).status, 403);
+ assert.equal((await fetch(url.replace("conversationId=" + state.conversationId, "conversationId=forged"), { headers })).status, 403);
  rmSync(path); assert.equal((await fetch(url, { headers })).status, 404);
  writeFileSync(join(root, "secret"), "secret"); symlinkSync(join(root, "secret"), path);
- assert.equal((await fetch(url, { headers })).status, 404);
+ assert.equal((await fetch(url, { headers })).status, 403);
  console.log("PASS authenticated native full output download, restored transcript, identity checks, cleanup and symlink rejection");
 } catch (error) { console.error(error); process.exitCode = 1; }
 finally { ws?.close(); const exit = new Promise(resolve => server.once("exit", resolve)); server.kill(); await exit; rmSync(path, { force: true }); for (const spill of spillPaths) rmSync(spill, { force: true }); rmSync(root, { recursive: true, force: true }); }

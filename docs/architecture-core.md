@@ -118,7 +118,9 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 
 serialize.ts 投影 edit 的 diff/firstChangedLine、bash 的退出码和截断摘要，以及工具结果的完整输出路径；diff 遵守 100,000 字符上限并标记截断。todo/codemode 保留专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
 
-`/api/tool-output` 受通用口令鉴权，参数仅为 clientId/conversationId/toolCallId。服务端从该对话原生 SessionManager 全部条目查找工具结果，覆盖压缩前及分支历史；有溢出文件引用时，只打开工作区内普通文件或系统临时目录的原生 `pi-bash-<16 hex>.log`、`pi-mcp-<16 hex>.txt`、`pi-codemode-<16 hex>.txt`；验证真实路径与文件类型，拒绝符号链接逃逸。下载使用已验证的文件句柄；已清理/不可用返回 404。浏览器不提供文件路径。没有溢出文件引用时下载会话里原始文本块，保留未截断的正文；引用文件已删除时明确返回不可用，不把截断正文冒充完整输出。普通工具、Codemode 卡片和树节点全文面板共用下载按钮。
+`/api/tool-output` 与按需清单 `/api/tool-output-list` 受通用口令鉴权，参数为 clientId/conversationId/toolCallId，下载可再带 outputId；浏览器不提供文件路径。服务端从原生全部条目查找，覆盖压缩前与分支历史；清单收集 fullOutputPath、MCP binary resource 及 Codemode image saved 标记，并异步读取完整输出补齐截断引用。路径去重后生成稳定 ID，清单只返回 ID/文件名。
+
+文件限定为工作区普通文件或真实系统临时目录中的 SDK 文件：Bash/PowerShell 的 16 hex `.log`、MCP 的 16 hex 加 1–8 位字母数字扩展名、Codemode 的 16 hex `.txt/.png/.jpg/.gif/.webp`。校验真实路径、文件类型和符号链接后用打开的句柄传输原字节，Content-Disposition 使用实际文件名。无 outputId 保持默认完整文本下载；没有溢出引用时返回原生文本块。401 为认证失败，403 为身份/路径拒绝，404 为文件不存在（可能已清理），其他错误为 500。通用工具卡、Codemode 卡和树全文面板共用入口，多文件显示选择列表。
 
 `snapshot` 里 `streamingMessage` 是进行中的消息（60ms 粒度流式），`messages` 是已落盘的。
 

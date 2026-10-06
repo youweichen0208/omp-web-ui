@@ -70,7 +70,7 @@ Markdown 使用原生 contenteditable，`rich-markdown.tsx` 按语法树的源�
 
 服务端在构建任何附件前验证全部快照的工作区、真实路径边界、类型和大小；历史重问在 fork 前也验证。快照作为 file aside 传给 agent，明确来源、保存状态及优先分析要求，details 保存原快照供卡片和历史重问恢复。旧记录无此字段时保持原行为。prompt 的 requestId 与 prompt_result 在 SDK 预检通过后确认接收，校验失败或断线保留编辑中的问题及附件；仅自动标签不能触发发送。
 
-SDK 的 nextTurn 缓冲不会随 steer/followUp 消费，因此附件在预检通过后进入对应队列；普通发送在 agent_start 时入队。带附件的运行临时使用 all 队列模式，让问题与文件卡一起消费，agent_end 恢复原模式。预检失败与仅执行扩展命令不留下下一轮文件快照。协议回归：`tests/current-file-protocol-test.mjs`（本地模拟模型，验证实际 SDK 请求）、`tests/unit/current-file.test.ts`；界面回归：`tests/current-file-ui-test.mjs`（chip 镜像、快照、取代与守卫）、`tests/file-open-ux-test.mjs`。
+附件与问题合并为单条原生 prompt，图片经 images 参数发送，保持原生 steer/followUp 及用户队列模式。扩展命令在附件读取前分类，命令执行成功只清除命令正文，附件留在输入框；失败保留正文和附件。`prompt_result` 按 requestId/conversationId 回传 commandExecuted 与 attachmentsConsumed，命令不产生等待用户消息回显。协议回归：`tests/current-file-protocol-test.mjs`（本地模拟模型）、`tests/unit/current-file.test.ts`；界面回归：`tests/current-file-ui-test.mjs`、`tests/file-open-ux-test.mjs`。
 
 高亮块使用 `> [!NOTE]` 加引用正文保存为 Markdown，编辑器和只读 Markdown 渲染器共用标记转换；浅蓝底色仅属于显示样式。保存时不会写入 HTML 或编辑器属性，普通引用保持原样。回归：`tests/highlight-block-ui-test.mjs` 验证插入、编辑、保存重开与源码切换，`tests/unit/highlight-block.test.ts` 验证标记识别边界。
 
@@ -84,4 +84,8 @@ Wiki 使用同一个富文本编辑器的专用编辑态：自动保存、H1–H
 
 ## 原生队列中的附件
 
-协议 v38 起，新发送的文件上下文与问题合并为同一条原生用户消息，图片使用 prompt 的 images 参数，避免 one-at-a-time 模式下附件落到另一轮。新消息的编辑文本包含其冻结文件内容；原生用户图片及历史独立附件卡继续恢复。附件构建仍执行原有工作区、大小、编辑器快照与上传路径校验。撤回全部待发消息通过草稿保护回填原始文本和 WebUI 图片，详见核心架构的待发撤回章节。
+协议 v39：文件上下文与问题合并为同一条原生用户消息，图片使用 images 参数。模板携带文本附件时，通过锁定 SDK 1.0.3 内部 prompt-templates 实现先展开用户命令，再附加原文，以 expandPromptTemplates:false 投递。此时扩展 input 钩子收到展开后的正文且仅调用一次；普通命令、无附件模板和技能沿用原入口。同名扩展命令优先。适配器加载失败直接拒绝发送，保留草稿。
+
+`server/user-attachments.ts` 从原生完整正文派生末尾完整 `<file>`、`<folder>` 和编辑器快照块；围栏内示例、残缺和有歧义的块保持正文。questionText/userAttachments 仅用于展示，不改历史正文。附件预览最多 12000 字符，恢复引用为原生 entryId + index；服务端只在当前对话原生条目解析完整原文，分支切换前解析完成，拒绝伪造引用。内联文件、选中行和编辑器快照重发不读磁盘；引用块仍保留原生路径引用语义。旧独立 file 消息也从原文恢复，图片沿用原流程。解析后的冻结原文只存在本次请求，不建立会话私有存储。
+
+回归：`tests/unit/user-attachments.test.ts`、`tests/unit/prompt-delivery.test.ts`、`tests/current-file-protocol-test.mjs --browser`。撤回仍返回原生队列全文和图片，通过既有草稿保护恢复。

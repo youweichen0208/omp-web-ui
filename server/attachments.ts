@@ -1,3 +1,4 @@
+import { frozenAttachmentText } from "./user-attachments.js";
 /**
  * attachments — 附件构建：把 prompt.attachments（inline/reference/lines、
  * 粘贴图片 imageData、上传 fileData）转成独立的 custom message（asides）。
@@ -147,7 +148,7 @@ export async function buildAttachmentMessages(
 			}
 			continue;
 		}
-		if (att.editorSnapshot || att.fileData || !att.path) continue;
+		if (att.nativeRef || att.editorSnapshot || att.fileData || !att.path) continue;
 		const ext = extname(att.path).toLowerCase();
 		if (!IMAGE_EXT.has(ext) || ext === ".svg") continue;
 		const abs = resolve(root, att.path);
@@ -175,6 +176,9 @@ export async function buildAttachmentMessages(
 	const MAX_LINES_READ_BYTES = 2 * 1024 * 1024;
 
 	for (const [idx, att] of attachments.entries()) {
+		const frozen = frozenAttachmentText(att);
+		if (frozen !== undefined) { out.push({ message: { customType: "file", display: true, content: frozen } }); continue; }
+		if (att.nativeRef) throw new Error("Unresolved attachment reference");
 		if (att.editorSnapshot) {
 			const snapshot = att.editorSnapshot;
 			out.push({ message: {

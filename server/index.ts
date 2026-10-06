@@ -189,19 +189,26 @@ app.post("/api/markdown-image", (req, res) => {
  * Content-Disposition: attachment so the browser saves it instead of
  * rendering. Path is validated against the workspace root either way.
  */
-app.get("/api/tool-output", async (req, res) => {
+app.get(["/api/tool-output", "/api/tool-output-list"], async (req, res) => {
 	const { clientId, conversationId, toolCallId } = req.query;
 	if (typeof clientId !== "string" || typeof conversationId !== "string" || typeof toolCallId !== "string") { res.status(400).end("Invalid request"); return; }
 	try {
 		const cs = service.get(clientId);
-		if (!cs) throw new Error("Output unavailable");
-		const handle = await cs.downloadToolOutput(conversationId, toolCallId);
-		res.attachment("tool-output.txt");
+		if (!cs) { res.status(403).end("Output access denied"); return; }
+		if (req.path === "/api/tool-output-list") {
+			res.json((await cs.listToolOutputs(conversationId, toolCallId)).map(({ id, name, default: isDefault }) => ({ id, name, default: isDefault }))); return;
+		}
+		const { handle, name } = await cs.downloadToolOutput(conversationId, toolCallId, typeof req.query.outputId === "string" ? req.query.outputId : undefined);
+		res.attachment(name);
+		res.setHeader("X-Content-Type-Options", "nosniff");
 		const stream = handle.createReadStream();
 		res.on("close", () => stream.destroy());
 		stream.on("error", () => res.destroy());
 		stream.pipe(res);
-	} catch { res.status(404).end("Full output unavailable or already cleaned up"); }
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		res.status(code === "ENOENT" ? 404 : code === "EACCES" || code === "EPERM" ? 403 : 500).end(code === "ENOENT" ? "Output file may have been cleaned up" : code === "EACCES" || code === "EPERM" ? "Output access denied" : "Output server error");
+	}
 });
 
 app.get("/api/file", async (req, res) => {

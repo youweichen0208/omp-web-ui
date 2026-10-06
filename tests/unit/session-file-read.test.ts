@@ -1,9 +1,9 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { mkdtempSync, writeFileSync, appendFileSync, readFileSync, rmSync, renameSync, statSync, utimesSync } from "node:fs";
+import { mkdtempSync, writeFileSync, appendFileSync, readFileSync, rmSync, renameSync, statSync, utimesSync, watch } from "node:fs";
 import * as fs from "node:fs/promises";
 
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { SessionBranchCounts, SessionTailValidator } from "../../server/session-file-read.js";
 vi.mock("node:fs/promises", { spy: true });
@@ -160,4 +160,36 @@ test("large single-record parsing runs in a worker without monopolizing the main
 		expect(await guard.ready()).toBe(true);
 		expect(ticks).toBeGreaterThan(10);
 	} finally { clearInterval(timer); }
+});
+
+test("paused tail checks are silent; full checks block and announce completion", async () => {
+	const f = fixture(), changed = vi.fn(), guard = new SessionTailValidator(f.path, f.sm, changed);
+	expect(guard.blocking).toBe(true); await guard.ready(); changed.mockClear();
+	let release!: () => void;
+	const gate = new Promise<void>(resolve => { release = resolve; });
+	const original = fs.stat;
+	vi.mocked(fs.stat).mockImplementationOnce(async (...args: Parameters<typeof fs.stat>) => { await gate; return original(...args); });
+	f.append(); const pending = guard.verify(f.sm);
+	expect(guard.checking).toBe(true); expect(guard.blocking).toBe(false); expect(changed).not.toHaveBeenCalled();
+	release(); expect(await pending).toBe(true); expect(changed).not.toHaveBeenCalled();
+	utimesSync(f.path, new Date(), new Date(Date.now() + 10000));
+	const full = guard.verify(f.sm); expect(guard.blocking).toBe(true); expect(await full).toBe(true); expect(changed).toHaveBeenCalledOnce();
+});
+
+
+test.each([true, false])("native fs.watch append stays silent (snapshot first: %s)", async snapshotFirst => {
+	const f = fixture(), changed = vi.fn(), guard = new SessionTailValidator(f.path, f.sm, changed);
+	await guard.ready(); changed.mockClear();
+	let notifications = 0;
+	const watcher = watch(dirname(f.path), () => { notifications++; guard.check(f.sm); expect(guard.blocking).toBe(false); });
+	try {
+		await new Promise(resolve => setTimeout(resolve, 100));
+		for (let i = 0; i < 5; i++) {
+			const before = notifications; f.append();
+			if (snapshotFirst) guard.check(f.sm);
+			await vi.waitFor(() => expect(notifications).toBeGreaterThan(before));
+			expect(await guard.verify(f.sm)).toBe(true); expect(guard.blocking).toBe(false);
+		}
+		expect(changed).not.toHaveBeenCalled();
+	} finally { watcher.close(); guard.dispose(); }
 });

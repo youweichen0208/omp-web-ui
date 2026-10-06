@@ -45,7 +45,7 @@ export function nativeToolDetails(name: string, result: unknown): Record<string,
 		if (typeof d?.diff === "string") { const bounded = truncate(d.diff, TOOL_OUTPUT_CAP); out.diff = bounded.text; out.diffTruncated = bounded.truncated; }
 		if (typeof d?.firstChangedLine === "number" && Number.isSafeInteger(d.firstChangedLine) && d.firstChangedLine > 0) out.firstChangedLine = d.firstChangedLine;
 	}
-	const path = d?.fullOutputPath ?? (name === "bash" ? r.structuredContent?.full_output_path : undefined);
+	const path = d?.fullOutputPath ?? (["bash", "powershell"].includes(name) ? r.structuredContent?.full_output_path : undefined);
 	if (typeof path === "string" && path.length <= 4096) out.fullOutputPath = path;
 	if (name === "bash") {
 		out.exitCode = toolExitCode(result, r.isError);

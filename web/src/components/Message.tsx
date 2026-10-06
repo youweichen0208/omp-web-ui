@@ -224,7 +224,7 @@ export const Message = memo(function Message({
 	const isFileAttachment =
 		message.role === "custom" && message.customType === "file";
 	// Question text for the per-question tag's tooltip.
-	const userText = message.content
+	const userText = message.questionText ?? message.content
 		.map((b) => asText(b)?.text ?? "")
 		.filter(Boolean)
 		.join("\n");
@@ -301,7 +301,7 @@ export const Message = memo(function Message({
 				? `/skill:${skillBlock.name}${
 						skillBlock.userMessage ? ` ${skillBlock.userMessage}` : ""
 				  }`
-				: message.content
+				: message.questionText ?? message.content
 						.map((b) => asText(b)?.text ?? "")
 						.filter(Boolean)
 						.join("\n"),
@@ -564,10 +564,11 @@ export const Message = memo(function Message({
 								{renderContentBlocks(true)}
 							</>
 						) : message.role === "user" ? (
-							<div ref={userContentRef} className={`user-message-content${foldableUser && !userExpanded ? " collapsed" : ""}`}>{renderContentBlocks(false)}</div>
+							<div ref={userContentRef} className={`user-message-content${foldableUser && !userExpanded ? " collapsed" : ""}`}>{message.questionText !== undefined ? <><Markdown text={preserveUserTree(message.questionText)} fileLinks />{message.content.filter(b => b.type === "image").map((b, i) => <Block key={i} block={b} user toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={false} />)}</> : renderContentBlocks(false)}</div>
 						) : (
 							renderContentBlocks(false)
 						)}
+						{message.role === "user" && message.userAttachments?.map((a, i) => <details className="user-attachment-card" key={i}><summary>{a.path}</summary><pre>{a.preview}</pre></details>)}
 						{foldableUser && userOverflow && !editing && !skillBlock && <button type="button" className="user-message-expand" onClick={() => setUserExpanded(value => !value)}>{userExpanded ? t("collapseCode") : t("expandAllLines", { n: userLineCount })}</button>}
 
 					</>
