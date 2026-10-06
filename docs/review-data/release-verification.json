@@ -1,0 +1,902 @@
+{
+  "release": {
+    "tag_name": "v0.99.8",
+    "html_url": "https://github.com/youweichen0208/pi-harness/releases/tag/v0.99.8",
+    "published_at": "2026-10-06T06:17:09Z",
+    "draft": false
+  },
+  "sourceCommit": "4fecc5b66e2b245b1537c2d63a788f9ecf7fb6cc",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 37421363349,
+      "headSha": "4fecc5b66e2b245b1537c2d63a788f9ecf7fb6cc",
+      "jobs": [
+        {
+          "completedAt": "2026-10-06T06:05:02Z",
+          "conclusion": "success",
+          "databaseId": 112131227640,
+          "name": "ci",
+          "startedAt": "2026-10-06T06:00:06Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:00:08Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:00:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:09Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:00:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:14Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:00:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:14Z",
+              "conclusion": "success",
+              "name": "Check lockfile registry",
+              "number": 4,
+              "startedAt": "2026-10-06T06:00:14Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:43Z",
+              "conclusion": "success",
+              "name": "Install dependencies",
+              "number": 5,
+              "startedAt": "2026-10-06T06:00:14Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:43Z",
+              "conclusion": "success",
+              "name": "Check protocol sync",
+              "number": 6,
+              "startedAt": "2026-10-06T06:00:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:01:02Z",
+              "conclusion": "success",
+              "name": "Typecheck",
+              "number": 7,
+              "startedAt": "2026-10-06T06:00:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:01:16Z",
+              "conclusion": "success",
+              "name": "Build",
+              "number": 8,
+              "startedAt": "2026-10-06T06:01:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:01:26Z",
+              "conclusion": "success",
+              "name": "Unit tests",
+              "number": 9,
+              "startedAt": "2026-10-06T06:01:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:04:57Z",
+              "conclusion": "success",
+              "name": "Protocol smoke tests",
+              "number": 10,
+              "startedAt": "2026-10-06T06:01:26Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 19,
+              "startedAt": "2026-10-06T06:04:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 20,
+              "startedAt": "2026-10-06T06:05:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:00Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 21,
+              "startedAt": "2026-10-06T06:05:00Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421363349/job/112131227640"
+        },
+        {
+          "completedAt": "2026-10-06T06:01:02Z",
+          "conclusion": "success",
+          "databaseId": 112131227848,
+          "name": "node-workbench (macos-latest)",
+          "startedAt": "2026-10-06T06:00:10Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:00:12Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:00:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:14Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:00:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:15Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:00:14Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:15Z",
+              "conclusion": "success",
+              "name": "Run npm run check:lockfile",
+              "number": 4,
+              "startedAt": "2026-10-06T06:00:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:46Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 5,
+              "startedAt": "2026-10-06T06:00:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:50Z",
+              "conclusion": "success",
+              "name": "Run npm run build:server",
+              "number": 6,
+              "startedAt": "2026-10-06T06:00:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:55Z",
+              "conclusion": "success",
+              "name": "Run node tests/node-workbench-test.mjs",
+              "number": 7,
+              "startedAt": "2026-10-06T06:00:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:59Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 13,
+              "startedAt": "2026-10-06T06:00:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:01:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 14,
+              "startedAt": "2026-10-06T06:00:59Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:01:01Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "startedAt": "2026-10-06T06:01:00Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421363349/job/112131227848"
+        },
+        {
+          "completedAt": "2026-10-06T06:02:53Z",
+          "conclusion": "success",
+          "databaseId": 112131228012,
+          "name": "node-workbench (windows-latest)",
+          "startedAt": "2026-10-06T06:00:06Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:00:08Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:00:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:13Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:00:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:18Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:00:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:00:19Z",
+              "conclusion": "success",
+              "name": "Run npm run check:lockfile",
+              "number": 4,
+              "startedAt": "2026-10-06T06:00:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:33Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 5,
+              "startedAt": "2026-10-06T06:00:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:40Z",
+              "conclusion": "success",
+              "name": "Run npm run build:server",
+              "number": 6,
+              "startedAt": "2026-10-06T06:02:33Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:46Z",
+              "conclusion": "success",
+              "name": "Run node tests/node-workbench-test.mjs",
+              "number": 7,
+              "startedAt": "2026-10-06T06:02:40Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:49Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 13,
+              "startedAt": "2026-10-06T06:02:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:52Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 14,
+              "startedAt": "2026-10-06T06:02:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:02:52Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "startedAt": "2026-10-06T06:02:52Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421363349/job/112131228012"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421363349"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37421855122,
+      "headSha": "4fecc5b66e2b245b1537c2d63a788f9ecf7fb6cc",
+      "jobs": [
+        {
+          "completedAt": "2026-10-06T06:05:34Z",
+          "conclusion": "success",
+          "databaseId": 112132737727,
+          "name": "prepare-release",
+          "startedAt": "2026-10-06T06:05:29Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:05:30Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:05:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:31Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:05:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:33Z",
+              "conclusion": "success",
+              "name": "Create GitHub release for tag",
+              "number": 3,
+              "startedAt": "2026-10-06T06:05:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:33Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 6,
+              "startedAt": "2026-10-06T06:05:33Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:33Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 7,
+              "startedAt": "2026-10-06T06:05:33Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122/job/112132737727"
+        },
+        {
+          "completedAt": "2026-10-06T06:09:15Z",
+          "conclusion": "success",
+          "databaseId": 112132772045,
+          "name": "build-linux",
+          "startedAt": "2026-10-06T06:05:36Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:05:38Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:05:37Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:40Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:05:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:44Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:05:40Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:50Z",
+              "conclusion": "success",
+              "name": "Install system deps (node-gyp)",
+              "number": 4,
+              "startedAt": "2026-10-06T06:05:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:50Z",
+              "conclusion": "success",
+              "name": "Check lockfile registry",
+              "number": 5,
+              "startedAt": "2026-10-06T06:05:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:14Z",
+              "conclusion": "success",
+              "name": "Install dependencies",
+              "number": 6,
+              "startedAt": "2026-10-06T06:05:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:32Z",
+              "conclusion": "success",
+              "name": "Build web + server",
+              "number": 7,
+              "startedAt": "2026-10-06T06:06:14Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:47Z",
+              "conclusion": "success",
+              "name": "Verify native tools and OAuth (plain Node)",
+              "number": 8,
+              "startedAt": "2026-10-06T06:06:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:59Z",
+              "conclusion": "success",
+              "name": "Build Electron (Linux)",
+              "number": 9,
+              "startedAt": "2026-10-06T06:06:47Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:04Z",
+              "conclusion": "success",
+              "name": "Verify packaged server, native worker and OAuth",
+              "number": 10,
+              "startedAt": "2026-10-06T06:08:59Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:13Z",
+              "conclusion": "success",
+              "name": "Upload verified Linux packages",
+              "number": 11,
+              "startedAt": "2026-10-06T06:09:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:13Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 21,
+              "startedAt": "2026-10-06T06:09:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:13Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 22,
+              "startedAt": "2026-10-06T06:09:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:13Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-06T06:09:13Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122/job/112132772045"
+        },
+        {
+          "completedAt": "2026-10-06T06:09:10Z",
+          "conclusion": "success",
+          "databaseId": 112132772050,
+          "name": "build-mac",
+          "startedAt": "2026-10-06T06:05:44Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:05:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:05:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:46Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:05:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:53Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:05:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:56Z",
+              "conclusion": "success",
+              "name": "Setup Python (setuptools for node-gyp)",
+              "number": 4,
+              "startedAt": "2026-10-06T06:05:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:57Z",
+              "conclusion": "success",
+              "name": "Check lockfile registry",
+              "number": 5,
+              "startedAt": "2026-10-06T06:05:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:42Z",
+              "conclusion": "success",
+              "name": "Install dependencies",
+              "number": 6,
+              "startedAt": "2026-10-06T06:05:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:07:02Z",
+              "conclusion": "success",
+              "name": "Build web + server",
+              "number": 7,
+              "startedAt": "2026-10-06T06:06:42Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:07:18Z",
+              "conclusion": "success",
+              "name": "Verify native tools and OAuth (plain Node)",
+              "number": 8,
+              "startedAt": "2026-10-06T06:07:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:43Z",
+              "conclusion": "success",
+              "name": "Build Electron (macOS)",
+              "number": 9,
+              "startedAt": "2026-10-06T06:07:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:54Z",
+              "conclusion": "success",
+              "name": "Verify packaged server, native worker and OAuth",
+              "number": 10,
+              "startedAt": "2026-10-06T06:08:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:05Z",
+              "conclusion": "success",
+              "name": "Upload verified macOS packages",
+              "number": 11,
+              "startedAt": "2026-10-06T06:08:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:06Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 21,
+              "startedAt": "2026-10-06T06:09:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:06Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 22,
+              "startedAt": "2026-10-06T06:09:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:08Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-06T06:09:06Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122/job/112132772050"
+        },
+        {
+          "completedAt": "2026-10-06T06:17:03Z",
+          "conclusion": "success",
+          "databaseId": 112132772080,
+          "name": "build-win",
+          "startedAt": "2026-10-06T06:05:36Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:05:38Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:05:37Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:43Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:05:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:05:55Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v5",
+              "number": 3,
+              "startedAt": "2026-10-06T06:05:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:03Z",
+              "conclusion": "success",
+              "name": "Setup Python (setuptools for node-gyp)",
+              "number": 4,
+              "startedAt": "2026-10-06T06:05:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:06:04Z",
+              "conclusion": "success",
+              "name": "Check lockfile registry",
+              "number": 5,
+              "startedAt": "2026-10-06T06:06:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:08Z",
+              "conclusion": "success",
+              "name": "Install dependencies",
+              "number": 6,
+              "startedAt": "2026-10-06T06:06:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:31Z",
+              "conclusion": "success",
+              "name": "Build web + server",
+              "number": 7,
+              "startedAt": "2026-10-06T06:08:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:50Z",
+              "conclusion": "success",
+              "name": "Terminal smoke test (plain Node)",
+              "number": 8,
+              "startedAt": "2026-10-06T06:08:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:08:54Z",
+              "conclusion": "success",
+              "name": "Verify native tools and OAuth (plain Node)",
+              "number": 9,
+              "startedAt": "2026-10-06T06:08:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:09Z",
+              "conclusion": "success",
+              "name": "Install browser for toolbar regression",
+              "number": 10,
+              "startedAt": "2026-10-06T06:08:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:09:30Z",
+              "conclusion": "success",
+              "name": "Verify desktop toolbar layout on Windows",
+              "number": 11,
+              "startedAt": "2026-10-06T06:09:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:14:11Z",
+              "conclusion": "success",
+              "name": "Build Electron (Windows)",
+              "number": 12,
+              "startedAt": "2026-10-06T06:09:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:16:49Z",
+              "conclusion": "success",
+              "name": "Verify packaged server and portable relaunch",
+              "number": 13,
+              "startedAt": "2026-10-06T06:14:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:00Z",
+              "conclusion": "success",
+              "name": "Publish verified Windows packages",
+              "number": 14,
+              "startedAt": "2026-10-06T06:16:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v5",
+              "number": 27,
+              "startedAt": "2026-10-06T06:17:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:02Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 28,
+              "startedAt": "2026-10-06T06:17:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:02Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 29,
+              "startedAt": "2026-10-06T06:17:02Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122/job/112132772080"
+        },
+        {
+          "completedAt": "2026-10-06T06:17:11Z",
+          "conclusion": "success",
+          "databaseId": 112135935318,
+          "name": "publish-release",
+          "startedAt": "2026-10-06T06:17:05Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-06T06:17:06Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-06T06:17:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:07Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v5",
+              "number": 2,
+              "startedAt": "2026-10-06T06:17:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:09Z",
+              "conclusion": "success",
+              "name": "Verify attachments and publish release",
+              "number": 3,
+              "startedAt": "2026-10-06T06:17:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:09Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v5",
+              "number": 6,
+              "startedAt": "2026-10-06T06:17:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-06T06:17:09Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 7,
+              "startedAt": "2026-10-06T06:17:09Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122/job/112135935318"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/youweichen0208/pi-harness/actions/runs/37421855122"
+    }
+  ],
+  "assets": [
+    {
+      "name": "latest-linux.yml",
+      "size": 541,
+      "digest": "sha256:b2ecfd6224261ee876fc3e3abdde86835e0be2326b0997348d55e525e8d7139f",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/latest-linux.yml"
+    },
+    {
+      "name": "latest-mac.yml",
+      "size": 498,
+      "digest": "sha256:4fa2863b52f7d91503884c1c626d5ca9de0fe6dd2632223fa27c96c197e7840e",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/latest-mac.yml"
+    },
+    {
+      "name": "latest.yml",
+      "size": 344,
+      "digest": "sha256:c7b2313a39c36a2e13108b0d0f2bf3824133b87aab2538a3a1be67eb7a35d087",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/latest.yml"
+    },
+    {
+      "name": "pi-0.99.8-linux-amd64.deb",
+      "size": 136572284,
+      "digest": "sha256:7da2429cbad672da6a7962d448c1d934c40af87aee1c5b527e7e7f5c3ebbfd78",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-linux-amd64.deb"
+    },
+    {
+      "name": "pi-0.99.8-linux-x86_64.AppImage",
+      "size": 175447308,
+      "digest": "sha256:1e72437a6d9916893796ca42c04e0e5a3ddc2edb66de45503086decf3194480a",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-linux-x86_64.AppImage"
+    },
+    {
+      "name": "pi-0.99.8-mac-arm64.dmg",
+      "size": 166683507,
+      "digest": "sha256:5b15e6ae04e949cd5597db3610b34b513741960e62390f6e8d35f3ee94796b9b",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-mac-arm64.dmg"
+    },
+    {
+      "name": "pi-0.99.8-mac-arm64.dmg.blockmap",
+      "size": 176112,
+      "digest": "sha256:730df7a4de277cffce02d87a3aacf16ad843af5b3430968f470a39ff623a0137",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-mac-arm64.dmg.blockmap"
+    },
+    {
+      "name": "pi-0.99.8-mac-arm64.zip",
+      "size": 173055424,
+      "digest": "sha256:0c077321309333ec86e14816496fab8fde8fe0bb3d5808dce580ff1807560e65",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-mac-arm64.zip"
+    },
+    {
+      "name": "pi-0.99.8-mac-arm64.zip.blockmap",
+      "size": 176320,
+      "digest": "sha256:ffa0e7bba5a52e98192d71f218c18bc2b1649f1d8bfc38ea3c821998d449297b",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-mac-arm64.zip.blockmap"
+    },
+    {
+      "name": "pi-0.99.8-setup-x64.exe",
+      "size": 149138595,
+      "digest": "sha256:f654b08d5c39a417ccde458a83e4a44899c73904ac494b4984c0c1e5b01436b9",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-setup-x64.exe"
+    },
+    {
+      "name": "pi-0.99.8-setup-x64.exe.blockmap",
+      "size": 156638,
+      "digest": "sha256:db991fceb232b62a05ada1bf48d9f2da08118333562122886a6fc4ba18aaa27e",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-setup-x64.exe.blockmap"
+    },
+    {
+      "name": "pi-0.99.8-win-x64.exe",
+      "size": 148903323,
+      "digest": "sha256:22fd5a88e2b0b105d4ca6d46071795a5dff7b4f95ea110776e83b7be0f415b4e",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-win-x64.exe"
+    },
+    {
+      "name": "pi-0.99.8-win-x64.zip",
+      "size": 203504043,
+      "digest": "sha256:04a0fcee1c222efd040f4e408ab024dad85577e61e7efa6d401be8fbebe07033",
+      "browser_download_url": "https://github.com/youweichen0208/pi-harness/releases/download/v0.99.8/pi-0.99.8-win-x64.zip"
+    }
+  ],
+  "scope": "GitHub API metadata and successful real-runner compatibility checks; Windows/Linux resource usage and installed sizes were not measured. Asset digests are reported by GitHub, not independently downloaded and hashed."
+}

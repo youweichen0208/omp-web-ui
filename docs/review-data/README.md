@@ -14,6 +14,7 @@
 - `pi-104-upstream-fixes.json`：上游 1.0.4 专项回归。
 - `upstream-comparison.json`：官方 v1.0.3 → v1.0.4 变更清单。
 - `validation/`：本机功能验证日志。
+- `release-verification.json`：正式发布状态、三平台工作流结果、附件体积及 GitHub API 提供的摘要；未重新下载附件计算哈希。
 - `archive-manifest.json`：归档及其中 69 个原始文件的 SHA-256 校验清单。
 - `environments.json`：各测量模式的环境元数据，便于不解压直接核对。
 

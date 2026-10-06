@@ -42,7 +42,7 @@ CDP 在渲染主线程繁忙时会延迟返回，不能保证前端每秒都有�
 
 资源脚本的 ui-ready 包含进程启动、探针准备及仪器化页面加载；Electron 为捕获完整首屏传输会再次导航，故不能把这个值当原生冷启动。独立点击脚本的 launch-to-ready 另记录首次页面可操作时间（含首次配置夹具弹窗关闭），不重载页面。历史加载时间包含控制请求及轮询，不能视为纯渲染耗时。固定循环计时是控制请求到下一次观察到快照，包含100ms轮询下限；它不保证这份快照已属于目标项目，更不是按键到像素延迟。循环在同一个控制客户端的三个项目间发请求，同时页面轮换对话/终端/节点视图；节点视图仅自动检测本机 SSH 配置的路径与数量元数据，不导入或连接节点。另外通过 `native-interaction-benchmark.mjs` 在三个短历史项目上测真实点击到目标内容可见且两次 requestAnimationFrame 后的延迟；它与协议轮询计时分开报告。样本量和 P50/P95 由 summary.json 及 interaction.json 原样列出，不用三个样本制造稳定尾延迟结论。
 
-Windows/Linux 的构建和产物回归交给发布 CI 的真实 runner；本机没有做这两个平台的 GUI/资源实测，发布前以工作流结果作为对应验收证据；本机资源数值不外推到其他平台。真实 OAuth 服务端政策、真实模型长时间重试及复杂 PDF/极端附件负载不在这些夹具的验证范围内。
+2026-10-06，源码提交 `4fecc5b` 的 [主 CI](https://github.com/youweichen0208/pi-harness/actions/runs/37421363349) 和 [三平台发布工作流](https://github.com/youweichen0208/pi-harness/actions/runs/37421855122) 全部通过，[v0.99.8](https://github.com/youweichen0208/pi-harness/releases/tag/v0.99.8) 已公开。macOS/Windows/Linux 真实 runner 均完成原生工具、OAuth、包内服务回归，Windows 另通过工具栏和便携版重启验证；13 个发布附件的大小及 GitHub 提供的摘要见 [release-verification.json](review-data/release-verification.json)。这些结果不等于 Windows/Linux 资源实测；本机资源数值不外推到其他平台。真实 OAuth 服务端政策、真实模型长时间重试及复杂 PDF/极端附件负载不在这些夹具的验证范围内。
 
 <!-- RESOURCE_RESULTS_START -->
 ## 实测结果
