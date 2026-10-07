@@ -191,7 +191,6 @@ interface Conversation {
 	webUi: WebUIContext;
 	/** Wiki conversations are temporary native in-memory sessions. */
 	wiki?: boolean;
-	lastRunMessages?: Extract<AgentSessionEvent, { type: "agent_end" }>["messages"];
 	thinkingTimings: ThinkingTimings;
 	id: string;
 	/** Display title: first user prompt (truncated) or the default. */
@@ -1062,25 +1061,12 @@ export class ClientSession {
 				break;
 			// A run finished or a new entry was persisted — keep the session list fresh
 			// (new chat + first message, completed turns, compaction, etc.).
-			case "agent_end":
-				conv.lastRunMessages = event.messages;
-				break;
-
 			case "agent_settled": {
 				this.coordinatePlan(conv);
 				if (this.pendingMcpReload.delete(conv.id)) void this.reloadMcpConversation(conv).catch(error => this.emit({ type: "notice", level: "error", text: `MCP reload failed: ${error.message}` }));
 
-				const messages = conv.lastRunMessages ?? [];
-				conv.lastRunMessages = undefined;
 				conv.lastTaskEndedAt = Date.now();
 				this.scheduleSessionsRefresh();
-				// Manual interrupt (Stop button / abort): the last assistant message
-				// carries stopReason "aborted". A half-finished run should NOT be
-				// reviewed (it would fail and inject a revision, only to be stopped
-				// again → an endless review loop). Clear the goal so the review loop
-				// stops too, then let the user give a fresh instruction.
-
-				// Goal review hook lives in GoalService.onAgentEnd(conv, false).
 
 				// Deferred settings reload: settings (system prompt / skills /
 				// extensions) changed while the run was streaming — applying now

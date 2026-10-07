@@ -108,6 +108,20 @@ export function workspacePath(
 }
 
 /**
+ * Symlink-aware containment: a link inside the workspace that points outside
+ * must not expose the target. A missing file is left to the caller's own
+ * stat/open to report.
+ */
+export function isRealPathInWorkspace(root: string, abs: string): boolean {
+	try {
+		const rel = relative(realpathSync(root), realpathSync(abs));
+		return !(isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`));
+	} catch (err) {
+		return (err as NodeJS.ErrnoException).code === "ENOENT";
+	}
+}
+
+/**
  * Read a directory for the file panel. The two platforms intentionally use
  * different strategies — do NOT unify them:
  *
@@ -611,6 +625,7 @@ export class FilesService {
 				throw new Error("路径超出工作区");
 			}
 			const { abs, rel } = wp;
+			if (!isRealPathInWorkspace(root, abs)) throw new Error("路径超出工作区");
 			const stat = await fs.stat(abs);
 			if (!stat.isFile()) {
 				throw new Error("不是文件");
@@ -691,7 +706,7 @@ export class FilesService {
 		try {
 			if (options.cwd !== undefined && options.cwd !== cwd) throw new Error("工作区已改变");
 			const wp = workspacePath(resolve(cwd), relPath);
-			if (!wp) throw new Error("路径超出工作区");
+			if (!wp || !isRealPathInWorkspace(cwd, wp.abs)) throw new Error("路径超出工作区");
 			if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024) throw new Error("文件内容过大（上限 2MB）");
 			const stat = statSync(wp.abs);
 			if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES) throw new Error("文件不是可编辑的完整文本");

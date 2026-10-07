@@ -57,16 +57,49 @@ export function promptUsesFile(session:AgentSession,cwd:string,agentDir:string,p
 	return session.settingsManager.isProjectTrusted()&&resolve(path)===join(cwd,"AGENTS.md")||catalog(session,cwd,agentDir).some(file=>resolve(file.path)===resolve(path)||identity(file.path)===target);
 }
 interface ReloadState { dirty:boolean; promise?:Promise<void>; error?:string; unsubscribe?:()=>void; refreshed:()=>void; }
-const reloads=new WeakMap<AgentSession,ReloadState>();
-export function promptReloadStatus(session:AgentSession){const state=reloads.get(session);return {pending:!!state&&(state.dirty||!!state.promise),...(state?.error?{reloadError:state.error}:{})};}
-export async function flushPromptReload(session:AgentSession,retry=false):Promise<void> {
-	const state=reloads.get(session);if(!state)return;if(state.promise)return state.promise;if(!state.dirty||!session.isIdle||state.error&&!retry)return;
-	state.error=undefined;state.dirty=false;
-	state.promise=(async()=>{try{await session.reload();state.refreshed();}catch(e){state.error=(e as Error).message;state.dirty=true;}finally{state.promise=undefined;if(!state.dirty){state.unsubscribe?.();reloads.delete(session);}}})();
-	await state.promise;
-	if(state.dirty&&!state.error&&session.isIdle)await flushPromptReload(session);
+const reloads = new WeakMap<AgentSession, ReloadState>();
+
+export function promptReloadStatus(session: AgentSession) {
+	const state = reloads.get(session);
+	return { pending: !!state && (state.dirty || !!state.promise), ...(state?.error ? { reloadError: state.error } : {}) };
 }
-export async function queuePromptReload(session:AgentSession,refreshed:()=>void) {
-	let state=reloads.get(session);if(!state){state={dirty:true,refreshed};reloads.set(session,state);state.unsubscribe=session.subscribe(event=>{if(event.type==="agent_settled")void flushPromptReload(session);});}
-	state.dirty=true;state.error=undefined;await flushPromptReload(session);
+
+export async function flushPromptReload(session: AgentSession, retry = false): Promise<void> {
+	const state = reloads.get(session);
+	if (!state) return;
+	if (state.promise) return state.promise;
+	if (!state.dirty || !session.isIdle || (state.error && !retry)) return;
+	state.error = undefined;
+	state.dirty = false;
+	state.promise = (async () => {
+		try {
+			await session.reload();
+			state.refreshed();
+		} catch (e) {
+			state.error = (e as Error).message;
+			state.dirty = true;
+		} finally {
+			state.promise = undefined;
+			if (!state.dirty) {
+				state.unsubscribe?.();
+				reloads.delete(session);
+			}
+		}
+	})();
+	await state.promise;
+	if (state.dirty && !state.error && session.isIdle) await flushPromptReload(session);
+}
+
+export async function queuePromptReload(session: AgentSession, refreshed: () => void) {
+	let state = reloads.get(session);
+	if (!state) {
+		state = { dirty: true, refreshed };
+		reloads.set(session, state);
+		state.unsubscribe = session.subscribe((event) => {
+			if (event.type === "agent_settled") void flushPromptReload(session);
+		});
+	}
+	state.dirty = true;
+	state.error = undefined;
+	await flushPromptReload(session);
 }

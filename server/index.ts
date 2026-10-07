@@ -40,6 +40,7 @@ import {
 	workspacePath,
 	QuiesceRejectedError,
 } from "./agent-service.js";
+import { isRealPathInWorkspace } from "./files-service.js";
 import { previewKind } from "./text-sniff.js";
 import { startControlServer } from "./control-socket.js";
 import { readSqlitePreview } from "./sqlite-preview.js";
@@ -232,6 +233,10 @@ app.get("/api/file", async (req, res) => {
 			return;
 		}
 		const abs = wp.abs;
+		if (!isRealPathInWorkspace(cs.cwd, abs)) {
+			res.status(400).end("path outside workspace");
+			return;
+		}
 		const name = basename(abs);
 		const kind = previewKind(name);
 		const isDownload = req.query.download === "1";
@@ -559,7 +564,6 @@ wss.on("connection", (ws) => {
 		ws.send(wire);
 	};
 
-	// Plugins broadcast to every open socket; unregister on close below.
 	// Plugins broadcast to every open socket; unregister on close below. The
 	// cid getter lets plugins target THIS socket via host.sendTo(clientId).
 	const removePluginSender = pluginMgr.addSender(send, () => clientId);
