@@ -5,7 +5,7 @@ import { SessionTreeController } from "./session-tree-controller.js";
 import { SessionBranchCounts } from "./session-file-read.js";
 import type { TreeRequest } from "./protocol.js";
 import { createHash, randomUUID } from "node:crypto";
-import { recoveryEvent, isRecovering, recoverySnapshot, type RecoveryState } from "./recovery-state.js";
+import { recoveryEvent, isRecovering, recoverySnapshot } from "./recovery-state.js";
 import { Readable } from "node:stream";
 import { openToolOutput, toolOutputManifest, toolOutputId } from "./tool-output.js";
 import { nativeToolDetails, toolExitCode } from "./serialize.js";
@@ -25,6 +25,17 @@ import type { PromptAttachment } from "./protocol.js";
 import { validateEditorSnapshots } from "./editor-snapshot.js";
 
 import { QueryCache } from "./query-cache.js";
+import {
+	DEFAULT_CONV_TITLE,
+	MAX_OPEN_CONVERSATIONS,
+	QuiesceRejectedError,
+	conversationTitle,
+	skillAwareTitleText,
+	type Conversation,
+} from "./conversation.js";
+import { browseDirs } from "./dir-browser.js";
+import { PiConfigProbe, checkUpdate, installPiAgent, isPiCliInstalled } from "./pi-environment.js";
+export { QuiesceRejectedError };
 /**
  * AgentService — wraps the pi SDK (@earendil-works/pi-coding-agent) for the web
  * frontend. Each browser client (identified by a persistent clientId) gets its
@@ -37,14 +48,11 @@ import { QueryCache } from "./query-cache.js";
  * snapshots. The frontend is snapshot-driven (server is the source of truth),
  * so reconnects just re-request a snapshot.
  */
-import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
-	readFileSync,
 	rmSync,
 	statSync,
 	writeFileSync,
-	mkdirSync,
 	watch,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -70,7 +78,6 @@ import {
 // 一致的版本号，保证两边用的是同一份实现。
 import { contentText } from "@earendil-works/pi-ai";
 import { estimateContextParts } from "./context-breakdown.js";
-import { appVersion } from "./app-version.js";
 import { BgServerTracker } from "./bg-servers.js";
 import type {   PluginToolEvent } from "./plugins.js";
 import { SettingsService } from "./settings-service.js";
@@ -145,19 +152,6 @@ const STALL_NOTIFY_MS = (() => {
 const UI_MESSAGE_CACHE_CAP = 4096;
 /** Preview panel cap: only the first 512KB of a file is ever read/sent. */
 
-/** Thrown when the service is quiesced (draining) and the request is NEW work
- *  the admission controller refuses: a brand-new client attach, a prompt,
- *  a fork, a session resume, or a goal wizard start. index.ts closes the
- *  WebSocket with 4403 so the browser reconnect loop can retry after the
- *  server reopens admission (see AgentService.quiesce). */
-export class QuiesceRejectedError extends Error {
-	readonly code = "QUIESCED";
-	constructor(detail: string) {
-		super(`服务器正在排空存量工作（quiesce）——${detail}`);
-		this.name = "QuiesceRejectedError";
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Preview kind classification. The preview panel only opens image / video /
 // text-editable files; everything else (exe, jar, archives, …) is refused so
@@ -177,144 +171,6 @@ export { workspacePath };
 // ---------------------------------------------------------------------------
 // Per-client persisted UI state (<dataDir>/client-state.json)
 // ---------------------------------------------------------------------------
-
-/**
- * One open conversation (chat thread) of a client. Each conversation owns its
- * OWN AgentSessionRuntime, so starting a new chat or switching between chats
- * never interrupts another conversation's in-flight run.
- */
-interface Conversation {
-	tree?: SessionTreeController;
-	treeProjectionRevision?: string;
-	treeEntryIds?: Map<string, string[]>;
-	recovery: RecoveryState;
-	webUi: WebUIContext;
-	/** Wiki conversations are temporary native in-memory sessions. */
-	wiki?: boolean;
-	thinkingTimings: ThinkingTimings;
-	id: string;
-	/** Display title: first user prompt (truncated) or the default. */
-	title: string;
-
-	runtime: AgentSessionRuntime;
-	session: AgentSession;
-	cwd: string;
-	createdAt: number;
-	/** In the per-project "running conversations" list. A conversation enters
-	 *  the list when it is displaced to the background while still streaming;
-	 *  it leaves (and its runtime is freed) when it is opened again and left
-	 *  without continuing. */
-	listed: boolean;
-	/** A prompt was sent while this conversation was active (cleared whenever
-	 *  it becomes active). A listed conversation that is displaced while idle
-	 *  with this still false counts as "opened but not continued" and is
-	 *  dismissed from the list. */
-	promptedSinceActive: boolean;
-	/** Last time this conversation became active — set_cwd picks the target
-	 *  project's most recently active conversation. */
-	lastActiveAt: number;
-	/** Last SDK event time for this conversation. This detects a quiet run;
-	 *  WebSocket heartbeat separately reports browser/server connectivity. */
-	lastSdkEventAt: number;
-	/** Timestamp of the latest completed run in the current user turn. */
-	lastTaskEndedAt?: number;
-	/** Set once the silence state has been sent for the current quiet period;
-	 *  cleared on every SDK event and on each new prompt. */
-	stallNoticed: boolean;
-	/** Names of in-flight tools, so a quiet command is not mistaken for a silent model. */
-	runningToolNames: Map<string, string>;
-	toolsExecutedSincePrompt: boolean;
-
-	/** Wizard execution is per conversation; dialog transport itself remains
-	 * client-wide because the browser can display one dialog at a time. */
-
-	/** Session event subscription — events are routed to THIS conversation. */
-	unsubscribe?: () => void;
-	/** Monotonic sequence for message_delta/tool_delta pushes of this conversation —
-	 *  a gap on the client triggers a get_state resync. */
-	deltaSeq: number;
-	/** PTYs belong to the conversation, not the browser socket or client. */
-	terminals: TerminalManager;
-	// Per-conversation serialization caches. Message ids derive from
-	// (role, timestamp); two conversations can produce identical pairs, so
-	// these must never be shared across conversations.
-	msgIds: Map<string, number>;
-	nextMsgId: number;
-	/** Per-timestamp 1-based user-message seq (drives the `u-<ts>-<seq>` id suffix). */
-	userSeqByTs: Map<number, number>;
-	uiMessageCache: Map<string, UiMessage>;
-	lastMessagesSig: string;
-	lastMessagesArray: UiMessage[];
-	/** Actual queued prompt TEXTS (steer = 插队, followUp = 排队) — the UI
-	 *  renders them as pending bubbles in the real message list. */
-	queueSteering: string[];
-	queueFollowUp: string[];
-	/** tool_execution_start timestamps keyed by toolCallId — lets tool_status
-	 *  report how long a tool actually ran (vs. waiting on the model). */
-	toolStartTimes: Map<string, number>;
-
-}
-
-/** Hard cap on how long ONE tool call may run before the watchdog aborts the
- *  session. This covers all tools, including explicit long bash timeouts and
- *  extension tools without their own deadlines. Override with the PI_WEB_TOOL_TIMEOUT_MS env var
- *  (milliseconds). */
-
-/** Cap on simultaneously open conversations of ONE project (each keeps a full
- *  runtime alive; conversations of other projects keep their own lists). */
-const MAX_OPEN_CONVERSATIONS = 8;
-const DEFAULT_CONV_TITLE = "新对话";
-
-// Mirrors web/src/skill-block.ts's parseSkillBlock (which itself mirrors the
-// pi SDK's dist/core/agent-session.js) — kept in sync by hand, server and
-// web can't share a module across the tsconfig split. When the user sends
-// /skill:name args, the SDK expands the prompt into
-// `<skill name="..." location="...">\n...SKILL.md body...\n</skill>\n\n<args>`;
-// using that raw text as a conversation title would dump (and mid-sentence
-// truncate) the entire skill body instead of something readable.
-const SKILL_BLOCK_TITLE_RE =
-	/^<skill name="([^"]+)" location="[^"]+">\n[\s\S]*?\n<\/skill>(?:\n\n([\s\S]+))?$/;
-
-function skillAwareTitleText(text: string): string {
-	const m = text.match(SKILL_BLOCK_TITLE_RE);
-	if (!m) return text;
-	const name = m[1];
-	const args = m[2]?.trim();
-	return `skill:${name}` + (args ? ` · ${args}` : "");
-}
-
-/** First user text in a session, truncated for the conversation list. */
-function conversationTitle(session: AgentSession): string {
-	try {
-		for (const m of session.agent.state.messages) {
-			if (m.role !== "user") continue;
-			const content = m.content as unknown;
-			let text = "";
-			if (typeof content === "string") {
-				text = content;
-			} else if (Array.isArray(content)) {
-				for (const p of content) {
-					if (
-						p &&
-						typeof p === "object" &&
-						(p as { type?: unknown }).type === "text" &&
-						typeof (p as { text?: unknown }).text === "string"
-					) {
-						text = (p as { text: string }).text;
-						break;
-					}
-				}
-			}
-			const trimmed = skillAwareTitleText(text).trim().replace(/\s+/g, " ");
-			if (trimmed.length > 0) {
-				return trimmed.length > 30 ? `${trimmed.slice(0, 30)}…` : trimmed;
-			}
-		}
-	} catch {
-		// best-effort
-	}
-	return DEFAULT_CONV_TITLE;
-}
 
 /** AgentSession 私有方法 `_getSummarizationRequestAuth` 的返回结构。
  *  动它之前先看下面 generateAiTitle() 上的注意事项。 */
@@ -586,7 +442,7 @@ export class ClientSession {
 	}
 
 	get nativeModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
-	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piCheckCache = null; await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
+	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piConfig.invalidate(); await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
 	private get webUi(): WebUIContext { return this.conv.webUi; }
 	private widgetsTimer: ReturnType<typeof setInterval> | null = null;
 	/** Model-stall watchdog interval (see startStallTimer). */
@@ -620,7 +476,7 @@ export class ClientSession {
 	 */
 	private disposed = false;
 	/** pi-config readiness check, cached briefly so 60ms snapshots don't hit disk. */
-	private piCheckCache: { at: number; configured: boolean } | null = null;
+	private piConfig!: PiConfigProbe; // 构造函数里创建（需要 agentDir）
 
 	/** fs.watch on the currently-listed directory — file changes push an instant
 	 *  refresh (`file_changed`) so the tree updates without waiting for the 10s
@@ -650,6 +506,7 @@ export class ClientSession {
 
 		this.cwd = cwd;
 		this.agentDir = agentDir;
+		this.piConfig = new PiConfigProbe(agentDir);
 		this.stateStore = stateStore;
 		this.thinkingDurationStore = thinkingDurationStore;
 		this.settingsSvc = new SettingsService({
@@ -679,7 +536,7 @@ export class ClientSession {
 			isDisposed: () => this.disposed,
 			modelRuntime: () => this.runtime.services.modelRuntime,
 			invalidatePiConfig: () => {
-				this.piCheckCache = null;
+				this.piConfig.invalidate();
 			},
 			pushModels: async () => this.listModels(),
 		});
@@ -1332,7 +1189,7 @@ export class ClientSession {
 			tools: state.tools.map((t) => t.name),
 			version: ++this.version,
 			piConfigured: this.isPiConfigured(),
-			piAgentInstalled: this.isPiCliInstalled(),
+			piAgentInstalled: isPiCliInstalled(),
 			stats,
 		};
 	}
@@ -1464,132 +1321,9 @@ export class ClientSession {
 		this.convs.get(conversationId)?.webUi.resolveDialog(id, value);
 	}
 
-	/**
-	 * Whether the pi agent config looks ready: the agent dir exists and
-	 * auth.json has at least one provider credential. Cached for 2s.
-	 */
+	/** Whether the pi agent config looks ready (cached for 2s). */
 	isPiConfigured(): boolean {
-		const now = Date.now();
-		const cached = this.piCheckCache;
-		if (cached && now - cached.at < 2000) return cached.configured;
-		let configured = false;
-		try {
-			const authPath = join(this.agentDir, "auth.json");
-			if (existsSync(authPath)) {
-				const data = JSON.parse(readFileSync(authPath, "utf8")) as Record<
-					string,
-					unknown
-				>;
-				configured =
-					typeof data === "object" &&
-					data !== null &&
-					Object.keys(data).length > 0;
-			}
-		} catch {
-			configured = false;
-		}
-		this.piCheckCache = { at: now, configured };
-		return configured;
-	}
-
-	/**
-	 * Whether the pi CLI binary is installed and runnable (`pi --version`
-	 * probe). Cached machine-wide (same binary for every client) for 10s —
-	 * the check is only rerun after install or when the cache expires.
-	 */
-	private static piCliProbe: { at: number; installed: boolean } | null = null;
-	private static readonly PI_CLI_PROBE_TTL_MS = 10_000;
-
-	private isPiCliInstalled(): boolean {
-		const now = Date.now();
-		const cached = ClientSession.piCliProbe;
-		if (cached && now - cached.at < ClientSession.PI_CLI_PROBE_TTL_MS)
-			return cached.installed;
-		let installed = false;
-		try {
-			const res = spawnSync("pi", ["--version"], {
-				timeout: 5000,
-				stdio: "ignore",
-				// Windows: `pi` resolves to a pi.cmd shim — spawnSync can only
-				// exec those through a shell (else ENOENT).
-				shell: process.platform === "win32",
-			});
-			installed = !res.error && res.status === 0;
-		} catch {
-			installed = false;
-		}
-		ClientSession.piCliProbe = { at: now, installed };
-		return installed;
-	}
-
-	private static invalidatePiCliProbe(): void {
-		ClientSession.piCliProbe = null;
-	}
-
-	/**
-	 * Run a command async, collecting stdout+stderr; kills on timeout.
-	 * Never throws / never crashes the server: spawn errors (ENOENT etc.)
-	 * resolve with code -1 so callers can report them as notices.
-	 */
-	private runAsync(
-		cmd: string,
-		args: string[],
-		timeoutMs: number,
-		cwd?: string,
-	): Promise<{ code: number | null; out: string }> {
-		return new Promise((resolve) => {
-			let p;
-			try {
-				p = spawn(cmd, args, {
-					...(cwd ? { cwd } : {}),
-					stdio: ["ignore", "pipe", "pipe"],
-					// Windows: npm and friends are .cmd shims — Node can only exec
-					// them through the shell (otherwise spawn npm → ENOENT).
-					shell: process.platform === "win32",
-				});
-			} catch (err) {
-				resolve({ code: -1, out: String(err) });
-				return;
-			}
-			let out = "";
-			let settled = false;
-			const done = (code: number | null, text?: string) => {
-				if (settled) return;
-				settled = true;
-				clearTimeout(t);
-				resolve({ code, out: text ?? out });
-			};
-			const t = setTimeout(() => p.kill(), timeoutMs);
-			p.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-			p.stderr?.on("data", (d: Buffer) => (out += d.toString()));
-			p.on("error", (err) => done(-1, String(err)));
-			p.on("close", (code) => done(code));
-		});
-	}
-
-	/**
-	 * Auto-install the pi agent: ensure the config dir exists and install the
-	 * pi CLI globally (npm i -g). Auth is configured afterwards via the API key
-	 * form or by running `pi` in a terminal.
-	 */
-
-	/**
-	 * Version of the RUNNING pi-web-ui package, shared with the ready handshake.
-	 */
-	private static currentAppVersion(): string {
-		return appVersion();
-	}
-
-	/** Simple numeric semver compare: >0 means a newer than b. */
-	private static compareVersions(a: string, b: string): number {
-		const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-		const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
-		for (let i = 0; i < 3; i++) {
-			const x = pa[i] ?? 0;
-			const y = pb[i] ?? 0;
-			if (x !== y) return x - y;
-		}
-		return 0;
+		return this.piConfig.isConfigured();
 	}
 
 	/** Set by index.ts: called when /pi-web-ui:quit is invoked. */
@@ -1601,41 +1335,7 @@ export class ClientSession {
 
 	/** Ask the npm registry for the latest pi-web-ui version and report it. */
 	async checkUpdate(): Promise<void> {
-		const current = ClientSession.currentAppVersion();
-		try {
-			// Fetch the full package doc (not /latest): it carries the per-version
-			// publish timestamps so the UI can hint when a version was JUST
-			// published and the registry/CDN caches may not have caught up yet.
-			const res = await fetch("https://registry.npmjs.org/@youweichen%2fpi-web-ui", {
-				signal: AbortSignal.timeout(8_000),
-			});
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const data = (await res.json()) as {
-				"dist-tags"?: { latest?: string };
-				time?: Record<string, string>;
-			};
-			const latest = data["dist-tags"]?.latest ?? null;
-			const latestPublishedAt =
-				latest && data.time ? (data.time[latest] ?? null) : null;
-			const upToDate =
-				latest === null || ClientSession.compareVersions(current, latest) >= 0;
-			this.emit({
-				type: "update_status",
-				current,
-				latest,
-				latestPublishedAt,
-				upToDate,
-			});
-		} catch (err) {
-			this.emit({
-				type: "update_status",
-				current,
-				latest: null,
-				latestPublishedAt: null,
-				upToDate: false,
-				error: `检查更新失败：${(err as Error).message}`,
-			});
-		}
+		return checkUpdate((msg) => this.emit(msg));
 	}
 
 	async checkComponentUpdates(requestId: string): Promise<void> {
@@ -1669,47 +1369,7 @@ export class ClientSession {
 	}
 
 	async installPiAgent(): Promise<void> {
-		try {
-			mkdirSync(this.agentDir, { recursive: true });
-			this.emit({
-				type: "notice",
-				level: "info",
-				text: "正在安装 pi agent CLI（npm i -g @earendil-works/pi-coding-agent）…",
-			});
-			const { code, out } = await this.runAsync(
-				"npm",
-				["i", "-g", "@earendil-works/pi-coding-agent"],
-				180_000,
-			);
-			if (code === 0) {
-				this.emit({
-					type: "notice",
-					level: "info",
-					text: "✅ pi agent CLI 安装完成。填入 API 密钥即可开始，或在终端运行 pi 完成登录。",
-				});
-				this.emit({ type: "install_result", ok: true, detail: "" });
-			} else {
-				this.emit({
-					type: "notice",
-					level: "error",
-					text: `pi agent 安装失败（${code ?? "timeout"}）：${out.slice(0, 400)}`,
-				});
-				this.emit({
-					type: "install_result",
-					ok: false,
-					detail: out.slice(0, 600),
-				});
-			}
-		} catch (err) {
-			this.emit({
-				type: "notice",
-				level: "error",
-				text: `pi agent 安装失败：${(err as Error).message}`,
-			});
-		}
-		// The CLI may just have landed on PATH (or the install may have failed) —
-		// drop the probe cache so the next snapshot re-checks.
-		ClientSession.invalidatePiCliProbe();
+		await installPiAgent(this.agentDir, (msg) => this.emit(msg));
 		this.flushSnapshot();
 	}
 
@@ -2545,52 +2205,8 @@ export class ClientSession {
 		}
 	}
 
-	/** List subdirectories for the workspace picker (`browse_dirs`).
-	 *
-	 * Deliberately NOT routed through FilesService.listFiles(), which pins
-	 * every listing inside the current workspace — choosing a new workspace
-	 * is exactly the case that has to look outside it. Scope is kept narrow
-	 * instead: directory *names* only, never file contents, and the same
-	 * loopback binding + PI_WEB_TOKEN auth as every other message guards it.
-	 * (The agent can already shell out with bash, so this exposes nothing it
-	 * could not already reach — it just makes it clickable.)
-	 */
 	async browseDirs(path?: string): Promise<void> {
-		const { homedir } = await import("node:os");
-		const fs = await import("node:fs/promises");
-		const { dirname } = await import("node:path");
-		const MAX = 500;
-		const target = resolve(path?.trim() || homedir());
-		try {
-			const dirents = await fs.readdir(target, { withFileTypes: true });
-			const dirs: string[] = [];
-			for (const d of dirents) {
-				// Symlinked directories are worth following (project checkouts
-				// are often symlinked), but a broken link must not abort the
-				// whole listing — isDirectory() is false for those, which is
-				// the behaviour we want anyway.
-				if (!d.isDirectory()) continue;
-				if (d.name.startsWith(".")) continue; // dotfolders: noise here
-				dirs.push(d.name);
-				if (dirs.length >= MAX) break;
-			}
-			dirs.sort((a, b) => a.localeCompare(b));
-			const parent = dirname(target);
-			this.emit({
-				type: "dir_browse",
-				path: target,
-				parent: parent === target ? null : parent,
-				dirs,
-				truncated: dirs.length >= MAX,
-				drives: await listWindowsDrives(),
-			});
-		} catch (err) {
-			this.emit({
-				type: "notice",
-				level: "error",
-				text: `无法读取目录：${(err as Error).message}`,
-			});
-		}
+		return browseDirs(path, (msg) => this.emit(msg));
 	}
 
 	/** Rename a persisted session (history list ✎).
@@ -3219,36 +2835,6 @@ export class ClientSession {
 			}
 		}
 	}
-}
-
-/**
- * Windows drive roots that currently exist ("C:\\", "D:\\", …); empty on
- * POSIX (where "/" already reaches everything).
- *
- * Needed because Windows has no unified filesystem root: dirname("C:\\") is
- * "C:\\", so the picker's walk-up hits a ceiling on the boot drive and can
- * never reach D:. Probing A–Z with access() avoids shelling out to wmic /
- * PowerShell (both slow to spawn, and wmic is gone on recent Windows).
- * Missing/empty drives simply reject, so they drop out.
- */
-async function listWindowsDrives(): Promise<string[] | undefined> {
-	if (process.platform !== "win32") return undefined;
-	const fs = await import("node:fs/promises");
-	const letters = Array.from({ length: 26 }, (_, i) =>
-		String.fromCharCode(65 + i),
-	);
-	const found = await Promise.all(
-		letters.map(async (letter) => {
-			const root = `${letter}:\\`;
-			try {
-				await fs.access(root);
-				return root;
-			} catch {
-				return null;
-			}
-		}),
-	);
-	return found.filter((d): d is string => d !== null);
 }
 
 export class AgentService {
