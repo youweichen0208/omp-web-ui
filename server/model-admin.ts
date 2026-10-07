@@ -1,3 +1,4 @@
+import { updateAuthFile } from "./auth-file.js";
 import { isChatModelConfig, mergeChatProvider } from "./model-config-merge.js";
 /**
  * model-admin — 模型/服务商配置管理，从 agent-service.ts 抽出。
@@ -167,20 +168,9 @@ export class ModelAdminService {
 			return;
 		}
 		try {
-			// Persist to auth.json (auth.json shape: { <provider>: { type: "api_key", key } }).
+			// Persist to auth.json ({ <provider>: { type: "api_key", key } }) under the SDK's lock.
 			const authPath = join(this.host.agentDir, "auth.json");
-			mkdirSync(this.host.agentDir, { recursive: true });
-			let data: Record<string, unknown> = {};
-			try {
-				data = JSON.parse(readFileSync(authPath, "utf8")) as Record<
-					string,
-					unknown
-				>;
-			} catch {
-				// no file yet / unparsable — start fresh
-			}
-			data[provider.trim()] = { type: "api_key", key };
-			writeFileSync(authPath, JSON.stringify(data, null, 2) + "\n");
+			await updateAuthFile(authPath, (data) => ({ ...data, [provider.trim()]: { type: "api_key", key } }));
 			// Apply immediately for this session (runtime credentials are cached), then
 			// refresh models. allowNetwork downloads the provider's official model
 			// catalog (openai/anthropic/… are dynamic providers with no built-in list).
@@ -221,16 +211,12 @@ export class ModelAdminService {
 		try {
 			// Remove from auth.json ({ <provider>: { type: "api_key", key } }).
 			const authPath = join(this.host.agentDir, "auth.json");
-			let data: Record<string, unknown> = {};
-			try {
-				data = JSON.parse(readFileSync(authPath, "utf8")) as Record<
-					string,
-					unknown
-				>;
-			} catch {
-				// no file yet / unparsable — nothing stored to clear
-			}
-			if (!(pid in data)) {
+			const removed = await updateAuthFile(authPath, (data) => {
+				if (!(pid in data)) return undefined;
+				const { [pid]: _removed, ...rest } = data;
+				return rest;
+			});
+			if (!removed) {
 				this.host.emit({
 					type: "notice",
 					level: "info",
@@ -238,8 +224,6 @@ export class ModelAdminService {
 				});
 				return;
 			}
-			delete data[pid];
-			writeFileSync(authPath, JSON.stringify(data, null, 2) + "\n");
 			// Drop the runtime override too, then re-read credentials so the
 			// provider goes back to unconfigured and its models leave the list.
 			const mr = this.host.modelRuntime();
