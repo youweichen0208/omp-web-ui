@@ -13,7 +13,8 @@ import { isChatModelConfig, mergeChatProvider } from "./model-config-merge.js";
  * 经 ModelAdminHost 与 ClientSession 解耦（同 settings/goal/slash 服务模式）。
  * UI 文案直接中文（服务端 notice 约定）。apiKey/headers 绝不下发浏览器。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { writeFileAtomic } from "./private-file.js";
 import { dirname, join } from "node:path";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { ServerMessage, UiModelConfigEntry, UiProviderConfig } from "./protocol.js";
@@ -798,11 +799,9 @@ static async probeModelsEndpoint(
 		try {
 			const { providers } = this.readModelsConfig();
 			providers[pid] = mergeChatProvider(providers[pid] ?? {}, { ...config, models });
-			mkdirSync(this.host.agentDir, { recursive: true });
-			writeFileSync(
-				this.modelsConfigPath(),
-				JSON.stringify({ providers }, null, 2) + "\n",
-			);
+			// models.json may carry provider apiKeys: atomic, private for new files,
+			// and an existing file keeps the mode its owner chose.
+			writeFileAtomic(this.modelsConfigPath(), JSON.stringify({ providers }, null, 2) + "\n", { keepExistingMode: true });
 
 			// Allow a custom models.json entry to reuse the provider credential
 			// already stored in auth.json.  Seed the shared runtime too, because
@@ -860,10 +859,7 @@ static async probeModelsEndpoint(
 				return;
 			}
 			delete providers[providerId];
-			writeFileSync(
-				this.modelsConfigPath(),
-				JSON.stringify({ providers }, null, 2) + "\n",
-			);
+			writeFileAtomic(this.modelsConfigPath(), JSON.stringify({ providers }, null, 2) + "\n", { keepExistingMode: true });
 			await this.host.modelRuntime().refresh();
 			await this.listModelsConfig();
 			await this.host.pushModels();

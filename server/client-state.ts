@@ -1,5 +1,6 @@
 /** Per-client UI preferences and project/session navigation, persisted best-effort. */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { writeFileAtomic } from "./private-file.js";
 import { dirname } from "node:path";
 import type { ProjectSummary } from "./protocol.js";
 
@@ -143,13 +144,11 @@ export class ClientStateStore {
 	private save(): void {
 		this.prune();
 		try {
-			mkdirSync(dirname(this.filePath), { recursive: true });
 			// Atomic write (tmp + rename): a crash mid-write must never leave a
 			// half-written JSON — that would wipe ALL persisted state (recent
-			// projects and display settings) on next load.
-			const tmp = `${this.filePath}.${process.pid}.tmp`;
-			writeFileSync(tmp, JSON.stringify(this.cache, null, 2) + "\n");
-			renameSync(tmp, this.filePath);
+			// projects and display settings) on next load. 0600: it lists the
+			// user's project paths.
+			writeFileAtomic(this.filePath, JSON.stringify(this.cache, null, 2) + "\n");
 		} catch {
 			// best effort
 		}

@@ -108,7 +108,7 @@ async function startServer(reusePort) {
 	}
 
 	// 桌面版数据目录与命令行版分开（见文件头注释），确保存在
-	mkdirSync(dataDir, { recursive: true });
+	mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 
 	serverProcess = fork(serverPath, [], {
 		env: {
