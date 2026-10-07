@@ -46,6 +46,7 @@ import { readSqlitePreview } from "./sqlite-preview.js";
 import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
+import { tokenCookie, tokenMatches } from "./token-auth.js";
 import { createOriginPolicy } from "./origin-policy.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
 
@@ -117,7 +118,7 @@ function requestTokens(req: { headers: IncomingMessage["headers"]; url?: string 
 }
 
 function tokenOk(req: Parameters<typeof requestTokens>[0]): boolean {
-	return requestTokens(req).includes(AUTH_TOKEN);
+	return tokenMatches(requestTokens(req), AUTH_TOKEN);
 }
 
 if (AUTH_TOKEN) {
@@ -126,10 +127,8 @@ if (AUTH_TOKEN) {
 		if (req.path === "/api/health" || tokenOk(req)) {
 			// 浏览器经 ?token= 首次进入后下发 HttpOnly cookie，后续导航/资源请求免带参数
 			if (!req.headers.cookie?.includes("pi_web_token=")) {
-				res.setHeader(
-					"Set-Cookie",
-					`pi_web_token=${encodeURIComponent(AUTH_TOKEN)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000`,
-				);
+				const https = (req.socket as { encrypted?: boolean }).encrypted === true || req.headers["x-forwarded-proto"] === "https";
+				res.setHeader("Set-Cookie", tokenCookie(AUTH_TOKEN, https));
 			}
 			next();
 			return;
@@ -144,7 +143,7 @@ installSystemPromptRoutes(app, () => service, originAllowed);
 installWikiRoutes(app, () => service, join(DATA_DIR, "wiki"), originAllowed);
 
 app.get("/api/health", (_req, res) => {
-	res.json({ ok: true, piVersion: VERSION, cwd: CWD, pid: process.pid });
+	res.json({ ok: true, piVersion: VERSION, pid: process.pid });
 });
 
 app.get("/api/sqlite", async (req, res) => {
@@ -191,6 +190,7 @@ app.post("/api/markdown-image", (req, res) => {
  * rendering. Path is validated against the workspace root either way.
  */
 app.get(["/api/tool-output", "/api/tool-output-list"], async (req, res) => {
+	if (!originAllowed(req)) { res.status(403).end("Forbidden"); return; }
 	const { clientId, conversationId, toolCallId } = req.query;
 	if (typeof clientId !== "string" || typeof conversationId !== "string" || typeof toolCallId !== "string") { res.status(400).end("Invalid request"); return; }
 	try {
@@ -213,6 +213,7 @@ app.get(["/api/tool-output", "/api/tool-output-list"], async (req, res) => {
 });
 
 app.get("/api/file", async (req, res) => {
+	if (!originAllowed(req)) { res.status(403).end("Forbidden"); return; }
 	try {
 		const raw = typeof req.query.path === "string" ? req.query.path : "";
 		// Resolve against the requesting client's workspace (the opened
@@ -222,8 +223,10 @@ app.get("/api/file", async (req, res) => {
 		const cid =
 			typeof req.query.clientId === "string" ? req.query.clientId : "";
 		const cs = cid ? service.get(cid) : undefined;
-		if (req.query.cwd && (!cs || cs.switchingWorkspace || req.query.cwd !== cs.cwd)) { res.status(409).end("workspace changed"); return; }
-		const wp = workspacePath(cs?.cwd ?? CWD, raw);
+		// No anonymous fallback to the server cwd: a request must belong to a live client.
+		if (!cs) { res.status(403).end("unknown client"); return; }
+		if (req.query.cwd && (cs.switchingWorkspace || req.query.cwd !== cs.cwd)) { res.status(409).end("workspace changed"); return; }
+		const wp = workspacePath(cs.cwd, raw);
 		if (!wp) {
 			res.status(400).end("path outside workspace");
 			return;
