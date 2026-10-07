@@ -87,11 +87,11 @@
 	--row-active: oklch(0.93 0.006 80);
 	--bubble-bg: #f1eeea;
 	--code-chip-bg: oklch(0.95 0.004 80);
-	--green: var(--accent);
-	--green-soft: var(--accent-soft);
-	--red: #dc2626;
-	--red-soft: rgba(220, 38, 38, 0.1);
-	--amber: #d97706;
+	--green: #3e9b5f;
+	--green-soft: #e6f4ea;
+	--red: #c9483a;
+	--red-soft: #fbe9e7;
+	--amber: #8a5a00;
 	/* 分类色：斜杠命令来源徽章靠色相区分（内置=强调色、技能=蓝、插件=紫）。
 	   原来是直接写死的字面量，提成 token 便于一起调。 */
 	--cat-skill: #5eb3ff;
@@ -10302,7 +10302,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 	--text: #e7e3ec; --text-dim: #b9b2c4; --text-faint: #a39bab; --heading: #f2eef8;
 	--accent: #5ba3d6; --accent-soft: #203e52; --accent-fg: #17232c; --link: #82bfe7;
 	--sidebar-bg: #21211f; --row-active: #353530; --bubble-bg: #33322e; --code-chip-bg: #343430;
-	--green: var(--accent); --red: #f38d99; --amber: #e9bd73;
+	--green: #3e9b5f; --red: #f38d99; --amber: #e9bd73;
 }
 :root[data-appearance="dark"] .extensions-panel { --ext-accent: var(--accent); --ext-pale: var(--accent-soft); --ext-line: var(--border-soft); --ext-muted: var(--text-dim); --ext-ink: var(--text); }
 :root[data-appearance="dark"] .system-prompt-panel { --prompt-accent: var(--accent); --prompt-line: var(--border-soft); color: var(--text); }
@@ -10855,24 +10855,26 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 
 .message-tree-controls { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--text-dim); }
 
-/* Icon palette: blue actions/completion, coral Git counts, yellow ongoing work. */
+/* Icon palette: blue selection, green success, red failure, yellow changes/work. */
 :root {
 	--accent: #2f7aae;
 	--accent-soft: #eaf2f8;
 	--accent-fg: #fff;
 	--link: #2f7aae;
-	--coral-text: #b8513f;
-	--coral-soft: #fce7e3;
-	--progress-text: #886411;
-	--progress-soft: #fff3cd;
+	--yellow: #f2bc4e;
+	--yellow-fg: #8a5a00;
+	--yellow-bg: #fdf1d6;
+	--progress-text: var(--yellow-fg);
+	--progress-soft: var(--yellow-bg);
 }
 :root[data-appearance="dark"] {
 	--accent: #5ba3d6;
 	--accent-soft: #203e52;
 	--accent-fg: #fff;
 	--link: #82bfe7;
-	--coral-text: #f4ac9d;
-	--coral-soft: #4b302d;
+	--yellow: #edc765;
+	--yellow-fg: #edc765;
+	--yellow-bg: #463c22;
 	--progress-text: #edc765;
 	--progress-soft: #463c22;
 }
@@ -10886,15 +10888,15 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .design-workspace .session-item.active .session-dot { background: var(--accent); }
 .design-workspace .view-switch .tab-change-count,
 .tree-modified-count {
-	background: var(--coral-soft); color: var(--coral-text); border-radius: var(--r-sm);
+	background: var(--yellow-bg); color: var(--yellow-fg); border-radius: var(--r-sm);
 	padding: 2px 5px; font-style: normal; font-variant-numeric: tabular-nums;
 }
 .design-workspace .panel-right .tree-filter { background: transparent; color: var(--text-dim); }
 .design-workspace .panel-right .tree-filter[aria-pressed="true"] { background: var(--bg-elev2); box-shadow: inset 0 0 0 1px var(--border); }
 .change-state.done, .task-progress-status.done, .task-step.done .task-step-mark,
 .task-plan-step.done .task-plan-mark, .todo-checklist-item.completed .todo-checklist-mark,
-.bash-step.done .bash-step-icon, .wiki-chat-tool.done summary > span { color: var(--accent); border-color: var(--accent); }
-.task-progress-track span.done, .read-file-head i.done { background: var(--accent); }
+.bash-step.done .bash-step-icon, .wiki-chat-tool.done summary > span { color: var(--green); border-color: var(--green); }
+.task-progress-track span.done, .read-file-head i.done { background: var(--green); }
 .change-state.running, .task-progress-status.running, .task-plan-step.running,
 .task-plan-step.running .task-plan-step-duration, .bash-running-dot, .header-task-progress,
 .wiki-save-status.saving { color: var(--progress-text); }
@@ -10942,7 +10944,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-quick-questions button { padding: 6px 9px; background: var(--bg); border: 1px solid var(--border); color: var(--text-dim); font: inherit; font-size: 12px; border-radius: var(--r-sm); cursor: pointer; }
 .wiki-quick-questions button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .wiki-quick-questions button:disabled { opacity: .5; cursor: default; }
-.wiki-save-status.saved i { background: var(--accent); }
+.wiki-save-status.saved i { background: var(--green); }
 :root[data-appearance="dark"] { --input-border: var(--border); --send-disabled-bg: var(--bg-elev2); --stop-bg: #39434b; }
 
 .design-workspace .inputbox .btn, .wiki-workbench .wiki-send { border-radius: var(--r-sm); }
@@ -10952,3 +10954,88 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 :root[data-appearance="dark"] .wiki-prose :not(pre) > code { background: var(--code-chip-bg); color: var(--text); }
 .wiki-avatar.pi { background: transparent; width: 18px; height: 18px; }
 .wiki-avatar.pi img { width: 18px; height: 18px; }
+
+/* ---- Design 27a: command groups and semantic status colors ---- */
+:root {
+	--blue: var(--accent); --blue-fg: var(--accent); --blue-bg: var(--accent-soft);
+	--green-fg: var(--green); --green-bg: var(--green-soft);
+	--red-fg: var(--red); --red-bg: var(--red-soft);
+	--output-bg: oklch(0.97 0.003 80);
+}
+:root[data-appearance="dark"] {
+	--green: #79c68e; --green-soft: #243c2b; --red: #ef9689; --red-soft: #452b29;
+	--output-bg: #292926;
+}
+.bash-group { margin: 10px 0; border: 1px solid var(--border-soft); border-radius: var(--r-md); overflow: hidden; background: var(--bg-elev); font-size: 12px; }
+.bash-group-head, .bash-row-head { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 10px 12px; border: 0; background: transparent; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.bash-group-head { background: var(--output-bg); }
+.bash-group-head strong { font-weight: 500; flex: none; }
+.bash-group-head svg, .bash-row-head svg { flex: none; color: var(--text-faint); }
+.bash-state { flex: none; font-size: 12px; }
+.bash-state.ok { color: var(--green); }
+.bash-state.err { color: var(--red); }
+.bash-state.run { color: var(--yellow-fg); }
+.bash-group-location { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 11px; }
+.bash-group-duration, .bash-row-stats { flex: none; font: 11px var(--mono); color: var(--text-dim); white-space: nowrap; }
+.bash-row { border-top: 1px solid var(--border-soft); }
+.bash-row-head > code { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 11.5px/1.7 var(--mono); }
+.bash-row-head:hover { background: var(--output-bg); }
+.bash-row.err .bash-row-stats { color: var(--red); }
+.bash-extra-lines { flex: none; padding: 1px 4px; border-radius: 4px; background: var(--bg-elev2); color: var(--text-dim); font: 10px var(--mono); }
+.bash-row-body { padding: 0 12px 10px 34px; }
+.bash-row-directory { color: var(--text-dim); margin: 0 0 6px; overflow-wrap: anywhere; }
+.bash-full-command, .bash-numbered-output { background: var(--output-bg); border-radius: var(--r-sm); overflow: auto; max-height: 440px; font: 11.5px/1.7 var(--mono); color: var(--text); }
+.bash-full-command { padding: 10px; margin: 0 0 8px; white-space: pre; }
+.bash-numbered-output { padding: 7px 0; }
+.bash-numbered-line { display: flex; gap: 12px; padding: 0 10px; min-width: max-content; white-space: pre; }
+.bash-numbered-line > span { width: 3ch; flex: none; text-align: right; color: var(--text-faint); user-select: none; }
+.bash-numbered-line > code { font: inherit; }
+.bash-numbered-line.error { color: var(--red); background: var(--red-bg); }
+.bash-numbered-line.important { background: var(--blue-bg); }
+.bash-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding-top: 9px; }
+.bash-row-actions button, .bash-group-more { border: 0; background: transparent; color: var(--text-dim); padding: 2px 0; font: 11px var(--sans); cursor: pointer; }
+.bash-row-actions button:hover:not(:disabled), .bash-group-more:hover { color: var(--accent); }
+.bash-row-actions button:disabled { opacity: .5; cursor: default; }
+.bash-group-more { display: block; padding: 8px 12px; width: 100%; text-align: center; }
+.design-workspace .inputbox .btn.send:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); filter: brightness(.94); }
+.design-workspace .statusbar > .status-dot { display: inline-block; }
+.design-workspace .statusbar { background: var(--sidebar-bg); }
+.toolcall-diff-line.add, .scm-diff-line.add, .fp-diff-view pre .add { background: var(--green-bg); color: var(--green-fg); }
+.toolcall-diff-line.del, .scm-diff-line.del, .fp-diff-view pre .del { background: var(--red-bg); color: var(--red-fg); }
+.task-progress-status.cancelled, .task-progress-status.failed { color: var(--red); }
+.task-progress-status.done i { background: var(--green); }
+.task-progress-status.cancelled i, .task-progress-status.failed i { background: var(--red); }
+.task-artifact-row { display: flex; min-width: 0; flex-wrap: nowrap; gap: 6px; padding: 7px 10px; }
+.task-artifact-row > button:not(.task-artifact-change) { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+.task-artifact-row code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-artifact-row > small { flex: none; }
+@media (max-width: 640px) {
+	.bash-group-head { flex-wrap: wrap; gap: 6px; }
+	.bash-group-location { order: 1; flex-basis: 100%; margin-left: 20px; }
+	.bash-row-head { gap: 5px; padding: 9px 8px; }
+	.bash-row-stats { font-size: 10px; }
+	.bash-row-body { padding-left: 12px; }
+}
+
+.design-workspace .msg-text { font-size: 13.5px; line-height: 1.7; }
+.design-workspace .msg-user > .msg-body { max-width: 75%; border-radius: var(--r-md); }
+.design-workspace .usage-trigger { font-family: var(--sans); color: var(--text-dim); }
+.design-workspace .usage-cache-short, .design-workspace .usage-cache-short strong { color: inherit; font-weight: 400; }
+.bash-row code { font-variant-ligatures: none; }
+
+.design-workspace > .statusbar, .design-workspace.wiki-mode > .statusbar { height: 26px; min-height: 26px; }
+
+:root[data-appearance="dark"] .design-workspace .inputbox .btn.send:disabled {
+	background: var(--send-disabled-bg); border-color: transparent; color: var(--text-faint); filter: none;
+}
+:root[data-appearance="dark"] .design-workspace .inputbox .btn.stop {
+	background: var(--stop-bg); border-color: var(--stop-bg); color: white;
+}
+
+/* ---- Native plan settings ---- */
+.plan-settings { padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.plan-settings label { display: flex; gap: 8px; align-items: center; }
+.plan-settings p { margin: 6px 0; color: var(--text-muted); font-size: 12px; }
+.todo-checklist-item details p { white-space: pre-wrap; margin: 6px 0; color: var(--text-muted); }
+.todo-checklist > .task-outline-criteria { margin: 8px 12px; }
+.task-unassigned-records { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }

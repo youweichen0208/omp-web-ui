@@ -33,8 +33,9 @@ import { isRasterImage, fileToProcessedImage } from "../image-paste";
 import { splitFrontmatter } from "../read-presentation";
 import { questionPreviewText } from "../question-markers";
 import { preserveUserTree } from "../user-message-presentation";
-import type { TodoPresentation } from "../todo-presentation";
-import { TodoChecklist } from "./TodoChecklist";
+import type { PlanPresentation } from "../plan-presentation";
+import { BashGroup } from "./BashGroup";
+import { PlanChecklist } from "./PlanChecklist";
 
 /** 编辑重问编辑器里直接拖入/粘贴文件的上限（与服务端 MAX_UPLOAD_BYTES 一致）。 */
 const MAX_EDIT_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -109,7 +110,9 @@ function editAttLabel(att: PromptAttachment, t: Translate): string {
 }
 
 interface MessageProps {
-	todoViews?: ReadonlyMap<string, TodoPresentation>;
+	toolsRunning?: boolean;
+	toolMessageIds?: ReadonlyMap<string, string>;
+	planViews?: ReadonlyMap<string, PlanPresentation>;
 	continuation?: boolean;
 	conversationId?: string;
 	message: UiMessage;
@@ -153,7 +156,9 @@ interface MessageProps {
 }
 
 export const Message = memo(function Message({
-	todoViews,
+	toolsRunning,
+	toolMessageIds,
+	planViews,
 	continuation,
 	conversationId,
 	message,
@@ -340,9 +345,9 @@ export const Message = memo(function Message({
 			const block = message.content[i];
 			if (skipText && block.type === "text") continue;
 			const first = asToolCall(block);
-			const todoView = first && todoViews?.get(first.id);
-			if (first && todoView) {
-				elements.push(<TodoChecklist key={first.id} toolCallId={first.id} view={todoView} />);
+			const planView = first && planViews?.get(first.id);
+			if (first && planView) {
+				elements.push(<PlanChecklist key={first.id} toolCallId={first.id} view={planView} />);
 				continue;
 			}
 			if (first?.name === "write" || first?.name === "edit") {
@@ -355,6 +360,16 @@ export const Message = memo(function Message({
 				}
 				if (changes.length >= 3) elements.push(<EditWriteGroup key={`${message.id}-${first.id}`} items={changes.map((item) => ({ block: item, view: viewFor(item) }))} retriedIds={retriedEditIds} />);
 				else elements.push(...changes.map((item) => <EditWriteCard key={`${message.id}-${item.id}`} item={{ block: item, view: viewFor(item) }} retried={retriedEditIds?.has(item.id)} />));
+				continue;
+			}
+			if (first?.name === "bash") {
+				const calls = [first];
+				while (i + 1 < message.content.length) {
+					const next = asToolCall(message.content[i + 1]);
+					if (next?.name !== "bash") break;
+					calls.push(next); i++;
+				}
+				elements.push(<BashGroup key={first.id} items={calls.map((item) => ({ block: item, view: { ...viewFor(item), streaming: toolsRunning ?? streaming }, messageId: toolMessageIds?.get(item.id) ?? message.id }))} onKill={onKillBash} />);
 				continue;
 			}
 			if (first?.name === "read") {

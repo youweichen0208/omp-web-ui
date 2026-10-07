@@ -395,7 +395,8 @@ function pruneLiveOutputs(
 	return changed ? new Map(live) : live;
 }
 
-/** Drop tool_status entries once the authoritative toolResult message lands.
+/** Retain measured bash durations while their results remain in the transcript.
+ * Drop other tool_status entries once the authoritative toolResult message lands.
  *  Builds the landed-id Set once (O(messages)) instead of scanning all
  *  messages per status entry (was O(statuses × messages) every snapshot). */
 function pruneToolStatuses(
@@ -407,14 +408,15 @@ function pruneToolStatuses(
 	for (const m of state.messages) {
 		if (m.role === "toolResult" && m.toolCallId) landed.add(m.toolCallId);
 	}
-	let changed = false;
-	for (const [id, status] of statuses) {
-		if (landed.has(id) || status.parentToolCallId && landed.has(status.parentToolCallId)) {
-			statuses.delete(id);
-			changed = true;
-		}
-	}
-	return changed ? new Map(statuses) : statuses;
+	const present = new Set(state.messages.flatMap((message) => message.content.flatMap((block) => block.type === "toolCall" && typeof block.id === "string" ? [block.id] : [])));
+	for (const block of state.streamingMessage?.content ?? []) if (block.type === "toolCall" && typeof block.id === "string") present.add(block.id);
+	const kept = new Map([...statuses].filter(([id, status]) => {
+		if (status.conversationId !== state.conversationId) return false;
+		if (status.parentToolCallId && landed.has(status.parentToolCallId)) return false;
+		if (status.toolName === "bash" && status.durationMs !== undefined) return present.has(id);
+		return !landed.has(id);
+	}));
+	return kept.size === statuses.size ? statuses : kept;
 }
 
 function reducer(state: ChatState, action: Action): ChatState {

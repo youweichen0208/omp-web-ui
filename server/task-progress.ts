@@ -1,4 +1,4 @@
-import { todoPlanFromTranscript } from "./todo-progress.js";
+import { planFromTranscript as nativePlanFromTranscript } from "./plan/progress.js";
 import type { TaskProgress, TaskStep, UiMessage, UiToolCallBlock } from "./protocol.js";
 
 const short = (text: string, limit: number) => {
@@ -125,16 +125,15 @@ function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, 
 /** P0: infer the current task from the server's serialized transcript. The
  * transcript remains authoritative; no browser heuristic decides completion. */
 export function deriveTaskProgress(conversationId: string, messages: UiMessage[], streamingMessage: UiMessage | null, isStreaming: boolean, turnEndedAt?: number): TaskProgress | null {
-	const recordedTodo = todoPlanFromTranscript(messages);
+	const recorded = nativePlanFromTranscript([...messages, ...(streamingMessage ? [streamingMessage] : [])]);
 	const latestUserIndex = messages.findLastIndex((message) => message.role === "user" && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
 	if (latestUserIndex < 0) return null;
-	const todo = recordedTodo && (recordedTodo.lastMutationIndex >= latestUserIndex || recordedTodo.plan.items.some((item) => item.status === "running" || item.status === "pending")) ? recordedTodo : undefined;
-	const userIndex = todo && !todo.cleared ? todo.startIndex : latestUserIndex;
+	const userIndex = latestUserIndex;
 	const user = messages[userIndex];
 	const tail = [...messages.slice(userIndex + 1), ...(streamingMessage?.role === "assistant" ? [streamingMessage] : [])];
 	// A plain conversation is not a task. Create the panel only after pi has
 	// actually invoked a tool in this turn.
-	if ((!todo || todo.cleared) && !tail.some((message) => message.role === "assistant" && message.content.some((part) => part.type === "toolCall"))) return null;
+	if (!recorded.plan && !tail.some((message) => message.role === "assistant" && message.content.some((part) => part.type === "toolCall"))) return null;
 	const results = new Map(tail.filter((message) => message.role === "toolResult" && message.toolCallId).map((message) => [message.toolCallId!, message]));
 	const steps: TaskStep[] = [];
 	for (const message of tail) {
@@ -159,7 +158,7 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 		};
 		for (const part of message.content) {
 			if (part.type === "toolCall" && typeof (part as UiToolCallBlock).id === "string") {
-				if (["task_plan", "todo"].includes((part as UiToolCallBlock).name)) { flush(); continue; }
+				if (["task_plan", "plan"].includes((part as UiToolCallBlock).name)) { flush(); continue; }
 				calls.push(part as UiToolCallBlock);
 			}
 			else if (part.type === "text" && typeof (part as { text?: unknown }).text === "string") { flush(); narrative = (part as { text: string }).text; }
@@ -177,9 +176,11 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 	const lastCompleted = steps.findLast((step) => step.status !== "running");
 	const status: TaskProgress["status"] = cancelled ? "cancelled" : isStreaming ? "running" : lastCompleted?.status === "failed" ? "failed" : "done";
 	const plannedEnd = status === "done" ? Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0)) : undefined;
-	const plan = todo && !todo.cleared ? todo.plan : todo ? undefined : planFromTranscript(tail, results, steps, status === "done", plannedEnd);
-	const planIncomplete = plan?.source === "todo" && plan.items.some((item) => item.status !== "done" && item.status !== "removed");
-	const taskStatus = planIncomplete && !isStreaming && !cancelled && status !== "failed" ? "waiting" : status;
+	const plan = recorded.known ? recorded.plan : planFromTranscript(tail, results, steps, status === "done", plannedEnd);
+	const planIncomplete = plan?.source === "plan" && plan.status === "active";
+	let taskStatus: TaskProgress["status"] = status;
+	if (plan?.status === "cancelled" || plan?.status === "failed") taskStatus = plan.status;
+	else if (!cancelled && status !== "failed" && (plan?.awaitingConfirmation || planIncomplete && !isStreaming)) taskStatus = "waiting";
 	if (!steps.length && !plan) return null;
 	const title = plan?.title || taskTitle(messages, userIndex, steps);
 	const endedAt = status === "running" ? undefined : Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0));

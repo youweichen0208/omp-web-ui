@@ -268,19 +268,8 @@ type ToolCallBlockProps = {
 
 export const ToolCallBlock = memo(function ToolCallBlock(props: ToolCallBlockProps) {
 
-	return props.block.name === "codemode" ? <CodemodeCard {...props} /> : props.block.name === "todo" ? <TodoCard block={props.block} view={props.view} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
+	return props.block.name === "codemode" ? <CodemodeCard {...props} /> : props.block.name === "task_plan" ? <TaskPlanCard block={props.block} view={props.view} /> : <RegularToolCallBlock {...props} />;
 });
-
-function TodoCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
-	const t = useT();
-	const [open, setOpen] = useState(false);
-	const text = view.result?.content.filter((part) => part.type === "text").map((part) => (part as { text: string }).text).join("\n") ?? "";
-	const failed = view.result?.isError || !!view.result?.todoSnapshot?.error || text.startsWith("Error:");
-	return <div className={`task-plan-card${failed ? " err" : ""}`} data-tool-call-id={block.id}>
-		<button type="button" className="task-plan-card-head" aria-expanded={open} onClick={() => setOpen(!open)}><FiChevronRight className={open ? "open" : ""} /><span>{t("taskTodoUpdate")}</span><span className="task-plan-card-state">{failed ? t("error") : view.result ? t("done") : t("running")}</span></button>
-		{(open || failed) && <pre className="task-todo-details">{view.result?.todoSnapshot?.error || text || block.argumentsText}</pre>}
-	</div>;
-}
 
 function TaskPlanCard({ block, view }: Pick<ToolCallBlockProps, "block" | "view">) {
 	const t = useT();

@@ -53,11 +53,31 @@ export type UiContentBlock =
 	| UiBashBlock
 	| { type: string; [k: string]: unknown };
 
-/** Allowlisted todo result for chat presentation; never includes extension metadata. */
-export interface UiTodoSnapshot {
-	action?: string;
-	error?: string;
-	tasks: { id: number; subject: string; status: "pending" | "in_progress" | "completed" | "deleted" }[];
+export interface PlanState {
+	title: string;
+	status: "active" | "completed" | "cancelled" | "failed";
+	steps: { id: string; title: string; detail?: string }[];
+	currentStepId: string | null;
+	completedStepIds: string[];
+	completionCriteria: string;
+	changeSummary?: string;
+}
+export type PlanChange =
+	| { kind: "added" | "updated" | "removed" | "started" | "completed" | "pending"; stepId: string; title: string; position?: number }
+	| { kind: "status"; status: PlanState["status"] }
+	| { kind: "replaced"; planId: string; revision: number; reason: string };
+export interface PlanSnapshot extends PlanState {
+	schemaVersion: 3;
+	planId: string;
+	revision: number;
+	changes: PlanChange[];
+}
+export interface PlanSettingsState {
+	enabled: boolean;
+	available: boolean;
+	effective: boolean;
+	pending: boolean;
+	reason?: "conflict" | "missing";
 }
 
 export interface UiCodemodeDetails {
@@ -151,7 +171,7 @@ export interface UiMessage {
 	toolName?: string;
 	toolOutputUrl?: string;
 	isError?: boolean;
-	todoSnapshot?: UiTodoSnapshot;
+	planSnapshot?: PlanSnapshot;
 	nestedCalls?: { calls: UiNestedToolCall[]; complete: boolean };
 	codemode?: UiCodemodeDetails;
 	/** Extension-injected custom messages. */
@@ -160,8 +180,7 @@ export interface UiMessage {
 	details?: unknown;
 }
 
-/** Current task inferred from the authoritative transcript. P0 has one task
- * per active conversation; historical tasks and explicit plans come later. */
+/** Current task projected from the authoritative transcript and native plan snapshots. */
 export interface TaskProgress {
 	id: string;
 	conversationId: string;
@@ -173,9 +192,11 @@ export interface TaskProgress {
 	endedAt?: number;
 	completed: number;
 	steps: TaskStep[];
-	/** Explicit todo state, or a legacy task_plan transcript. */
+	/** Native plan state, or a legacy task_plan transcript. */
 	plan?: {
-		source?: "todo";
+		source?: "plan";
+		status?: PlanState["status"];
+		awaitingConfirmation?: boolean;
 		origin?: string;
 		revision: number;
 		added: number;
@@ -219,6 +240,7 @@ export interface UiRecovery {
 }
 
 export interface UiState {
+	planSettings?: PlanSettingsState;
 	tree?: UiTreeState;
 	recovery?: UiRecovery;
 	runSettings?: { autoCompaction: boolean; autoRetry: boolean };
@@ -556,6 +578,7 @@ export type ClientMessage =
 	| { type: "clone_provider"; provider: string; reqId: number }
 	// -- display preferences and native resource views ------------
 	/** Request the current settings state (also pushed automatically on attach). */
+	| { type: "set_plan_enabled"; enabled: boolean; conversationId: string }
 	| { type: "get_settings" }
 	/** Apply a partial settings update: main-session prompt/toggles or isolated
 	 *  reviewer prompt/skill toggles. Each change is persisted per client; main

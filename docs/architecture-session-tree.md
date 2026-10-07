@@ -1,6 +1,6 @@
 # 原生会话树
 
-会话条目、label 和分支仍由 pi SDK 1.0.4 的 SessionManager 保存在原生 JSONL 中。WebUI 不建立树存储、不迁移旧的派生会话。协议版本 39。
+会话条目、label 和分支仍由 pi SDK 1.0.4 的 SessionManager 保存在原生 JSONL 中。WebUI 不建立树存储、不迁移旧的派生会话。协议版本 40。
 
 ## 投影与读取
 
@@ -43,3 +43,5 @@ label 使用 `appendLabelChange`，允许运行中写入；不自行改写旧条
 编辑重问的非成功结果由 WebSocket 接收层统一发出对话所属 notice，不依赖树面板是否打开。`tests/unit/session-file-read.test.ts` 覆盖 5000 条、超过 11 MB 的尾部 I/O、大文件连续追加、异常外写、延迟首次落盘和旧/空文件只读读取。
 
 树节点全文面板可按 toolCallId 下载完整工具输出，包括压缩前及其他分支的原生工具结果。中断后的最终落盘及派生后的新文件校验完成后，才执行后续导航或编辑重问。
+
+树导航完成后宿主重新协调原生 plan 激活状态，防止历史工具声明重新启用已关闭工具；计划身份与状态始终从目标分支重建，见 [计划扩展](architecture-plan.md)。

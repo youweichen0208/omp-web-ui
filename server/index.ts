@@ -827,6 +827,9 @@ wss.on("connection", (ws) => {
 				void cs.saveCommands(msg.commands);
 				break;
 
+			case "set_plan_enabled":
+				void cs.setPlanEnabled(msg.enabled, msg.conversationId).catch(error => send({ type: "notice", level: "error", text: String(error.message ?? error) }));
+				break;
 			case "get_settings":
 				cs.pushSettings();
 				break;

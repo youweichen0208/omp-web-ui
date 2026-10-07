@@ -1,3 +1,4 @@
+import { planSettings } from "./plan/settings.js";
 import { resolveNativeAttachments } from "./user-attachments.js";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import { SessionTreeController } from "./session-tree-controller.js";
@@ -112,7 +113,7 @@ import {
 } from "./serialize.js";
 import { deriveTaskProgress } from "./task-progress.js";
 
-import { taskHistoryFromSession } from "./todo-progress.js";
+import { taskHistoryFromSession } from "./plan/progress.js";
 
 import {
 	loadCommands,
@@ -571,6 +572,23 @@ export class ClientSession {
 			});
 		} catch (error) { this.emit({ type: "native_mcp_result", requestId: msg.requestId, cwd: msg.cwd, error: (error as Error).message }); }
 	}
+	private coordinatePlan(conv: Conversation): void {
+		const tree = conv.tree?.refresh();
+		planSettings().coordinate(conv.session, !tree?.externallyModified && !tree?.verifying && !tree?.busy);
+	}
+	async setPlanEnabled(enabled: boolean, conversationId: string): Promise<void> {
+		if (typeof enabled !== "boolean" || this.activeId !== conversationId || this.switchingWorkspace) throw new Error("Conversation changed");
+		if (this.quiesceBlocked()) return;
+		await this.conv.tree?.waitForVerification();
+		if (this.activeId !== conversationId) throw new Error("Conversation changed");
+		this.conv.tree?.assertWritable();
+		planSettings().set(enabled);
+		for (const client of ClientSession.liveClients.values()) {
+			for (const conv of client.convs.values()) client.coordinatePlan(conv);
+			client.flushSnapshot();
+		}
+	}
+
 	get nativeModelRuntime(): ModelRuntime { return this.runtime.services.modelRuntime; }
 	readonly providerAuth = new ProviderAuthService(() => this.runtime.services.modelRuntime, message => this.emit(message), async () => { this.piCheckCache = null; await this.modelAdmin.listProviders(); await this.listModels(); this.flushSnapshot(); }, () => this.session.settingsManager.getOrCreateDeviceId());
 	private get webUi(): WebUIContext { return this.conv.webUi; }
@@ -872,7 +890,7 @@ export class ClientSession {
 			active: () => this.activeId === conv.id && this.convs.get(conv.id) === conv,
 			admitted: () => !this.quiesceBlocked(),
 			emit: message => this.emit(message),
-			changed: () => { this.scheduleSnapshot(); this.scheduleSessionsRefresh(); },
+			changed: () => { this.coordinatePlan(conv); this.scheduleSnapshot(); this.scheduleSessionsRefresh(); },
 			replaced: async () => { conv.treeProjectionRevision = undefined; conv.uiMessageCache.clear(); conv.title = conv.runtime.session.sessionManager.getSessionName() || conversationTitle(conv.runtime.session); await this.bindSession(conv); this.invalidateLists(); this.flushSnapshot(true); },
 			summary: operation => { conv.recovery = { ...conv.recovery, branch: operation, summary: !operation && conv.recovery.summary?.source === "branchSummary" ? undefined : conv.recovery.summary }; this.flushSnapshot(); },
 		});
@@ -890,6 +908,7 @@ export class ClientSession {
 					session.extensionRunner.setUIContext(conv.webUi, "rpc");
 					await options?.beforeSessionStart?.();
 				} });
+				this.coordinatePlan(conv);
 			};
 		}
 
@@ -901,6 +920,7 @@ export class ClientSession {
 			},
 		});
 
+		this.coordinatePlan(conv);
 		const unsubscribe = conv.session.subscribe((event) =>
 			this.onEvent(conv, event),
 		);
@@ -1050,6 +1070,7 @@ export class ClientSession {
 				break;
 
 			case "agent_settled": {
+				this.coordinatePlan(conv);
 				if (this.pendingMcpReload.delete(conv.id)) void this.reloadMcpConversation(conv).catch(error => this.emit({ type: "notice", level: "error", text: `MCP reload failed: ${error.message}` }));
 
 				const messages = conv.lastRunMessages ?? [];
@@ -1253,6 +1274,7 @@ export class ClientSession {
 		messages: UiMessage[],
 	): Omit<UiState, "messages" | "rev"> & { rev: number } {
 		const conv = this.conv;
+		this.coordinatePlan(conv);
 		const state = conv.session.agent.state;
 		const model = state.model;
 		const streamingMessage = state.streamingMessage
@@ -1284,6 +1306,7 @@ export class ClientSession {
 			// stats are best-effort
 		}
 		return {
+			planSettings: planSettings().state(conv.session),
 			tree: conv.tree?.refresh(),
 			clientId: this.clientId,
 			cwd: this.cwd,
@@ -1400,6 +1423,7 @@ export class ClientSession {
 			this.emit({ type: "tree_navigate_result", conversationId: message.conversationId, reqId: message.reqId, status: "error", error: "只能操作当前活动对话。" }); return;
 		}
 		await conv.tree.request(message);
+		this.coordinatePlan(conv);
 		this.flushSnapshot(true);
 	}
 	setRunSettings(message: Extract<ClientMessage, { type: "set_run_settings" }>): void {

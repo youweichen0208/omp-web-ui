@@ -145,12 +145,12 @@ const EMPTY_MESSAGES: UiMessage[] = [];
 // ---- 可拖拽面板宽度（桌面端；≤768px 抽屉模式固定宽度不受影响）----
 const PANEL_MIN = 180;
 const PANEL_MAX = 520;
-const PANEL_DEFAULT = 264;
+const PANEL_DEFAULT = 240;
 type PanelSide = "left" | "right" | "editor";
 const panelWidthKey = (side: PanelSide) => `pi-web-ui:${side}-panel-width`;
 function readPanelWidth(side: PanelSide): number {
 	const v = Number(localStorage.getItem(panelWidthKey(side)));
-	return Number.isFinite(v) && v >= PANEL_MIN && v <= PANEL_MAX ? v : side === "editor" ? 480 : side === "right" ? 272 : PANEL_DEFAULT;
+	return Number.isFinite(v) && v >= PANEL_MIN && v <= PANEL_MAX ? v : side === "editor" ? 480 : side === "right" ? 300 : PANEL_DEFAULT;
 }
 
 /** 面板与主区之间的拖拽分隔条：拖动改宽度，双击复位。 */
@@ -198,7 +198,7 @@ function ResizeHandle({
 			onPointerDown={onPointerDown}
 			onDoubleClick={() => {
 				if (onReset) { onReset(); return; }
-				const value = side === "editor" ? 480 : side === "right" ? 272 : PANEL_DEFAULT;
+				const value = side === "editor" ? 480 : side === "right" ? 300 : PANEL_DEFAULT;
 				onResize(value);
 				localStorage.setItem(panelWidthKey(side), String(value));
 			}}

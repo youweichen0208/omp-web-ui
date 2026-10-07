@@ -1,3 +1,4 @@
+import { groupBashMessages } from "../bash-groups";
 import { assistantPredecessors } from "../agent-activity";
 import { ConversationWorkingStatus } from "./WorkingStatus";
 import { goalEventText, goalCompletedText, groupGoalEvents } from "../goal-events";
@@ -17,7 +18,7 @@ import { Message, asText } from "./Message";
 
 import { collectQuestionAttachments } from "../question-attachments";
 import { retriedEditIds as findRetriedEditIds } from "../edit-write-presentation";
-import { isAbsorbedTodoMessage, todoPresentation } from "../todo-presentation";
+import { planPresentation } from "../plan-presentation";
 
 import { parseSkillBlock } from "../skill-block";
 import { buildCollapsedGroups } from "../collapsed-groups";
@@ -198,11 +199,10 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	const retriedEditIds = useMemo(() => findRetriedEditIds(state.messages, toolResults), [state.messages, toolResults]);
 	// Most streaming frames only add text or arguments; keep the shared map stable
 	// so those frames do not force every historical Message to render again.
-	const todoStreamingMessage = state.streamingMessage?.content.some((block) => block.type === "toolCall" && typeof block.id === "string" && toolResults.get(block.id)?.todoSnapshot) ? state.streamingMessage : null;
-	const todoViews = useMemo(() => todoPresentation(
-		todoStreamingMessage ? [...state.messages, todoStreamingMessage] : state.messages, toolResults,
-	), [state.messages, todoStreamingMessage, toolResults]);
-	const absorbedTodos = useMemo(() => new Set(state.messages.filter((message) => isAbsorbedTodoMessage(message, todoViews)).map((message) => message.id)), [state.messages, todoViews]);
+	const planStreamingMessage = state.streamingMessage?.content.some((block) => block.type === "toolCall" && typeof block.id === "string" && toolResults.get(block.id)?.planSnapshot) ? state.streamingMessage : null;
+	const planViews = useMemo(() => planPresentation(
+		planStreamingMessage ? [...state.messages, planStreamingMessage] : state.messages, toolResults, state.conversationId,
+	), [state.messages, planStreamingMessage, toolResults, state.conversationId]);
 	/**
 	 * Original attachments per user question (memoized on the stable messages
 	 * array) — restored in the edit composer because the fork drops the
@@ -217,6 +217,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	const timeGaps = useMemo(() => messageTimeGaps(state.messages), [state.messages]);
 	const predecessors = assistantPredecessors(messages);
 	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
+	const lastUserIndex = state.messages.findLastIndex((message) => message.role === "user");
 	const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
 	// Only the last KEEP_RECENT persisted messages are fully rendered; older
 	// ones collapse to summary rows (unless the user expanded them).
@@ -224,12 +225,14 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		state.messages.length > COLLAPSE_MIN
 			? Math.max(0, state.messages.length - KEEP_RECENT)
 			: 0;
+	const bashStreaming = state.streamingMessage?.content.length && state.streamingMessage.content.every((block) => block.type === "toolCall" && block.name === "bash") ? state.streamingMessage : null;
+	const bashGroups = useMemo(() => groupBashMessages(bashStreaming ? [...state.messages, bashStreaming] : state.messages, recentStart, new Set(timeGaps.keys())), [state.messages, bashStreaming, recentStart, timeGaps]);
 	// 相邻的同角色折叠消息并成一条摘要：一次「想一下 → 调几个工具 → 回话」在
 	// transcript 里是 8 条 assistant 消息，一条一行会把历史区堆成 8 条长得一模
 	// 一样的条带。纯逻辑在 collapsed-groups.ts（有单测）。
 	const collapsed = useMemo(
-		() => buildCollapsedGroups(state.messages, recentStart, expanded, new Set(timeGaps.keys()), absorbedTodos),
-		[state.messages, recentStart, expanded, timeGaps, absorbedTodos],
+		() => buildCollapsedGroups(state.messages, recentStart, expanded, new Set(timeGaps.keys())),
+		[state.messages, recentStart, expanded, timeGaps],
 	);
 
 	// ---- 惰性窗口化（lazy windowing，纯函数见 lazy-window.ts）----------------
@@ -449,12 +452,18 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	// 搜索跳转目标若是折叠的旧消息，先同步展开（flushSync 保证本轮 DOM 就绪）
 	const ensureExpanded = useCallback(
 		(id: string) => {
-			const idx = state.messages.findIndex((m) => m.id === id);
-			if (idx >= 0 && idx < recentStart && !expanded.has(id)) {
-				flushSync(() => expand(id));
-			}
+			const source = state.messages.find((message) => message.id === id);
+			const sourceId = source?.role === "toolResult" && source.toolCallId ? bashGroups.sources.get(source.toolCallId) ?? id : id;
+			const owner = bashGroups.owners.get(sourceId) ?? sourceId;
+			const idx = state.messages.findIndex((message) => message.id === owner);
+			flushSync(() => {
+				if (idx >= 0 && idx < recentStart && !expanded.has(owner)) expand(owner);
+				setPinned((prev) => prev.has(owner) ? prev : new Set(prev).add(owner));
+			});
+			const toolIds = source?.toolCallId ? [source.toolCallId] : source?.content.flatMap((block) => block.type === "toolCall" && block.name === "bash" && typeof block.id === "string" ? [block.id] : []) ?? [];
+			for (const toolCallId of toolIds) flushSync(() => window.dispatchEvent(new CustomEvent("pi:reveal-tool", { detail: { toolCallId, search: true } })));
 		},
-		[state.messages, recentStart, expanded, expand],
+		[state.messages, recentStart, expanded, expand, bashGroups],
 	);
 
 	// Ctrl+F / Cmd+F 打开搜索（可编辑元素内不抢占）
@@ -487,6 +496,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 	/** Scroll the conversation to a question; expand it first if it's collapsed. */
 	const jumpTo = useCallback(
 		(id: string) => {
+			id = bashGroups.owners.get(id) ?? id;
 			const idx = state.messages.findIndex((m) => m.id === id);
 			// 占位中的目标先同步恢复真实渲染（折叠行同步展开），再滚动定位——
 			// flushSync 保证本轮 commit 后 DOM 即为最终形态。
@@ -516,7 +526,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 				}
 			});
 		},
-		[state.messages, recentStart, expanded, expand],
+		[state.messages, recentStart, expanded, expand, bashGroups],
 	);
 	useEffect(() => {
 		const onTaskJump = (event: Event) => {
@@ -524,17 +534,19 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 			if (id && messages.some((message) => message.id === id)) jumpTo(id);
 		};
 		const onToolJump = (event: Event) => {
-			let { messageId, toolCallId, todoItemIds } = (event as CustomEvent<{ messageId?: string; toolCallId?: string; todoItemIds?: number[] }>).detail ?? {};
-			const todo = toolCallId ? todoViews.get(toolCallId) : undefined;
+			let { messageId, toolCallId, todoItemIds } = (event as CustomEvent<{ messageId?: string; toolCallId?: string; todoItemIds?: string[] }>).detail ?? {};
+			const todo = toolCallId ? planViews.get(toolCallId) : undefined;
 			if (todo?.target) ({ messageId, toolCallId } = todo.target);
 			if (!messageId || !toolCallId || !messages.some((message) => message.id === messageId)) return;
 			jumpTo(messageId);
-			requestAnimationFrame(() => requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				flushSync(() => window.dispatchEvent(new CustomEvent("pi:reveal-tool", { detail: { toolCallId } })));
+				requestAnimationFrame(() => {
 				const card = scrollRef.current?.querySelector<HTMLElement>(`[data-tool-call-id="${CSS.escape(toolCallId)}"]`);
 				if (!card) return;
 				if (todoItemIds?.length) {
 					scrollRef.current?.querySelectorAll(".todo-item-flash").forEach((node) => node.classList.remove("todo-item-flash"));
-					const rows = Array.from(card.querySelectorAll<HTMLElement>("[data-todo-item-id]")).filter((row) => todoItemIds.includes(Number(row.dataset.todoItemId)));
+					const rows = Array.from(card.querySelectorAll<HTMLElement>("[data-todo-item-id]")).filter((row) => todoItemIds.includes(row.dataset.todoItemId ?? ""));
 					if (rows.length) {
 						rows[0].focus({ preventScroll: true });
 						rows[0].scrollIntoView({ block: "center" });
@@ -548,12 +560,13 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 				void card.offsetWidth;
 				card.classList.add("change-card-flash");
 				window.setTimeout(() => card.classList.remove("change-card-flash"), 1800);
-			}));
+				});
+			});
 		};
 		window.addEventListener("pi:jump-message", onTaskJump);
 		window.addEventListener("pi:jump-tool", onToolJump);
 		return () => { window.removeEventListener("pi:jump-message", onTaskJump); window.removeEventListener("pi:jump-tool", onToolJump); };
-	}, [jumpTo, messages, todoViews]);
+	}, [jumpTo, messages, planViews]);
 
 	const onScroll = useCallback(() => {
 		const el = scrollRef.current;
@@ -713,7 +726,6 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 					if (item.kind === "cwd") return <div key={`cwd-${item.event.timestamp}`} className="goal-event cwd-event" role="status"><span aria-hidden="true">↪</span><span>{t("cwdSwitchEvent", { path: item.event.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~") })}</span></div>;
 					const { message: m, index: i } = item;
 					if (goalEvents.absorbed.has(m.id)) return null;
-					if (absorbedTodos.has(m.id)) return null;
 					const withGap = (content: ReactNode) => {
 						const label = timeGaps.get(i);
 						return label ? <Fragment key={m.id}><div className="time-gap" aria-label={t("timeGapAt", { time: label })} title={m.timestamp ? new Date(m.timestamp).toLocaleString() : undefined}><span>{label}</span></div>{content}</Fragment> : content;
@@ -741,6 +753,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							/>
 						);
 					}
+					if (bashGroups.owners.has(m.id)) return null;
 					const qIdx = m.role === "user" ? qnIndex.get(m.id) : undefined;
 					const show =
 						!virtualOn ||
@@ -762,17 +775,19 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						>
 						<Message
 							key={m.id}
-							message={m}
+							message={bashGroups.projected.get(m.id) ?? m}
+							toolMessageIds={bashGroups.sources}
 							continuation={!!predecessors.get(m.id) && !hidden.has(predecessors.get(m.id)!) && !(i < recentStart && !expanded.has(predecessors.get(m.id)!))}
 							qnIndex={qIdx}
 							qnActive={qIdx !== undefined ? qIdx === activeIdx : undefined}
 							onJump={jumpTo}
 							toolResults={toolResults}
-							todoViews={todoViews}
+							planViews={planViews}
 							retriedEditIds={retriedEditIds}
 							liveOutputs={hasToolCall(m) ? liveOutputs : EMPTY_LIVE}
 							toolStatuses={toolStatuses}
-							streaming={state.isStreaming && connected}
+							streaming={state.isStreaming && connected && i > lastUserIndex}
+							toolsRunning={state.isStreaming && i > lastUserIndex}
 							onKillBash={onKillBash}
 							toolsWrap={toolsWrap}
 							thinkingWrap={thinkingWrap}
@@ -785,19 +800,20 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						</LazyMount>
 					);
 				})}
-				{state.streamingMessage && streamingHasContent && !isAbsorbedTodoMessage(state.streamingMessage, todoViews) && (
+				{state.streamingMessage && streamingHasContent && !bashGroups.owners.has(state.streamingMessage.id) && (
 					<Message
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}
 						continuation={!!predecessors.get(state.streamingMessage.id)}
 						toolResults={toolResults}
-						todoViews={todoViews}
+						planViews={planViews}
 						retriedEditIds={retriedEditIds}
 						liveOutputs={
 							hasToolCall(state.streamingMessage) ? liveOutputs : EMPTY_LIVE
 						}
 						toolStatuses={toolStatuses}
 						streaming={connected}
+						toolsRunning={state.isStreaming}
 						isLast
 						onEdit={onEdit}
 							conversationId={state.conversationId}

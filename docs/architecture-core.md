@@ -2,7 +2,7 @@
 
 ## 原生上下文边界
 
-会话由 pi 1.0.4 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不追加宿主系统提示词，不注册自定义代理工具，不覆盖原生 bash，不注入终端状态消息。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包，不添加宿主工具或提示词。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
+会话由 pi 1.0.4 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不覆盖原生 bash，不注入终端状态消息。可选原生 plan 扩展默认关闭，开启后由扩展注册工具、提供规则与压缩背景（见 [计划扩展](architecture-plan.md)）。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包；plan 的服务全局开关独立协调激活状态。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
 
 > 改代码前必读。本文档覆盖快照驱动、协议单源、安全边界、多对话并发等全局架构决策。
 
@@ -78,7 +78,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 ### 工具结束实时状态（`tool_status`）
 
-服务端 `onEvent` 监听 `tool_execution_start/end`（AI 调工具路径，注意区别于 `bash_execution_update`——那是 `!cmd`/终端直接执行路径专属）。`tool_execution_end` 触发时立即推 `tool_status`（toolCallId/toolName/isError/exitCode/durationMs），**先于** toolResult 快照落盘——浏览器 tool 卡片随即从「执行中」切到「已结束 · 等模型 · 耗时」，一眼区分「命令还在跑」vs「命令完了在等模型响应」。退出码统一优先读取 `structuredContent.exit_code`（含 0），其次是旧 `details.exitCode`，仅旧错误结果回退文本正则；`tool_execution_start` 时刻记在 `conv.toolStartTimes`（按对话隔离）算真实执行耗时。前端 `toolStatuses` Map 在 toolResult 落盘（snapshot prune）后清除，回落到权威的 toolResult 状态。
+服务端 `onEvent` 监听 `tool_execution_start/end`（AI 调工具路径，注意区别于 `bash_execution_update`——那是 `!cmd`/终端直接执行路径专属）。`tool_execution_end` 触发时立即推 `tool_status`（toolCallId/toolName/isError/exitCode/durationMs），**先于** toolResult 快照落盘——浏览器 tool 卡片随即从「执行中」切到「已结束 · 等模型 · 耗时」，一眼区分「命令还在跑」vs「命令完了在等模型响应」。退出码统一优先读取 `structuredContent.exit_code`（含 0），其次是旧 `details.exitCode`，仅旧错误结果回退文本正则；`tool_execution_start` 时刻记在 `conv.toolStartTimes`（按对话隔离）算真实执行耗时。前端状态回落到权威 toolResult；`toolStatuses` 在结果落盘后清除，仅为 27a 命令卡保留当前 transcript 中 bash 的实测耗时，切换会话或工具移出 transcript 时清除。历史无计时记录时显示未知，不估算执行用时。
 
 ### 模型／工具静默状态（`agent_silence`）
 
@@ -88,7 +88,7 @@ SDK `tool_execution_update.partialResult` 是累计输出快照，服务端发�
 
 服务端只在当前用户轮次至少调用一次工具后，从权威 transcript 推断当前任务；纯聊天没有任务卡。相邻工具调用组成步骤，工具结果决定完成或失败；流式回复期间工具已完成但模型尚未继续时保留“正在分析请求”步骤。短句“继续”等沿用上一条实际任务请求作标题。任务耗时从用户消息时间算到 `agent_settled`；恢复历史时用消息时间回退。`taskProgress` 随全量和增量快照传递，ID 来源于原消息 ID，切换对话不会串进度。前端将连续步骤合并为语义阶段；只有一个阶段时直接列出文件和命令，多个阶段时显示阶段列表，原始步骤展开区只保留短摘要与工具记录，不展示整段助手回复。完成结果卡只取本轮记录里实际出现的提交、测试和改动数值。文件栏不再显示“本次对话涉及”区域。
 
-任务展示只读解析 transcript，不注册 todo 或 task_plan，不追加任务管理规则。用户通过 pi 原生配置加载的 todo 扩展可以继续显示；已有历史记录也保留只读展示。
+任务展示从成功 plan 快照投影，遵循 [计划扩展](architecture-plan.md) 的分支身份、轮次确认和工具归属规则。第三方 todo 使用普通工具卡；历史 task_plan 保留只读兼容。
 
 ### 工具挂死看门狗
 
@@ -116,7 +116,7 @@ bash 工具执行前后各拍一次监听快照（`snapshotListeningPorts`，Win
 
 ### 原生工具结果与下载
 
-serialize.ts 投影 edit 的 diff/firstChangedLine、bash 的退出码和截断摘要，以及工具结果的完整输出路径；diff 遵守 100,000 字符上限并标记截断。todo/codemode 保留专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
+serialize.ts 投影 edit 的 diff/firstChangedLine、bash 的退出码和截断摘要，以及工具结果的完整输出路径；diff 遵守 100,000 字符上限并标记截断。plan/codemode 保留白名单专用投影，任意扩展字段和 structuredContent 中的完整输出正文不会透传。缓存按实际投影变化失效，消息数组按对象引用复用。
 
 `/api/tool-output` 与按需清单 `/api/tool-output-list` 受通用口令鉴权，参数为 clientId/conversationId/toolCallId，下载可再带 outputId；浏览器不提供文件路径。服务端从原生全部条目查找，覆盖压缩前与分支历史；清单保留 fullOutputPath；仅 codemode、mcp__…__… 和 read_mcp_resource 收集 MCP binary resource 及 Codemode image saved 标记。完整输出按 64 KiB 分块异步扫描，最多前 8 MiB，跨块 UTF-8 和完整标记保留，截止处不完整标记忽略。Bash、PowerShell 及其他工具的正文和日志不做标记扫描。扫描范围外、且未在原生结果正文出现的额外文件不进入清单，但完整文本始终可以全部下载。路径去重后生成稳定 ID，清单只返回 ID/文件名。
 

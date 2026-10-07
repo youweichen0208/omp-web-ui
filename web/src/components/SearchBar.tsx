@@ -169,11 +169,12 @@ export function SearchBar({
 		let raf = 0;
 		raf = requestAnimationFrame(() => {
 			if (cancelled) return;
-			const { byMsg, all } = collectRanges(wrap, q);
-			setHighlight("msg-search", all);
 			const list = hitsRef.current;
 			const hit = list[Math.min(activeRef.current, list.length - 1)];
-			if (!hit) return;
+			if (!hit) { setHighlight("msg-search", []); setHighlight("msg-search-active", []); return; }
+			onEnsureExpanded(hit.messageId);
+			const { byMsg, all } = collectRanges(wrap, q);
+			setHighlight("msg-search", all);
 			const range = byMsg.get(hit.messageId)?.[hit.occurrence];
 			if (range) {
 				setHighlight("msg-search-active", [range]);
@@ -190,7 +191,7 @@ export function SearchBar({
 			cancelled = true;
 			cancelAnimationFrame(raf);
 		};
-	}, [open, q, hits, containerRef, flashMsg]);
+	}, [open, q, hits, containerRef, flashMsg, onEnsureExpanded]);
 
 	const step = useCallback(
 		(dir: 1 | -1) => {

@@ -52,7 +52,7 @@ pi-web-ui/
 │   ├── system-prompt-view.ts / system-prompt-files.ts / system-prompt-routes.ts # 原生提示词分段、文件编辑与 reload
 │   ├── settings-service.ts     # 界面偏好与原生资源只读视图（扩展命名见 extension-display.ts）
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
-│   ├── todo-progress.ts        # 会话分支 todo 快照 → 跨轮次任务进度
+│   ├── plan/                   # 可选原生 plan 扩展、全局开关与分支快照投影；见 docs/architecture-plan.md
 │   ├── slash-commands.ts       # 斜杠命令（NATIVE_COMMANDS 内置命令拦截执行 + 目录推送）
 │   ├── model-admin.ts          # 模型/服务商配置管理
 │   ├── model-config-merge.ts   # 聊天模型表单合并；保留 typed models 和未知字段
@@ -130,8 +130,8 @@ pi-web-ui/
 | `RightPanel.tsx` / `TaskProgressPanel.tsx` | 可展开目录树、Git 改动标记、文件预览；当前任务进度由服务端 transcript 推断，右栏展示合并后的任务阶段和结果；布局见 `docs/ui-design.md` |
 | `ChatInput.tsx` | 输入框 + 附件 chips（inline/reference/lines 三色）+ 当前文件 chip（镜像预览面板，发送取编辑器快照）；全窗口拖放目标；followUp 排队/steer 插队；斜杠命令选择器 |
 | `Message.tsx` / `MessageList.tsx` / `WorkingStatus.tsx` | 消息渲染、流式等待标题与静默状态、tool 结果关联；编辑重问、惰性窗口化、问题导航；等待态切换与间距见 `docs/ui-design.md` |
-| `TodoChecklist.tsx` | Web/桌面共用清单卡和变化行；修改连续更新合并、clear 身份隔离或任务项跳转时，读取 `web/src/todo-presentation.ts`、`docs/architecture-core.md` 和 `docs/ui-design.md` |
-| `ToolCallBlock.tsx` / `EditWriteCard.tsx` / `ThinkingBlock.tsx` / `BashBlock` | 通用工具卡片、编辑与写入的逐行 diff 卡片、思考块、bash 输出；编辑卡片的数据整理在 `web/src/edit-write-presentation.ts`，交互规则见 `docs/ui-design.md` |
+| `PlanChecklist.tsx` | Web/桌面共用清单卡和变化行；修改计划更新合并、替换隔离或步骤跳转时，读取 `web/src/plan-presentation.ts`、`docs/architecture-plan.md` 和 `docs/ui-design.md` |
+| `ToolCallBlock.tsx` / `BashGroup.tsx` / `EditWriteCard.tsx` / `ThinkingBlock.tsx` | 通用工具卡片、连续命令分组、编辑与写入的逐行 diff 卡片、思考块；修改命令合并/折叠/跳转时读取 `web/src/bash-groups.ts` 和 `docs/ui-design.md` 的 27a 规则；编辑卡片的数据整理在 `web/src/edit-write-presentation.ts`，交互规则见 `docs/ui-design.md` |
 | `TerminalPanel.tsx` / `TermXterm.tsx` | 终端视图 + xterm 实例桥接 |
 | `SCMPanel.tsx` | 源代码管理（Git）视图：status/branch/diff；提交/推送/拉取/切换分支 |
 | `TopBar.tsx` / `FooterBar.tsx` | 顶栏（项目／会话标题、后台任务、视图切换、文件栏开关）、状态栏（版本／分支／消息／工作目录）；模型与思考强度在 `ChatInput.tsx` 底部 |
@@ -151,7 +151,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不注册代理工具、不追加系统提示词、不自动续跑或发起额外模型调用。设置中的提示词支持原生文件编辑与空闲时 reload，技能支持原生发现、筛选和启停（见 docs/architecture-extensions.md）；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash、不自动续跑或发起额外模型调用；可选原生 plan 扩展默认关闭，开启后由扩展提供工具规则与条件性历史背景。修改工具、全局开关、压缩恢复或计划投影时读取 `docs/architecture-plan.md`。设置中的提示词支持原生文件编辑与空闲时 reload，技能支持原生发现、筛选和启停（见 docs/architecture-extensions.md）；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 
@@ -172,13 +172,13 @@ pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 S
 | **SSH 节点** | `docs/architecture-nodes.md` | 修改 Xshell/SSH config 同步、凭据、执行确认或终端引用时阅读；本机 ssh2 与远端专用 Agent |
 | **工具结束实时状态** | `docs/architecture-core.md` | tool_status 先于快照落盘，浏览器卡片立即从「执行中」→「已结束」 |
 | **运行静默状态** | `docs/architecture-core.md` | 改模型无响应或长时间工具运行提示时，使用 conversationId 绑定的 agent_silence；恢复响应即清除，重试只适用于本轮未调用工具的纯文本请求 |
-| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：原生 `rpiv-todo` 管理跨轮次清单，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
+| **当前任务进度** | `docs/architecture-core.md`、`docs/ui-design.md` | 修改任务判定、提纲布局或计划触发时阅读：可选原生 `plan` 管理分支版本化计划，尊重用户／skill 的执行与等待规则；步骤按工具 ID 展开记录，暂停不自动完成，兼容历史 `task_plan`；历史任务列表尚未实现 |
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 
 Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改阅读布局/本页目录、右侧对话面板/建议跳转、文档切换性能/正文独立读取、文档会话隔离/等待状态、索引状态、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx` / `WikiReading.tsx` / `WikiChatPanel.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
 
-会话树：修改树过滤/搜索、分支切换/摘要/label、编辑重问、派生会话、外部修改检测或返回文本的草稿保护时，读取 `docs/architecture-session-tree.md`。树状态由原生 SDK 管理，协议 v39，默认编辑重问留在同一会话文件。修改附件卡片、原生条目冻结恢复或模板附件时，读取 `docs/architecture-attachments.md`。
+会话树：修改树过滤/搜索、分支切换/摘要/label、编辑重问、派生会话、外部修改检测或返回文本的草稿保护时，读取 `docs/architecture-session-tree.md`。树状态由原生 SDK 管理，协议 v40，默认编辑重问留在同一会话文件。修改附件卡片、原生条目冻结恢复或模板附件时，读取 `docs/architecture-attachments.md`。
 
 ## 5. 开发工作流
 

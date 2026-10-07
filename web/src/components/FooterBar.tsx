@@ -58,7 +58,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 	}, [selIdx]);
 
 	if (!state) return null;
-	const s = state.stats;
 	const current = state.conversationId === chat.activeConversationId;
 	const git = chat.gitBranch?.cwd === state.cwd ? chat.gitBranch : null;
 	const branchLabel = git?.notRepo ? t("notGitRepoShort") : git?.branch ? (git.detached ? `${t("scmDetached")} · ${git.branch}` : git.branch) : "—";
@@ -66,20 +65,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 	const connClass = chat.ready ? "ok" : "busy";
 	const connLabel = chat.ready ? t("connected") : t("connecting");
 
-	const context = current ? s.contextUsage : { tokens: null, percent: null, contextWindow: 0 };
-	const ctxText =
-		context.tokens !== null && context.percent !== null
-			? `${formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`
-			: "—";
-	const ctxPercent = context.percent ?? null;
-	const ctxBarClass =
-		ctxPercent === null
-			? ""
-			: ctxPercent >= 80
-				? "warn"
-				: ctxPercent >= 50
-					? "mid"
-					: "ok";
 
 	const queueTotal = state.queue.steering.length + state.queue.followUp.length;
 
@@ -150,19 +135,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 			{chat.serverVersion && <span className="status-item status-version" title={`pi-web-ui v${chat.serverVersion}`}>v{chat.serverVersion}</span>}
 			<span className="status-sep">·</span>
 
-			<span className="status-item status-ctx" title={t("contextUsage")}>
-				{t("context")}
-				<span className={`ctx-bar ${ctxBarClass}`}>
-					{ctxPercent !== null && (
-						<span
-							className="ctx-bar-fill"
-							style={{ width: `${Math.min(ctxPercent, 100)}%` }}
-						/>
-					)}
-				</span>
-				{ctxText}
-			</span>
-			<span className="status-sep">·</span>
 
 			<span className="status-item status-branch" title={git?.notRepo ? branchLabel : `${t("scmCurrentBranch")}: ${branchLabel}`}>
 				{!git?.notRepo && <span className="workspace-stat-label">{t("workspaceBranch")}</span>}
@@ -232,9 +204,4 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 			)}
 		</footer>
 	);
-}
-
-function formatTokens(n: number): string {
-	if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
-	return String(n);
 }

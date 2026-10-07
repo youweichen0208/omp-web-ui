@@ -6,7 +6,7 @@ import { codemodeDetails } from "./codemode-presentation.js";
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { UiContentBlock, UiMessage } from "./protocol.js";
-import { todoSnapshot } from "./todo-progress.js";
+import { snapshotFromDetails } from "./plan/state.js";
 
 /** AgentMessage is not re-exported from the package root; derive it from AgentSession. */
 export type AgentMessage = AgentSession["messages"][number];
@@ -162,7 +162,7 @@ export function serializeMessage(
 				.map((c) => (c.type === "text" ? c.text : ""))
 				.join("\n");
 			const { text, truncated } = truncate(raw, TOOL_OUTPUT_CAP);
-			const todo = m.toolName === "todo" ? todoSnapshot(m.details) : undefined;
+			const plan = m.toolName === "plan" && !m.isError ? snapshotFromDetails(m.details) : undefined;
 			let nestedComplete = m.nestedCalls?.complete === true && m.nestedCalls.calls.length <= 256;
 			const nestedCalls = m.nestedCalls?.calls.slice(0, 256).map(call => {
 				const args = call.arguments ? truncate(JSON.stringify(call.arguments), ARGS_CAP) : undefined;
@@ -181,11 +181,7 @@ export function serializeMessage(
 				details: nativeToolDetails(m.toolName, m),
 				...(m.toolName === "codemode" ? { codemode: codemodeDetails(m.details) } : {}),
 				isError: m.isError,
-				...(todo ? { todoSnapshot: {
-					action: typeof todo.action === "string" ? todo.action : undefined,
-					error: typeof todo.error === "string" ? todo.error : undefined,
-					tasks: todo.tasks.map(({ id, subject, status }) => ({ id, subject, status })),
-				} } : {}),
+				...(plan ? { planSnapshot: plan } : {}),
 				timestamp: m.timestamp,
 			};
 		}

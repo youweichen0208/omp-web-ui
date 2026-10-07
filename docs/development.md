@@ -98,3 +98,5 @@ SDK / pi-ai 当前精确锁定 1.0.4。升级前必须验证内部 prompt-templa
 附件围栏回归使用真实 buildAttachmentMessages → promptWithAttachments → parseUserAttachments 链路。工具输出回归包含 600 MiB 稀疏日志的清单及原字节流式校验，不把大文件读为完整字符串；单测覆盖扫描上限和跨块标记。
 
 Pi 1.0.4 专项：`pi-104-prompt-contract-test.mjs` 核对 Codemode on/only 的模型请求、getter、隐藏规则和技能；`pi-104-upstream-fixes-test.mjs` 验证初始化中的 MCP 关闭、Codemode 内建对象修改后结算及 read 图片，均进入零 token 冒烟。资源基准与已知问题复现另见 [原生能力与资源审查](pi-native-resource-review.md)，不在 CI 中运行长时间性能场景。
+
+原生计划回归：`plan-sdk-test.mjs` 与 `plan-settings-test.mjs` 纳入零 token 冒烟；浏览器单独执行 `node tests/plan-chat-browser-test.mjs`。均使用隔离目录与本地模拟模型，不调用真实服务。

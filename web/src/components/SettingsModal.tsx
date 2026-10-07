@@ -14,7 +14,7 @@ interface SettingsModalProps {
 	chat: {
 		ready: boolean;
 		settings: UiSettingsState | null;
-		state?: { cwd: string; conversationId: string } | null;
+		state?: { cwd: string; conversationId: string; planSettings?: import("../types").PlanSettingsState; tree?: import("../types").UiTreeState } | null;
 		dialog: { id: string; conversationId: string; kind: "select" | "confirm" | "input" | "editor"; title: string; args: unknown[] } | null;
 		update?: Omit<Extract<ServerMessage, { type: "update_status" }>, "type"> | null;
 		componentUpdates: Extract<ServerMessage, { type: "component_updates" }> | null;
@@ -48,6 +48,11 @@ export function SettingsModal({ chat, send, onClose }: SettingsModalProps) {
 				<div className="modal-body"><div className="set-section">
 					{!settings ? <p>{t("loading")}</p> : <>
 						<label className="tree-edit-preference"><input type="checkbox" checked={settings.editResendNewSession ?? false} onChange={event => send({ type: "set_settings", editResendNewSession: event.target.checked })} />{t("treeEditNewSession")}</label>
+						{chat.state?.planSettings && <div className="plan-settings">
+							<label><input type="checkbox" checked={chat.state.planSettings.enabled} disabled={!chat.ready || chat.state.tree?.externallyModified || chat.state.tree?.verifying || chat.state.tree?.busy} onChange={event => send({ type: "set_plan_enabled", conversationId: chat.state!.conversationId, enabled: event.target.checked })} />{t("planEnabled")}</label>
+							<p>{t("planEnabledHint")}</p>
+							{!chat.state.planSettings.available ? <p>{t(chat.state.planSettings.reason === "conflict" ? "planConflict" : "planMissing")}</p> : chat.state.planSettings.pending ? <p>{t("planPending")}</p> : null}
+						</div>}
 						{tab === "prompt" && chat.state && <SystemPromptPanel key={`${chat.state.cwd}:${chat.state.conversationId}`} cwd={chat.state.cwd} conversationId={chat.state.conversationId} />}
 						{tab === "skills" && chat.state && <SkillsPanel key={chat.state.cwd} cwd={chat.state.cwd} reload={() => send({ type: "extensions_reload" })} />}
 						{tab === "extensions" && chat.state?.cwd && <ExtensionsPanel key={chat.state.cwd} cwd={chat.state.cwd} onUpdateCount={setExtensionUpdates} reload={() => send({ type: "extensions_reload" })} />}

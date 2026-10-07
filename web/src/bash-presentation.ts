@@ -85,3 +85,8 @@ export function gitStatusSummary(command: string, lines: string[]) {
 	if (rows.some((row) => !row)) return null;
 	return { files: rows.length, added: rows.filter((row) => row!.kind === "added" || row!.kind === "untracked").length, modified: rows.filter((row) => row!.kind === "modified").length, deleted: rows.filter((row) => row!.kind === "deleted").length, conflicts: rows.filter((row) => row!.kind === "conflict").length };
 }
+
+/** Display-only shortening: retain the executable and path leaf, copy the original. */
+export function compactCommandLabel(command: string): string {
+	return command.split(/\r?\n/, 1)[0].replace(/(?:[~.]?\/|[A-Za-z]:\\)(?:[\w.@-]+[\/\\]){2,}([\w.@-]+)/g, "…/$1");
+}
