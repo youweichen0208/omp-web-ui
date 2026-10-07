@@ -49,7 +49,7 @@ export function SettingsModal({ chat, send, onClose }: SettingsModalProps) {
 					{!settings ? <p>{t("loading")}</p> : <>
 						<label className="tree-edit-preference"><input type="checkbox" checked={settings.editResendNewSession ?? false} onChange={event => send({ type: "set_settings", editResendNewSession: event.target.checked })} />{t("treeEditNewSession")}</label>
 						{chat.state?.planSettings && <div className="plan-settings">
-							<label><input type="checkbox" checked={chat.state.planSettings.enabled} disabled={!chat.ready || chat.state.tree?.externallyModified || chat.state.tree?.verifying || chat.state.tree?.busy} onChange={event => send({ type: "set_plan_enabled", conversationId: chat.state!.conversationId, enabled: event.target.checked })} />{t("planEnabled")}</label>
+							<label><input type="checkbox" checked={chat.state.planSettings.enabled} disabled={!chat.ready} onChange={event => send({ type: "set_plan_enabled", conversationId: chat.state!.conversationId, enabled: event.target.checked })} />{t("planEnabled")}</label>
 							<p>{t("planEnabledHint")}</p>
 							{!chat.state.planSettings.available ? <p>{t(chat.state.planSettings.reason === "conflict" ? "planConflict" : "planMissing")}</p> : chat.state.planSettings.pending ? <p>{t("planPending")}</p> : null}
 						</div>}

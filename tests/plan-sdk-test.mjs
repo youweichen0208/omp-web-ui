@@ -39,6 +39,8 @@ try {
 	for (const mode of ['on', 'only']) {
 		session = await make(mode);
 		assert.equal(session.getActiveToolNames().includes('plan'), false);
+		assert.equal(session.getAllTools().find(tool => tool.name === 'plan').sourceInfo.path, '<inline:pi-harness-plan>');
+		assert.deepEqual(session.getToolDefinition('plan').annotations, { readOnlyHint: true, openWorldHint: false });
 		preference.set(true); preference.coordinate(session, true);
 		assert(preference.state(session).effective, JSON.stringify(session.getAllTools().find(t => t.name === 'plan')));
 		let round = 0;

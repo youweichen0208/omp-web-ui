@@ -51,9 +51,9 @@ try {
 		const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
 		const errors = [];
 		page.on("pageerror", (error) => errors.push(String(error)));
-		let socket, baseState, fixture = initial;
+		let socket, baseState, fixture = initial, running = false;
 		const send = () => {
-			const state = { ...baseState, piConfigured: true, messages: fixture.map(({ details, ...message }) => message), streamingMessage: null, isStreaming: false, taskProgress: deriveTaskProgress(baseState.conversationId, fixture, null, false) };
+			const state = { ...baseState, piConfigured: true, messages: fixture.map(({ details, ...message }) => message), streamingMessage: null, isStreaming: running, taskProgress: deriveTaskProgress(baseState.conversationId, fixture, null, running) };
 			socket.send(JSON.stringify({ type: "snapshot", state }));
 		};
 		await page.routeWebSocket("**/ws", (route) => {
@@ -123,6 +123,13 @@ try {
 		await page.locator('.task-progress:visible').waitFor();
 		assert.match(await page.locator('.task-progress-source').textContent(), lang === 'en' ? /awaiting confirmation/ : /等待确认/);
 		fixture.push({ id: 'outside-call', role: 'assistant', timestamp, content: [{ type: 'toolCall', id: 'outside-read', name: 'read', argumentsText: '{"path":"README.md"}' }] }, { id: 'outside-result', role: 'toolResult', toolName: 'read', toolCallId: 'outside-read', timestamp, isError: false, content: [{ type: 'text', text: 'file contents' }] }); send();
+		running = true; send();
+		await page.locator('.task-progress.running').waitFor();
+		assert.match(await page.locator('.header-task-progress').textContent(), lang === 'en' ? /Task progress/ : /任务进度/);
+		assert.match(await page.locator('.task-progress-status').textContent(), lang === 'en' ? /Working/ : /工作中/);
+		assert.match(await page.locator('.task-progress-source').first().textContent(), lang === 'en' ? /awaiting confirmation/ : /等待确认/);
+		running = false; send();
+		await page.locator('.task-progress.waiting').waitFor();
 		await page.locator('.task-unassigned-records').waitFor();
 		assert.match(await page.locator('.task-unassigned-records').textContent(), /README.md/);
 		fixture.push(...pair('last-step', transition({ ...started, action: 'update', expectedRevision: 2, currentStepId: '5', completedStepIds: ['1', '2', '3', '4'] }, started))); send();

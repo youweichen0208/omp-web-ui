@@ -1,4 +1,4 @@
-/** Service-global switch, live background deferral, reconnect/restart and readonly guard. */
+/** Service-global switch, live background deferral, reconnect/restart and readonly deferral. */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -9,9 +9,10 @@ import WebSocket from 'ws';
 const root = mkdtempSync(join(tmpdir(), 'pi-plan-settings-')), agent = join(root, 'agent');
 mkdirSync(agent, { recursive: true });
 let child, logs = '', held, hold = false;
-const sockets = [];
+const sockets = [], requests = [];
+let directClient;
 const model = createServer(async (req, res) => {
-	for await (const chunk of req) { /* drain */ }
+	let raw = ""; for await (const chunk of req) raw += chunk; requests.push(JSON.parse(raw));
 	const respond = () => {
 		res.writeHead(200, { 'content-type': 'text/event-stream' });
 		for (const choice of [{ index: 0, delta: { content: 'local fixture' }, finish_reason: null }, { index: 0, delta: {}, finish_reason: 'stop' }]) res.write(`data: ${JSON.stringify({ id: 'fixture', object: 'chat.completion.chunk', model: 'fixture', choices: [choice] })}\n\n`);
@@ -66,12 +67,35 @@ try {
 	await wait(() => !a.state.tree.verifying);
 	appendFileSync(file, JSON.stringify({ type: 'custom', id: 'foreign', parentId: a.state.tree.leafId, timestamp: new Date().toISOString(), customType: 'foreign', data: {} }) + '\n');
 	await wait(() => a.state.tree.externallyModified, 'read-only');
-	const notices = a.wire.length; a.toggle(true); await wait(() => a.wire.slice(notices).some(m => m.type === 'notice' && m.level === 'error'), 'readonly rejection');
-	assert.equal(JSON.parse(readFileSync(join(root, 'plan-settings.json'))).enabled, false);
-	b.toggle(true); await wait(() => a.state.planSettings.enabled && b.state.planSettings.effective);
+	const notices = a.wire.length; a.toggle(true); await wait(() => a.state.planSettings.enabled && b.state.planSettings.effective, 'readonly preference save');
+	assert.equal(JSON.parse(readFileSync(join(root, 'plan-settings.json'))).enabled, true);
+	assert(!a.wire.slice(notices).some(m => m.type === 'notice' && m.level === 'error'));
 	assert.equal(a.state.planSettings.effective, false); assert.equal(a.state.planSettings.pending, true);
 	a.send({ type: 'session_reopen', conversationId: active, reqId: 'reopen' }); await wait(() => !a.state.tree.externallyModified && a.state.planSettings.effective, 'writable reapply');
 	const reconnected = await connect('b'); assert(reconnected.state.planSettings.effective);
 	await stop(); await start(); const restarted = await connect('restart'); assert(restarted.state.planSettings.enabled && restarted.state.planSettings.effective);
+	await stop();
+	// Exercise the actual host boundary without allowing snapshots to repair a stale loadout.
+	const hostRoot = join(root, 'direct-host'); mkdirSync(hostRoot);
+	process.env.PI_WEB_DATA_DIR = hostRoot; process.env.PI_CODING_AGENT_DIR = agent;
+	const { ClientSession } = await import('../dist/server/agent-service.js');
+	const { ClientStateStore } = await import('../dist/server/client-state.js');
+	const { ThinkingDurationStore } = await import('../dist/server/thinking-timing.js');
+	const { planSettings } = await import('../dist/server/plan/settings.js');
+	directClient = await ClientSession.create('plan-direct', hostRoot, new ClientStateStore(join(hostRoot, 'state.json')), new ThinkingDurationStore(join(hostRoot, 'thinking.json')));
+	const conv = directClient.conv, session = conv.session;
+	for (const enabled of [false, true]) {
+		await conv.tree.waitForVerification();
+		planSettings().set(enabled);
+		const tools = session.getActiveToolNames().filter(name => name !== 'plan');
+		session.setActiveToolsByName(enabled ? tools : [...tools, 'plan']);
+		directClient.flushSnapshot();
+		assert.equal(session.getActiveToolNames().includes('plan'), !enabled, 'snapshot must not mutate the loadout');
+		const count = requests.length;
+		await directClient.prompt('Read the current tool declaration');
+		assert(requests.length > count, 'the host must send a model request');
+		assert.equal(requests.at(-1).tools.some(tool => tool.function.name === 'plan'), enabled, 'prompt must coordinate before sending');
+	}
+	console.log('PASS snapshot read-only behavior and prompt-time activation/deactivation');
 	console.log('PASS plan global settings: multi-client, background settled, reload/tree, readonly, reconnect and restart');
-} finally { held?.(); await stop(); model.closeAllConnections(); await new Promise(r => model.close(r)); rmSync(root, { recursive: true, force: true }); }
+} finally { held?.(); await directClient?.dispose(); await stop(); model.closeAllConnections(); await new Promise(r => model.close(r)); rmSync(root, { recursive: true, force: true }); }

@@ -47,6 +47,7 @@ export const createPlanExtension = (): ExtensionFactory => pi => {
 	pi.registerTool({
 		name: "plan", label: "Plan", description: "Create or update a complete, versioned implementation plan on this session branch. Updates require the latest planId and expectedRevision. Ended plans require create.",
 		exposure: "model-only", executionMode: "sequential", defaultActive: false,
+		annotations: { readOnlyHint: true, openWorldHint: false },
 		promptSnippet: "Record and update a multi-step implementation plan.",
 		promptGuidelines: ["For multi-step implementation, create or update a relevant plan before execution and update the current step before starting it. Submit the full state each time. Wait for create to return its identity before updating. Follow user and skill instructions, including waiting; a plan does not grant authorization. Ordinary questions need no plan. Mark completion explicitly; never infer it from a stopped run."],
 		parameters: planParameters,

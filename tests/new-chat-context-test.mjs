@@ -308,7 +308,7 @@ try {
 	await client.waitForState(state => !state.isStreaming);
 	client.received = client.received.filter((message) => message.type !== "sessions");
 	client.send({ type: "list_sessions" });
-	const list = await client.waitForType("sessions", (message) => message.sessions.some((session) => session.path === historyPath));
+	const list = await client.waitForType("sessions", (message) => message.sessions.some((session) => session.path === historyPath) && message.sessions.some((session) => session.path === client.state.sessionFile));
 	if (list.sessions.find((session) => session.path === historyPath)?.name !== "Keep this conversation") throw new Error("/new changed the old session title");
 	const newPath = client.state.sessionFile;
 	const newId = client.state.sessionId;
@@ -354,7 +354,7 @@ try {
 		if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("UI retained old messages while new_chat snapshot was delayed");
 		for (let i = 0; i < 20 && !resyncs; i++) await sleep(50);
 		if (!resyncs) throw new Error("Missing snapshot recovery request");
-		if (!(await page.locator(".status-ctx").innerText()).includes("—")) throw new Error("Footer retained old context usage");
+		if ((await page.locator(".usage-cache-short strong").innerText()) !== "—") throw new Error("Input toolbar retained old cache usage");
 		hold = false;
 		for (const wire of held) downstream.send(wire);
 		await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");

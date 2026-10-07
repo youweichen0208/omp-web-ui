@@ -138,3 +138,16 @@ test("an unrelated failed tool stays outside the waiting historical plan", () =>
 	expect(task?.plan?.awaitingConfirmation).toBe(true);
 	expect(task?.plan?.items.every(item => !item.toolCallIds?.length)).toBe(true);
 });
+
+test("an unrelated running request keeps its own status and title until plan confirmation", () => {
+	const plan = { ...create(), title: "重构" };
+	const request = { ...user("u2"), content: [{ type: "text", text: "解释一下 README 的安装步骤" }] };
+	const messages = [user("u1"), assistant("p1"), result("p1", plan), request, assistant("read-readme")];
+	const running = deriveTaskProgress("c", messages, null, true);
+	expect(running).toMatchObject({ status: "running", title: "解释一下 README 的安装步骤", plan: { title: "重构", awaitingConfirmation: true } });
+	expect(running?.plan?.items.flatMap(item => item.toolCallIds ?? [])).not.toContain("read-readme");
+	const settled = deriveTaskProgress("c", messages, null, false);
+	expect(settled).toMatchObject({ status: "waiting", title: "解释一下 README 的安装步骤" });
+	const confirmed = deriveTaskProgress("c", [...messages, assistant("p2"), result("p2", transition(update(plan), plan))], null, true);
+	expect(confirmed).toMatchObject({ status: "running", title: "重构", plan: { awaitingConfirmation: false } });
+});

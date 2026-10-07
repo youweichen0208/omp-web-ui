@@ -4,7 +4,7 @@
 
 ## 工具与持久化
 
-`plan` 使用 `model-only`、`sequential`、`defaultActive: false`。启用后提供简短 promptSnippet 和规则，尊重用户、skill 的等待与授权要求。未声明幂等或额外操作权限。
+`plan` 使用 `model-only`、`sequential`、`defaultActive: false`。启用后提供简短 promptSnippet 和规则，尊重用户、skill 的等待与授权要求。`annotations` 声明 `readOnlyHint: true`、`openWorldHint: false`：只返回用于会话记录的计划快照，不修改外部资源。未声明幂等；权限扩展仍自行决定确认策略。
 
 create/update 都提交完整状态：title、status、steps、currentStepId（无当前项时明确 null）、completedStepIds、completionCriteria，可选 changeSummary。标题最多 80 字符，步骤 1–16 个，步骤 ID 最多 64 字符且唯一，详情最多 500 字符，完成标准和变更说明最多 240 字符。完成 ID 必须唯一且属于步骤；当前项不能已完成。completed/cancelled/failed 不保留当前项，completed 要求全部步骤完成。
 
@@ -20,9 +20,9 @@ create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision
 
 ## 宿主生命周期
 
-注册完成后先检查工具来源，只协调 `builtin:pi-harness-plan` / `<inline:pi-harness-plan>`。第三方同名工具覆盖时显示 conflict，不修改该工具的激活状态，也不提供原生恢复背景。默认工具集不追加 `+plan`。
+注册完成后先检查工具来源，以 `<inline:pi-harness-plan>` 注册，不占用 SDK 的 builtin 命名空间；来源检查兼容旧的 `builtin:pi-harness-plan`。第三方同名工具覆盖时显示 conflict，不修改该工具的激活状态，也不提供原生恢复背景。默认工具集不追加 `+plan`。
 
-创建、恢复、reload、树导航、只读恢复以及 agent_settled 共用协调函数。空闲且可写时仅在期望与实际不一致时调用 setActiveToolsByName；运行中或只读的其他会话显示 pending。当前只读会话不能发起全局切换。全局切换保存后广播全部客户端的快照，不触发 reload。
+创建、恢复、reload、树导航、只读恢复以及 agent_settled 共用协调函数。空闲且可写时仅在期望与实际不一致时调用 setActiveToolsByName；运行中或只读的会话显示 pending。当前只读会话也可保存全局偏好，恢复可写后再应用工具激活变更。全局切换保存后广播全部客户端的快照，不触发 reload。prompt 在实际投递前再次协调，快照构建只读取计划开关状态。
 
 树导航后的协调不能省略：SDK 1.0.4 会从历史工具声明恢复激活集合，包括已关闭的 plan。协议 v40 的 UiState.planSettings 提供 enabled、available、effective、pending 和不可用原因；set_plan_enabled 带当前 conversationId。
 
@@ -30,7 +30,7 @@ create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision
 
 序列化仅按工具名 plan 和 schema 白名单投影；失败、无效和未知版本按普通工具卡展示。第三方 todo 专用投影已移除，历史 task_plan 继续只读兼容。
 
-右栏以 assistant 内调用顺序配对成功结果重放。新用户请求使 active 计划进入“此前未完成计划 · 等待确认”；本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏单独显示“本轮执行记录 · 未归入计划”，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
+右栏以 assistant 内调用顺序配对成功结果重放。新用户请求使 active 计划区块进入“此前未完成计划 · 等待确认”；确认前任务整体使用当前请求的标题，运行时保持 running，结束后未完成计划进入 waiting。本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏单独显示“本轮执行记录 · 未归入计划”，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
 
 聊天按当前 conversationId 内的 planId 合并卡片；成功更新保留变化行和键盘可操作的查看入口，错误保持普通卡。替换取消记录保留在新卡，旧卡显示取消；历史分支仍从其自身 transcript 还原。右栏保留当前步骤、详情和完成标准。
 
@@ -38,7 +38,7 @@ create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision
 
 - `tests/unit/plan.test.ts`：校验、冲突纠错、变化与替换、白名单、分支恢复、上下文可见性、工具归属、等待与终态、卡片身份。
 - `tests/plan-sdk-test.mjs`：真实 SDK + 本地模拟模型，Codemode on/only、连续更新独立落盘、失败纠正、原生压缩条目恢复、关闭/reload/双向分支导航、无扩展读取历史、第三方同名工具。
-- `tests/plan-settings-test.mjs`：隔离服务，多客户端全局开关、后台 settled 延迟、reload/导航、只读保护与恢复、重连和服务重启。
+- `tests/plan-settings-test.mjs`：隔离服务，多客户端全局开关、后台 settled 延迟、reload/导航、只读延后应用、发送前协调与只读快照、重连和服务重启。
 - `tests/plan-chat-browser-test.mjs`：Web/macOS/Windows 壳、中文/英文、窄窗口、变化跳转与折叠历史、错误卡、替换隔离和等待确认。
 
 本阶段不提供独立包、CLI 专用渲染或快捷发送按钮。

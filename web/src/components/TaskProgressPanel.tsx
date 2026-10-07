@@ -75,7 +75,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("working") : task.status === "waiting" ? t("taskWaitingContinue") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
 	const hasResult = task.status === "done" && !single && !!(result.commit || result.tests || result.changes);
 	const finalTestPhase = phases.findLast((phase) => phase.kind === "test" || phase.kind === "fix")?.id;
-	const title = plainTitle(task.plan?.title || task.title || conversationTitle);
+	const title = plainTitle(task.title || conversationTitle);
 	const preview = (path: string) => { const relative = path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path; onPreview(relative, relative.split("/").at(-1) ?? relative); };
 	const activeTool = task.steps.findLast((step) => step.status === "running" && step.artifacts.length)?.artifacts.at(-1);
 	const activeCall = activeTool ? messages.flatMap((message) => message.content).find((part): part is UiToolCallBlock => part.type === "toolCall" && part.id === activeTool.toolCallId) : undefined;
@@ -105,7 +105,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 					</div>}
 				</div>
 			</div>
-			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span><span>· {t("bashCommandCount", { n: task.steps.flatMap((step) => step.artifacts).filter((item) => item.kind === "bash" || item.kind === "terminal").length })}</span></div>
+			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && !task.plan.awaitingConfirmation && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span><span>· {t("bashCommandCount", { n: task.steps.flatMap((step) => step.artifacts).filter((item) => item.kind === "bash" || item.kind === "terminal").length })}</span></div>
 			{task.plan && <div className="task-progress-source" title={t("taskPlanSourceHint")}>{t(task.plan.awaitingConfirmation ? "planPrevious" : "taskPlanSource")}</div>}
 			{task.plan?.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
 		</div>

@@ -180,9 +180,9 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 	const planIncomplete = plan?.source === "plan" && plan.status === "active";
 	let taskStatus: TaskProgress["status"] = status;
 	if (plan?.status === "cancelled" || plan?.status === "failed") taskStatus = plan.status;
-	else if (!cancelled && status !== "failed" && (plan?.awaitingConfirmation || planIncomplete && !isStreaming)) taskStatus = "waiting";
+	else if (!isStreaming && !cancelled && status !== "failed" && (plan?.awaitingConfirmation || planIncomplete)) taskStatus = "waiting";
 	if (!steps.length && !plan) return null;
-	const title = plan?.title || taskTitle(messages, userIndex, steps);
+	const title = (!plan?.awaitingConfirmation && plan?.title) || taskTitle(messages, userIndex, steps);
 	const endedAt = status === "running" ? undefined : Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0));
 	return { id: `task:${plan?.origin ?? user.id}`, conversationId, sourceMessageId: user.id, title, status: taskStatus, startedAt: user.timestamp ?? 0, ...(endedAt ? { endedAt } : {}), completed: steps.filter((step) => step.status === "done").length, steps, ...(plan ? { plan } : {}) };
 }

@@ -23,7 +23,7 @@ export function conversationSettings(cwd: string, agentDir: string): SettingsMan
 /** Same native extensions as the Pi CLI; activation follows the user's settings. */
 export function nativeToolExtensions(): InlineExtension[] {
 	return [
-		{ name: "pi-harness-plan", builtin: true, replaceable: true, factory: createPlanExtension() },
+		{ name: "pi-harness-plan", replaceable: true, factory: createPlanExtension() },
 		{ name: "codemode", builtin: true, replaceable: true, factory: createCodemodeExtension() },
 		{ name: "tool-search", builtin: true, replaceable: true, factory: createToolSearchExtension() },
 		{ name: "mcp", builtin: true, replaceable: true, factory: createMcpExtension() },

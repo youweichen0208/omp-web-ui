@@ -579,9 +579,6 @@ export class ClientSession {
 	async setPlanEnabled(enabled: boolean, conversationId: string): Promise<void> {
 		if (typeof enabled !== "boolean" || this.activeId !== conversationId || this.switchingWorkspace) throw new Error("Conversation changed");
 		if (this.quiesceBlocked()) return;
-		await this.conv.tree?.waitForVerification();
-		if (this.activeId !== conversationId) throw new Error("Conversation changed");
-		this.conv.tree?.assertWritable();
 		planSettings().set(enabled);
 		for (const client of ClientSession.liveClients.values()) {
 			for (const conv of client.convs.values()) client.coordinatePlan(conv);
@@ -1274,7 +1271,6 @@ export class ClientSession {
 		messages: UiMessage[],
 	): Omit<UiState, "messages" | "rev"> & { rev: number } {
 		const conv = this.conv;
-		this.coordinatePlan(conv);
 		const state = conv.session.agent.state;
 		const model = state.model;
 		const streamingMessage = state.streamingMessage
@@ -1980,6 +1976,7 @@ export class ClientSession {
 			await conv.tree?.waitForVerification();
 			if (this.conv !== conv || conv.session !== s) throw new Error("Conversation changed");
 			if (!s.isStreaming) { conv.toolsExecutedSincePrompt = false; conv.lastTaskEndedAt = undefined; }
+			this.coordinatePlan(conv);
 			await deliverPrompt(s, text, asides, queue, acknowledge);
 		} catch (err) {
 			acknowledge(false);
