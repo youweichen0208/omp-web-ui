@@ -27,7 +27,7 @@ try {
 	for (let i = 0; i < 100 && await visible(); i++) await sleep(50);
 	assert.equal(await visible(), false); assert(readFileSync(join(cwd, 'README.md'), 'utf8').includes('Saved on hide.'));
 	await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http://127.0.0.1:')); w.show(); w.focus(); });
-	await page.route('**/api/wiki', route => route.request().postDataJSON().action === 'write' ? route.fulfill({ status: 503, json: { error: 'Simulated failure' } }) : route.continue());
+	await page.route(/\/api\/wiki(\?|$)/, route => route.request().postDataJSON().action === 'write' ? route.fulfill({ status: 503, json: { error: 'Simulated failure' } }) : route.continue());
 	await type(' Preserve failed save.'); await close();
 	await page.getByRole('button', { name: '保存失败 · 重试', exact: true }).waitFor();
 	assert.equal(await visible(), true); assert(!readFileSync(join(cwd, 'README.md'), 'utf8').includes('Preserve failed save.'));

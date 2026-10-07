@@ -27,7 +27,7 @@ try {
 		await sleep(100);
 	}
 	assert(page,'desktop window loaded');
-	const url=page.url();
+	const url=new URL(page.url()).origin+'/'; // the web client strips ?token= after boot
 	const original=childPid(app.process().pid);
 	assert(original,'server child is running');
 	process.kill(original,'SIGKILL');
@@ -40,7 +40,7 @@ try {
 		await sleep(100);
 	}
 	assert(replacement&&replacement!==original,'desktop restarted the server child');
-	assert.equal(page.url(),url,'window kept its URL and conversation state');
+	assert.equal(new URL(page.url()).origin+'/',url,'window kept its URL and conversation state');
 	assert((await fetch(`${url}api/health`)).ok,'server responds after restart');
 	console.log('PASS desktop server recovery: same port and window URL');
 } finally {await app?.close();}

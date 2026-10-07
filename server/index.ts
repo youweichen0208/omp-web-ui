@@ -47,7 +47,7 @@ import { readSqlitePreview } from "./sqlite-preview.js";
 import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
-import { tokenCookie, tokenMatches } from "./token-auth.js";
+import { needsTokenCookie, tokenCookie, tokenMatches } from "./token-auth.js";
 import { createOriginPolicy } from "./origin-policy.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
 
@@ -127,7 +127,7 @@ if (AUTH_TOKEN) {
 	app.use((req, res, next) => {
 		if (req.path === "/api/health" || tokenOk(req)) {
 			// 浏览器经 ?token= 首次进入后下发 HttpOnly cookie，后续导航/资源请求免带参数
-			if (!req.headers.cookie?.includes("pi_web_token=")) {
+			if (needsTokenCookie(req.headers.cookie, AUTH_TOKEN)) {
 				const https = (req.socket as { encrypted?: boolean }).encrypted === true || req.headers["x-forwarded-proto"] === "https";
 				res.setHeader("Set-Cookie", tokenCookie(AUTH_TOKEN, https));
 			}
