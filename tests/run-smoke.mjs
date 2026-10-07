@@ -30,6 +30,7 @@ const ALL = [
 	"plan-settings-test",
 	"app-updater-test",
 	"desktop-server-auth-test",
+	"client-eviction-test",
 	"clear-provider-key-test",
 	"component-updates-test",
 	"extensions-test",

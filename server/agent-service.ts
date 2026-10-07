@@ -34,6 +34,7 @@ import {
 	type Conversation,
 } from "./conversation.js";
 import { browseDirs } from "./dir-browser.js";
+import { clientIdleMsFromEnv, isClientEvictable } from "./client-eviction.js";
 import { PiConfigProbe, checkUpdate, installPiAgent, isPiCliInstalled } from "./pi-environment.js";
 export { QuiesceRejectedError };
 /**
@@ -678,6 +679,7 @@ export class ClientSession {
 	/** Add a socket to this client's broadcast set; flushes buffered startup notices. */
 	attachSink(send: (msg: ServerMessage) => void): void {
 		this.sinks.add(send);
+		this.idleSince = 0;
 		for (const result of this.recalledQueues.values()) send(result);
 
 		this.providerAuth.replay();
@@ -719,8 +721,26 @@ export class ClientSession {
 		// conversation and can be inspected after reconnecting. Only conversation
 		// disposal or server shutdown kills them.
 		if (this.sinks.size === 0) {
+			this.idleSince = Date.now();
 			this.files.unwatchDir();
 		}
+	}
+
+	/** ms epoch since the last socket detached (0 while attached). */
+	private idleSince = Date.now();
+
+	/** True when nothing is attached or running, so the session can be rebuilt on demand. */
+	isEvictable(now: number, idleMs: number): boolean {
+		return isClientEvictable({
+			socketCount: this.sinks.size,
+			idleSince: this.idleSince,
+			streamingConversations: this.activeConversations(),
+			queuedMessages: this.pendingMessages(),
+			liveTerminals: [...this.convs.values()].reduce((n, conv) => n + conv.terminals.list().length, 0),
+			backgroundTasks: this.bg.hasServers() ? 1 : 0,
+			switchingWorkspace: this.cwdSwitchRunning,
+			disposed: this.disposed,
+		}, now, idleMs);
 	}
 
 	/** Broadcast to every connected socket of this client. */
@@ -2873,6 +2893,27 @@ export class AgentService {
 	) {
 		this.stateStore = new ClientStateStore(stateFile);
 		this.thinkingDurationStore = new ThinkingDurationStore(join(dirname(stateFile), "thinking-durations.json"));
+		const idleMs = clientIdleMsFromEnv(process.env.PI_WEB_CLIENT_IDLE_MINUTES);
+		if (idleMs > 0) {
+			this.evictTimer = setInterval(() => void this.evictIdleClients(idleMs), Math.min(5 * 60_000, idleMs));
+			this.evictTimer.unref();
+		}
+	}
+
+	private evictTimer: ReturnType<typeof setInterval> | null = null;
+
+	/** Dispose sessions of clients that left (closed tabs). Persisted state survives; a
+	 *  returning clientId simply gets a fresh session. Skipped while draining. */
+	async evictIdleClients(idleMs: number, now = Date.now()): Promise<number> {
+		if (this.quiesced) return 0;
+		const evicted: ClientSession[] = [];
+		for (const [id, cs] of [...this.clients]) {
+			if (!cs.isEvictable(now, idleMs)) continue;
+			this.clients.delete(id);
+			evicted.push(cs);
+		}
+		await Promise.all(evicted.map((cs) => cs.dispose().catch(() => {})));
+		return evicted.length;
 	}
 
 	/** Get or create the session for a client, racing attach calls safely. */
@@ -2930,6 +2971,7 @@ export class AgentService {
 		quiesced: boolean;
 		quiescedSince?: number;
 		connectedClients: number;
+		clientSessions: number;
 		activeConversations: number;
 		pendingMessages: number;
 	} {
@@ -2939,6 +2981,7 @@ export class AgentService {
 			cwd: this.cwd,
 			...this.quiesceInfo(),
 			connectedClients: this.socketCount,
+			clientSessions: this.clients.size,
 			activeConversations: this.activeConversations(),
 			pendingMessages: this.pendingMessages(),
 		};
@@ -3034,6 +3077,8 @@ export class AgentService {
 	}
 
 	async disposeAll(): Promise<void> {
+		if (this.evictTimer) clearInterval(this.evictTimer);
+		this.evictTimer = null;
 		// Record still-streaming conversations BEFORE tearing anything down, so
 		// the next attach can tell the user what was lost (SIGTERM / update).
 		for (const [clientId, cs] of [...this.clients]) {

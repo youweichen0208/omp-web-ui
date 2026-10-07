@@ -37,6 +37,11 @@ export class BgServerTracker {
 		},
 	) {}
 
+	/** True while AI-started background servers are tracked (keeps the client session alive). */
+	hasServers(): boolean {
+		return this.servers.size > 0;
+	}
+
 	/** 启动周期性存活检查（死项静默剔除）。 */
 	start(): void {
 		this.refreshTimer = setInterval(() => void this.refresh(), BG_REFRESH_INTERVAL_MS);

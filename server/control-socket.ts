@@ -48,6 +48,8 @@ export interface ControlStatus {
 	quiesced?: boolean;
 	quiescedSince?: number;
 	connectedClients?: number;
+	/** Client sessions kept alive in memory (sockets attached or not). */
+	clientSessions?: number;
 	activeConversations?: number;
 	pendingMessages?: number;
 }
