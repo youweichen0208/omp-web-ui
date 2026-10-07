@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.9 原生计划与工作区体验
+
+新增默认关闭的原生 plan 扩展及全局开关，支持分支版本化、压缩背景恢复、聊天计划卡和右栏执行记录；修复历史待确认计划覆盖当前请求状态的问题，完善连续命令分组和工作区界面。SDK 保持 1.0.4，协议升至 40。本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。说明见 `.github/release-notes/v0.99.9.md`。
+
 ## 0.99.8 Pi 1.0.4 与原生资源审查
 
 SDK / pi-ai 及配套 Pi 依赖升级至 1.0.4，系统提示词适配 hiddenTools，模板适配器保持原生展开契约。新增上游 MCP 关闭、Codemode 结束状态及图片回归；协议保持 39。原生能力、既有异常恢复问题与资源基准见 [审查报告](pi-native-resource-review.md)。本次发布 GitHub 源码与三平台桌面 Release，不发布 npm。说明见 `.github/release-notes/v0.99.8.md`。
