@@ -1,11 +1,13 @@
+import { Dropdown, DropdownItem } from "./Dropdown";
+import { queuedMessagePreview } from "../skill-block";
 import { TreeDraftRestore } from "./TreeDraftRestore";
 import { useExtensionEditor } from "../extension-editor";
-import type { MutableRefObject } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "../current-file";
 import { mergeCurrentFile } from "../current-file";
 import { randomUuid } from "../uuid";
 import { memo, useLayoutEffect, useEffect, useRef, useState } from "react";
-import { FiPlus, FiSquare, FiPaperclip, FiArrowUp } from "react-icons/fi";
+import { FiCornerUpLeft, FiPlus, FiSquare, FiPaperclip, FiArrowUp } from "react-icons/fi";
 import type { ClientMessage, PromptAttachment, ServerMessage, ModelInfo, SlashCommandInfo, UiMessage, UiState } from "../types";
 import { useT, useI18n } from "../i18n";
 import { isRasterImage } from "../image-paste";
@@ -31,6 +33,8 @@ interface ChatInputProps {
 	ready: boolean;
 	verifying?: boolean;
 	pendingCount?: number;
+	queue?: UiState["queue"];
+	workingStatus?: ReactNode;
 	streaming: boolean;
 	silentActivity?: "model" | "tool" | null;
 	/** Persisted messages (stable reference while unchanged) — used by /copy. */
@@ -88,7 +92,7 @@ export const ChatInput = memo(function ChatInput({
 	active = true,
 	currentFile, contextReader, contextSaver,
 	stats,
-	ready, promptResult, verifying, pendingCount = 0,
+	ready, promptResult, verifying, pendingCount = 0, queue, workingStatus,
 	streaming,
 	silentActivity,
 	messages,
@@ -112,7 +116,7 @@ export const ChatInput = memo(function ChatInput({
 	// preview opens a (different) file — key is the open instance id.
 	const [dismissed, setDismissed] = useState<Record<string, string>>({});
 	const autoFile = currentFile && dismissed[activeConversationId] !== currentFile.id ? currentFile : null;
-	const pendingSubmit = useRef<{ id: string; conversation: string; text: string; attachments: ChatInputProps["attachments"] } | null>(null);
+	const pendingSubmit = useRef<{ id: string; conversation: string; text: string; queued: boolean; attachments: ChatInputProps["attachments"] } | null>(null);
 
 	const { locale } = useI18n();
 	const slashDesc = (c: SlashCommandInfo) =>
@@ -122,6 +126,16 @@ export const ChatInput = memo(function ChatInput({
 	const drafts = useRef(new Map<string, string>());
 	const draftKey = useRef(activeConversationId);
 	const [text, setText] = useState("");
+	const [delivery, setDelivery] = useState<"steer" | "followUp">("steer");
+	const [deliveryOpen, setDeliveryOpen] = useState(false);
+	const [queueOpen, setQueueOpen] = useState(false);
+	useEffect(() => { setDelivery("steer"); setDeliveryOpen(false); setQueueOpen(false); }, [activeConversationId, streaming]);
+	const recallQueue = () => send({ type: "recall_queue", conversationId: activeConversationId, requestId: randomUuid() });
+	const stop = () => {
+		const accepted = send({ type: "abort" });
+		if (!connected) onNotice(accepted ? "warning" : "error", t(accepted ? "stopQueuedAfterReconnect" : "stopUnavailable"));
+	};
+	const queued = queue ? [...queue.steering.map(text => ({ text, steer: true })), ...queue.followUp.map(text => ({ text, steer: false }))] : [];
 
 	useLayoutEffect(() => {
 		if (draftKey.current !== activeConversationId) {
@@ -141,7 +155,7 @@ export const ChatInput = memo(function ChatInput({
 		if (promptResult.attachmentsConsumed !== false) onSent(pending.conversation, pending.attachments);
 		if (pending.conversation === activeConversationId) {
 			setText((value) => value === pending.text ? "" : value);
-			if (!promptResult.commandExecuted && pending.text.trim() !== "/reload") setPendingEcho(activeConversationId, pending.text.trim());
+			if (!pending.queued && !promptResult.commandExecuted && pending.text.trim() !== "/reload") setPendingEcho(activeConversationId, pending.text.trim());
 		} else {
 			if (drafts.current.get(pending.conversation) === pending.text) drafts.current.delete(pending.conversation);
 		}
@@ -340,7 +354,7 @@ export const ChatInput = memo(function ChatInput({
 		// steering message (delivered as soon as the current assistant turn
 		// settles, skipping remaining tool calls — the pi CLI Enter semantic)
 		// and the agent immediately responds to it — see AgentService.prompt()
-		// in agent-service.ts. The 补充 (supplement) button passes queue=true,
+		// in agent-service.ts. Follow-up delivery passes queue=true,
 		// which the server delivers as followUp instead — the prompt is sent
 		// only after the WHOLE run finishes ("AI 生成结束才发送").
 		const dispatchPrompt = () => {
@@ -361,7 +375,7 @@ export const ChatInput = memo(function ChatInput({
 			}
 			const requestId = randomUuid();
 			if (send({ type: "prompt", text: trimmed, queue, requestId, attachments: outgoing })) {
-				pendingSubmit.current = { id: requestId, conversation: activeConversationId, text, attachments };
+				pendingSubmit.current = { id: requestId, conversation: activeConversationId, text, queued: streaming, attachments };
 			}
 		};
 		// 发送即保存：携带当前文件且草稿未保存时，先落盘再发送（磁盘 == 快照 ==
@@ -413,51 +427,30 @@ export const ChatInput = memo(function ChatInput({
 					return;
 			}
 		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			e.stopPropagation();
+			if (deliveryOpen) setDeliveryOpen(false);
+			else if (text) setText("");
+			else if (streaming) stop();
+			return;
+		}
+		if (e.key === "ArrowUp" && !text && pendingCount === 1) {
+			e.preventDefault(); recallQueue(); return;
+		}
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
-			submit(streaming && (e.metaKey || e.ctrlKey));
+			submit(streaming && (e.altKey ? delivery !== "followUp" : delivery === "followUp"));
 		}
 	};
 
-	// Send / stop / supplement — rendered twice (desktop row + mobile tools
-	// row); CSS hides whichever set doesn't apply at the current width.
+	// Both states use the same compact controls in the bottom toolbar.
 	const renderActions = () => (
 		<div className="inputbox-actions">
-			{pendingCount > 0 && <button type="button" className="btn recall-queue" disabled={!connected} onClick={() => send({ type: "recall_queue", conversationId: activeConversationId, requestId: randomUuid() })}>{t("recallQueue")} ({pendingCount})</button>}
-			{streaming ? (
-				<>
-					{text.trim() && <>
-						<button type="button" className="btn supplement" title={t("supplementTip")} disabled={!connected || verifying} onClick={() => submit(true)}>{t("supplement")}</button>
-						<button type="button" className="btn steer" disabled={!connected || verifying} onClick={() => submit(false)}>{t("steerSend")}</button>
-					</>}
-					<button
-						type="button"
-						className="btn stop"
-						title={t("stopAgent")}
-						aria-label={t("stopTask")}
-						onClick={() => {
-							const accepted = send({ type: "abort" });
-							if (!connected) onNotice(accepted ? "warning" : "error", t(accepted ? "stopQueuedAfterReconnect" : "stopUnavailable"));
-						}}
-					>
-						<FiSquare /><span>{t("stopTask")}</span>
-					</button>
-				</>
-			) : (
-				<button
-					type="button"
-					className="btn send"
-					title={t("sendTip")}
-					disabled={
-						!connected || verifying ||
-						(!text.trim() &&
-							!attachments.some((a) => a.imageData || a.fileData))
-					}
-					onClick={() => submit()}
-				>
-					<FiArrowUp />
-				</button>
-			)}
+			{streaming && <button type="button" className="btn composer-action stop" title={`${t("stopTask")} · Esc`} aria-label={t("stopTask")} onClick={stop}><FiSquare aria-hidden="true" /></button>}
+			<button type="button" className="btn composer-action send" title={t("sendTip")} aria-label={t("sendTip")}
+				disabled={!connected || verifying || (!text.trim() && !attachments.some(a => a.imageData || a.fileData))}
+				onClick={() => submit(streaming && delivery === "followUp")}><FiArrowUp aria-hidden="true" /></button>
 		</div>
 	);
 
@@ -561,6 +554,15 @@ export const ChatInput = memo(function ChatInput({
 				const bytes = Uint8Array.from(atob(image.data), char => char.charCodeAt(0));
 				return new File([bytes], `recalled-${index}.${image.mimeType.split("/")[1] ?? "png"}`, { type: image.mimeType });
 			}))} />
+			{workingStatus && <div className="composer-working">{workingStatus}</div>}
+			{pendingCount > 0 && <div className="composer-queue">
+				<div className="composer-queue-head">
+					{pendingCount > 1 ? <button type="button" className="queue-toggle" aria-expanded={queueOpen} onClick={() => setQueueOpen(!queueOpen)}>{t("pendingMessages", { n: pendingCount })} {queueOpen ? "▴" : "▾"}</button> : <span className="queue-single"><span className="queue-badge">{t(queued[0]?.steer ? "queueSteerTag" : "queueFollowTag")}</span><span className="queued-text" title={queuedMessagePreview(queued[0]?.text ?? "")}>{queuedMessagePreview(queued[0]?.text ?? "")}</span></span>}
+					{pendingCount === 1 && <span className="queue-when">{t(queued[0]?.steer ? "deliverySteerHint" : "deliveryFollowHint")}</span>}
+					<button type="button" className="recall-queue" title={t("recallQueue")} disabled={!connected} onClick={recallQueue}><FiCornerUpLeft aria-hidden="true" />{t("recallQueueEdit")}</button>
+				</div>
+				{queueOpen && pendingCount > 1 && <div className="composer-queue-list">{queued.map((item, i) => <div className="composer-queue-item" key={i}><span className="queue-badge">{t(item.steer ? "queueSteerTag" : "queueFollowTag")}</span><span className="queued-text" title={queuedMessagePreview(item.text)}>{queuedMessagePreview(item.text)}</span><span className="queue-when">{t(item.steer ? "deliverySteerHint" : "deliveryFollowHint")}</span></div>)}</div>}
+			</div>}
 			<div className={`inputbox${text.length > 0 ? " has-draft" : ""}`}>
 			{promptResult?.commandExecuted && promptResult.conversationId === activeConversationId && attachments.length > 0 && <div role="status">{t("commandAttachmentsRetained")}</div>}
 			{(attachments.length > 0 || autoFile) && (
@@ -648,7 +650,7 @@ export const ChatInput = memo(function ChatInput({
 														placeholder={
 															connected
 																? streaming
-																	? silentActivity ? t(silentActivity === "model" ? "placeholderModelSilent" : "placeholderToolSilent") : t("placeholderStreaming")
+																	? silentActivity ? t(silentActivity === "model" ? "placeholderModelSilent" : "placeholderToolSilent") : t("placeholderStreamingModes", { primary: t(delivery === "steer" ? "queueSteerTag" : "queueFollowTag"), alternate: t(delivery === "steer" ? "queueFollowTag" : "queueSteerTag") })
 																	: t("composerPlaceholder")
 																: t("placeholderConnecting")
 														}
@@ -660,10 +662,10 @@ export const ChatInput = memo(function ChatInput({
 														onKeyDown={onKeyDown}
 														onPaste={onPaste}
 													/>
-					{renderActions()}
 				</div>
 				{/* Mobile second line: model/thinking left, file/send right — the top
 				    bar folds those away on phones (styles.css ≤768px). */}
+
 				<div className="input-tools">
 					<div className="input-tools-left">
 						<button type="button" className="btn composer-attach" title={t("uploadFile")} disabled={!connected} onClick={() => fileInputRef.current?.click()}><FiPlus /></button>
@@ -676,6 +678,9 @@ export const ChatInput = memo(function ChatInput({
 							compact
 							segmented
 						/>
+						{streaming && <div className="delivery-control"><Dropdown direction="up" open={deliveryOpen} onOpenChange={setDeliveryOpen} trigger={t(delivery === "steer" ? "queueSteerTag" : "queueFollowTag")}>
+							{(["steer", "followUp"] as const).map(mode => <DropdownItem key={mode} active={delivery === mode} onClick={() => { setDelivery(mode); setDeliveryOpen(false); taRef.current?.focus(); }}><span className="delivery-option"><strong>{t(mode === "steer" ? "queueSteerTag" : "queueFollowTag")}</strong><small>{t(mode === "steer" ? "deliverySteerHint" : "deliveryFollowHint")}</small></span></DropdownItem>)}
+						</Dropdown></div>}
 					</div>
 					<div className="input-tools-right">
 						<UsagePopover stats={stats} />

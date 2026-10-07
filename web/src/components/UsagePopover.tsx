@@ -28,7 +28,7 @@ export function UsagePopover({ stats }: { stats?: Stats }) {
 		<button type="button" className={`usage-trigger${percent !== null && percent >= 80 ? " warn" : ""}`} aria-label={`${t("usageContextTitle")} ${percent ?? "—"}%`} aria-expanded={open} onPointerDown={() => { pinned.current = !pinned.current; setOpen(pinned.current); }} onClick={(event) => { if (event.detail === 0) { pinned.current = !pinned.current; setOpen(pinned.current); } }}>
 			<span className="usage-context-label">{t("context")}</span>
 			<span className="usage-percent">{percent === null ? "—" : `${percent}%`}</span>
-			<span className="usage-cache-short">· {t("usageCacheTitle")} <strong className={sessionRate !== null && sessionRate < 50 ? "warn" : ""}>{sessionRate === null ? "—" : `${sessionRate}%`}</strong></span>
+			{sessionRate !== null && <span className="usage-cache-short">· {t("usageCacheShort")} <strong className={sessionRate < 50 ? "warn" : ""}>{sessionRate}%</strong></span>}
 		</button>
 		{open && <div className="usage-popover" role="dialog" aria-label={t("usageContextTitle")}>
 			<div className="usage-head"><strong>{t("usageContextTitle")}</strong><span>{context?.tokens === null || context?.tokens === undefined ? "—" : formatTokens(context.tokens)} / {context?.contextWindow ? formatTokens(context.contextWindow) : "—"}</span></div>

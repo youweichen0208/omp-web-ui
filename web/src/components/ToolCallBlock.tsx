@@ -624,6 +624,7 @@ function TerminalCommand({ args, cwd }: { args: string; cwd: string }) {
 function formatDuration(ms?: number): string {
 	if (ms === undefined) return "";
 	const totalSec = ms / 1000;
+	if (totalSec < 0.1) return "<0.1s";
 	if (totalSec < 60) return `${totalSec.toFixed(1)}s`;
 	const m = Math.floor(totalSec / 60);
 	const s = Math.round(totalSec % 60);

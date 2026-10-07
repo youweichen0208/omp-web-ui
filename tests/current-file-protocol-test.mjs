@@ -20,6 +20,10 @@ const agentDir = join(base, "agent");
 mkdirSync(workdir, { recursive: true });
 mkdirSync(dataDir, { recursive: true });
 mkdirSync(agentDir, { recursive: true });
+const queueSkillBody = "Queue skill instructions\n".repeat(200);
+mkdirSync(join(agentDir, "skills", "queue-ops"), { recursive: true });
+writeFileSync(join(agentDir, "skills", "queue-ops", "SKILL.md"), "---\nname: queue-ops\ndescription: Queue preview fixture\n---\n" + queueSkillBody);
+
 
 const markdown = '# Markdown attachment\n```ts\nconst s = "a  b";\n```\n';
 writeFileSync(join(workdir, "guide.md"), markdown);
@@ -249,6 +253,10 @@ try {
 	await client.waitForState(s => s.isStreaming);
 	client.send({ type: "prompt", requestId: "recalled", queue: true, text: "never send this", attachments: [{ path: "note.txt", editorSnapshot: { cwd: workdir, text: "RECALLED_DRAFT", dirty: true } }] });
 	assert.equal((await client.waitForType("prompt_result", m => m.requestId === "recalled")).ok, true);
+	client.send({ type: "prompt", requestId: "queued-skill", queue: true, text: "/skill:queue-ops 检查状态" });
+	assert.equal((await client.waitForType("prompt_result", m => m.requestId === "queued-skill")).ok, true);
+	await client.waitForState(s => s.queue.followUp.includes("skill:queue-ops · 检查状态"));
+	assert(!client.state.queue.followUp.some(text => text.includes("Queue skill instructions")));
 	const conversationId = client.state.conversationId;
 	client.send({ type: "recall_queue", conversationId: "wrong", requestId: "wrong-recall" });
 	await sleep(50);
@@ -256,6 +264,8 @@ try {
 	client.send({ type: "recall_queue", conversationId, requestId: "recall" });
 	const recalled = await client.waitForType("queue_recalled", m => m.requestId === "recall");
 	assert(recalled.text.includes("RECALLED_DRAFT"));
+	assert(recalled.text.includes(queueSkillBody.trim()), "recall retains the full skill body beyond 2000 characters");
+	assert(recalled.text.includes("检查状态"));
 	client.send({ type: "recall_queue", conversationId, requestId: "recall" });
 	assert.deepEqual(await client.waitForType("queue_recalled", m => m.requestId === "recall"), recalled);
 	const reconnect = async () => {

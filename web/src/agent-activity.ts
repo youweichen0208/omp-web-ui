@@ -21,6 +21,8 @@ export function activeTool(messages: readonly UiMessage[], completed: ReadonlyMa
 		for (const block of [...message.content].reverse()) {
 			if (block.type === "toolCall" && typeof block.id === "string" && typeof block.name === "string" && !results.has(block.id) && !completed.has(block.id)) return block as UiToolCallBlock;
 		}
+		// A later assistant tool batch supersedes missing results from an older attempt.
+		if (message.role === "assistant" && message.content.some(block => block.type === "toolCall")) return undefined;
 	}
 }
 export function toolTarget(block: UiToolCallBlock) {

@@ -90,6 +90,20 @@ try {
 		await page.locator(".header-task-progress").click();
 		await page.locator(".task-progress:visible").waitFor();
 		assert.equal(await page.locator(".task-plan-step").count(), 5);
+		// A short sidebar with many unassigned commands must not crush the plan.
+		const savedFixture = fixture;
+		fixture = [...updates, text("next-round", "Inspect the implementation", "user"), ...Array.from({ length: 15 }, (_, i) => [
+			{ id: `unassigned-a-${i}`, role: 'assistant', timestamp, content: [{ type: 'toolCall', id: `unassigned-${i}`, name: 'bash', argumentsText: JSON.stringify({ command: `sed -n '1,2p' src/file-${i}.ts` }) }] },
+			{ id: `unassigned-r-${i}`, role: 'toolResult', timestamp, toolName: 'bash', toolCallId: `unassigned-${i}`, content: [{ type: 'text', text: 'result' }] },
+		]).flat()];
+		await page.setViewportSize({ width, height: 600 }); send();
+		await page.locator('.task-unassigned-records .task-file-result').last().waitFor({ state: 'attached' });
+		const geometry = await page.locator('.task-plan-list').evaluate(el => ({ height: el.clientHeight, first: el.firstElementChild.getBoundingClientRect().height }));
+		assert(geometry.height >= geometry.first, `plan compressed below one complete step: ${JSON.stringify(geometry)}`);
+		await page.locator('.task-unassigned-records .task-file-result').last().scrollIntoViewIfNeeded();
+		assert(await page.locator('.task-unassigned-records .task-file-result').last().evaluate(el => { const r = el.getBoundingClientRect(); const p = el.closest('.task-progress').getBoundingClientRect(); return r.top >= p.top && r.bottom <= p.bottom + 1; }), 'last execution record is reachable');
+		fixture = savedFixture; await page.setViewportSize({ width, height: 900 }); send();
+
 		if (width <= 1100) await page.locator(".drawer-backdrop").click({ position: { x: 10, y: 100 } });
 
 		// Errors stay ordinary tool cards and cannot mutate the valid plan.
@@ -126,7 +140,7 @@ try {
 		running = true; send();
 		await page.locator('.task-progress.running').waitFor();
 		assert.match(await page.locator('.header-task-progress').textContent(), lang === 'en' ? /Task progress/ : /任务进度/);
-		assert.match(await page.locator('.task-progress-status').textContent(), lang === 'en' ? /Working/ : /工作中/);
+		assert.match(await page.locator('.task-progress-status').textContent(), lang === 'en' ? /This turn/ : /本轮/);
 		assert.match(await page.locator('.task-progress-source').first().textContent(), lang === 'en' ? /awaiting confirmation/ : /等待确认/);
 		running = false; send();
 		await page.locator('.task-progress.waiting').waitFor();
@@ -134,7 +148,7 @@ try {
 		assert.match(await page.locator('.task-unassigned-records').textContent(), /README.md/);
 		fixture.push(...pair('last-step', transition({ ...started, action: 'update', expectedRevision: 2, currentStepId: '5', completedStepIds: ['1', '2', '3', '4'] }, started))); send();
 		await page.waitForFunction(() => document.querySelector('.task-plan-step.running')?.textContent.includes('提交文档'));
-		assert(await page.locator('.task-plan-step.running').evaluate(node => { const rect = node.getBoundingClientRect(), list = node.parentElement.getBoundingClientRect(); return rect.top >= list.top - 1 && rect.bottom <= list.bottom + 1; }));
+		assert(await page.locator('.task-plan-step.running').evaluate(node => { const rect = node.getBoundingClientRect(), list = node.closest(".task-plan-scroll").getBoundingClientRect(); return rect.top >= list.top - 1 && rect.bottom <= list.bottom + 1; }));
 		assert.deepEqual(errors, []);
 		await page.close();
 		console.log(`PASS ${platform}/${width}/${lang}: merged card, changes, keyboard navigation, sidebar, failure, folded history, replacement and waiting`);

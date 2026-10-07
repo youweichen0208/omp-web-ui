@@ -65,6 +65,9 @@ test("a running turn keeps a pending step between completed tools and the next m
 	const progress = deriveTaskProgress("c1", messages, null, true);
 	expect(progress?.steps.map((step) => step.status)).toEqual(["done", "running"]);
 	expect(progress?.steps[1].messageId).toBe("a1");
+	expect(progress?.status).toBe("running");
+	expect(progress?.endedAt).toBeUndefined();
+	expect(deriveTaskProgress("c1", messages, null, false, 200)?.status).toBe("done");
 });
 
 test("explicit plan revisions keep added and removed steps visible", () => {
@@ -92,4 +95,16 @@ test("outline metadata and changes persist while tool ownership follows transcri
 	expect(task.plan).toMatchObject({ changeSummary: "新增校验步骤", changes: [{ kind: "added", position: 3, title: "修正校验" }] });
 	messages.push({ id: "error", role: "toolResult", toolCallId: "p3", isError: true, content: [] }, { id: "error2", role: "toolResult", toolCallId: "p4", isError: true, content: [] });
 	expect(deriveTaskProgress("c", messages, null, true)!.plan!.items).toHaveLength(3);
+});
+
+
+test("an unresolved plan validation error cannot turn successful commands into a completed task", () => {
+	const messages: UiMessage[] = [user("u", "Finish implementation"),
+		{ id: "a", role: "assistant", content: [call("bash", "bash", { command: "git diff --check" }), call("plan", "plan", { action: "update", status: "completed" })] },
+		{ id: "rb", role: "toolResult", toolCallId: "bash", content: [{ type: "text", text: "" }] },
+		{ id: "rp", role: "toolResult", toolCallId: "plan", isError: true, content: [{ type: "text", text: "steps is required" }] },
+	];
+	expect(deriveTaskProgress("c", messages, null, true)?.status).toBe("running");
+	expect(deriveTaskProgress("c", messages, null, false)?.status).toBe("failed");
+	expect(deriveTaskProgress("c", [messages[0], { ...messages[1], content: [call("plan", "plan", {})] }, messages[3]], null, false)?.status).toBe("failed");
 });

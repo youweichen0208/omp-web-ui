@@ -32,3 +32,8 @@ it("hides the current folder and shortens only the same user's home",()=>{
 	expect(differentCommandDirectory(args('cd /Users/bob && ls'),cwd)).toBe('/Users/bob');
 	expect(differentCommandDirectory(args('cd "$TARGET" && ls'),cwd)).toBeNull();
 });
+
+it("does not resurrect a missing result after a newer tool batch completes", () => {
+ const next: UiMessage = { ...a, id: "retry", content: [{ type: "toolCall", id: "retry-call", name: "bash" }] };
+ expect(activeTool([a, next, {...result, toolCallId: "retry-call"}], new Map())).toBeUndefined();
+});

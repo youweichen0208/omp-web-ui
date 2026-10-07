@@ -1,3 +1,4 @@
+import { isProcessNarration } from "../command-reading";
 import { navigateSibling } from "../tree-events";
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -792,7 +793,7 @@ function Block({
 		const body = leak ? leak.visible : text.text;
 		if (!body.trim() && !leak?.leaked.trim() && !text.truncated) return null;
 		return (
-			<div className="msg-text">
+			<div className={`msg-text${!user && !isLast && isProcessNarration(body) ? " process-narration" : ""}`}>
 				{leak && <LeakedThinkingBlock text={leak.leaked} />}
 				{body &&
 					(live ? (

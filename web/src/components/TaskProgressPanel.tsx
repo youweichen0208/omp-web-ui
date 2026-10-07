@@ -1,6 +1,8 @@
+import { commandReading } from "../command-reading";
 import { WorkspacePathContext } from "../workspace-context";
+import { CommandLabel } from "./CommandLabel";
 import { bashCommand } from "../bash-steps";
-import { compactCommandLabel, commandPresentation } from "../bash-presentation";
+import { commandRecordLabel, commandPresentation } from "../bash-presentation";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronRight, FiMoreHorizontal } from "react-icons/fi";
 import type { ServerMessage, TaskProgress, UiMessage, UiToolCallBlock } from "../types";
@@ -47,6 +49,21 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 		}
 		return map;
 	}, [messages]);
+	const files = new Map<string, { path: string; added: number; removed: number; changed: boolean; counted: boolean }>();
+	for (const step of displayedTask.steps) for (const item of step.artifacts) {
+		const rawPath = item.path ?? (["bash", "terminal"].includes(item.kind) ? commandReading(commandPresentation(item.label, cwd).command).path : undefined);
+		if (!rawPath || !["read", "write", "edit", "bash", "terminal"].includes(item.kind)) continue;
+		const toolResult = messages.find(m => m.role === "toolResult" && m.toolCallId === item.toolCallId);
+		if (!toolResult || toolResult.isError) continue;
+		const path = (rawPath.startsWith(`${cwd}/`) ? rawPath.slice(cwd.length + 1) : rawPath).replace(/^\.\//, "");
+		const entry = files.get(path) ?? { path, added: 0, removed: 0, changed: false, counted: false };
+		const count = changes.get(item.toolCallId);
+		entry.changed ||= item.kind === "write" || item.kind === "edit";
+		entry.counted ||= !!count;
+		entry.added += count?.added ?? 0; entry.removed += count?.removed ?? 0;
+		files.set(path, entry);
+	}
+	const fileResults = <div className="task-file-results">{[...files.values()].map(file => <div className="task-file-result" key={file.path}><span>{t(file.changed ? "taskArtifactEdit" : "taskArtifactRead")}</span><button type="button" title={file.path} onClick={() => preview(file.path)}>{file.path}</button>{file.changed && file.counted && <span className="task-file-counts"><span>+{file.added}</span> <span>−{file.removed}</span></span>}</div>)}</div>;
 	const result = progressResult(task, messages);
 	const finishedAt = task.status === "running" ? now : task.endedAt ?? Math.max(task.startedAt, ...task.steps.map((step) => step.endedAt ?? step.startedAt));
 	const elapsed = task.startedAt > 0 ? Math.max(0, Math.floor((finishedAt - task.startedAt) / 1000)) : 0;
@@ -66,13 +83,15 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 		const list = planListRef.current;
 		const active = list?.querySelector<HTMLElement>(".task-plan-step.running");
 		if (!list || !active) return;
-		const top = active.offsetTop - list.offsetTop;
-		list.scrollTop = Math.max(0, top - list.clientHeight / 3);
+		const scroller = list.parentElement;
+		if (!scroller) return;
+		const top = active.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+		scroller.scrollTop = Math.max(0, top - scroller.clientHeight / 3);
 	}, [task.id, currentPlanId, showProcess]);
 	const finalMessage = messages.slice(messages.findIndex((message) => message.id === task.sourceMessageId) + 1).findLast((message) => message.role === "assistant" && message.content.some((part) => part.type === "text"));
 	const jump = (messageId: string) => window.dispatchEvent(new CustomEvent("pi:jump-message", { detail: { messageId } }));
 	const jumpTool = (messageId: string, toolCallId: string) => window.dispatchEvent(new CustomEvent("pi:jump-tool", { detail: { messageId, toolCallId } }));
-	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("working") : task.status === "waiting" ? t("taskWaitingContinue") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
+	const statusLabel = silence?.conversationId === task.conversationId ? silence.activity === "tool" ? t("taskLongTool") : t("taskWaitingModel") : task.status === "running" ? t("taskCurrentRound") : task.status === "waiting" ? t("taskWaitingContinue") : task.status === "cancelled" ? t("taskCancelled") : task.status === "failed" ? t("error") : t("done");
 	const hasResult = task.status === "done" && !single && !!(result.commit || result.tests || result.changes);
 	const finalTestPhase = phases.findLast((phase) => phase.kind === "test" || phase.kind === "fix")?.id;
 	const title = plainTitle(task.title || conversationTitle);
@@ -82,8 +101,6 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 	const activeCommand = activeTool && ["bash", "terminal"].includes(activeTool.kind) ? commandPresentation(bashCommand(activeCall?.argumentsText) ?? activeTool.label, cwd).command : "";
 	const activeArtifact = activeTool ? activeCommand ? /^git\s+commit\b/.test(activeCommand) ? `${t("taskCommitting")} · git commit` : `${t("taskArtifactRun")} · ${activeCommand}` : `${activeTool.kind === "read" ? t("taskArtifactRead") : activeTool.kind === "edit" ? t("taskArtifactEdit") : activeTool.kind === "write" ? t("taskArtifactWrite") : activeTool.kind} · ${activeTool.label}` : undefined;
 	const planChangesFor = (item: NonNullable<TaskProgress["plan"]>["items"][number]) => planStepArtifacts(displayedTask, item).filter(({ artifact }) => changes.has(artifact.toolCallId)).map(({ artifact, messageId }) => ({ messageId, toolCallId: artifact.toolCallId, count: changes.get(artifact.toolCallId)! }));
-	const assignedToolIds = new Set(task.plan?.items.flatMap(item => item.toolCallIds ?? []) ?? []);
-	const unassignedArtifacts = task.plan ? displayedTask.steps.flatMap(step => step.artifacts.filter(item => !assignedToolIds.has(item.toolCallId)).map(item => ({ item, messageId: step.messageId }))) : [];
 	const planChange = task.plan?.changeSummary || task.plan?.changes?.map((change) => t(change.kind === "added" ? "taskOutlineAdded" : change.kind === "removed" ? "taskOutlineRemoved" : "taskOutlineUpdated", { n: change.position ?? "", title: planStepPresentation(change.title).title })).join("；") || (task.plan && (task.plan.added || task.plan.removed) ? `+${task.plan.added} / −${task.plan.removed}` : "");
 
 	const copyMarkdown = () => {
@@ -105,15 +122,17 @@ export function TaskProgressPanel({ task, silence, cwd, messages, conversationTi
 					</div>}
 				</div>
 			</div>
-			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && !task.plan.awaitingConfirmation && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span><span>· {t("bashCommandCount", { n: task.steps.flatMap((step) => step.artifacts).filter((item) => item.kind === "bash" || item.kind === "terminal").length })}</span></div>
+			<div className="task-progress-meta"><span className={`task-progress-status ${task.status}`}><i aria-hidden="true" />{task.plan && !task.plan.awaitingConfirmation && task.status === "running" && !silence ? t("taskPlanPosition", { current: Math.max(1, currentPlanIndex + 1), total }) : statusLabel}</span><span>· {t("bashCommandCount", { n: task.steps.flatMap((step) => step.artifacts).filter((item) => item.kind === "bash" || item.kind === "terminal").length })}</span><span>· {duration(elapsed, t("taskUnderSecond"))}</span></div>
 			{task.plan && <div className="task-progress-source" title={t("taskPlanSourceHint")}>{t(task.plan.awaitingConfirmation ? "planPrevious" : "taskPlanSource")}</div>}
 			{task.plan?.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
 		</div>
 		{hasResult && <div className="task-result task-result-inline">{result.commit && <code title={result.commit.subject}>{result.commit.hash}</code>}{result.tests && <span className="success">{result.tests.passed}/{result.tests.total} {t("taskPassed")}</span>}{result.changes && <span className="task-result-counts"><span className="success">+{result.changes.added}</span> <span className="removed">−{result.changes.deleted}</span></span>}<button type="button" title={t("taskViewChanges")} onClick={() => onViewChanges(result.commit?.hash)}>{t("taskChanges")} ›</button></div>}
 
-		{single ? <div className="task-single-actions">{phases.flatMap((phase) => phase.steps).flatMap((step) => step.artifacts.map((item) => <ArtifactRow key={item.toolCallId} item={item} change={changes.get(item.toolCallId)} onPreview={preview} onJump={() => jump(step.messageId)} onJumpTool={() => jumpTool(step.messageId, item.toolCallId)} />))}</div> : task.plan && showProcess ? <div className="task-plan-list" ref={planListRef}>{task.plan.items.map((item, index) => <PlanStepRow key={item.id} item={item} index={index} now={now} activeArtifact={activeTool && item.toolCallIds?.includes(activeTool.toolCallId) ? activeArtifact : undefined} changes={planChangesFor(item)} onJumpTool={jumpTool} artifacts={planStepArtifacts(displayedTask, item)} open={expanded === item.id} onToggle={() => setExpanded((value) => value === item.id ? null : item.id)} onPreview={preview} onJump={jump} taskEndedAt={task.status === "running" ? undefined : finishedAt} />)}</div> : showProcess && <><div className="task-current-phase">{currentPhase && <PhaseRow phase={currentPhase} changes={changes} now={now} attempt={currentAttempt} showRaw={showRaw} testResult={currentPhase.id === finalTestPhase ? result.tests : undefined} linked={!!hoveredTool && currentPhase.steps.some((step) => step.artifacts.some((item) => item.toolCallId === hoveredTool))} stalled={!!silence} open={expanded === currentPhase.id} onToggle={() => setExpanded((value) => value === currentPhase.id ? null : currentPhase.id)} onJump={jump} onJumpTool={jumpTool} onPreview={preview} />}</div><div className="task-progress-list">{phases.filter((phase) => phase !== currentPhase).map((phase) => <PhaseRow key={phase.id} phase={phase} changes={changes} now={now} showRaw={showRaw} testResult={phase.id === finalTestPhase ? result.tests : undefined} linked={!!hoveredTool && phase.steps.some((step) => step.artifacts.some((item) => item.toolCallId === hoveredTool))} stalled={!!silence && phase.status === "running"} open={expanded === phase.id} onToggle={() => setExpanded((value) => value === phase.id ? null : phase.id)} onJump={jump} onJumpTool={jumpTool} onPreview={preview} />)}</div></>}
-		{showProcess && unassignedArtifacts.length > 0 && <div className="task-unassigned-records"><div className="task-progress-source">{t("planUnassignedRecords")}</div>{unassignedArtifacts.map(({ item, messageId }) => <ArtifactRow key={item.toolCallId} item={item} change={changes.get(item.toolCallId)} onPreview={preview} onJump={() => jump(messageId)} onJumpTool={() => jumpTool(messageId, item.toolCallId)} />)}</div>}
+		<div className={task.plan ? "task-plan-scroll" : "task-process-contents"}>
+		{single ? <div className="task-single-actions">{fileResults}</div> : task.plan && showProcess ? <div className="task-plan-list" ref={planListRef}>{task.plan.items.map((item, index) => <PlanStepRow key={item.id} item={item} index={index} now={now} activeArtifact={activeTool && item.toolCallIds?.includes(activeTool.toolCallId) ? activeArtifact : undefined} changes={planChangesFor(item)} onJumpTool={jumpTool} artifacts={planStepArtifacts(displayedTask, item)} open={expanded === item.id} onToggle={() => setExpanded((value) => value === item.id ? null : item.id)} onPreview={preview} onJump={jump} taskEndedAt={task.status === "running" ? undefined : finishedAt} />)}</div> : showProcess && <><div className="task-current-phase">{currentPhase && <PhaseRow phase={currentPhase} changes={changes} now={now} attempt={currentAttempt} showRaw={showRaw} testResult={currentPhase.id === finalTestPhase ? result.tests : undefined} linked={!!hoveredTool && currentPhase.steps.some((step) => step.artifacts.some((item) => item.toolCallId === hoveredTool))} stalled={!!silence} open={expanded === currentPhase.id} onToggle={() => setExpanded((value) => value === currentPhase.id ? null : currentPhase.id)} onJump={jump} onJumpTool={jumpTool} onPreview={preview} />}</div><div className="task-progress-list">{phases.filter((phase) => phase !== currentPhase).map((phase) => <PhaseRow key={phase.id} phase={phase} changes={changes} now={now} showRaw={showRaw} testResult={phase.id === finalTestPhase ? result.tests : undefined} linked={!!hoveredTool && phase.steps.some((step) => step.artifacts.some((item) => item.toolCallId === hoveredTool))} stalled={!!silence && phase.status === "running"} open={expanded === phase.id} onToggle={() => setExpanded((value) => value === phase.id ? null : phase.id)} onJump={jump} onJumpTool={jumpTool} onPreview={preview} />)}</div></>}
+		{task.plan && files.size > 0 && <div className="task-unassigned-records">{fileResults}</div>}
 		{planChange && <div className="task-plan-change" role="status">{t("taskOutlineChanged")}：{planChange}</div>}
+		</div>
 	</div></WorkspacePathContext.Provider>;
 }
 
@@ -140,9 +159,10 @@ function PlanStepRow({ item, index, now, taskEndedAt, activeArtifact, changes, o
 function ArtifactRow({ item, change, onPreview, onJump, onJumpTool }: { item: ProgressPhase["steps"][number]["artifacts"][number]; change?: { added: number; removed: number }; onPreview: (path: string) => void; onJump: () => void; onJumpTool: () => void }) {
 	const t = useT();
 	const cwd = useContext(WorkspacePathContext);
-	const label = item.kind === "bash" || item.kind === "terminal" ? compactCommandLabel(commandPresentation(item.label, cwd).command) : item.label;
+	if (["bash", "terminal"].includes(item.kind)) return null;
+	const label = item.kind === "bash" || item.kind === "terminal" ? commandRecordLabel(commandPresentation(item.label, cwd).command) : item.label;
 	const action = item.kind === "read" ? t("taskArtifactRead") : item.kind === "write" ? t("taskArtifactWrite") : item.kind === "edit" ? t("taskArtifactEdit") : item.kind === "bash" ? t("taskArtifactRun") : item.kind;
-	return <div className="task-artifact-row"><span>{action}</span>{item.path ? <button type="button" title={item.path} onClick={() => onPreview(item.path!)}><code>{label}</code></button> : <button type="button" title={item.label} onClick={item.kind === "bash" || item.kind === "terminal" ? onJumpTool : onJump}><code>{label}</code></button>}{change && <button type="button" className="task-artifact-change" onClick={onJumpTool} title={t("taskJumpToChat")}>+{change.added}{change.removed > 0 && ` −${change.removed}`}</button>}{item.outputLines !== undefined && <small>· {item.outputLines} {t("taskLines")}</small>}</div>;
+	return <div className="task-artifact-row">{!["bash", "terminal"].includes(item.kind) && <span>{action}</span>}{item.path ? <button type="button" title={item.path} onClick={() => onPreview(item.path!)}><CommandLabel label={label} /></button> : <button type="button" title={item.label} onClick={item.kind === "bash" || item.kind === "terminal" ? onJumpTool : onJump}><CommandLabel label={label} /></button>}{change && <button type="button" className="task-artifact-change" onClick={onJumpTool} title={t("taskJumpToChat")}>+{change.added}{change.removed > 0 && ` −${change.removed}`}</button>}{item.outputLines !== undefined && <small>· {item.outputLines} {t("taskLines")}</small>}</div>;
 }
 
 function PhaseRow({ phase, changes, now, attempt = 0, showRaw, testResult, linked, stalled, open, onToggle, onJump, onJumpTool, onPreview }: { phase: ProgressPhase; changes: ReadonlyMap<string, { added: number; removed: number }>; now: number; attempt?: number; showRaw: boolean; testResult?: { passed: number; total: number }; linked: boolean; stalled: boolean; open: boolean; onToggle: () => void; onJump: (messageId: string) => void; onJumpTool: (messageId: string, toolCallId: string) => void; onPreview: (path: string) => void }) {

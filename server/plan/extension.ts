@@ -7,7 +7,7 @@ export const planParameters = Type.Object({
 	action: Type.Union([Type.Literal("create"), Type.Literal("update")]),
 	planId: Type.Optional(string(128)), expectedRevision: Type.Optional(Type.Integer({ minimum: 1 })),
 	title: string(80), status: Type.Union([Type.Literal("active"), Type.Literal("completed"), Type.Literal("cancelled"), Type.Literal("failed")]),
-	steps: Type.Array(Type.Object({ id: string(64), title: string(80), detail: Type.Optional(string(500)) }), { minItems: 1, maxItems: 16 }),
+	steps: Type.Array(Type.Object({ id: string(64), title: string(80), detail: Type.Optional(string(500)) }), { minItems: 1, maxItems: 16, description: "Required for BOTH create and update, including completion. Send every step with its id, title and detail; never omit unchanged steps." }),
 	currentStepId: Type.Union([string(64), Type.Null()]), completedStepIds: Type.Array(string(64), { maxItems: 16, uniqueItems: true }),
 	completionCriteria: string(240), changeSummary: Type.Optional(string(240)),
 });
@@ -25,8 +25,11 @@ export function restorePlanContext(messages: ContextEvent["messages"], branch: r
 			return identity && JSON.stringify(editableState(args)) === JSON.stringify(editableState(snapshot));
 		} catch { return false; }
 	}));
-	if (visibleResult && visibleCall) return messages;
-	const content = `Historical plan background, not authorization to continue. Judge relevance to the current request yourself. For related implementation, first update this plan with its current identity and revision. For unrelated multi-step work, create a new plan. Ordinary questions do not require a plan. Follow user/skill instructions and waiting requirements; this tool grants no extra permissions.\n${JSON.stringify({ action: "update", planId: snapshot.planId, expectedRevision: snapshot.revision, ...editableState(snapshot) })}`;
+	const lastUser = messages.findLastIndex(message => message.role === "user");
+	const lastPlanResult = messages.slice(lastUser + 1).findLast(message => message.role === "toolResult" && message.toolName === "plan");
+	const failedCall = lastPlanResult?.role === "toolResult" && lastPlanResult.isError;
+	if (visibleResult && visibleCall && !failedCall) return messages;
+	const content = `${failedCall ? "Plan call failed; the saved plan below is unchanged. To correct the call, submit the full state including steps, even if unchanged or marking completion. Use the saved planId and expectedRevision. This reminder does not authorize continuing work.\n" : ""}Historical plan background, not authorization to continue. Judge relevance to the current request yourself. For related implementation, first update this plan with its current identity and revision. For unrelated multi-step work, create a new plan. Ordinary questions do not require a plan. Follow user/skill instructions and waiting requirements; this tool grants no extra permissions.\n${JSON.stringify({ action: "update", planId: snapshot.planId, expectedRevision: snapshot.revision, ...editableState(snapshot) })}`;
 	const reminder: ContextEvent["messages"][number] = { role: "custom", customType: "pi-harness:plan-background", content, display: false, timestamp: 0 };
 	const summary = messages.findLastIndex(message => message.role === "compactionSummary");
 	const user = messages.findLastIndex(message => message.role === "user");
@@ -45,7 +48,7 @@ export function restorePlanContext(messages: ContextEvent["messages"], branch: r
 
 export const createPlanExtension = (): ExtensionFactory => pi => {
 	pi.registerTool({
-		name: "plan", label: "Plan", description: "Create or update a complete, versioned implementation plan on this session branch. Updates require the latest planId and expectedRevision. Ended plans require create.",
+		name: "plan", label: "Plan", description: "Create or update a complete, versioned implementation plan on this session branch. Every call requires title, status, steps, currentStepId, completedStepIds and completionCriteria, even when completing or only changing status. Updates also require the latest planId and expectedRevision. This is full replacement, not a partial patch. Ended plans require create.",
 		exposure: "model-only", executionMode: "sequential", defaultActive: false,
 		annotations: { readOnlyHint: true, openWorldHint: false },
 		promptSnippet: "Record and update a multi-step implementation plan.",

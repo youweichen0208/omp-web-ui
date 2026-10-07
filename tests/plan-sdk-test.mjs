@@ -67,6 +67,26 @@ try {
 			}
 		});
 		assert.equal(latest().revision, 4);
+		// Missing full-snapshot fields are rejected by SDK validation before execute.
+		round = 0;
+		const beforeMissing = latest();
+		await prompt('Finish the plan', request => {
+			if (round++ === 0) {
+				const incomplete = update(beforeMissing, { status: 'completed', currentStepId: null, completedStepIds: ['a', 'b'] });
+				delete incomplete.steps;
+				return [['missing-steps', incomplete]];
+			}
+			if (round === 2) {
+				const wire = JSON.stringify(request.messages);
+				assert.match(wire, /Validation failed for tool/);
+				assert.match(wire, /Plan call failed/);
+				assert.match(wire, /Full details/);
+				assert.equal(latest().revision, beforeMissing.revision);
+				assert.equal(latest().status, 'active');
+				return [['missing-fixed', update(beforeMissing)]];
+			}
+		});
+		assert.equal(latest().revision, 5);
 		const newerLeaf = session.sessionManager.getLeafId();
 		// Reopen a native compacted branch whose model context contains only the summary.
 		session.sessionManager.appendCompaction('Implementation is in progress.', null, 16000);
@@ -95,7 +115,7 @@ try {
 			assert(!JSON.stringify(request.messages).includes('Historical plan background'));
 		});
 		await session.navigateTree(newerLeaf, { summarize: false }); preference.coordinate(session, true);
-		assert.equal(latest().revision, 4); assert.equal(session.getActiveToolNames().includes('plan'), false);
+		assert.equal(latest().revision, 5); assert.equal(session.getActiveToolNames().includes('plan'), false);
 		await session.reload(); preference.coordinate(session, true); assert.equal(preference.state(session).effective, false);
 		const file = session.sessionManager.getSessionFile();
 		assert.match(readFileSync(file, 'utf8'), /"planSnapshot"/);

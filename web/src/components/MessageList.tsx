@@ -1,6 +1,6 @@
+import { ConversationWorkingStatus } from "./WorkingStatus";
 import { groupBashMessages } from "../bash-groups";
 import { assistantPredecessors } from "../agent-activity";
-import { ConversationWorkingStatus } from "./WorkingStatus";
 import { goalEventText, goalCompletedText, groupGoalEvents } from "../goal-events";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -619,16 +619,6 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 		}
 	}, [messages, state.isStreaming, liveOutputs]);
 
-	// Queued prompts (插队/排队) render as pending bubbles at the list bottom —
-	// include them in the stick-to-bottom deps so a newly queued message is
-	// scrolled into view when the user hasn't left the bottom.
-	const queueSig = state.queue.steering.join("\u0000") + "\u0001" + state.queue.followUp.join("\u0000");
-	useEffect(() => {
-		const el = scrollRef.current;
-		if (el && stickRef.current) {
-			el.scrollTop = el.scrollHeight;
-		}
-	}, [queueSig]);
 
 	const scrollToBottom = useCallback(() => {
 		const el = scrollRef.current;
@@ -822,7 +812,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						thinkingWrap={thinkingWrap}
 					/>
 				)}
-				<ConversationWorkingStatus state={state} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} />
+				<div className="trailing-working"><ConversationWorkingStatus compact state={state} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} /></div>
 				{/* 乐观本地回显：刚点发送、服务端确认（snapshot_delta 追加）之前，
 				 *  立刻把用户刚输入的文字显示出来，避免等待服务端往返的空白期。
 				 *  一旦真实消息落地（reducer 里 appended.length>0）就会清空 pendingEcho，
@@ -841,22 +831,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						</div>
 					</div>
 				)}
-				{state.queue.steering.map((text, i) => (
-					<div className="queued-msg" key={`q-steer-${i}`}>
-						<div className="queued-bubble">
-							<span className="queued-tag steer">{t("queueSteerTag")}</span>
-							<div className="queued-text">{text}</div>
-						</div>
-					</div>
-				))}
-				{state.queue.followUp.map((text, i) => (
-					<div className="queued-msg" key={`q-fu-${i}`}>
-						<div className="queued-bubble">
-							<span className="queued-tag follow">{t("queueFollowTag")}</span>
-							<div className="queued-text">{text}</div>
-						</div>
-					</div>
-				))}
+
 			</div>
 			{!stickBottom && (() => {
 				const button = <button type="button" className="scroll-bottom" onClick={scrollToBottom}><FiArrowDown /> {t("backToBottom")}</button>;

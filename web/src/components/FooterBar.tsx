@@ -58,7 +58,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 	}, [selIdx]);
 
 	if (!state) return null;
-	const current = state.conversationId === chat.activeConversationId;
 	const git = chat.gitBranch?.cwd === state.cwd ? chat.gitBranch : null;
 	const branchLabel = git?.notRepo ? t("notGitRepoShort") : git?.branch ? (git.detached ? `${t("scmDetached")} · ${git.branch}` : git.branch) : "—";
 
@@ -66,7 +65,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 	const connLabel = chat.ready ? t("connected") : t("connecting");
 
 
-	const queueTotal = state.queue.steering.length + state.queue.followUp.length;
 
 	const startEdit = () => {
 		setDraft(state.cwd);
@@ -151,7 +149,6 @@ export function FooterBar({ chat, send }: FooterBarProps) {
 			)}
 
 			<span id="wiki-status-slot" />
-			{current && queueTotal > 0 && <span className="status-queue">{queueTotal} {t("queued")}</span>}
 
 			{editing ? (
 				<div className="status-cwd-wrap">

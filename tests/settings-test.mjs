@@ -93,7 +93,10 @@ try {
 	c = await connect();
 	c.send({ type: "hello", clientId: "settings-test-client" });
 	await c.waitFor("ready");
-	await c.waitFor(["snapshot", "snapshot_delta"]);
+	// The first snapshot can legitimately defer default-on plan while the tree is verifying.
+	await c.waitFor(["snapshot", "snapshot_delta"], 8000, m => m.state?.planSettings?.effective && !m.state.planSettings.pending);
+	c.received = c.received.filter(m => m.type !== "settings_state");
+	c.send({ type: "get_settings" });
 	const st0 = await c.waitFor("settings_state");
 	check("settings_state pushed on attach", !!st0.settings);
 	check("has skills array", Array.isArray(st0.settings.skills));

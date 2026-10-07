@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -59,7 +59,7 @@ test("same-batch replay, failed updates, waiting, terminal tombstones and plan i
 	const messages = [user("u"), assistant("p1", "read-a", "p2", "read-b", "p3", "read-c"), result("p1", first), result("p2", second), result("p3", first, true)];
 	const task = deriveTaskProgress("c", messages, null, false)!;
 	expect(task.plan?.items.map(i => i.toolCallIds)).toEqual([["read-a"], ["read-b", "read-c"]]);
-	expect(task.status).toBe("waiting");
+	expect(task.status).toBe("failed");
 	const next = deriveTaskProgress("c", [...messages, user("u2"), assistant("read-unrelated")], null, true)!;
 	expect(next.plan?.awaitingConfirmation).toBe(true); expect(next.plan?.items.map(i => i.toolCallIds)).toEqual([["read-a"], ["read-b", "read-c"]]);
 	expect(next.plan?.items.flatMap(i => i.toolCallIds ?? [])).not.toContain("read-unrelated");
@@ -98,10 +98,15 @@ test("branch reconstruction and context restoration use latest successful paired
 	expect(manager.getBranch()).toHaveLength(1);
 });
 
-test("global preference persists, defaults off, and never touches third-party tools", () => {
+test("global preference defaults on and preserves explicit on/off choices", () => {
 	const root = mkdtempSync(join(tmpdir(), "pi-plan-unit-"));
 	try {
-		const settings = new PlanSettings(root); expect(settings.enabled).toBe(false); settings.set(true); expect(new PlanSettings(root).enabled).toBe(true);
+		const settings = new PlanSettings(root); expect(settings.enabled).toBe(true);
+		settings.set(false); expect(new PlanSettings(root).enabled).toBe(false);
+		settings.set(true); expect(new PlanSettings(root).enabled).toBe(true);
+		for (const invalid of ["{}", "null", '{"enabled":"false"}', "broken json"]) {
+			writeFileSync(settings.path, invalid); expect(new PlanSettings(root).enabled).toBe(true);
+		}
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -150,4 +155,17 @@ test("an unrelated running request keeps its own status and title until plan con
 	expect(settled).toMatchObject({ status: "waiting", title: "解释一下 README 的安装步骤" });
 	const confirmed = deriveTaskProgress("c", [...messages, assistant("p2"), result("p2", transition(update(plan), plan))], null, true);
 	expect(confirmed).toMatchObject({ status: "running", title: "重构", plan: { awaitingConfirmation: false } });
+});
+
+
+test("failed completion retains the last saved steps, and corrected completion clears the error", () => {
+	const plan = create();
+	const messages = [user("u"), assistant("p1"), result("p1", plan), assistant("p-bad"), { ...result("p-bad", plan), isError: true }];
+	const failed = deriveTaskProgress("c", messages, null, false);
+	expect(failed?.status).toBe("failed");
+	expect(failed?.plan?.items.map(item => item.status)).toEqual(["running", "pending"]);
+	const done = transition(update(plan, { status: "completed", currentStepId: null, completedStepIds: ["a", "b"] }), plan);
+	const corrected = deriveTaskProgress("c", [...messages, assistant("p-fixed"), result("p-fixed", done)], null, false);
+	expect(corrected?.status).toBe("done");
+	expect(corrected?.plan?.items.every(item => item.status === "done")).toBe(true);
 });

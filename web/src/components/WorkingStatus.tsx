@@ -37,7 +37,8 @@ export function WorkingStatus({ label, phase, durationMs }: { label: string; pha
 }
 
 /** Shared by chat and Wiki: identical waiting phases, tool activity and disconnect state. */
-export function ConversationWorkingStatus({ state, connected, silenceNotified, toolStatuses }: {
+export function ConversationWorkingStatus({ state, connected, silenceNotified, toolStatuses, compact = false }: {
+	compact?: boolean;
 	state: Pick<UiState, "messages" | "streamingMessage" | "isStreaming" | "conversationId" | "model" | "recovery">;
 	connected: boolean; silenceNotified: boolean; toolStatuses: ReadonlyMap<string, ToolStatus>;
 }) {
@@ -57,6 +58,14 @@ export function ConversationWorkingStatus({ state, connected, silenceNotified, t
 	if (state.recovery && Object.values(state.recovery).some(Boolean)) return null;
 	if (!state.isStreaming) return null;
 	if (!connected) return <div className="agent-working disconnected" role="status">{t("workDisconnected")}</div>;
+	if (compact) {
+		if (silenceNotified) return null;
+		if (awaitingFirstAssistant) {
+			const user = state.messages[lastUserIndex];
+			return <div className="agent-working"><WaitingHeaderStatus key={`${state.conversationId}:${user.id}`} startedAt={user.timestamp} /></div>;
+		}
+		return <WorkingStatus key={state.conversationId} label={completedTool && !runningTool ? t("waitingModel").replace(/[.…]+$/, "") : activityLabel} phase={activityPhase} />;
+	}
 	if (awaitingFirstAssistant) {
 		const user = state.messages[lastUserIndex];
 		return <div className="msg msg-assistant agent-working-placeholder">

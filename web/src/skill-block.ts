@@ -53,3 +53,11 @@ export function skillAwarePreview(text: string): string {
 	}
 	return text.replace(/\s+/g, " ").trim();
 }
+
+/** Queue snapshots from older servers may end before the skill's closing tag.
+ * This is a display-only fallback, never used for sending or restoring text. */
+export function queuedMessagePreview(text: string): string {
+	if (parseSkillBlock(text)) return skillAwarePreview(text);
+	const truncated = /^<skill name="([^"]+)" location="[^"]+">\r?\n/.exec(text);
+	return truncated && !text.includes("</skill>") ? `skill:${truncated[1]}` : text;
+}

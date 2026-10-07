@@ -86,7 +86,31 @@ export function gitStatusSummary(command: string, lines: string[]) {
 	return { files: rows.length, added: rows.filter((row) => row!.kind === "added" || row!.kind === "untracked").length, modified: rows.filter((row) => row!.kind === "modified").length, deleted: rows.filter((row) => row!.kind === "deleted").length, conflicts: rows.filter((row) => row!.kind === "conflict").length };
 }
 
+/** Hide only a trailing, unquoted stderr-to-null redirect in the summary.
+ * Quoted literals, compound commands and executable text remain untouched. */
+function commandSummaryLine(command: string): string {
+	const first = command.split(/\r?\n/, 1)[0];
+	const redirect = /\s+2>\s*\/dev\/null\s*$/.exec(first);
+	if (!redirect) return first;
+	const prefix = first.slice(0, redirect.index);
+	// Be conservative around shell syntax: the full command remains authoritative.
+	if (/['"`\\;&|<>$]/.test(prefix)) return first;
+	return prefix;
+}
+
 /** Display-only shortening: retain the executable and path leaf, copy the original. */
 export function compactCommandLabel(command: string): string {
-	return command.split(/\r?\n/, 1)[0].replace(/(?:[~.]?\/|[A-Za-z]:\\)(?:[\w.@-]+[\/\\]){2,}([\w.@-]+)/g, "…/$1");
+	const label = commandSummaryLine(command).replace(/(?:[~.]?\/|[A-Za-z]:\\)(?:[\w.@-]+[\/\\]){2,}([\w.@-]+)/g, (match, leaf: string, offset: number, source: string) => `${match.startsWith("/") && offset > 0 && /[\w.@-]/.test(source[offset - 1]) ? "/" : ""}…/${leaf}`);
+	return label.length > 80 ? `${label.slice(0, 28)}…${label.slice(-48)}` : label;
+}
+
+/** Git object reads are distinguished by their path, rather than a repeated ref. */
+export function commandRecordLabel(command: string): string {
+	const line = commandSummaryLine(command);
+	const show = /^git\s+show\s+[^\s:'"`;$&|<>]+:([^\s'"`;$&|<>]+)$/.exec(line);
+	return show ? show[1].split("/").at(-1)! : compactCommandLabel(command);
+}
+
+export function commandDuration(ms: number): string {
+	return ms < 100 ? "<0.1s" : `${(ms / 1000).toFixed(1)}s`;
 }

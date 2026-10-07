@@ -933,8 +933,8 @@ export class ClientSession {
 				break;
 			}
 			case "queue_update":
-				conv.queueSteering = event.steering.map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
-				conv.queueFollowUp = event.followUp.map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
+				conv.queueSteering = event.steering.map(skillAwareTitleText).map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
+				conv.queueFollowUp = event.followUp.map(skillAwareTitleText).map(text => text.length > 2000 ? text.slice(0, 2000) + "…" : text);
 				break;
 			// A run finished or a new entry was persisted — keep the session list fresh
 			// (new chat + first message, completed turns, compaction, etc.).

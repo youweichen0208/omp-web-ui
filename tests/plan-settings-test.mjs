@@ -45,7 +45,8 @@ try {
 	writeFileSync(join(agent, 'models.json'), JSON.stringify({ providers: { fixture: { api: 'openai-completions', baseUrl: `http://127.0.0.1:${model.address().port}`, apiKey: 'fixture', models: [{ id: 'fixture', contextWindow: 32000, maxTokens: 100 }] } } }));
 	writeFileSync(join(agent, 'settings.json'), JSON.stringify({ defaultProvider: 'fixture', defaultModel: 'fixture', retry: { enabled: false }, compaction: { enabled: false } }));
 	await start(); const a = await connect('a'), b = await connect('b');
-	assert.deepEqual(a.state.planSettings, { enabled: false, available: true, effective: false, pending: false });
+	assert.deepEqual(a.state.planSettings, { enabled: true, available: true, effective: true, pending: false });
+	b.toggle(false); await wait(() => !a.state.planSettings.effective && !b.state.planSettings.effective, "global saved off");
 	a.toggle(true); await wait(() => a.state.planSettings.effective && b.state.planSettings.effective, 'global on');
 	hold = true; a.send({ type: 'prompt', text: 'Hold fixture' }); await wait(() => held && a.state.isStreaming, 'running');
 	const active = a.state.conversationId;

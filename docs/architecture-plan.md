@@ -1,6 +1,6 @@
 # 原生 plan 扩展
 
-`server/plan/` 是 pi 1.0.4 可替换 inline extension，名称 `pi-harness-plan`。它不进入 CLI 自动发现目录，也不修改 SDK、原生 bash 或自动续跑策略。默认关闭；服务实例的 `<dataDir>/plan-settings.json` 保存唯一全局 `enabled` 偏好。
+`server/plan/` 是 pi 1.0.4 可替换 inline extension，名称 `pi-harness-plan`。它不进入 CLI 自动发现目录，也不修改 SDK、原生 bash 或自动续跑策略。默认开启，尊重已保存的布尔开关（包括关闭）；缺失或无效配置使用默认值。服务实例的 `<dataDir>/plan-settings.json` 保存唯一全局 `enabled` 偏好。
 
 ## 工具与持久化
 
@@ -8,13 +8,13 @@
 
 create/update 都提交完整状态：title、status、steps、currentStepId（无当前项时明确 null）、completedStepIds、completionCriteria，可选 changeSummary。标题最多 80 字符，步骤 1–16 个，步骤 ID 最多 64 字符且唯一，详情最多 500 字符，完成标准和变更说明最多 240 字符。完成 ID 必须唯一且属于步骤；当前项不能已完成。completed/cancelled/failed 不保留当前项，completed 要求全部步骤完成。
 
-create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision，只能更新当前分支最新且 active 的计划。冲突抛错并返回原因、正确操作和完整可编辑状态；没有计划或计划结束时提示 create。错误不会写入有效状态。
+create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision，只能更新当前分支最新且 active 的计划。冲突抛错并返回原因、正确操作和完整可编辑状态；没有计划或计划结束时提示 create。错误不会写入有效状态。工具描述和 steps 字段明确要求 update（包括完成）也提交完整步骤，不能当成部分更新。
 
 唯一事实源为当前 `getBranch()` 中成功工具结果的 `details.planSnapshot`（schemaVersion=3）。恢复时保留 entryId 和 toolCallId。成功正文只报告身份、版本和结果；调用方先取得 create 返回的身份，再发 update。create 替换 active 计划时，在新快照 changes 内原子记录旧 planId、revision 和取消原因；旧条目保持不变，切回旧分支仍可继续它。
 
 ## 压缩背景
 
-仅工具已激活且最新计划 active 时考虑恢复。最新成功结果及其配对完整参数都在模型上下文中可见时不重复补入，旧版本或错误结果不能抑制恢复。`context` 钩子临时插入完整可编辑状态，放在最近压缩摘要后；没有摘要时放在最新用户请求前。
+仅工具已激活且最新计划 active 时考虑恢复。最新成功结果及其配对完整参数都在模型上下文中可见时不重复补入，旧版本或错误结果不能抑制恢复。本轮最近一次 plan 结果失败时，即使成功调用仍在上下文中，也补入当前有效计划和纠错说明，覆盖 SDK 参数校验在 execute 前拒绝调用的情况；不自动重试、不自动补字段、不授权继续执行。`context` 钩子临时插入完整可编辑状态，放在最近压缩摘要后；没有摘要时放在最新用户请求前。
 
 背景要求模型判断与当前请求的相关性：相关实施先 update，无关多步骤任务 create，普通问答无需计划。历史计划不授权继续执行。背景不写入 JSONL；增删背景可能改变提示词缓存。
 
@@ -30,7 +30,7 @@ create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision
 
 序列化仅按工具名 plan 和 schema 白名单投影；失败、无效和未知版本按普通工具卡展示。第三方 todo 专用投影已移除，历史 task_plan 继续只读兼容。
 
-右栏以 assistant 内调用顺序配对成功结果重放。新用户请求使 active 计划区块进入“此前未完成计划 · 等待确认”；确认前任务整体使用当前请求的标题，运行时保持 running，结束后未完成计划进入 waiting。本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏单独显示“本轮执行记录 · 未归入计划”，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
+右栏以 assistant 内调用顺序配对成功结果重放。新用户请求使 active 计划区块进入“此前未完成计划 · 等待确认”；确认前任务整体使用当前请求的标题，运行时保持 running，结束后未完成计划进入 waiting。本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏单独显示“本轮执行记录 · 未归入计划”，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。本轮最近一次计划调用失败且尚未被成功调用修正时，运行中保持 running，任务结束后显示 failed，不能因其他命令成功而显示完成；之后成功更新清除该错误。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
 
 聊天按当前 conversationId 内的 planId 合并卡片；成功更新保留变化行和键盘可操作的查看入口，错误保持普通卡。替换取消记录保留在新卡，旧卡显示取消；历史分支仍从其自身 transcript 还原。右栏保留当前步骤、详情和完成标准。
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSkillBlock, skillAwarePreview } from "../../web/src/skill-block.js";
+import { parseSkillBlock, skillAwarePreview, queuedMessagePreview } from "../../web/src/skill-block.js";
 
 const BODY = `---
 name: demo
@@ -44,5 +44,15 @@ describe("skillAwarePreview", () => {
 
 	it("非 skill 文本原样返回（折叠空白）", () => {
 		expect(skillAwarePreview("  hello   world  \n")).toBe("hello world");
+	});
+});
+
+
+describe("queuedMessagePreview", () => {
+	it("summarizes full skills and old truncated queue snapshots without exposing the body", () => {
+		const body = '<skill name="ops" location="/tmp/SKILL.md">\n' + 'instructions\n'.repeat(300) + '</skill>\n\n检查状态';
+		expect(queuedMessagePreview(body)).toBe('skill:ops · 检查状态');
+		expect(queuedMessagePreview(body.slice(0, 2000) + '…')).toBe('skill:ops');
+		expect(queuedMessagePreview('普通问题\n保留换行')).toBe('普通问题\n保留换行');
 	});
 });

@@ -15,7 +15,11 @@ export function groupBashMessages(messages: UiMessage[], start = 0, barriers = n
 		if (barriers.has(i)) owner = undefined;
 		if (message.role === "toolResult") continue;
 		const onlyBash = message.role === "assistant" && message.content.length > 0 && message.content.every((block) => block.type === "toolCall" && block.name === "bash");
-		if (!onlyBash) { owner = undefined; continue; }
+		if (!onlyBash) {
+			const last = message.content.at(-1);
+			owner = message.role === "assistant" && last?.type === "toolCall" && last.name === "bash" ? message : undefined;
+			continue;
+		}
 		if (!owner) { owner = message; continue; }
 		const previous = projected.get(owner.id) ?? owner;
 		projected.set(owner.id, { ...previous, content: [...previous.content, ...message.content] });

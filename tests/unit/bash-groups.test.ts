@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { groupBashMessages } from "../../web/src/bash-groups.js";
-import { compactCommandLabel } from "../../web/src/bash-presentation.js";
+import { compactCommandLabel, commandRecordLabel, commandDuration } from "../../web/src/bash-presentation.js";
 import type { UiMessage } from "../../server/protocol.js";
 const call = (id: string): UiMessage => ({ id, role: "assistant", content: [{ type: "toolCall", id: `tool-${id}`, name: "bash", argumentsText: '{"command":"pwd"}' }] });
 const result = (id: string): UiMessage => ({ id: `result-${id}`, role: "toolResult", toolCallId: `tool-${id}`, content: [{ type: "text", text: "/tmp" }] });
@@ -29,4 +29,16 @@ describe("command groups", () => {
 		expect(compactCommandLabel("python3 - <<'PY'\nprint(1)\nPY")).toBe("python3 - <<'PY'");
 		expect(compactCommandLabel("git status --short")).toBe("git status --short");
 	});
+});
+
+it("keeps the filename and omits only an unquoted trailing stderr redirect", () => {
+	const command = "git show feat/hermes-design-package:docs/architecture/decisions/progress.json 2>/dev/null";
+	expect(compactCommandLabel(command)).toBe("git show feat/hermes-design-package:docs/…/progress.json");
+	expect(compactCommandLabel(command)).not.toContain("/dev/null");
+	expect(commandRecordLabel(command)).toBe("progress.json");
+	expect(commandRecordLabel(command.replace("progress.json", "ARCHITECTURE.md"))).toBe("ARCHITECTURE.md");
+	for (const literal of ["echo 'text 2>/dev/null'", 'echo "text 2>/dev/null"', 'echo "unterminated 2>/dev/null', "echo x && cat f 2>/dev/null"]) expect(compactCommandLabel(literal)).toBe(literal);
+	expect(commandDuration(0)).toBe("<0.1s");
+	expect(commandDuration(99)).toBe("<0.1s");
+	expect(commandDuration(100)).toBe("0.1s");
 });

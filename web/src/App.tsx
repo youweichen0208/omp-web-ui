@@ -1014,6 +1014,7 @@ export function App() {
 								stats={conversationState?.stats}
 								promptResult={chat.promptResult}
 								verifying={conversationState?.tree?.verifying}
+								queue={conversationState?.queue}
 								pendingCount={(conversationState?.queue.steering.length ?? 0) + (conversationState?.queue.followUp.length ?? 0)}
 								send={send}
 								ready={chat.ready && !!conversationState && !(view === "chat" && (wikiPending || wikiConversationMatches))}

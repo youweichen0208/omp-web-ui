@@ -7,10 +7,13 @@ import type { PlanSettingsState } from "../protocol.js";
 /** One service instance preference. Sessions only hold their effective loadout. */
 export class PlanSettings {
 	readonly path: string;
-	enabled = false;
+	enabled = true;
 	constructor(dataDir = resolve(process.env.PI_WEB_DATA_DIR ?? join(homedir(), ".pi-web"))) {
 		this.path = join(dataDir, "plan-settings.json");
-		try { this.enabled = JSON.parse(readFileSync(this.path, "utf8")).enabled === true; } catch { /* Default off. */ }
+		try {
+			const saved = JSON.parse(readFileSync(this.path, "utf8"));
+			if (typeof saved.enabled === "boolean") this.enabled = saved.enabled;
+		} catch { /* Missing or invalid preference: default on. */ }
 	}
 	set(enabled: boolean) {
 		mkdirSync(dirname(this.path), { recursive: true });

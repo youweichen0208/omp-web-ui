@@ -174,14 +174,18 @@ export function deriveTaskProgress(conversationId: string, messages: UiMessage[]
 	// Earlier failed commands can be followed by a successful fix or rerun.
 	// The latest completed tool group is the best observed outcome for this turn.
 	const lastCompleted = steps.findLast((step) => step.status !== "running");
-	const status: TaskProgress["status"] = cancelled ? "cancelled" : isStreaming ? "running" : lastCompleted?.status === "failed" ? "failed" : "done";
+	// Plan calls do not create execution rows, but their latest unresolved error
+	// must still prevent a successful turn status. A corrected call clears it.
+	const planCalls = currentTail.flatMap(message => message.role === "assistant" ? message.content.filter((part): part is UiToolCallBlock => part.type === "toolCall" && ["plan", "task_plan"].includes((part as UiToolCallBlock).name)) : []);
+	const planFailed = results.get(planCalls.at(-1)?.id ?? "")?.isError === true;
+	const status: TaskProgress["status"] = cancelled ? "cancelled" : isStreaming ? "running" : planFailed || lastCompleted?.status === "failed" ? "failed" : "done";
 	const plannedEnd = status === "done" ? Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0)) : undefined;
 	const plan = recorded.known ? recorded.plan : planFromTranscript(tail, results, steps, status === "done", plannedEnd);
 	const planIncomplete = plan?.source === "plan" && plan.status === "active";
 	let taskStatus: TaskProgress["status"] = status;
 	if (plan?.status === "cancelled" || plan?.status === "failed") taskStatus = plan.status;
 	else if (!isStreaming && !cancelled && status !== "failed" && (plan?.awaitingConfirmation || planIncomplete)) taskStatus = "waiting";
-	if (!steps.length && !plan) return null;
+	if (!steps.length && !plan && !planFailed) return null;
 	const title = (!plan?.awaitingConfirmation && plan?.title) || taskTitle(messages, userIndex, steps);
 	const endedAt = status === "running" ? undefined : Math.max(user.timestamp ?? 0, turnEndedAt ?? 0, ...tail.map((message) => message.timestamp ?? 0), ...steps.map((step) => step.endedAt ?? 0));
 	return { id: `task:${plan?.origin ?? user.id}`, conversationId, sourceMessageId: user.id, title, status: taskStatus, startedAt: user.timestamp ?? 0, ...(endedAt ? { endedAt } : {}), completed: steps.filter((step) => step.status === "done").length, steps, ...(plan ? { plan } : {}) };
