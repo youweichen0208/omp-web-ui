@@ -7,7 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync, statSync, writeFileSync, watch } from "node:fs";
-import { resolve, relative, sep } from "node:path";
+import { isAbsolute, resolve, relative, sep } from "node:path";
 import type { ServerMessage, FileEntry, FileSearchResult } from "./protocol.js";
 import {
 	previewKind,
@@ -99,7 +99,9 @@ export function workspacePath(
 ): { abs: string; rel: string } | null {
 	const abs = resolve(root, raw);
 	const rawRel = relative(root, abs);
-	if (rawRel.startsWith("..") || rawRel.includes(`${sep}..`)) return null;
+	// relative() yields an absolute path across Windows drives / UNC shares, and
+	// "..foo" is a legitimate file name — only a real ".." segment escapes.
+	if (isAbsolute(rawRel) || rawRel === ".." || rawRel.startsWith(`..${sep}`)) return null;
 	// Normalize to forward slashes: the wire protocol and the frontend always
 	// use "/", but relative() returns "\\" on Windows.
 	return { abs, rel: rawRel.split(sep).join("/") };
