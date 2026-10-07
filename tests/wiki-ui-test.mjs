@@ -112,7 +112,7 @@ try {
 	assert((await page.locator('.wiki-document-meta').innerText()).includes('分钟读完'));
 	const readingCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
 	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
-	assert.equal(readingCode, "rgb(30, 28, 24)");
+	assert.equal(readingCode, "rgb(36, 37, 34)");
 	assert.equal(await page.locator(".wiki-prose .codeblock").evaluate(el => getComputedStyle(el).backgroundColor), readingCode);
 	assert.equal(await page.locator('.wiki-prose select[data-code-language]').first().inputValue(), 'js');
 	await page.locator('.wiki-scroll').evaluate(el => { el.scrollTo({ top: 0, behavior: 'instant' }); el.dispatchEvent(new Event('scroll')); });
@@ -122,9 +122,16 @@ try {
 	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
 	await page.waitForFunction(() => {
 		const code = document.querySelector('.wiki-prose .codeblock');
-		return getComputedStyle(code).backgroundColor === getComputedStyle(code).backgroundColor;
+		return getComputedStyle(code).backgroundColor !== "rgb(36, 37, 34)";
 	});
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-light-expanded.png' });
+	await page.getByRole('button', { name: '专注阅读', exact: true }).click();
+	assert.equal(await page.locator('.wiki-sidebar').isVisible(), false);
+	assert.equal(await page.locator('.wiki-toc').isVisible(), false);
+	assert.equal(await page.locator('.wiki-prose .fp-rich-document').getAttribute('contenteditable'), 'true');
+	await page.screenshot({ path: '/tmp/pi-wiki-focus-light.png' });
+	await page.getByRole('button', { name: '退出专注阅读', exact: true }).click();
+	assert.equal(await page.locator('.wiki-sidebar').isVisible(), true);
 	await page.keyboard.press('Escape');
 	await page.evaluate(() => { document.documentElement.dataset.appearance = 'dark'; });
 	await page.keyboard.press('Meta+k');
