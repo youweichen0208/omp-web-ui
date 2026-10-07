@@ -16,18 +16,23 @@
  *     不能防同一用户账号下的完整进程妥协——本地个人工具的合理折衷。
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { writeFileAtomic } from "./private-file.js";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readFile as fspReadFile, readdir as fspReaddir, rm as fspRm, mkdir as fspMkdir, writeFile as fspWriteFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 
 /** tmp+rename 原子写（错误由调用方隔离——插件设施的 IO 一律尽力而为）。 */
-function atomicWrite(file: string, data: string): void {
-	mkdirSync(dirname(file), { recursive: true });
-	const tmp = `${file}.tmp-${process.pid}`;
-	writeFileSync(tmp, data);
-	renameSync(tmp, file);
+function atomicWrite(file: string, data: string, mode?: number): void {
+	if (mode === undefined) {
+		mkdirSync(dirname(file), { recursive: true });
+		const tmp = `${file}.tmp-${process.pid}`;
+		writeFileSync(tmp, data);
+		renameSync(tmp, file);
+		return;
+	}
+	writeFileAtomic(file, data, { mode });
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +69,7 @@ export class PluginStorage {
 		const store = this.load();
 		store[key] = value;
 		try {
-			atomicWrite(this.file, JSON.stringify(store));
+			atomicWrite(this.file, JSON.stringify(store), 0o600);
 		} catch (err) {
 			console.error(`[plugin-storage] 写入失败 (${this.file}):`, err);
 		}
@@ -75,7 +80,7 @@ export class PluginStorage {
 		if (!(key in store)) return;
 		delete store[key];
 		try {
-			atomicWrite(this.file, JSON.stringify(store));
+			atomicWrite(this.file, JSON.stringify(store), 0o600);
 		} catch (err) {
 			console.error(`[plugin-storage] 写入失败 (${this.file}):`, err);
 		}
@@ -121,10 +126,7 @@ function loadOrCreateKey(dataDir: string): Buffer {
 		/* fallthrough → regenerate */
 	}
 	const key = randomBytes(32);
-	atomicWrite(keyFile, `${key.toString("hex")}\n`);
-	try {
-		chmodSync(keyFile, 0o600); // best-effort（win 无效，不抛错）
-	} catch {}
+	atomicWrite(keyFile, `${key.toString("hex")}\n`, 0o600); // 创建即 0600，没有先 0644 再 chmod 的窗口
 	return key;
 }
 
@@ -173,7 +175,7 @@ export class PluginSecrets {
 		const s = this.load();
 		s.items[name] = seal(this.key, value);
 		try {
-			atomicWrite(this.file, JSON.stringify(s));
+			atomicWrite(this.file, JSON.stringify(s), 0o600);
 		} catch (err) {
 			console.error("[plugin-secrets] 写入失败:", err);
 		}
@@ -198,7 +200,7 @@ export class PluginSecrets {
 		if (!(name in s.items)) return;
 		delete s.items[name];
 		try {
-			atomicWrite(this.file, JSON.stringify(s));
+			atomicWrite(this.file, JSON.stringify(s), 0o600);
 		} catch (err) {
 			console.error("[plugin-secrets] 写入失败:", err);
 		}

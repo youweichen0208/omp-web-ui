@@ -1,5 +1,6 @@
 /** Per-client UI preferences and project/session navigation, persisted best-effort. */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { writeFileAtomic } from "./private-file.js";
 import { dirname } from "node:path";
 import type { ProjectSummary } from "./protocol.js";
 
@@ -23,7 +24,12 @@ export function extensionKey(e: {
 	return src?.path ?? e.path;
 }
 
+/** Upper bound on persisted client entries (see ClientStateStore.prune). */
+const MAX_CLIENT_ENTRIES = 200;
+
 export interface ClientState {
+	/** ms epoch of the last write for this client; drives pruning of stale entries. */
+	seen?: number;
 	/** Absolute path of the workspace this client last used. */
 	lastCwd?: string;
 	/** Workspaces this client opened before, most-recently-used first (capped
@@ -115,15 +121,34 @@ export class ClientStateStore {
 		return this.cache;
 	}
 
+	/** Get or create a client's entry and stamp it as recently used. */
+	private entry(clientId: string): ClientState {
+		const all = this.load();
+		const state = (all[clientId] ??= { projects: [] });
+		state.seen = Date.now();
+		return state;
+	}
+
+	/** Browser tabs are a new clientId each; keep the file bounded by dropping the
+	 *  least recently used entries (the desktop app's stable id stays near the top). */
+	private prune(): void {
+		const all = this.cache;
+		if (!all) return;
+		const ids = Object.keys(all);
+		if (ids.length <= MAX_CLIENT_ENTRIES) return;
+		const lastSeen = (state: ClientState) => state.seen ?? Math.max(0, ...(state.projects ?? []).map((p) => p.lastUsed));
+		ids.sort((a, b) => lastSeen(all[b]) - lastSeen(all[a]));
+		for (const id of ids.slice(MAX_CLIENT_ENTRIES)) delete all[id];
+	}
+
 	private save(): void {
+		this.prune();
 		try {
-			mkdirSync(dirname(this.filePath), { recursive: true });
 			// Atomic write (tmp + rename): a crash mid-write must never leave a
 			// half-written JSON — that would wipe ALL persisted state (recent
-			// projects and display settings) on next load.
-			const tmp = `${this.filePath}.${process.pid}.tmp`;
-			writeFileSync(tmp, JSON.stringify(this.cache, null, 2) + "\n");
-			renameSync(tmp, this.filePath);
+			// projects and display settings) on next load. 0600: it lists the
+			// user's project paths.
+			writeFileAtomic(this.filePath, JSON.stringify(this.cache, null, 2) + "\n");
 		} catch {
 			// best effort
 		}
@@ -136,8 +161,7 @@ export class ClientStateStore {
 	/** Freeze the order anchors of projects discovered from old session files as
 	 *  soon as they are shown. Selecting one later must not make it "new". */
 	rememberDisplayedProjects(clientId: string, projects: readonly ProjectSummary[]): void {
-		const all = this.load();
-		const state = (all[clientId] ??= { projects: [] });
+		const state = this.entry(clientId);
 		const known = new Set(state.projects.map((p) => p.path));
 		let changed = false;
 		for (const project of projects) {
@@ -155,8 +179,7 @@ export class ClientStateStore {
 
 	/** Remember which workspace a client last used and move it to the front. */
 	remember(clientId: string, cwd: string): void {
-		const all = this.load();
-		const state = (all[clientId] ??= { projects: [] });
+		const state = this.entry(clientId);
 		state.lastCwd = cwd;
 		// Distinct clicks can share one millisecond; keep ordering deterministic.
 		const now = Math.max(Date.now(), ...state.projects.map((project) => project.lastUsed + 1));
@@ -181,8 +204,7 @@ export class ClientStateStore {
 	 *  Records a tombstone too: pushProjects() re-discovers cwds from session
 	 *  files on every listing, so without it the entry would instantly reappear. */
 	removeProject(clientId: string, cwd: string): void {
-		const all = this.load();
-		const state = (all[clientId] ??= { projects: [] });
+		const state = this.entry(clientId);
 		state.projects = state.projects.filter((p) => p.path !== cwd);
 		if (state.lastCwd === cwd) delete state.lastCwd;
 		const removed = new Set(state.removedProjects ?? []);
@@ -204,8 +226,7 @@ export class ClientStateStore {
 		list: { title: string; cwd: string; at: number }[],
 	): void {
 		if (list.length === 0) return;
-		const all = this.load();
-		const state = (all[clientId] ??= { projects: [] });
+		const state = this.entry(clientId);
 		state.interrupted = list.slice(0, 8);
 		this.save();
 	}
@@ -231,8 +252,7 @@ export class ClientStateStore {
 
 	/** Persist the client's settings-panel state (partial merge). */
 	saveSettings(clientId: string, partial: Partial<ClientSettings>): void {
-		const all = this.load();
-		const state = (all[clientId] ??= { projects: [] });
+		const state = this.entry(clientId);
 		const current = this.getSettings(clientId);
 		state.settings = { editResendNewSession: partial.editResendNewSession ?? current.editResendNewSession ?? false, thinkingWrap: partial.thinkingWrap ?? current.thinkingWrap, toolsWrap: partial.toolsWrap ?? current.toolsWrap, disabledPlugins: partial.disabledPlugins ?? current.disabledPlugins };
 		this.save();

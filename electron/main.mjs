@@ -34,6 +34,7 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { desktopClientId } from "./client-identity.mjs";
 import { agentRuntimeEnvironment } from "./agent-runtime-env.mjs";
+import { bearerHeaders, desktopServerToken, desktopWindowUrl } from "./server-auth.mjs";
 // electron-updater 是 CJS 包，Node ESM 下不能直接 named import，
 // 得走默认导出再解构（Node 的 CJS→ESM 互操作不会自动分析 named exports）。
 import electronUpdaterPkg from "electron-updater";
@@ -53,6 +54,8 @@ let serverProcess = null;
 let isQuitting = false;
 let closeGuardReady = false, closeApproved = false, pendingClose = null;
 let serverPort = 0;
+// One secret per launch, kept across server restarts so the open window stays authorized.
+const serverToken = desktopServerToken();
 let clientId;
 const dataDir = process.env.PI_WEB_DATA_DIR || join(
 	process.env.HOME || process.env.USERPROFILE || "~", ".pi-web-desktop",
@@ -105,13 +108,14 @@ async function startServer(reusePort) {
 	}
 
 	// 桌面版数据目录与命令行版分开（见文件头注释），确保存在
-	mkdirSync(dataDir, { recursive: true });
+	mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 
 	serverProcess = fork(serverPath, [], {
 		env: {
 			...agentRuntimeEnvironment(getPkgRoot(), dataDir),
 			PORT: String(serverPort),
 			PI_WEB_HOST: "127.0.0.1",
+			PI_WEB_TOKEN: serverToken,
 			PI_WEB_DATA_DIR: dataDir,
 			PI_WEB_NO_BROWSER: "1", // 不要自动打开浏览器（本身也不会打开，桌面版有自己的窗口）
 			PI_WEB_PKG_ROOT: getPkgRoot(), // 告诉 server 去哪找 web/dist
@@ -279,7 +283,7 @@ function createWindow() {
 	};
 	mainWindow.webContents.on("will-navigate", guardNavigation);
 	mainWindow.webContents.on("will-redirect", guardNavigation);
-	mainWindow.loadURL(url);
+	mainWindow.loadURL(desktopWindowUrl(serverPort, serverToken));
 
 	mainWindow.once("ready-to-show", () => {
 		mainWindow.show();
@@ -352,7 +356,7 @@ ipcMain.handle("pi-wiki-open-file", async (event, request) => {
 	if (!win || win.isDestroyed() || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) throw new Error("Forbidden");
 	if (!request || ![request.clientId, request.cwd, request.path].every(value => typeof value === "string")) throw new Error("Invalid file request");
 	const response = await fetch(`http://127.0.0.1:${serverPort}/api/wiki`, {
-		method: "POST", headers: { "Content-Type": "application/json", ...(process.env.PI_WEB_TOKEN ? { Authorization: `Bearer ${process.env.PI_WEB_TOKEN.trim()}` } : {}) },
+		method: "POST", headers: { "Content-Type": "application/json", ...bearerHeaders(serverToken) },
 		body: JSON.stringify({ clientId: request.clientId, cwd: request.cwd, path: request.path, action: "open-info" }),
 	});
 	const result = await response.json();
@@ -365,7 +369,7 @@ ipcMain.handle("pi-extension-open-path", async (event, request) => {
 	if (!win || win.isDestroyed() || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) throw new Error("Forbidden");
 	if (!request || ![request.clientId, request.cwd, request.id].every(value => typeof value === "string")) throw new Error("Invalid package request");
 	const response = await fetch(`http://127.0.0.1:${serverPort}/api/extensions`, {
-		method: "POST", headers: { "Content-Type": "application/json", ...(process.env.PI_WEB_TOKEN ? { Authorization: `Bearer ${process.env.PI_WEB_TOKEN.trim()}` } : {}) },
+		method: "POST", headers: { "Content-Type": "application/json", ...bearerHeaders(serverToken) },
 		body: JSON.stringify({ clientId: request.clientId, cwd: request.cwd, id: request.id, action: "open-info" }),
 	});
 	const result = await response.json();

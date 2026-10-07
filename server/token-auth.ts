@@ -16,3 +16,21 @@ export function tokenMatches(candidates: string[], expected: string): boolean {
 export function tokenCookie(token: string, secure: boolean): string {
 	return `pi_web_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${secure ? "; Secure" : ""}`;
 }
+
+/**
+ * Cookies are not scoped by port, so a cookie from an earlier run (other port or
+ * rotated token) would shadow a fresh login and make asset requests fail.
+ * Re-issue the cookie unless the browser already holds the current token.
+ */
+export function needsTokenCookie(cookieHeader: string | undefined, token: string): boolean {
+	for (const part of (cookieHeader ?? "").split(";")) {
+		const [name, ...rest] = part.trim().split("=");
+		if (name !== "pi_web_token") continue;
+		try {
+			if (decodeURIComponent(rest.join("=")) === token) return false;
+		} catch {
+			/* malformed value: replace it */
+		}
+	}
+	return true;
+}
