@@ -46,6 +46,7 @@ import { readSqlitePreview } from "./sqlite-preview.js";
 import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
+import { createOriginPolicy } from "./origin-policy.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
 
 import { NodeWorkbench } from "./node-workbench.js";
@@ -341,7 +342,7 @@ if (existsSync(webDist)) {
 	// UI-less 404 with no explanation.
 	console.error(
 		"✖ 更新后的安装不完整（缺少 web/dist/index.html）。\n" +
-			"  请手动执行 npm i -g pi-web-ui@latest 修复后重新启动。",
+			"  请手动执行 npm i -g @youweichen/pi-web-ui@latest 修复后重新启动。",
 	);
 	process.exit(1);
 }
@@ -360,9 +361,8 @@ const wss = new WebSocketServer({
 //
 // Browsers attach an Origin header; non-browser clients (curl, ws scripts)
 // usually don't — they're admitted by the network layer / reverse proxy.
-// Rules (checked in order):
-//   4. No Origin header → admit (non-browser client).
-//   5. Anything else → 403 + close.
+// Policy lives in origin-policy.ts: Host allowlist (loopback by default when
+// bound to loopback, against DNS rebinding), then same-authority Origin match.
 //
 // Dev-mode note: the Vite dev server (:5173) proxies /ws to the backend on
 // :8788, so their authorities differ — the dev:server script sets
@@ -370,33 +370,10 @@ const wss = new WebSocketServer({
 // LAN / reverse-proxy setups add their own origin the same way.
 // ---------------------------------------------------------------------------
 
-/** "host" or "host:port" → { hostname, port }. */
-function parseAuthority(a: string): { hostname: string; port: string } {
-	try {
-		const u = new URL(`http://${a}`);
-		return { hostname: u.hostname.toLowerCase(), port: u.port || "80" };
-	} catch {
-		return { hostname: "", port: "" };
-	}
-}
+const originPolicy = createOriginPolicy({ bindHost: HOST, allowHosts: ALLOW_HOSTS, allowOrigins: ALLOW_ORIGINS });
 
 function originAllowed(req: IncomingMessage): boolean {
-	const hostHeader = (req.headers.host ?? "").toLowerCase();
-	const host = parseAuthority(hostHeader);
-	if (ALLOW_HOSTS.length > 0 && !ALLOW_HOSTS.includes(host.hostname)) {
-		return false;
-	}
-	const origin = req.headers.origin;
-	if (!origin) return true; // non-browser client
-	const o = origin.toLowerCase();
-	if (ALLOW_ORIGINS.includes(o)) return true;
-	if (o === "null") return false; // file:// pages etc. are not trusted
-	const ori = parseAuthority(o.replace(/^[a-z]+:\/\//, ""));
-	if (ori.hostname === host.hostname && ori.port === host.port) return true;
-	// Browsers treat host:port pairs on the SAME host as different origins —
-	// do not accept them. (Dev-mode proxying is handled by PI_WEB_ALLOW_ORIGINS
-	// set in the dev:server script; LAN/reverse-proxy setups add their origin.)
-	return false;
+	return originPolicy(req.headers);
 }
 
 httpServer.on("upgrade", (req, socket, head) => {
@@ -468,7 +445,7 @@ service.onClientCwdChanged = (cwd) => pluginMgr.notifyCwd(cwd);
 // ---------------------------------------------------------------------------
 // Self-update
 // ---------------------------------------------------------------------------
-// In-app updates now run `npm i -g pi-web-ui@latest` in a visible terminal
+// In-app updates now run `npm i -g @youweichen/pi-web-ui@latest` in a visible terminal
 // tab (frontend-initiated); after it finishes the user restarts via
 // `pi-web-ui server restart`. The PI_WEB_RESTART_CHILD port-wait handshake
 // below stays: an externally orchestrated replacement child still needs it.
