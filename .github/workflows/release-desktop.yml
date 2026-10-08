@@ -273,7 +273,7 @@ jobs:
       - name: Verify packaged server, native worker and OAuth
         run: |
           root="$PWD/release/linux-unpacked/resources/app"
-          executable="$PWD/release/linux-unpacked/pi"
+          executable="$PWD/release/linux-unpacked/pi-harness"
           node tests/packaged-server-start-test.mjs "$executable" "$root"
           node tests/native-tools-desktop-test.mjs "$executable" "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$root"
@@ -288,11 +288,14 @@ jobs:
           dpkg-deb -x "$previous/"*.deb "$previous/app"
           oldroot=$(dirname "$(find "$previous/app" -path '*/resources/app/package.json' -print -quit)")
           node tests/packaged-upgrade-test.mjs seed "$oldroot/../../pi" "$oldroot" "$RUNNER_TEMP/pi-upgrade-state"
-          sudo dpkg -i release/*.deb || sudo apt-get install -f -y
+          sudo apt-get update
+          sudo apt-get install -y ./release/*.deb
           package=$(dpkg-deb -f release/*.deb Package)
+          test "$package" = pi-harness
+          test "$(dpkg-query -W -f='${Version}' "$package")" = "$(node -p "require('./package.json').version")"
           root=$(dirname "$(dpkg -L "$package" | sed -n '\|/resources/app/package.json$|p')")
-          node tests/packaged-server-start-test.mjs "$root/../../pi" "$root"
-          node tests/packaged-upgrade-test.mjs verify "$root/../../pi" "$root" "$RUNNER_TEMP/pi-upgrade-state"
+          node tests/packaged-server-start-test.mjs "$root/../../pi-harness" "$root"
+          node tests/packaged-upgrade-test.mjs verify "$root/../../pi-harness" "$root" "$RUNNER_TEMP/pi-upgrade-state"
 
       - name: Upload verified Linux packages
         env:
@@ -307,6 +310,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Require successful CI for the exact release commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test "$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --limit 50 --json conclusion --jq 'any(.[]; .conclusion == "success")')" = true
       - name: Verify attachments and publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

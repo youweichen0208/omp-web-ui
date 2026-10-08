@@ -54,6 +54,10 @@ compose 默认只把端口映射到 `127.0.0.1`，并设置 `PI_WEB_ALLOW_HOSTS=
 
 重建旧容器前先停止服务并备份。旧版默认实际数据可能在容器的 `/home/node/.pi/agent` 和 `/home/node/.pi-web`，不是旧 compose 声明的 `/app/.pi-web` 卷；若设置过自定义环境变量，以容器配置里的实际目录为准。先用 `docker cp <旧容器>:<实际目录> <备份目录>` 导出两个目录，再将其内容分别复制到新卷的 `/data/pi-agent` 与 `/data/pi-harness`，设置为 UID/GID 1000 可写。核对新容器能列出旧会话、配置和附件后，才删除旧容器及备份；已有同名文件时先合并核对，不覆盖新数据。新容器的 `/data` 命名卷会在普通容器重建后保留，`docker compose down -v` 会删除卷，不能用于保留数据的升级。
 
+## Linux 安装
+
+Linux 的 deb 包名和可执行文件为 `pi-harness`，避免与发行版仓库的圆周率计算程序 `pi` 冲突。使用 `sudo apt install ./pi-<版本>-linux-amd64.deb` 安装本地包及其依赖。旧版桌面 deb 使用包名 `pi`；升级前通过 `dpkg-query -s pi` 核对它确实是旧桌面应用，再卸载旧应用，保留用户数据目录。不要据包名直接删除系统中的其他程序。
+
 ## Windows 下载选择
 
 - `pi-<版本>-setup-x64.exe`：安装版，包含安装向导、安装目录选择，以及桌面和开始菜单快捷方式。
