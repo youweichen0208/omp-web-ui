@@ -1319,45 +1319,6 @@ body.panel-resizing {
 	display: inline-flex;
 }
 
-/* Instant CSS tooltip (no browser title delay). Anchored to the button's RIGHT
-   edge so text never overflows the right side of the screen (file panel is at
-   the window edge). */
-.file-attach::after {
-	content: attr(data-tip);
-	position: absolute;
-	bottom: calc(100% + 8px);
-	right: 0;
-	background: var(--tooltip-bg);
-	color: var(--tooltip-fg);
-	border: 1px solid var(--border);
-	border-radius: var(--r-sm);
-	padding: 4px 9px;
-	font-size: 11px;
-	line-height: 1.4;
-	white-space: nowrap;
-	pointer-events: none;
-	opacity: 0;
-	transition: opacity 0.09s ease;
-	z-index: 40;
-	box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-color) 45%, transparent);
-}
-.file-attach::before {
-	content: "";
-	position: absolute;
-	bottom: calc(100% + 3px);
-	right: 6px; /* arrow centered on the 22px-wide button */
-	border: 5px solid transparent;
-	border-top-color: var(--tooltip-bg);
-	pointer-events: none;
-	opacity: 0;
-	transition: opacity 0.09s ease;
-	z-index: 40;
-}
-.file-attach:hover::after,
-.file-attach:hover::before {
-	opacity: 1;
-}
-
 /* Tooltip below the trigger for toolbar chips (they sit at the window top). */
 .chip[data-tip] {
 	position: relative;
@@ -7456,7 +7417,7 @@ span.msg-editor-hint svg {
 	color: var(--text-dim);
 }
 
-/* Tooltip for the header icon buttons (same pattern as .file-attach). */
+/* Tooltip for the header icon buttons. */
 .fp-attach::after {
 	content: attr(data-tip);
 	position: absolute;
@@ -8080,14 +8041,9 @@ span.msg-editor-hint svg {
 
 	/* ---- side panels become sliding drawers ---- */
 
-	/* File tree: hover-revealed attach buttons don't work on touch — always
-	   show them; hide the hover-only tooltip bubbles. */
+	/* File tree: always show attachment buttons on touch screens. */
 	.file-item .file-attach {
 		display: inline-flex;
-	}
-	.file-attach::after,
-	.file-attach::before {
-		display: none;
 	}
 	.panel-drawer {
 		display: block;
