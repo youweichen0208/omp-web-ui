@@ -81,6 +81,10 @@ const ALLOW_ORIGINS = (process.env.PI_WEB_ALLOW_ORIGINS ?? "")
  *  Authorization: Bearer / X-PI-Token 头、?token= 查询参数或 pi_web_token cookie
  *  任一匹配即可；供 0.0.0.0 / 反代等暴露场景兜底，未设置则行为不变。 */
 const AUTH_TOKEN = process.env.PI_WEB_TOKEN?.trim() ?? "";
+// The token authenticates browsers to this server. Terminals, the agent's bash tool and
+// worker processes inherit process.env, so leaving it there would hand the secret to
+// anything the agent runs (and into model context via `env`). Nothing re-reads it.
+delete process.env.PI_WEB_TOKEN;
 // Root of the SDK default per-project session dirs — chat transcripts live in
 // <SESSION_DIR_ROOT>/--<cwd>--/, shared with the pi CLI/TUI (getAgentDir
 // honors PI_CODING_AGENT_DIR).
