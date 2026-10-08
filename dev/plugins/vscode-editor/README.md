@@ -1,6 +1,6 @@
-# 📝 vscode-editor —— pi-web-ui 编辑器 + SSH 插件（Remote-SSH）
+# 📝 vscode-editor —— pi-harness 编辑器 + SSH 插件（Remote-SSH）
 
-在 pi-web-ui 界面里提供一个类 VSCode 的工作台视图：
+在 pi-harness 界面里提供一个类 VSCode 的工作台视图：
 
 - **多根文件树**：本地工作区 + 已保存的 SSH 主机（同一棵树、同一组标签页）
 - **工作区跟随**：主应用切换项目（set_cwd）后，本地树根目录实时切到新项目——
@@ -54,15 +54,15 @@ vscode-editor/
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor
-pi-web-ui install dev/plugins/vscode-editor  # 或本地目录（开发态）
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor
+pi-harness install dev/plugins/vscode-editor  # 或本地目录（开发态）
 # 可选：--data-dir <dir> 自定义数据目录（默认 ~/.pi-web）
 
 # ── 查看 ──
-pi-web-ui plugins                            # 列出已装插件与 id
+pi-harness plugins                            # 列出已装插件与 id
 
 # ── 更新 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor --force
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/vscode-editor --force
                                              # --force 覆盖重装即更新
                                              # ⚠ 先备份插件目录里的 ssh-hosts.json 与
                                              #   工作区 .vscode/sftp.json（主机凭据/同步配置）
@@ -73,7 +73,7 @@ cp -r dev/plugins/vscode-editor ~/.pi-web/plugins/  # 本地开发态：改完 s
                                              # node_modules / src / build.mjs 不需要拷贝
 
 # ── 卸载 ──
-pi-web-ui uninstall vscode-editor            # 移除插件目录（ssh-hosts.json 一并删除）
+pi-harness uninstall vscode-editor            # 移除插件目录（ssh-hosts.json 一并删除）
 # 手动方式：rm -rf ~/.pi-web/plugins/vscode-editor
 ```
 

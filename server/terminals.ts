@@ -300,7 +300,7 @@ console.warn = (...args: unknown[]) => {
 // execute bit (mode 0644 in the npm tarball), so posix_spawn fails with EACCES
 // and node-pty throws the generic "posix_spawnp failed". Locally-built
 // copies (build/Release) are fine; every `npm install` that picks the prebuild
-// — e.g. `npm i -g pi-web-ui`, which is what system-service installs run — is
+// — e.g. `npm i -g pi-harness`, which is what system-service installs run — is
 // broken until the bit is restored. Self-heal at startup AND lazily before
 // every spawn (an `npm i -g` while the server is running replaces the helper
 // under the running process, so the startup-only repair misses it).
@@ -359,7 +359,7 @@ function brokenSpawnHelper(): string {
 // macOS TCC camera/mic warning (launchd-spawned servers)
 // ---------------------------------------------------------------------------
 // TCC attributes camera/mic access to the process chain's "responsible
-// process". When pi-web-ui runs as a launchd LaunchAgent (node ← launchd),
+// process". When pi-harness runs as a launchd LaunchAgent (node ← launchd),
 // the responsible process is node itself — a bare CLI binary with no app
 // bundle / Info.plist / NSCameraUsageDescription — so TCC silently denies
 // camera access (no prompt, nothing to tick in System Settings) and
@@ -371,7 +371,7 @@ const TCC_HINT = [
 	"\x1b[90m  · 需要隐私权限的命令会被系统静默拒绝：不弹授权窗，系统设置里也无法勾选，表现多为卡死或无输出。",
 	"  · 这类任务请在你自己已授权的前台终端里运行。",
 	"  · 本终端内可运行不需要隐私权限的命令（如文件处理、网络请求、远程设备流）。",
-	"  · 若改在前台终端里运行 pi-web-ui，本提示即不再出现。\x1b[0m",
+	"  · 若改在前台终端里运行 pi-harness，本提示即不再出现。\x1b[0m",
 ].join("\r\n") + "\r\n";
 
 /** True when this server was spawned by launchd (or orphaned) on macOS — no GUI app in the ancestry, so camera/mic TCC grants are unavailable. */

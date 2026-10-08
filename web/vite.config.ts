@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Dev: Vite serves the web UI on :5173 and proxies the WebSocket + any API
 // traffic to the backend server (which runs separately via `npm run dev:server`).
 // The dev backend is pinned to :8788 (see the dev:server script) so it never
-// collides with a globally-installed pi-web-ui running on the default :8787.
+// collides with a globally-installed pi-harness running on the default :8787.
 export default defineConfig({
 	root: __dirname,
 	plugins: [react()],

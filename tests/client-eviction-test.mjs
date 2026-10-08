@@ -26,7 +26,7 @@ const server = spawn(process.execPath, [join(REPO, 'dist', 'server', 'index.js')
 });
 let log = ''; server.stdout.on('data', d => log += d); server.stderr.on('data', d => log += d);
 
-const sock = process.platform === 'win32' ? `\\\\.\\pipe\\pi-web-ui-${PORT}` : join(DATA, 'pi-web-ui.sock');
+const sock = process.platform === 'win32' ? `\\\\.\\pipe\\pi-harness-${PORT}` : join(DATA, 'pi-harness.sock');
 const status = () => new Promise(resolve => {
 	const c = createConnection(sock); let buf = '';
 	c.on('connect', () => c.write('{"cmd":"status"}\n'));

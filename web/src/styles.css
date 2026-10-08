@@ -2777,7 +2777,7 @@ body.panel-resizing {
 .brand-name {
 	font-weight: 600;
 	letter-spacing: 0.2px;
-	/* 空间不够时截断，不要在词中间断行。之前 "pi-web-ui" 会折成 "pi-web-" 和
+	/* 空间不够时截断，不要在词中间断行。之前 "pi-harness" 会折成 "pi-web-" 和
 	   "ui" 两行，整条顶栏跟着高一截。 */
 	min-width: 0;
 	max-width: 22ch;

@@ -1,4 +1,4 @@
-/** The footer must receive pi-web-ui's release version, not the pi SDK version. */
+/** The footer must receive pi-harness's release version, not the pi SDK version. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -32,8 +32,8 @@ try {
 		});
 		socket.on('error', (error) => { clearTimeout(timer); reject(error); });
 	});
-	assert.equal(version, expected, `ready.serverVersion should be pi-web-ui ${expected}, got ${version}`);
-	console.log(`PASS ready.serverVersion is pi-web-ui v${expected}`);
+	assert.equal(version, expected, `ready.serverVersion should be pi-harness ${expected}, got ${version}`);
+	console.log(`PASS ready.serverVersion is pi-harness v${expected}`);
 } finally {
 	if (server) { server.kill(); await Promise.race([new Promise((resolve) => server.once('exit', resolve)), sleep(2000)]); }
 	rmSync(root, { recursive: true, force: true });

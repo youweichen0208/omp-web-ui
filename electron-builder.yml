@@ -1,14 +1,14 @@
-# pi-web-ui Electron 打包配置
+# pi-harness Electron 打包配置
 # 构建：npm run build:electron 或 npm run build:electron:mac / :win / :linux
 # 推送 v* 标签后由 release-desktop.yml 构建并发布到 GitHub Releases。
 
-appId: com.youweichen.pi-web-ui
+appId: com.youweichen.pi-harness
 productName: pi
 copyright: Copyright © 2026 youweichen
 
 # electron-builder 26.x 起，没有显式配置时 executableName 会从 package.json 的
 # "name" 字段推导（不是 productName），而我们的 "name" 是带 scope 的 npm 包名
-# "@youweichen/pi-web-ui" —— 25.x 之前没这个问题，是这次升级到 26.15.3 才炸出来的。
+# "@youweichen/pi-harness" —— 25.x 之前没这个问题，是这次升级到 26.15.3 才炸出来的。
 # 显式指定成 productName 同一个值，避免再从 package.json 的 name 推导。
 executableName: pi
 

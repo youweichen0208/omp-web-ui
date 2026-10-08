@@ -1,15 +1,15 @@
 /**
- * pi-web-ui 的 pi 扩展 —— 提供命令行集成。
+ * pi-harness 的 pi 扩展 —— 提供命令行集成。
  *
  * 能力：
- *   /webui                      启动本机 pi-web-ui 服务器，打开浏览器访问
+ *   /webui                      启动本机 pi-harness 服务器，打开浏览器访问
  *   /webui --port 9000          指定端口启动
  *   /webui --no-browser         启动但不开浏览器
  *   /webui stop                 停止已启动的服务器
  *   /webui status               查看运行状态 / URL
  *
  * 实现说明：
- *   - 不依赖全局 bin（pi install 后 pi-web-ui 命令不一定在 PATH），直接用
+ *   - 不依赖全局 bin（pi install 后 pi-harness 命令不一定在 PATH），直接用
  *     node 调包内 dist/server/index.js，通过环境变量 PORT / PI_WEB_CWD /
  *     PI_WEB_DATA_DIR 控制。
  *   - 工作目录默认用当前 pi 会话的 ctx.cwd；可用 --cwd / path 覆盖。
@@ -99,7 +99,7 @@ async function openBrowser(url: string): Promise<void> {
 
 export default function (pi: ExtensionAPI): void {
 	pi.registerCommand("webui", {
-		description: "启动本机 pi-web-ui Web 界面（/webui [--port N] [--cwd PATH] [--no-browser] | stop | status）",
+		description: "启动本机 pi-harness Web 界面（/webui [--port N] [--cwd PATH] [--no-browser] | stop | status）",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
 			const sid = ctx.sessionManager.getSessionId();
 			const opts = parseArgs(args);
@@ -109,12 +109,12 @@ export default function (pi: ExtensionAPI): void {
 			if (action === "stop" || action === "kill") {
 				const inst = running.get(sid);
 				if (!inst) {
-					ctx.ui.notify("没有正在运行的本机 pi-web-ui 服务器", "info");
+					ctx.ui.notify("没有正在运行的本机 pi-harness 服务器", "info");
 					return;
 				}
 				inst.proc.kill("SIGTERM");
 				running.delete(sid);
-				ctx.ui.notify(`已停止 pi-web-ui (${inst.url})`, "info");
+				ctx.ui.notify(`已停止 pi-harness (${inst.url})`, "info");
 				return;
 			}
 
@@ -122,12 +122,12 @@ export default function (pi: ExtensionAPI): void {
 			if (action === "status") {
 				const inst = running.get(sid);
 				if (!inst) {
-					ctx.ui.notify("本机 pi-web-ui 未运行", "info");
+					ctx.ui.notify("本机 pi-harness 未运行", "info");
 					return;
 				}
 				const alive = inst.proc.exitCode === null;
 				ctx.ui.notify(
-					alive ? `pi-web-ui 运行中 → ${inst.url}\n端口 ${inst.port} · cwd ${inst.cwd}` : `已退出(exit=${inst.proc.exitCode})`,
+					alive ? `pi-harness 运行中 → ${inst.url}\n端口 ${inst.port} · cwd ${inst.cwd}` : `已退出(exit=${inst.proc.exitCode})`,
 					alive ? "info" : "warning",
 				);
 				return;
@@ -142,14 +142,14 @@ export default function (pi: ExtensionAPI): void {
 			// 已运行则提示
 			const existing = running.get(sid);
 			if (existing && existing.proc.exitCode === null) {
-				ctx.ui.notify(`pi-web-ui 已在运行 → ${existing.url}`, "info");
+				ctx.ui.notify(`pi-harness 已在运行 → ${existing.url}`, "info");
 				return;
 			}
 
 			// 检查是否已构建
 			if (!existsSync(SERVER_ENTRY)) {
 				ctx.ui.notify(
-					"缺少 dist/ 产物（当前安装未包含已构建前端）。请运行 `npm run build` 后重试，或用 pi-web-ui 官方 npm 包。",
+					"缺少 dist/ 产物（当前安装未包含已构建前端）。请运行 `npm run build` 后重试，或用 pi-harness 官方 npm 包。",
 					"warning",
 				);
 				return;
@@ -169,7 +169,7 @@ export default function (pi: ExtensionAPI): void {
 			proc.unref();
 			running.set(sid, { proc, port, cwd, url });
 
-			ctx.ui.notify(`pi-web-ui 启动中 → ${url}\n端口 ${port} · cwd ${cwd}\n(几秒后可用，/webui status 查看)`);
+			ctx.ui.notify(`pi-harness 启动中 → ${url}\n端口 ${port} · cwd ${cwd}\n(几秒后可用，/webui status 查看)`);
 
 			if (!opts.noBrowser) await openBrowser(url);
 

@@ -204,7 +204,7 @@ export function TopBar({
 					<FiMenu />
 				</button>
 				<img className="brand-logo" src="/icon/1a-mark.svg" alt="" />
-				<span className="brand-name">pi-web-ui</span>
+				<span className="brand-name">pi-harness</span>
 				{desktopAPI && (
 					<span className="desktop-window-title" title={chat.state?.cwd ?? ""}>
 						pi-harness <span className="desktop-title-separator">/</span> {projectName || t("desktopWorkspace")}

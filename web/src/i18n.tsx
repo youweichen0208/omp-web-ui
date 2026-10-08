@@ -10,7 +10,7 @@ import {
 
 export type Locale = "zh" | "en";
 
-const STORAGE_KEY = "pi-web-ui:lang";
+const STORAGE_KEY = "pi-harness:lang";
 
 /* ------------------------------------------------------------------ */
 /* zh (default)                                                        */
@@ -879,10 +879,10 @@ const zh = {
 	componentManual: "请按安装来源手动维护",
 	componentUnknown: "无法确定已安装版本",
 	componentCheckFailed: "检查失败，可重试",
-	componentApp: "pi-web-ui 应用",
+	componentApp: "pi-harness 应用",
 	componentDesktopUnsupported: "开发运行不支持自动安装，请使用已安装的桌面版。",
 	componentAppHint: "检查并下载新版本，完成后可重启安装。",
-	componentWebUpdateHint: "在终端更新全局 npm 包；完成后运行 pi-web-ui server restart 重启服务。",
+	componentWebUpdateHint: "在终端更新全局 npm 包；完成后运行 pi-harness server restart 重启服务。",
 	componentDownloading: "正在下载：{n}%",
 	componentRestartInstall: "重启并安装",
 	componentAutoUpdate: "自动更新",
@@ -1087,7 +1087,7 @@ const zh = {
 
 	/* self-update */
 	update: "更新",
-	updateTip: "检查并更新 pi-web-ui",
+	updateTip: "检查并更新 pi-harness",
 	currentVersion: "当前版本",
 	latestVersion: "最新版本",
 	checkingUpdate: "检查中…",
@@ -1097,9 +1097,9 @@ const zh = {
 	updateJustPublished:
 		"v{version} 刚刚发布，npm 缓存可能尚未同步——若未检测到新版本，请稍后重新检查",
 	updateNow: "在终端中更新",
-	updateTabTitle: "更新 pi-web-ui",
+	updateTabTitle: "更新 pi-harness",
 	updateTerminalHint:
-		"点击后会在可见终端中运行 npm i -g @youweichen/pi-web-ui@latest；完成后重启服务生效（pi-web-ui server restart）。",
+		"点击后会在可见终端中运行 npm i -g @youweichen/pi-harness@latest；完成后重启服务生效（pi-harness server restart）。",
 
 	/* right panel */
 	rootDir: "根目录",
@@ -1257,7 +1257,7 @@ const zh = {
 	/* pi setup modal */
 	setupTitle: "未检测到 pi agent 配置",
 	setupDesc:
-		"pi-web-ui 需要 pi 的配置目录（~/.pi/agent）和至少一个 API 密钥才能运行智能体。pi 内置了 openai、anthropic、deepseek 等服务商——选一个填密钥即可，全程无需打开终端。",
+		"pi-harness 需要 pi 的配置目录（~/.pi/agent）和至少一个 API 密钥才能运行智能体。pi 内置了 openai、anthropic、deepseek 等服务商——选一个填密钥即可，全程无需打开终端。",
 	installFailed: "✖ pi agent 安装失败：",
 	retryInstall: "重试安装",
 	skip: "跳过",
@@ -1600,7 +1600,7 @@ const zh = {
 	pluginUpdateHint:
 		"从安装来源重新拉取并覆盖安装（保留 config.json 配置），完成后自动重载插件列表",
 	pluginUninstallHint:
-		"在可见终端执行 pi-web-ui uninstall 卸载此插件（再次点击确认），完成后自动刷新列表",
+		"在可见终端执行 pi-harness uninstall 卸载此插件（再次点击确认），完成后自动刷新列表",
 	settingsExtensions: "Extensions",
 	settingsUiPlugins: "界面插件",
 	noUiPlugins: "未安装界面组件（<dataDir>/plugins/）",
@@ -1622,7 +1622,7 @@ const zh = {
 
 	/* app */
 	loadingSession: "正在加载会话…",
-	connectingServer: "正在连接 pi-web-ui 服务器…",
+	connectingServer: "正在连接 pi-harness 服务器…",
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -2493,10 +2493,10 @@ const en: Record<keyof typeof zh, string> = {
 	componentManual: "Maintain manually at the installation source",
 	componentUnknown: "Installed version unknown",
 	componentCheckFailed: "Check failed; retry available",
-	componentApp: "pi-web-ui application",
+	componentApp: "pi-harness application",
 	componentDesktopUnsupported: "Automatic installation is available in the installed desktop app, not development mode.",
 	componentAppHint: "Check and download a new version, then restart to install.",
-	componentWebUpdateHint: "Update the global npm package in the terminal, then run pi-web-ui server restart.",
+	componentWebUpdateHint: "Update the global npm package in the terminal, then run pi-harness server restart.",
 	componentDownloading: "Downloading: {n}%",
 	componentRestartInstall: "Restart and install",
 	componentAutoUpdate: "Update automatically",
@@ -2702,7 +2702,7 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* self-update */
 	update: "Update",
-	updateTip: "Check & update pi-web-ui",
+	updateTip: "Check & update pi-harness",
 	currentVersion: "Current version",
 	latestVersion: "Latest version",
 	checkingUpdate: "Checking…",
@@ -2712,9 +2712,9 @@ const en: Record<keyof typeof zh, string> = {
 	updateJustPublished:
 		"v{version} was just published — npm cache may lag; if the new version isn't detected yet, re-check in a moment",
 	updateNow: "Update in terminal",
-	updateTabTitle: "Update pi-web-ui",
+	updateTabTitle: "Update pi-harness",
 	updateTerminalHint:
-		"Clicking runs npm i -g @youweichen/pi-web-ui@latest in a visible terminal; restart the service afterwards to take effect (pi-web-ui server restart).",
+		"Clicking runs npm i -g @youweichen/pi-harness@latest in a visible terminal; restart the service afterwards to take effect (pi-harness server restart).",
 
 	/* right panel */
 	rootDir: "Root",
@@ -2874,7 +2874,7 @@ const en: Record<keyof typeof zh, string> = {
 	/* pi setup modal */
 	setupTitle: "pi agent config not detected",
 	setupDesc:
-		"pi-web-ui needs pi's config directory (~/.pi/agent) and at least one API key to run the agent. pi has built-in providers such as openai, anthropic, and deepseek — just pick one and enter a key, no terminal needed.",
+		"pi-harness needs pi's config directory (~/.pi/agent) and at least one API key to run the agent. pi has built-in providers such as openai, anthropic, and deepseek — just pick one and enter a key, no terminal needed.",
 	installFailed: "✖ pi agent installation failed:",
 	retryInstall: "Retry install",
 	skip: "Skip",
@@ -3225,7 +3225,7 @@ const en: Record<keyof typeof zh, string> = {
 	pluginUpdateHint:
 		"Re-installs from the recorded source (--force, keeps config.json), then refreshes the plugin list automatically",
 	pluginUninstallHint:
-		"Runs pi-web-ui uninstall in a visible terminal (click again to confirm), then refreshes the list automatically",
+		"Runs pi-harness uninstall in a visible terminal (click again to confirm), then refreshes the list automatically",
 	settingsExtensions: "Extensions",
 	settingsUiPlugins: "UI plugins",
 	noUiPlugins: "No UI plugins installed (<dataDir>/plugins/)",
@@ -3247,7 +3247,7 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* app */
 	loadingSession: "Loading session…",
-	connectingServer: "Connecting to pi-web-ui server…",
+	connectingServer: "Connecting to pi-harness server…",
 };
 
 /* ------------------------------------------------------------------ */

@@ -1,4 +1,4 @@
-# pi-web-ui Electron 桌面版发布 CI
+# pi-harness Electron 桌面版发布 CI
 # 在 tag（v*）推送时触发：三平台各自构建安装包并上传到 GitHub Releases
 # （electron-builder.yml 里的 publish: provider: github 配置生效）。
 # 也支持手动触发（workflow_dispatch），比如某个平台构建失败要单独重跑。

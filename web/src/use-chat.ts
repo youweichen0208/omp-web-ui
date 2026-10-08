@@ -49,7 +49,7 @@ export interface Notice {
 
 export type ReloadStatus = Extract<ServerMessage, { type: "reload_status" }>;
 
-const RELOAD_EVENTS_KEY = "pi-web-ui:reload-events";
+const RELOAD_EVENTS_KEY = "pi-harness:reload-events";
 function restoreReloadEvents(): ReloadStatus[] {
 	try {
 		const events: unknown = JSON.parse(sessionStorage.getItem(RELOAD_EVENTS_KEY) ?? "[]");

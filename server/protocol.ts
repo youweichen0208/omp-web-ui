@@ -1,5 +1,5 @@
 /**
- * Wire protocol between the browser client and the pi-web-ui server.
+ * Wire protocol between the browser client and the pi-harness server.
  * Pure JSON over WebSocket. The web frontend mirrors these types in
  * web/src/types.ts (kept in sync by hand — types only, no shared runtime code).
  */
@@ -530,7 +530,7 @@ export type ClientMessage =
 	| { type: "set_run_settings"; conversationId: string; autoCompaction?: boolean; autoRetry?: boolean }
 	| { type: "dialog_response"; conversationId: string; id: string; value: string | boolean | null }
 	// -- self-update ----------------------------------------------------------
-	/** Check the npm registry for a newer pi-web-ui version. */
+	/** Check the npm registry for a newer pi-harness version. */
 	| { type: "check_update" }
 	| { type: "check_component_updates"; requestId: string }
 	| { type: "update_component"; requestId: string; id: string }
@@ -605,7 +605,7 @@ export type ClientMessage =
 	| { type: "plugin_message"; pluginId: string; payload: unknown }
 	/** Re-scan the plugin directory: deactivate removed entries, activate new
 	 *  ones, bump the epoch and re-push the catalog. Same spirit as
-	 *  extensions_reload but for pi-web-ui's own UI plugins. */
+	 *  extensions_reload but for pi-harness's own UI plugins. */
 	| { type: "plugins_reload" }
 
 	/** Save a UI plugin's declarative settings (manifest "settings" schema).
@@ -834,7 +834,7 @@ export interface UiProviderConfig {
 // Plugins (optional UI components dropped into <dataDir>/plugins/<id>/)
 // ---------------------------------------------------------------------------
 
-/** One installed pi-web-ui plugin (see server/plugins.ts). A plugin is a
+/** One installed pi-harness plugin (see server/plugins.ts). A plugin is a
  *  directory under <dataDir>/plugins/<id>/ with a manifest.json and optional
  *  server entry (index.mjs) + client view bundle (client/entry.mjs). Not
  *  bundled with the app — users install by dropping the directory in and
@@ -883,7 +883,7 @@ export interface UiPluginInfo {
 	settingsSchema?: UiPluginSettingField[];
 	/** Current stored values (storage.json "settings" key, defaults applied). */
 	settingsValues?: Record<string, unknown>;
-	/** Install source recorded by `pi-web-ui install` (<dir>/.pi-source.json):
+	/** Install source recorded by `pi-harness install` (<dir>/.pi-source.json):
 	 *  the original spec the user typed (owner/repo, URL or local path). The
 	 *  settings panel offers an Update button only when this exists. */
 	source?: string;
@@ -1001,7 +1001,7 @@ export type ServerMessage =
 	| {
 			type: "ready";
 			clientId: string;
-			/** Running pi-web-ui package version, independent of the pi SDK version. */
+			/** Running pi-harness package version, independent of the pi SDK version. */
 			serverVersion: string;
 			/** Wire-protocol version (server/protocol-version.ts). The client
 			 *  compares it against its own copy — a mismatch means the page was

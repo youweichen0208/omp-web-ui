@@ -32,7 +32,7 @@ export function updateTargets(session: AgentSession, manager: DefaultPackageMana
 		const parsed = npmSource.exec(pkg.source);
 		const metadata = pkg.installedPath ? packageInfo(pkg.installedPath) : {};
 		const git = /^(?:git:|https?:\/\/|git@|ssh:\/\/)/.test(pkg.source);
-		targets.push({ id: `${pkg.scope}:${pkg.source}`, name: parsed?.[1] ?? metadata.name ?? pkg.source, source: pkg.source, scope: pkg.scope, directory: pkg.installedPath, kind: parsed && ["@youweichen/pi-web-ui", "pi-web-ui"].includes(parsed[1]) ? "bundled" : parsed ? "npm" : git ? "git" : "local", packageName: parsed?.[1], current: metadata.version ?? null, ambiguous: packages.filter((other) => parsed ? npmSource.exec(other.source)?.[1] === parsed[1] : other.source === pkg.source).length > 1, pinned: parsed ? !!parsed[2] : git && pkg.source.includes("#") });
+		targets.push({ id: `${pkg.scope}:${pkg.source}`, name: parsed?.[1] ?? metadata.name ?? pkg.source, source: pkg.source, scope: pkg.scope, directory: pkg.installedPath, kind: parsed && ["@youweichen/pi-harness", "pi-harness"].includes(parsed[1]) ? "bundled" : parsed ? "npm" : git ? "git" : "local", packageName: parsed?.[1], current: metadata.version ?? null, ambiguous: packages.filter((other) => parsed ? npmSource.exec(other.source)?.[1] === parsed[1] : other.source === pkg.source).length > 1, pinned: parsed ? !!parsed[2] : git && pkg.source.includes("#") });
 	}
 	const roots = packages.flatMap((pkg) => pkg.installedPath ? [pkg.installedPath.replaceAll("\\", "/").replace(/\/$/, "") + "/"] : []);
 	for (const extension of session.resourceLoader.getExtensions().extensions) {

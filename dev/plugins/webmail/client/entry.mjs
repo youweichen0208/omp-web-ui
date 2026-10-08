@@ -350,10 +350,10 @@ export default {
 			if (e.target.closest(".btn-update")) {
 				// 复用主应用的可见终端执行更新（与 SCM 提交/拉取同一条链路）
 				window.dispatchEvent(
-					new CustomEvent("pi-web-ui:plugin-run-command", {
+					new CustomEvent("pi-harness:plugin-run-command", {
 						detail: {
 							title: "webmail 更新",
-							command: "pi-web-ui install youweichen0208/pi-harness/tree/develop/dev/plugins/webmail --force",
+							command: "pi-harness install youweichen0208/pi-harness/tree/develop/dev/plugins/webmail --force",
 						},
 					}),
 				);

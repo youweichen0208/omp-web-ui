@@ -1183,7 +1183,7 @@ export class ClientSession {
 			sessionFile: this.session.sessionFile,
 			conversationId: this.activeId,
 			cwdEvents: this.session.sessionManager.getBranch()
-				.filter((entry) => entry.type === "custom" && entry.customType === "pi-web-ui:cwd-switch" && typeof (entry.data as { cwd?: unknown } | undefined)?.cwd === "string")
+				.filter((entry) => entry.type === "custom" && entry.customType === "pi-harness:cwd-switch" && typeof (entry.data as { cwd?: unknown } | undefined)?.cwd === "string")
 				.slice(-40)
 				.map((entry) => ({ cwd: (entry as { data: { cwd: string } }).data.cwd, timestamp: Date.parse(entry.timestamp) })),
 			rev,
@@ -1356,14 +1356,14 @@ export class ClientSession {
 		return this.piConfig.isConfigured();
 	}
 
-	/** Set by index.ts: called when /pi-web-ui:quit is invoked. */
+	/** Set by index.ts: called when /pi-harness:quit is invoked. */
 	onQuit: (() => boolean) | undefined = undefined;
 	/** 本客户端成功切换工作区（set_cwd）后触发，参数为新绝对路径。
 	 *  attach 时由 AgentService 接到全局 onClientCwdChanged —— 编辑器等
 	 *  工作区跟随型插件借此把根目录切到用户当前项目。 */
 	onCwdChanged: ((abs: string) => void) | undefined = undefined;
 
-	/** Ask the npm registry for the latest pi-web-ui version and report it. */
+	/** Ask the npm registry for the latest pi-harness version and report it. */
 	async checkUpdate(): Promise<void> {
 		return checkUpdate((msg) => this.emit(msg));
 	}
@@ -1561,7 +1561,7 @@ export class ClientSession {
 		this.emit({
 			type: "notice",
 			level: "error",
-			text: "服务器正在排空存量工作（quiesce），已拒绝新的对话/消息/编辑。存量运行会继续跑完；用 pi-web-ui server unquiesce 可恢复。",
+			text: "服务器正在排空存量工作（quiesce），已拒绝新的对话/消息/编辑。存量运行会继续跑完；用 pi-harness server unquiesce 可恢复。",
 		});
 		this.flushSnapshot();
 		return true;
@@ -2715,7 +2715,7 @@ export class ClientSession {
 			this.files.unwatchGit();
 			this.files.unwatchDir();
 			if (source !== "ui") {
-				try { this.session.sessionManager.appendCustomEntry("pi-web-ui:cwd-switch", { cwd: abs }); }
+				try { this.session.sessionManager.appendCustomEntry("pi-harness:cwd-switch", { cwd: abs }); }
 				catch { /* A transcript write failure must not turn a completed switch into an error. */ }
 			}
 			const preparedAt = Date.now();
@@ -2914,7 +2914,7 @@ export class AgentService {
 	/** Quiesce (draining) state — the service refuses NEW work (prompts, forks,
 	 *  session resumes, new clients) so a deploy/upgrade/backup can stop cleanly
 	 *  once existing runs finish. Controlled via the local control socket:
-	 *  `pi-web-ui server quiesce|unquiesce`. */
+	 *  `pi-harness server quiesce|unquiesce`. */
 	private quiesced = false;
 	private quiescedAt = 0;
 	/** Attached browser sockets (reported by index.ts on open/close) — the
@@ -2923,7 +2923,7 @@ export class AgentService {
 	private pending = new Map<string, Promise<ClientSession>>();
 	private stateStore: ClientStateStore;
 	private thinkingDurationStore: ThinkingDurationStore;
-	/** Set by index.ts: called when /pi-web-ui:quit is invoked. */
+	/** Set by index.ts: called when /pi-harness:quit is invoked. */
 	onQuit: (() => boolean) | undefined = undefined;
 	/** 任意客户端成功切换工作区后触发（新绝对路径）。index.ts 接到
 	 *  PluginManager.notifyCwd，让插件宿主的 host.cwd 实时跟随当前项目。 */

@@ -1,6 +1,6 @@
 # 内置 SSH 节点工作台使用手册
 
-适用范围：pi-web-ui 安装在 macOS 或 Windows 客户端，本机服务经 SSH 连接 Linux/macOS 节点。节点上的账号或容器提供实际的权限边界。工作台内置于顶栏「SSH 节点」，无须安装 Remote-SSH 插件。
+适用范围：pi-harness 安装在 macOS 或 Windows 客户端，本机服务经 SSH 连接 Linux/macOS 节点。节点上的账号或容器提供实际的权限边界。工作台内置于顶栏「SSH 节点」，无须安装 Remote-SSH 插件。
 
 ## 准备节点
 
@@ -19,7 +19,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_pi_nodes
 ssh-copy-id -i ~/.ssh/id_ed25519_pi_nodes.pub user@your-host
 ```
 
-`ssh-copy-id` 并非每台 Windows 客户端都有；可用管理员提供的方法安装公钥。工作台里的“私钥路径”填写**客户端本机**私钥的路径，如 macOS 的 `/Users/you/.ssh/id_ed25519_pi_nodes`，或 Windows 的 `C:\Users\you\.ssh\id_ed25519_pi_nodes`。选择 SSH agent 认证时，先确保运行 pi-web-ui 的用户进程能访问已加载密钥的 agent。
+`ssh-copy-id` 并非每台 Windows 客户端都有；可用管理员提供的方法安装公钥。工作台里的“私钥路径”填写**客户端本机**私钥的路径，如 macOS 的 `/Users/you/.ssh/id_ed25519_pi_nodes`，或 Windows 的 `C:\Users\you\.ssh\id_ed25519_pi_nodes`。选择 SSH agent 认证时，先确保运行 pi-harness 的用户进程能访问已加载密钥的 agent。
 
 ## 新增并连接
 
@@ -50,7 +50,7 @@ ssh-copy-id -i ~/.ssh/id_ed25519_pi_nodes.pub user@your-host
 | 现象 | 检查项 |
 | --- | --- |
 | 连接超时或拒绝 | 远端 SSH 服务、地址、端口、网络与防火墙；先用系统 `ssh` 命令排查。 |
-| 认证失败 | 用户名、密码、私钥路径、口令或 SSH agent 是否属于运行 pi-web-ui 的用户。 |
+| 认证失败 | 用户名、密码、私钥路径、口令或 SSH agent 是否属于运行 pi-harness 的用户。 |
 | 主机密钥变化 | 停止连接，独立核实远端是否换钥；不要仅凭弹窗清除信任。 |
 | Agent 提示无法确认 shell | 终端可能仍在 vim、交互程序或卡住的前台任务中；手动恢复 shell 提示符后重试。 |
 | 文件无法保存 | 检查远端账号对该路径的权限，以及 512 KiB 限制。 |

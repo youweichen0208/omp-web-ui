@@ -1,9 +1,9 @@
 # One-command deploy: `docker compose up -d`
 # Auto-restarts on boot when the Docker daemon starts (restart: unless-stopped).
 services:
-  pi-web-ui:
+  pi-harness:
     build: .
-    image: pi-web-ui:latest
+    image: pi-harness:latest
     ports:
       - "8787:8787"
     environment:

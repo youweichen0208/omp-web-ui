@@ -44,7 +44,7 @@ try {
 				route.send(JSON.stringify(message));
 			});
 		});
-		await page.addInitScript(language => { localStorage.setItem('pi-web-ui:lang', language); localStorage.setItem('pi-left-collapsed', 'true'); }, language);
+		await page.addInitScript(language => { localStorage.setItem('pi-harness:lang', language); localStorage.setItem('pi-left-collapsed', 'true'); }, language);
 		await page.goto(`http://127.0.0.1:${port}`);
 		await page.locator('.codemode-body').waitFor();
 		await page.locator('.chip-routed-model:visible').first().waitFor();

@@ -1,4 +1,4 @@
-# AGENTS.md — pi-web-ui 项目指南
+# AGENTS.md — pi-harness 项目指南
 
 > 本文件是给 AI 编码助手（pi / Claude Code / Cursor 等）看的高层项目说明书。
 > 详细文档按主题分拆在 `docs/` 目录下。
@@ -6,13 +6,13 @@
 
 ## 1. 项目是什么
 
-pi-web-ui 是 pi 编码智能体（`@earendil-works/pi-coding-agent` SDK）的 Web 聊天界面：
+pi-harness 是 pi 编码智能体（`@earendil-works/pi-coding-agent` SDK）的 Web 聊天界面：
 浏览器里对话、查看文件树、附加文件、内置终端（xterm.js + node-pty）、模型管理、
-声音提醒、中英文切换。一条命令可跑（`pi-web-ui`），可 Docker / systemd / launchd /
+声音提醒、中英文切换。一条命令可跑（`pi-harness`），可 Docker / systemd / launchd /
 Windows 计划任务部署。
 
 -   仓库（公开）：`git@github.com:youweichen0208/pi-harness.git`
--   npm 包：`@youweichen/pi-web-ui`（发布者 npm 账号 `youweichen`；当前项目独立维护）
+-   npm 包：`@youweichen/pi-harness`（发布者 npm 账号 `youweichen`；当前项目独立维护）
 -   Node 要求：**\>= 22.19.0**（pi SDK 的 dist 使用了 `import … with { type: "json" }` 语法）
 -   版本：`package.json` 与 `package-lock.json` 两处同步维护。
 
@@ -36,10 +36,10 @@ SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` �
 ## 3. 目录结构
 
 ```
-pi-web-ui/
+pi-harness/
 ├── server/                     # 后端（Node ESM，编译到 dist/server/）
 │   ├── index.ts                # 入口：express 静态 + /ws 端点、消息分发、心跳、优雅停机
-│   ├── app-version.ts          # 运行中 pi-web-ui 包版本（区别于 pi SDK VERSION）
+│   ├── app-version.ts          # 运行中 pi-harness 包版本（区别于 pi SDK VERSION）
 │   ├── protocol.ts             # ★ 唯一事实源：wire 协议类型（client↔server 消息）
 │   ├── agent-service.ts        # 核心：ClientSession（每客户端一个会话组，可并行多个对话）+ AgentService
 │   ├── serialize.ts            # SDK 消息 → UiMessage 序列化
@@ -94,7 +94,7 @@ pi-web-ui/
 │   │   ├── main.tsx            # 入口：initAuthToken
 │   │   └── components/         # 见下
 │   └── dist/                   # 构建产物（gitignore，但打进 npm 包）
-├── bin/pi-web-ui.mjs           # CLI：前台启动 / server install|uninstall|start|stop|restart|status
+├── bin/pi-harness.mjs          # CLI：前台启动 / server install|uninstall|start|stop|restart|status
 ├── deploy/                     # 部署示例：launchd plist / systemd unit / Windows 任务 XML
 ├── tests/                      # 全部测试脚本（自包含：独立端口 ≥8900 + 临时 data-dir）
 │   ├── run-smoke.mjs           # 零 token 协议冒烟聚合跑器
@@ -138,7 +138,7 @@ pi-web-ui/
 | `Dialog.tsx` | 扩展 `ui.select/confirm/input` → 浏览器弹窗 |
 | `ModelConfigModal.tsx` / `PiSetupModal.tsx` | models.json 管理 / 首次配置引导 |
 | `SystemPromptPanel.tsx` | 原生提示词分段、全文复制、SYSTEM/APPEND/上下文文件编辑；见 `docs/architecture-system-prompt.md` |
-| `SettingsModal.tsx` | 设置面板（原生提示词/技能/扩展/MCP/更新；更新页不显示 pi-web-ui 本身；默认打开原生提示词，各页使用设置 v2 带用途说明的分组列表，MCP 常用控件自动保存；见 docs/ui-design.md） |
+| `SettingsModal.tsx` | 设置面板（原生提示词/技能/扩展/MCP/更新；更新页不显示 pi-harness 本身；默认打开原生提示词，各页使用设置 v2 带用途说明的分组列表，MCP 常用控件自动保存；见 docs/ui-design.md） |
 | `BgTasksModal.tsx` | 后台任务弹窗：AI 启动的监听端口进程列表 |
 | `ModelThinking.tsx` | 模型 + 思考强度下拉（模型下拉顶部有搜索过滤框；输入工具栏思考档位为带说明的三级菜单） |
 | `GlobalSearchModal.tsx` | 全局搜索弹窗（Ctrl+K）：搜历史对话/最近项目/工作区文件名 |
@@ -213,7 +213,7 @@ git push origin develop
 npm publish --access public
 ```
 
-注意事项：版本号必须高于 npm registry；提交信息不要带 `Co-authored-by`；升级后需手动重启服务 `pi-web-ui server restart`；发布前检查示例文件不泄密。
+注意事项：版本号必须高于 npm registry；提交信息不要带 `Co-authored-by`；升级后需手动重启服务 `pi-harness server restart`；发布前检查示例文件不泄密。
 
 桌面版发布是独立的一条线（跟 npm 发布不绑在一起）：打一个 `v*` tag push 上去，`.github/workflows/release-desktop.yml` 先创建草稿，在 mac/win/linux 真机 runner 上构建、执行打包产物回归，再上传附件；三个平台全部成功且附件齐全后才公开。使用 GitHub 自带的 `GITHUB_TOKEN`，带 `-` 的 beta tag 标记 prerelease。mac 只有 ad-hoc 签名、未公证：macOS 14 及更早右键「打开」，macOS 15 及以后需在「系统设置 → 隐私与安全性」点「仍要打开」；Windows 未签名，SmartScreen 点「更多信息 → 仍要运行」。正式签名需要修改 `electron-builder.yml`，仅加 Secrets 不会生效。手动单平台重建只更新附件，不单独公开草稿。
 Windows job 的终端冒烟测试必须通过才能上传安装包；`AttachConsole failed` 清理竞态由 `server/patch-node-pty.ts` 处理，不能以 `continue-on-error` 跳过终端读写失败。
@@ -234,8 +234,8 @@ Windows job 的终端冒烟测试必须通过才能上传安装包；`AttachCons
 
 > 详细文档见 `docs/deployment.md`
 
-- **CLI 前台**：`pi-web-ui --port 9000 --cwd /path`
-- **开机自启**：`pi-web-ui server install`（macOS→launchd / Linux→systemd / Windows→计划任务）
+- **CLI 前台**：`pi-harness --port 9000 --cwd /path`
+- **开机自启**：`pi-harness server install`（macOS→launchd / Linux→systemd / Windows→计划任务）
 - **Docker**：`docker compose up -d`
 - **桌面版（Electron）**：`npm run build && npm run dev:electron` 本地跑；`npm run build:electron:mac/:win/:linux` 出安装包（`release/`，未发布，需真机构建）。改窗口顶栏、preload 接口或窄窗口布局时看 `docs/deployment.md` 的桌面窗口外壳说明。
 

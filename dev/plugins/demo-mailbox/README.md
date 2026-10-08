@@ -1,6 +1,6 @@
 # 📬 demo-mailbox —— 插件开发示例
 
-pi-web-ui 可选界面组件的**最小可运行示例**：演示「服务端入口 index.mjs +
+pi-harness 可选界面组件的**最小可运行示例**：演示「服务端入口 index.mjs +
 客户端视图 client/entry.mjs + 双向消息」的完整链路。兼作
 `tests/plugin-test.mjs` 的协议测试夹具。
 
@@ -24,15 +24,15 @@ demo-mailbox/
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/demo-mailbox
-pi-web-ui install dev/plugins/demo-mailbox   # 或本地目录
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/demo-mailbox
+pi-harness install dev/plugins/demo-mailbox   # 或本地目录
 
 # ── 查看 / 卸载 ──
-pi-web-ui plugins                            # 列出已装插件与 id
-pi-web-ui uninstall demo-mailbox             # 或 rm -rf ~/.pi-web/plugins/demo-mailbox
+pi-harness plugins                            # 列出已装插件与 id
+pi-harness uninstall demo-mailbox             # 或 rm -rf ~/.pi-web/plugins/demo-mailbox
 
 # ── 更新 ──
-pi-web-ui install ...同上... --force          # 覆盖重装
+pi-harness install ...同上... --force          # 覆盖重装
 cp -r dev/plugins/demo-mailbox ~/.pi-web/plugins/
 ```
 
@@ -47,4 +47,4 @@ cp -r dev/plugins/demo-mailbox ~/.pi-web/plugins/
   不共享 React 实例
 - 带请求语义的上行必须自带 `reqId`，响应靠它匹配并发；无 reqId 的响应会被
   客户端静默丢弃
-- 协议约定详见 pi-web-ui 主 README「插件」章节与 AGENTS.md
+- 协议约定详见 pi-harness 主 README「插件」章节与 AGENTS.md

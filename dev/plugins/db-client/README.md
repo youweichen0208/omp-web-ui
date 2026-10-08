@@ -1,6 +1,6 @@
 # db-client —— 数据库连接管理插件
 
-pi-web-ui 界面插件，类似 [vscode-database-client](https://github.com/cweijan/vscode-database-client)
+pi-harness 界面插件，类似 [vscode-database-client](https://github.com/cweijan/vscode-database-client)
 的网页版精简体验：连接管理 + 库表树浏览 + 表结构查看 + 数据分页浏览 + SQL 查询编辑器。
 
 ## 支持的数据库
@@ -21,15 +21,15 @@ pi-web-ui 界面插件，类似 [vscode-database-client](https://github.com/cwei
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client
-pi-web-ui install dev/plugins/db-client      # 或本地目录（开发态）
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client
+pi-harness install dev/plugins/db-client      # 或本地目录（开发态）
 # 可选：--data-dir <dir> 自定义数据目录（默认 ~/.pi-web）
 
 # ── 查看 ──
-pi-web-ui plugins                            # 列出已装插件与 id
+pi-harness plugins                            # 列出已装插件与 id
 
 # ── 更新 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client --force
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/db-client --force
                                              # --force 覆盖重装即更新
                                              # ⚠ 先备份插件目录里的 db-connections.json（连接凭据）
 
@@ -37,7 +37,7 @@ cp -r dev/plugins/db-client ~/.pi-web/plugins/  # 本地开发态：改完 src �
                                              # Windows: %USERPROFILE%\.pi-web\plugins\db-client
 
 # ── 卸载 ──
-pi-web-ui uninstall db-client                # 移除插件目录（db-connections.json 一并删除）
+pi-harness uninstall db-client                # 移除插件目录（db-connections.json 一并删除）
 # 手动方式：rm -rf ~/.pi-web/plugins/db-client
 ```
 

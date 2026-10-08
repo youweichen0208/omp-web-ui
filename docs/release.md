@@ -1,10 +1,10 @@
 # 发布流程
 
-> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
+> npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
 ## 1.0.0 首个正式版
 
-从 origin/develop 发布，功能与 0.99.14 一致，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、SSH `TCP_NODELAY`、生产依赖漏洞清零、标题改为 pi-harness、macOS 服务标识迁移，并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v40 不变。npm 上一版为 0.9.0，本次同时发布 npm；说明见 `.github/release-notes/v1.0.0.md`。
+从 origin/develop 发布，功能与 0.99.14 一致，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、SSH `TCP_NODELAY`、生产依赖漏洞清零、npm 包、命令、服务与应用标识统一改名为 pi-harness（不兼容旧包）、标题改为 pi-harness，并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v40 不变。旧包 `@youweichen/pi-web-ui` 停在 0.9.0，新包从 1.0.0 开始；说明见 `.github/release-notes/v1.0.0.md`。
 
 ## 0.99.14 Wiki 文档页 v2 与工具恢复状态
 
@@ -240,17 +240,17 @@ git push origin develop
 npm publish --access public
 
 # 6) 验证
-npm view @youweichen/pi-web-ui version        # 应显示新版本（registry 有缓存延迟属正常）
-curl -s https://registry.npmjs.org/@youweichen/pi-web-ui/latest | jq .version
+npm view @youweichen/pi-harness version        # 应显示新版本（registry 有缓存延迟属正常）
+curl -s https://registry.npmjs.org/@youweichen/pi-harness/latest | jq .version
 ```
 
 ## 注意事项
 
-- 版本号必须递增且尚未占用；发布前用 `npm view @youweichen/pi-web-ui dist-tags --json` 核对。`1.0.0` 起高于历史上所有版本（包括旧的 `0.51.x`），`npm publish` 会把 `latest` 指向新版本；此前 `latest` 停在 `0.9.0`，0.10–0.99.x 未发布到 npm。
+- 版本号必须递增且尚未占用；发布前用 `npm view @youweichen/pi-harness dist-tags --json` 核对。1.0.0 起包名为 `@youweichen/pi-harness`，第一次发布即为 1.0.0。旧包 `@youweichen/pi-web-ui` 停在 0.9.0，不删除（npm 只允许在 72 小时内或满足低下载量等条件时撤销，撤销后已安装用户也无法重装），改用 `npm deprecate @youweichen/pi-web-ui "已改名为 @youweichen/pi-harness：npm uninstall -g @youweichen/pi-web-ui && npm install -g @youweichen/pi-harness"` 让安装时显示迁移提示。
 - 提交信息不要带 `Co-authored-by`（P1 规则，仓库 hook 会拦）。
 - `.pi/commands.json` 是**每个项目各自**的个人命令（当前 cwd 的 `.pi/ 下），已被 gitignore，永远不会进公开仓库；切换 cwd 时命令列表自动刷新为该项目的命令。
 - 大改动发布前先问用户是否要 `npm publish`（会真实消耗账号权限、触发构建）。
-- **升级后的重启**：`npm i -g` 只更新磁盘文件，已运行进程内存里还是旧代码——前端是每次请求实时读盘的（会先变新），但 WS 消息处理是进程内旧逻辑，新旧混跑会表现为「界面是新的、某功能一直加载中」。界面内「立即更新」（顶栏更新下拉）现在是在可见终端 tab 中跑 `npm i -g @youweichen/pi-web-ui@latest`（复用 SCM/插件卸载同款 tab 模式），完成后需手动重启服务生效：`pi-web-ui server restart`（launchd/systemd 由服务管理器拉起；Docker 需 `docker compose restart`）。服务端保留 `PI_WEB_RESTART_CHILD` 端口等待握手（restart-handoff-test 回归），供外部编排的替换子进程使用。
+- **升级后的重启**：`npm i -g` 只更新磁盘文件，已运行进程内存里还是旧代码——前端是每次请求实时读盘的（会先变新），但 WS 消息处理是进程内旧逻辑，新旧混跑会表现为「界面是新的、某功能一直加载中」。界面内「立即更新」（顶栏更新下拉）现在是在可见终端 tab 中跑 `npm i -g @youweichen/pi-harness@latest`（复用 SCM/插件卸载同款 tab 模式），完成后需手动重启服务生效：`pi-harness server restart`（launchd/systemd 由服务管理器拉起；Docker 需 `docker compose restart`）。服务端保留 `PI_WEB_RESTART_CHILD` 端口等待握手（restart-handoff-test 回归），供外部编排的替换子进程使用。
 - **发布前检查示例文件不泄密**：`deploy/`、`README` 等随 npm 包（`files` 白名单含 `deploy/`）和 GitHub 分发的文件**绝不放真实 IP / 域名 / 密钥**——用占位符（如 `<LAN_IP>`、`<PUBLIC_IP>:<PUBLIC_PORT>`、`your-host`）。真实环境配置只在本地改，不进仓库。
 
 ## 历史 IP 泄露的清理方法

@@ -133,14 +133,14 @@ export function compareVersions(a: string, b: string): number {
 	return 0;
 }
 
-/** Ask the npm registry for the latest pi-web-ui version and report it. */
+/** Ask the npm registry for the latest pi-harness version and report it. */
 export async function checkUpdate(emit: Emit): Promise<void> {
 	const current = appVersion();
 	try {
 		// Fetch the full package doc (not /latest): it carries the per-version
 		// publish timestamps so the UI can hint when a version was JUST
 		// published and the registry/CDN caches may not have caught up yet.
-		const res = await fetch("https://registry.npmjs.org/@youweichen%2fpi-web-ui", {
+		const res = await fetch("https://registry.npmjs.org/@youweichen%2fpi-harness", {
 			signal: AbortSignal.timeout(8_000),
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);

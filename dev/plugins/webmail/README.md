@@ -1,6 +1,6 @@
-# 📬 webmail —— pi-web-ui 网页邮箱插件
+# 📬 webmail —— pi-harness 网页邮箱插件
 
-在 pi-web-ui 界面里提供一个完整的邮箱管理视图（顶栏 📬 标签页）：
+在 pi-harness 界面里提供一个完整的邮箱管理视图（顶栏 📬 标签页）：
 IMAP 收件 + SMTP 发信 + 新邮件通知，还可以把邮箱开放给 AI 直接管理。
 
 ## 功能
@@ -34,15 +34,15 @@ auth.json 同级安全模型）：
 
 ```bash
 # ── 安装 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/webmail
-pi-web-ui install dev/plugins/webmail        # 或本地目录（开发态）
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/webmail
+pi-harness install dev/plugins/webmail        # 或本地目录（开发态）
 # 可选：--data-dir <dir> 自定义数据目录（默认 ~/.pi-web）
 
 # ── 查看 ──
-pi-web-ui plugins                            # 列出已装插件与 id
+pi-harness plugins                            # 列出已装插件与 id
 
 # ── 更新 ──
-pi-web-ui install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/webmail --force
+pi-harness install https://github.com/youweichen0208/pi-harness/tree/develop/dev/plugins/webmail --force
                                              # --force 覆盖重装即更新
                                              # ⚠ 先备份插件目录里的 config.json（账号凭据）
 
@@ -50,7 +50,7 @@ cp -r dev/plugins/webmail ~/.pi-web/plugins/ # 本地开发态：直接拷贝覆
                                              # Windows: %USERPROFILE%\.pi-web\plugins\webmail
 
 # ── 卸载 ──
-pi-web-ui uninstall webmail                  # 移除插件目录（config.json 一并删除）
+pi-harness uninstall webmail                  # 移除插件目录（config.json 一并删除）
 # 手动方式：rm -rf ~/.pi-web/plugins/webmail
 ```
 

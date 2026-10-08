@@ -39,7 +39,7 @@ export async function extensionWork(input: WorkerRequest, progress: (message: st
 				let metadata: Record<string,any> = {}; if (path) try { metadata = readJson(join(path, "package.json")); } catch {}
 				const counts = blankResources();
 				for (const type of resourceTypes) counts[type] = resources[type].filter(r => r.metadata.source === source && r.metadata.scope === scope).map(r => relative(path ?? cwd, r.path));
-				result.push({ id: `${scope}:${source}`, source, scope, kind: info.kind, name: textField(metadata.name) ?? info.name, path, version: textField(metadata.version), description: textField(metadata.description), enabled: !packageDisabled(entry), pinned: info.pinned, trusted: scope === "user" || trusted, resources: counts, protected: ["@youweichen/pi-web-ui", "pi-web-ui", "@earendil-works/pi-coding-agent"].includes(info.name) });
+				result.push({ id: `${scope}:${source}`, source, scope, kind: info.kind, name: textField(metadata.name) ?? info.name, path, version: textField(metadata.version), description: textField(metadata.description), enabled: !packageDisabled(entry), pinned: info.pinned, trusted: scope === "user" || trusted, resources: counts, protected: ["@youweichen/pi-harness", "pi-harness", "@earendil-works/pi-coding-agent"].includes(info.name) });
 			}
 		}
 		for (const resource of resources.extensions) {
@@ -62,7 +62,7 @@ export async function extensionWork(input: WorkerRequest, progress: (message: st
 		const entries = packages(scope), index = entries.findIndex(p => sourceOf(p) === source);
 		if (op.action === "install") {
 			if (!input.source) throw Error("Install preview expired");
-			if (["@youweichen/pi-web-ui", "pi-web-ui", "@earendil-works/pi-coding-agent"].includes(sourceInfo(input.source).name)) throw Error("Manage this package with the application updater");
+			if (["@youweichen/pi-harness", "pi-harness", "@earendil-works/pi-coding-agent"].includes(sourceInfo(input.source).name)) throw Error("Manage this package with the application updater");
 			await manager.install(input.source, { local });
 			if (input.version !== settingsVersion(cwd,agentDir)) throw Error("Pi settings changed during install; files were installed but configuration was not overwritten");
 			manager.addSourceToSettings(input.source, { local });
