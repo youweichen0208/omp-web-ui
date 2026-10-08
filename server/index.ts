@@ -47,6 +47,7 @@ import { readSqlitePreview } from "./sqlite-preview.js";
 import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
+import { securityHeaders } from "./security-headers.js";
 import { needsTokenCookie, tokenCookie, tokenMatches } from "./token-auth.js";
 import { createOriginPolicy } from "./origin-policy.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
@@ -94,6 +95,7 @@ if (process.platform === "win32") {
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
+app.use(securityHeaders);
 
 /** 从请求中提取候选 token：头 / 查询参数 / cookie（浏览器导航场景靠 cookie 续命）。 */
 function requestTokens(req: { headers: IncomingMessage["headers"]; url?: string }): string[] {
