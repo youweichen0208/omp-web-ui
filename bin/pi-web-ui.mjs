@@ -14,7 +14,7 @@
  *   pi-web-ui plugins / uninstall <id>      列出 / 卸载界面插件
  *
  * 系统服务：
- *   - macOS   → launchd 用户代理，label 默认 com.xingshuyin.pi-web-ui
+ *   - macOS   → launchd 用户代理，label 默认 com.youweichen.pi-web-ui
  *              （--name 自定义时 com.<name>.server），无需 sudo
  *   - Linux   → systemd 单元 <name>.service（/etc/systemd/system/，自动 sudo）
  *   - Windows → 计划任务（Task Scheduler / schtasks，登录后自启，无需管理员），
@@ -50,6 +50,7 @@ import { homedir, tmpdir, userInfo } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
+import { LEGACY_LAUNCHD_LABEL, legacyLaunchdPlan, relabelPlist } from "./launchd-legacy.mjs";
 
 const BIN_DIR = dirname(fileURLToPath(import.meta.url));
 /** <pkg>/dist/server/index.js — the actual server entry. */
@@ -81,7 +82,7 @@ server 选项:
   --cwd <dir>       工作目录（默认 $PI_WEB_CWD 或当前目录）
   --data-dir <dir>  会话数据目录（默认 <cwd>/.pi-web）
   --name <name>     服务名（默认 pi-web-ui；macOS 的 launchd label
-                    为 com.xingshuyin.pi-web-ui，自定义名时为 com.<name>.server）
+                    为 com.youweichen.pi-web-ui，自定义名时为 com.<name>.server）
   --print           只打印将生成的配置文件，不实际安装
 
 平台: macOS → launchd 用户代理 · Linux → systemd · Windows → 计划任务（schtasks）
@@ -288,7 +289,7 @@ function uid() {
 function serviceLabel(name) {
 	if (isMac) {
 		return name === "pi-web-ui"
-			? "com.xingshuyin.pi-web-ui"
+			? "com.youweichen.pi-web-ui"
 			: `com.${name}.server`;
 	}
 	return name;
@@ -301,6 +302,25 @@ function launchAgentPlist(name) {
 		"LaunchAgents",
 		`${serviceLabel(name)}.plist`,
 	);
+}
+
+/** Remove (or, for commands that only operate on the service, migrate) the pre-1.0 agent. */
+function cleanupLegacyLaunchd(action, opts) {
+	if (!isMac || (opts.name ?? "pi-web-ui") !== "pi-web-ui") return;
+	const legacy = join(homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`);
+	const target = launchAgentPlist("pi-web-ui");
+	const plan = legacyLaunchdPlan({ legacyExists: existsSync(legacy), targetExists: existsSync(target), action });
+	if (plan === "none") return;
+	const content = plan === "migrate" ? relabelPlist(readFileSync(legacy, "utf8"), LEGACY_LAUNCHD_LABEL, serviceLabel("pi-web-ui")) : null;
+	run("launchctl", ["bootout", `gui/${uid()}/${LEGACY_LAUNCHD_LABEL}`], { ignoreError: true, silent: true });
+	if (content) {
+		writeFileSync(target, content);
+		run("launchctl", ["bootstrap", `gui/${uid()}`, target], { ignoreError: true });
+		console.log(`已将开机自启服务迁移为 ${serviceLabel("pi-web-ui")}（配置不变）`);
+	} else {
+		console.log(`已移除旧版开机自启服务 ${LEGACY_LAUNCHD_LABEL}`);
+	}
+	rmSync(legacy, { force: true });
 }
 
 function systemdUnitPath(name) {
@@ -1704,12 +1724,14 @@ async function serverCmd(argv) {
 	if (positionals.length === 0) {
 		console.log(HELP);
 		console.log("--- 当前服务状态 ---");
+		cleanupLegacyLaunchd("status", opts);
 		controlService("status", opts);
 		return;
 	}
 	const action = positionals[0];
 	if (positionals.length > 1)
 		fail(`多余的参数: ${positionals.slice(1).join(" ")}`);
+	if (["install", "uninstall", "start", "stop", "restart", "status", "shortcut"].includes(action) && !opts.print) cleanupLegacyLaunchd(action, opts);
 	switch (action) {
 		case "shortcut": {
 			if (isWin) {

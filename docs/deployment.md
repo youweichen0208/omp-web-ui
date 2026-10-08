@@ -28,6 +28,8 @@ pi-web-ui server status|restart|stop|uninstall
 # Docker：docker-compose.yml（端口映射 + 挂载数据目录）
 ```
 
+macOS 服务的 launchd 标识为 `com.youweichen.pi-web-ui`（`--name` 自定义时为 `com.<name>.server`）。1.0 之前的版本使用上游遗留的旧标识：执行 `server install`／`uninstall` 时直接卸载并删除旧服务；执行 `start`／`stop`／`restart`／`status`／`shortcut` 时把旧服务的配置迁到新标识后删除旧文件，开机自启不中断。旧标识只保留在 `bin/launchd-legacy.mjs` 中用于这次清理；回归见 `tests/launchd-legacy-test.mjs`。旧版创建的桌面 `.command` 启动器仍指向旧标识，重新运行 `server shortcut` 即可更新。
+
 > uninstall 会自动移除桌面图标；未装服务时桌面快捷方式启动的实例在 status/stop 中单独报告（PS1 前台+记录 PID）。
 
 ## Windows 下载选择
