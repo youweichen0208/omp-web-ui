@@ -98,6 +98,9 @@ try {
 	await page.getByRole('dialog').getByText('单个文件超过 2 MB', { exact: true }).waitFor();
 	await page.keyboard.press('Escape');
 	assert(await page.getByRole('button', { name: '展开提问框', exact: true }).isVisible());
+	assert.equal(await page.locator('.wiki-composer-pill').evaluate(el => getComputedStyle(el).borderRadius), '8px');
+	assert.equal(await page.locator('.wiki-pill-send').evaluate(el => getComputedStyle(el).borderRadius), '6px');
+	assert.equal(await page.locator('.wiki-pill-send').isDisabled(), true);
 	assert(!(await page.getByRole('textbox', { name: '问 pi', exact: true }).isVisible()));
 	await page.keyboard.press('/');
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('retain this draft');

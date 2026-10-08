@@ -1,3 +1,4 @@
+import type { ToolRecoveryActions } from "./ToolRecoveryCard";
 import { ConversationWorkingStatus } from "./WorkingStatus";
 import { groupBashMessages } from "../bash-groups";
 import { assistantPredecessors } from "../agent-activity";
@@ -80,6 +81,7 @@ function examples(
 }
 
 interface MessageListProps {
+	recovery?: ToolRecoveryActions;
 	active?: boolean;
 	connected?: boolean;
 	silenceNotified?: boolean;
@@ -134,7 +136,7 @@ function ReloadEvent({ event }: { event: ReloadStatus }) {
 	</div>;
 }
 
-export const MessageList = memo(function MessageList({ state, connected = true, silenceNotified = false, liveOutputs, toolStatuses, onEdit, onKillBash, onStop, thinkingWrap, toolsWrap, pendingEcho, reloadEvents = [] }: MessageListProps) {
+export const MessageList = memo(function MessageList({ recovery, state, connected = true, silenceNotified = false, liveOutputs, toolStatuses, onEdit, onKillBash, onStop, thinkingWrap, toolsWrap, pendingEcho, reloadEvents = [] }: MessageListProps) {
 	const t = useT();
 	const timeline = useMemo(() => {
 		const events = [
@@ -764,7 +766,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 							onMeasured={storeHeight}
 							lazyRef={attachEl}
 						>
-						<Message
+						<Message recovery={recovery}
 							key={m.id}
 							message={bashGroups.projected.get(m.id) ?? m}
 							toolMessageIds={bashGroups.sources}
@@ -792,7 +794,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 					);
 				})}
 				{state.streamingMessage && streamingHasContent && !bashGroups.owners.has(state.streamingMessage.id) && (
-					<Message
+					<Message recovery={recovery}
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}
 						continuation={!!predecessors.get(state.streamingMessage.id)}

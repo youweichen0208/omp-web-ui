@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.12 界面统一与工具异常手动恢复
+
+按第 19 版设计统一浅深色变量、等待状态与 Wiki 圆角；工具指令作为正文返回时支持手动重发原问题或换模型重发，保留附件与草稿，并在顶栏、右栏及当前计划步骤显示中断。同步设计规范与历史归档。SDK 保持 1.0.4、协议保持 v40。本次发布 GitHub 源码和三平台桌面 Release，不发布 npm。发布说明见 `.github/release-notes/v0.99.12.md`。
+
 ## 0.99.11 进度输出、等待状态与安全修复
 
 从 origin/develop 发布，右栏改为进度／输出双分区，输出限定成功创建或修改的文件；同步第 17 版等待指示器、孤立协议标签过滤与未执行工具指令提示。包含 WebSocket 异常消息容错、页面嵌入与 clientId 防护、子进程 token 隔离及 SSH 终端延迟修复。SDK 保持 1.0.4、协议保持 v40。本次仅发布 GitHub 源码和 macOS／Windows／Linux 桌面 Release，不发布 npm。发布说明见 `.github/release-notes/v0.99.11.md`。

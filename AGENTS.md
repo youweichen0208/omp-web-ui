@@ -195,6 +195,8 @@ npm run test:smoke   # 零 token 协议冒烟聚合跑器
 
 依赖安装前先运行 `npm run check:lockfile`，确保下载地址全部使用 HTTPS npm 官方源且与声明版本一致；安装验证流程见 `docs/development.md`。
 
+**界面规则**：修改界面前读取 `docs/ui-design.md`，以其为准；颜色和圆角只能用 CSS 变量，例外见该文档。
+
 **关键约定**：缩进用 Tab；i18n 走 `useT()`（zh/en 同时加）；样式全部在 `styles.css`；新增协议消息只改 `protocol.ts` 再两端 switch 加分支。
 
 **测试规范**：端口隔离（≥8900）；data-dir 隔离（`mkdtempSync`）；精确清理自己进程；不允许 `pkill -f` 杀全局。

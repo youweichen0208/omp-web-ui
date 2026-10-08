@@ -291,7 +291,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const composer = <div ref={composerRef} className={`wiki-composer-area ${composerOpen || chatOpen ? "expanded" : "compact"}`}>
 				{!chatOpen && !composerOpen && <div className="wiki-composer-pill">
 					<button className="wiki-expand-composer" onClick={expandComposer} aria-label={t("wikiExpandComposer")}><span className="wiki-pill-file">{path.split("/").at(-1) || t("wikiMode")}</span><span>{input.trim() || t("wikiCompactPlaceholder")}</span><kbd>/</kbd></button>
-					{streaming ? <button className="wiki-pill-send" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-pill-send" aria-label={t("wikiSend")} disabled><FiArrowUp /></button>}
+					{streaming ? <button className="wiki-pill-send stop" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-pill-send" aria-label={t("wikiSend")} disabled><FiArrowUp /></button>}
 				</div>}
 				<div className="wiki-composer" hidden={!composerOpen && !chatOpen}>
 					{(selection || refs.length > 0) && <div className="wiki-context-chips">{selection && <button className="wiki-quoted-selection" onClick={() => setSelection("")} title={t("wikiSelected")}><b>{t("wikiSelected")}</b><span>{selection}</span><FiX /></button>}{refs.map(ref => <button key={ref} onClick={() => setRefs(r => r.filter(p => p !== ref))}>@{ref}<FiX /></button>)}</div>}

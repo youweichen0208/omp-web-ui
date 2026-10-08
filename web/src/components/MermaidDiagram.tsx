@@ -9,27 +9,7 @@ function loadMermaid() {
 	if (!mermaidPromise) {
 		mermaidPromise = import("mermaid").then((mod) => {
 			const mermaid = mod.default;
-			mermaid.initialize({
-				startOnLoad: false,
-				securityLevel: "strict",
-				// Diagrams read best on a light "paper" background — mermaid's
-				// dark theme renders low-contrast boxes that clash with
-				// whatever surrounds them (see .mermaid-block in styles.css,
-				// which gives this its own light card instead of matching the
-				// app's dark chrome directly).
-				theme: "base",
-				themeVariables: {
-					background: "#ffffff",
-					primaryColor: "#f1edfe",
-					primaryTextColor: "#1f2430",
-					primaryBorderColor: "#8b5cf6",
-					lineColor: "#6b7280",
-					secondaryColor: "#eef2ff",
-					tertiaryColor: "#f8fafc",
-					textColor: "#1f2430",
-					fontFamily: "var(--mono, monospace)",
-				},
-			});
+
 			return mermaid;
 		});
 	}
@@ -37,6 +17,28 @@ function loadMermaid() {
 }
 
 let renderSeq = 0;
+let renderQueue: Promise<unknown> = Promise.resolve();
+function renderDiagram(id: string, code: string) {
+	const job = renderQueue.then(async () => {
+		const mermaid = await loadMermaid();
+		const styles = getComputedStyle(document.documentElement);
+		const canvas = document.createElement("canvas"); canvas.width = canvas.height = 1;
+		const context = canvas.getContext("2d")!;
+		const color = (token: string) => {
+			context.clearRect(0, 0, 1, 1); context.fillStyle = styles.getPropertyValue(token).trim(); context.fillRect(0, 0, 1, 1);
+			const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+			return `rgb(${r}, ${g}, ${b})`;
+		};
+		mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", themeVariables: {
+			background: color("--bg-elev"), primaryColor: color("--accent-soft"), primaryBorderColor: color("--accent"),
+			primaryTextColor: color("--text"), textColor: color("--text"), lineColor: color("--text-dim"),
+			secondaryColor: color("--bg-elev2"), tertiaryColor: color("--bg"), fontFamily: styles.getPropertyValue("--mono").trim(),
+		} });
+		return mermaid.render(id, code);
+	});
+	renderQueue = job.catch(() => {});
+	return job;
+}
 
 /** Renders a ```mermaid fenced block as an SVG diagram (flowcharts, sequence
  *  diagrams, etc. — see docs/AI_Investment_OS_SYSTEM_DESIGN.md for examples).
@@ -48,14 +50,19 @@ export function MermaidDiagram({ code }: { code: string }) {
 	const [svg, setSvg] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [appearance, setAppearance] = useState(document.documentElement.dataset.appearance);
+	useEffect(() => {
+		const observer = new MutationObserver(() => setAppearance(document.documentElement.dataset.appearance));
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-appearance"] });
+		return () => observer.disconnect();
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
 		setSvg(null);
 		setError(null);
 		const renderId = `mermaid-${reactId}-${++renderSeq}`;
-		loadMermaid()
-			.then((mermaid) => mermaid.render(renderId, code))
+		renderDiagram(renderId, code)
 			.then(({ svg }) => {
 				if (!cancelled) setSvg(svg);
 			})
@@ -71,7 +78,7 @@ export function MermaidDiagram({ code }: { code: string }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [code, reactId]);
+	}, [code, reactId, appearance]);
 
 	if (error) {
 		return (

@@ -37,6 +37,7 @@ const titles: Record<ProgressPhase["kind"], string> = {
 	read: "读取与确认", build: "实现主体", migration: "补 migrations", test: "运行测试", fix: "运行并修复", commit: "提交", other: "执行操作",
 };
 
+// Legacy transcript titles may still contain 正在分析请求; never render it as a live wait label.
 function phaseTitle(kind: ProgressPhase["kind"], step: TaskStep): string {
 	const title = plainTitle(step.title);
 	if (title && !/^(?:处理任务|执行操作|当前任务|正在分析请求|运行工具|读取文件|修改文件)$/.test(title) && kind !== "test" && kind !== "commit") return title.slice(0, 32);

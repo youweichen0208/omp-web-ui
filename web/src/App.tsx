@@ -1,3 +1,4 @@
+import { useToolRecovery } from "./use-tool-recovery";
 import { randomUuid } from "./uuid";
 import { SessionTreeWorkbench } from "./components/SessionTreeWorkbench";
 import { RecoveryStatus } from "./components/RecoveryStatus";
@@ -765,6 +766,7 @@ export function App() {
 	// the edited text there (stable callback — Message is memoized). Attachments
 	// carry the question's original images (branching drops their aside cards) plus
 	// any newly pasted/dropped ones — same pipeline as a normal prompt.
+	const toolRecovery = useToolRecovery(chat, send, () => pushNotice("error", t("toolRecoveryFailed")));
 	const onEditMessage = useCallback(
 		(messageId: string, text: string, attachments?: PromptAttachment[], options?: { entryId?: string; newSession?: boolean }) => {
 			send({ type: "edit_message", conversationId: chat.activeConversationId, messageId, text, attachments, ...options });
@@ -980,7 +982,7 @@ export function App() {
 					<div className={`view-pane ${previewFile ? "preview-open" : ""} ${view === "chat" ? "" : "hidden"}`}>
 						<main className="main">
 							{conversationState ? (
-								<WorkspacePathContext.Provider value={conversationState.cwd}><MessageList
+								<WorkspacePathContext.Provider value={conversationState.cwd}><MessageList recovery={{ ...toolRecovery, models: chat.models, onLoadModels: () => { if (!chat.models.length && !chat.modelsLoading) send({ type: "list_models" }); } }}
 									active={view === "chat"}
 									connected={chat.ready}
 									silenceNotified={chat.agentSilence?.conversationId === conversationState.conversationId && chat.agentSilence.phase === "silent"}

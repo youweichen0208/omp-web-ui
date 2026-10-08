@@ -1,3 +1,5 @@
+import { latestToolTextFailure } from "../tool-text";
+import { conversationWait } from "../waiting-indicator";
 import { useEffect, useRef, useState } from "react";
 import { FiChevronRight, FiFile } from "react-icons/fi";
 import type { ServerMessage, TaskProgress, UiMessage } from "../types";
@@ -9,6 +11,8 @@ type Silence = Extract<ServerMessage, { type: "agent_silence" }> | null;
 
 export function TaskProgressPanel({ task, silence, cwd, messages, onPreview }: { task?: TaskProgress | null; silence: Silence; cwd: string; messages: UiMessage[]; onPreview: (path: string, name: string) => void }) {
 	const t = useT();
+	const interrupted = !!latestToolTextFailure(messages, task?.status === "running");
+	const phase = conversationWait(messages, new Map());
 	const [progressOpen, setProgressOpen] = useState(true);
 	const [outputsOpen, setOutputsOpen] = useState(true);
 	const [expanded, setExpanded] = useState<string | null>(null);
@@ -30,18 +34,18 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview }: {
 	const files = taskOutputs(task, messages, cwd);
 	const planMessage = messages.find(message => message.role === "toolResult" && message.planSnapshot?.planId === task?.plan?.origin);
 	const planSource = planMessage && messages.find(message => message.role === "assistant" && message.content.some(block => block.type === "toolCall" && block.id === planMessage.toolCallId));
-	const status = task?.status === "failed" ? t("taskFailed") : task?.status === "cancelled" ? t("taskCancelled") : task?.plan?.awaitingConfirmation ? t("planPrevious") : task?.status === "waiting" ? t("taskPaused") : silence && task && silence.conversationId === task.conversationId ? t(silence?.activity === "tool" ? "taskLongTool" : "taskWaitingModel") : "";
-	return <div className={`task-progress task-sections ${task?.status ?? "empty"}`} tabIndex={-1} aria-label={t("taskProgress")}>
+	const status = interrupted ? t("toolRecoveryInterrupted") : task?.status === "failed" ? t("taskFailed") : task?.status === "cancelled" ? t("taskCancelled") : task?.plan?.awaitingConfirmation ? t("planPrevious") : task?.status === "waiting" ? t("taskPaused") : silence && task && silence.conversationId === task.conversationId ? t(phase?.label ?? "working") : "";
+	return <div className={`task-progress task-sections ${interrupted ? "interrupted" : task?.status ?? "empty"}`} tabIndex={-1} aria-label={t("taskProgress")}>
 		<div className="task-sections-scroll" ref={scrollRef}>
 			<section className="task-section">
 				<button type="button" className="task-section-heading" aria-expanded={progressOpen} onClick={() => setProgressOpen(value => !value)}><FiChevronRight className={progressOpen ? "open" : ""} />{t("taskProgressHeading")}</button>
 				{progressOpen && <div className="task-section-content">
-					{status && <p className={`task-progress-status task-progress-source ${task?.status}`} role="status">{status}</p>}
+					{status && <p className={`task-progress-status task-progress-source ${interrupted ? "interrupted" : task?.status}`} role="status">{status}</p>}
 					{task?.plan && items.length ? <>
 						{task.plan.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
-						<div className="task-plan-list">{items.map(item => <div key={item.id} className={`task-plan-step ${item.status}${expanded === item.id ? " expanded" : ""}`}>
+						<div className="task-plan-list">{items.map(item => <div key={item.id} className={`task-plan-step ${interrupted && item.status === "running" ? "interrupted" : item.status}${expanded === item.id ? " expanded" : ""}`}>
 							<button type="button" className="task-plan-step-head" aria-expanded={expanded === item.id} onClick={() => setExpanded(value => value === item.id ? null : item.id)}>
-								<span className="task-plan-mark" aria-hidden="true">{item.status === "done" ? "✓" : item.status === "running" ? "●" : ""}</span>
+								<span className="task-plan-mark" aria-hidden="true">{interrupted && item.status === "running" ? "×" : item.status === "done" ? "✓" : item.status === "running" ? "●" : ""}</span>
 								<span className="task-plan-step-title">{item.title}</span><FiChevronRight className={expanded === item.id ? "open" : ""} />
 							</button>
 							{expanded === item.id && <div className="task-plan-step-detail">

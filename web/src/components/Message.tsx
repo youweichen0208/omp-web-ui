@@ -1,3 +1,4 @@
+import { ToolRecoveryCard, type ToolRecoveryActions } from "./ToolRecoveryCard";
 import { isProcessNarration } from "../command-reading";
 import { navigateSibling } from "../tree-events";
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -112,6 +113,7 @@ function editAttLabel(att: PromptAttachment, t: Translate): string {
 }
 
 interface MessageProps {
+	recovery?: ToolRecoveryActions;
 	toolsRunning?: boolean;
 	toolMessageIds?: ReadonlyMap<string, string>;
 	planViews?: ReadonlyMap<string, PlanPresentation>;
@@ -158,6 +160,7 @@ interface MessageProps {
 }
 
 export const Message = memo(function Message({
+	recovery,
 	toolsRunning,
 	toolMessageIds,
 	planViews,
@@ -390,7 +393,7 @@ export const Message = memo(function Message({
 				elements.push(<GrepSummary key={`${message.id}-${first.id}`} block={first} view={viewFor(first)} wrap={toolsWrap} />);
 				continue;
 			}
-			elements.push(<Block key={`${message.id}-${i}`} block={block} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
+			elements.push(<Block key={`${message.id}-${i}`} block={block} modelName={message.model ?? ""} recovery={recovery?.messageId === message.id ? recovery : undefined} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
 		}
 		return elements;
 	};
@@ -757,6 +760,7 @@ function SkillCard({ block }: { block: SkillBlock }) {
 }
 
 function Block({
+	recovery, modelName,
 	block,
 	user,
 	toolResults,
@@ -769,6 +773,8 @@ function Block({
 	toolsWrap,
 }: {
 	block: UiContentBlock;
+	modelName?: string;
+	recovery?: ToolRecoveryActions;
 	user?: boolean;
 	toolResults: ReadonlyMap<string, UiMessage>;
 	liveOutputs: ReadonlyMap<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
@@ -804,11 +810,7 @@ function Block({
 					) : (
 						<Markdown text={user ? preserveUserTree(body) : body} fileLinks={user} />
 					))}
-				{failedCall && <div className="unexecuted-tool" role="status">
-					<strong>{t("unexecutedToolTitle", { tools: failedCall.tools.join(", ") })}</strong>
-					<p>{t("unexecutedToolHint")}</p>
-					<details><summary>{t("unexecutedToolOriginal")}</summary><pre>{failedCall.raw}</pre></details>
-				</div>}
+				{failedCall && <ToolRecoveryCard raw={failedCall.raw} model={modelName || t("unknown")} recovery={recovery} />}
 				{text.truncated && <div className="trunc-note">{t("truncated")}</div>}
 			</div>
 		);

@@ -1,3 +1,4 @@
+import { latestToolTextFailure } from "../tool-text";
 import { openSessionTree } from "../tree-events";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
@@ -101,6 +102,7 @@ export function TopBar({
 	useEffect(() => desktopAPI?.onWindowState(setWindowState), []);
 	const projectName = chat.state?.cwd?.split(/[\\/]/).filter(Boolean).at(-1);
 	const notGitRepo = chat.gitBranch?.cwd === chat.state?.cwd && !!chat.gitBranch?.notRepo;
+	const interrupted = chat.state?.conversationId === chat.activeConversationId && !!latestToolTextFailure(chat.state.messages, chat.state.isStreaming);
 	const task = chat.state?.conversationId === chat.activeConversationId ? chat.state?.taskProgress : null;
 	const planItems = (task?.status === "running" || task?.status === "waiting") ? task.plan?.items.filter((item) => item.status !== "removed") ?? [] : [];
 	const currentStep = planItems.findIndex((item) => item.status === "running");
@@ -211,7 +213,7 @@ export function TopBar({
 			</div>
 
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
-			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{currentStep >= 0 && <button type="button" className="header-task-progress" title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{task?.plan?.awaitingConfirmation ? t("taskProgress") : t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
+			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{(interrupted || currentStep >= 0) && <button type="button" className={`header-task-progress${interrupted ? " interrupted" : ""}`} title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{interrupted ? t("toolRecoveryInterrupted") : task?.plan?.awaitingConfirmation ? t("taskProgress") : t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
 				<div
 					className="view-switch"
