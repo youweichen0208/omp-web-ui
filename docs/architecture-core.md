@@ -19,7 +19,8 @@ Pi 1.0 工具结果的 `nestedCalls` 投影为独立子调用记录（参数、�
 - **WS permessage-deflate**：WebSocketServer 开启压缩（threshold 16KB），大会话多 MB snapshot 线上传输降数倍；小消息（notice/心跳）不压省 CPU。
 - `/reload` 使用带 `conversationId`、`requestId` 的 `reload_status` 事件发送运行中及完成状态，包含资源数量、名称、耗时和加载诊断；前端按请求更新同一条对话事件，不通过通用 notice 浮层。事件保存在当前标签页的 sessionStorage，刷新后仍可查看，不写入 Agent 上下文。
 - **多标签页序列化共享**：emit 把同一消息对象发给客户端的所有 socket，index.ts 用 WeakMap 按对象身份缓存 stringify 结果——N 个标签页共享一次序列化，新 snapshot 即新对象自动失效。
-- 序列化时**对象引用稳定**：`uiMessageCache` + 消息数组签名比对，消息没变就不重建数组，前端 `React.memo` 因此能跳过整条消息——**不要**破坏这个缓存（stable id、引用复用）。
+- 序列化时**对象引用稳定**：`uiMessageCache` + 消息数组签名比对，消息没变就不重建数组，前端 `React.memo` 因此能跳过整条消息——**不要**破坏这个缓存（stable id、引用复用）。缓存使用完整内容指纹与原生 entry ID；同时间戳、相同前缀或内容相同的不同条目保持独立身份。指纹按不可变原生消息对象复用，plan 历史投影使用相同 entry 身份。
+- 强停恢复在销毁、创建和绑定扩展的异步边界检查对话是否仍有效；删除或关闭期间失效的 runtime 会清理，异步 `session_start` 晚到的资源也会收到最终 shutdown。
 - `UiState` 携带 `thinkingLevel`（当前生效）和 `availableThinkingLevels`（当前模型实际支持的级别，SDK 会把集合外的请求静默就近钳制——UI 只能启用这些，否则用户点"低/中"看起来"改不了"）。
 
 ### `message_delta` 实时增量通道

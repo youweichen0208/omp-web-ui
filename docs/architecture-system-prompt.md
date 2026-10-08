@@ -29,6 +29,7 @@ POST `/api/system-prompt` 位于已有鉴权之后，校验同源、JSON、clien
 - 空闲时立即 reload；运行中保存只标记待加载，在 `agent_settled` 后加载。
 - 下一条用户 prompt 先等待待处理 reload，失败时拒绝该请求并显示错误；设置页提供重试。手动压缩后也可由页面刷新或下一条 prompt 补做 reload。
 - reload 保留 session ID 和 transcript；不新开会话、不调用模型。下一次请求由 SDK 对比 section 并提交原生变化。
+- 提示词保存、设置、MCP 和 `/reload` 共用按原生 session 排队的 `session-reload.ts`；前次失败不阻断后续重载，不同 session 独立执行。手动重载事件只引用发起时的会话资源。
 - 页面区分保存待加载、加载完成待下次请求、加载失败。切页／关闭／浏览器离开时保护未保存草稿；文件冲突要求重新读取，不能自动覆盖。
 - 其他独立 Pi/WebUI 进程遵循各自的原生 reload 生命周期，不承诺跨进程实时重载。
 

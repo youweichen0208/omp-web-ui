@@ -36,6 +36,16 @@ try {
 	assert.deepEqual(second.filter(m => m.role === "user").map(m => m.id), userIds, "ids do not drift between snapshots");
 	assert(second.every((m, i) => m === first[i]), "messages are served from the cache, so snapshots can send deltas");
 	assert(elapsed < 1000, `second snapshot took ${elapsed.toFixed(0)} ms`);
+	const identical = { role: "user", content: [{ type: "text", text: "same content" }], timestamp: 42 };
+	const collisions = ["a", "b"].map(tail => ({ role: "user", content: [{ type: "text", text: "x".repeat(520) + tail }], timestamp: 42 }));
+	const nativeMessages = [...collisions, identical, { ...identical }];
+	for (const message of nativeMessages) conv.session.sessionManager.appendMessage(message);
+	conv.session.agent.state.messages = nativeMessages;
+	const distinct = client.currentMessages();
+	assert.equal(new Set(distinct.map(m => m.id)).size, 4, "native entries remain distinct even with identical content and timestamps");
+	assert.equal(new Set(distinct.map(m => m.entryId)).size, 4);
+	assert.notEqual(distinct[0].content[0].text, distinct[1].content[0].text);
+	assert(client.currentMessages().every((m, i) => m === distinct[i]));
 	console.log(`PASS 12,000-message transcript keeps stable ids and cached objects (second walk ${elapsed.toFixed(0)} ms)`);
 } finally {
 	await client?.dispose();

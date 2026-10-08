@@ -13,6 +13,7 @@
  * 保留在目录里供选择器展示，exec 里吞掉防止 SDK 当文本。
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { reloadSession } from "./session-reload.js";
 import type { ServerMessage, SlashCommandInfo } from "./protocol.js";
 import type {  } from "./plugins.js";
 
@@ -257,15 +258,17 @@ export class SlashCommandsService {
 				return true;
 			case "reload":
 				const startedAt = Date.now();
+				const s = this.host.getSession();
 				this.host.emit({ type: "reload_status", ...context, phase: "running", timestamp: startedAt });
 				try {
 					// Re-discovers extensions / skills / prompt templates from disk and
 					// re-pushes the picker catalog (the CLI's /reload semantics).
-					await this.host.getSession().reload();
+					await reloadSession(s);
 					// reload() 会把 custom 工具加回活跃集——重放设置门控（终端开关等）。
-					this.host.afterReload?.();
-					await this.push();
-					const s = this.host.getSession();
+					if (this.host.getSession() === s) {
+						this.host.afterReload?.();
+						await this.push();
+					}
 					const extensions = s.resourceLoader.getExtensions();
 					const skills = s.resourceLoader.getSkills();
 					const prompts = s.resourceLoader.getPrompts();

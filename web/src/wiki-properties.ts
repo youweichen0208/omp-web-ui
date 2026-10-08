@@ -5,29 +5,34 @@ import remarkParse from "remark-parse";
 const PROPERTY = /^(?:\*\*([\p{L}\p{N}_ -]{1,40})[：:]\*\*|(?:\*\*)?([\p{L}\p{N}_ -]{1,40})(?:\*\*)?[：:])\s*(.+)$/u;
 const propertyLine = (line: string) => line.replace(/(?:\\| {2,})$/, "").trim();
 
-/** End offset of the opening lines that can hold properties (an optional H1,
- * then key/value lines), extended to the end of the first other block so the
- * parser sees the same boundary as in the full document. */
-function openingRegion(source: string, from: number): number {
-	let heading = false, content = false, boundary = false;
+/** Parse metadata plus a small boundary witness. A body line is enough to
+ * invalidate a continued property paragraph; parsing all of its inline
+ * Markdown (potentially megabytes) on every keystroke is unnecessary. */
+function openingRegion(source: string, from: number): string {
+	let heading = false, content = false;
 	const lines = /[^\n]*(?:\n|$)/g;
 	lines.lastIndex = from;
 	for (let match = lines.exec(source); match && match[0]; match = lines.exec(source)) {
-		const end = match.index + match[0].length, line = propertyLine(match[0]);
-		if (!line) { if (boundary) return end; continue; }
-		if (boundary) continue;
+		const line = propertyLine(match[0]);
+		if (!line) continue;
 		if (!content && !heading && /^# /.test(line)) { heading = true; continue; }
 		content = true;
-		if (!PROPERTY.test(line)) boundary = true;
+		if (!PROPERTY.test(line)) {
+			const end = match.index + match[0].length;
+			// Setext underlines change the preceding paragraph's block type.
+			const underline = source.slice(end).match(/^ {0,3}(?:=+|-+)[ \t]*(?:\r?\n|$)/)?.[0] ?? "";
+			const witness = match[0].replace(/^[ \t]{4,}/, "    ");
+			return source.slice(0, match.index) + witness.slice(0, 256).trimEnd() + "\n" + underline;
+		}
 	}
-	return source.length;
+	return source;
 }
 
 /** Only a consecutive opening group of key/value paragraphs is document metadata.
  * Runs on every keystroke, so only the opening region is parsed. */
 export function wikiProperties(source: string) {
 	const front = source.match(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/)?.[0].length ?? 0;
-	const region = source.slice(0, openingRegion(source.replace(/\r/g, " "), front));
+	const region = openingRegion(source, front);
 	const nodes = unified().use(remarkParse).parse(region).children.filter(node => (node.position?.start.offset ?? 0) >= front);
 	if (nodes[0]?.type === "heading" && nodes[0].depth === 1) nodes.shift();
 	const rows: { key: string; value: string }[] = [];

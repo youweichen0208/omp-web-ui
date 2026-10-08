@@ -129,12 +129,12 @@ async function startServer(reusePort) {
 	let serverOut = "";
 	serverProcess.stdout?.on("data", (chunk) => {
 		const text = chunk.toString();
-		serverOut += text;
+		serverOut = (serverOut + text).slice(-64 * 1024);
 		process.stdout.write(`[server] ${text}`);
 	});
 	serverProcess.stderr?.on("data", (chunk) => {
 		const text = chunk.toString();
-		serverOut += text;
+		serverOut = (serverOut + text).slice(-64 * 1024);
 		process.stderr.write(`[server:err] ${text}`);
 	});
 
@@ -150,6 +150,7 @@ async function startServer(reusePort) {
 			const text = chunk.toString();
 			if (text.includes("⚡ pi-harness") || text.includes("http://localhost")) {
 				clearTimeout(timeout);
+				serverProcess.stdout?.removeListener("data", checkOutput);
 				resolvePromise(undefined);
 			}
 		};

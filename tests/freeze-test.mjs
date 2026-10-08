@@ -68,11 +68,7 @@ async function stopServer() {
 		}
 	}
 	console.error("⚠ port did not free — killing stragglers");
-	try {
-		await freePort(PORT);
-	} catch {
-		/* noop */
-	}
+	await freePort(PORT);
 }
 
 // Build first so web/dist is fresh.

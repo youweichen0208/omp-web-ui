@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { PromptFileView, SystemPromptState } from "./protocol.js";
 import { promptView, estimatePromptTokens } from "./system-prompt-view.js";
+import { reloadSession } from "./session-reload.js";
 const LIMIT=512*1024;
 const hash=(value:string|Buffer)=>createHash("sha256").update(value).digest("hex");
 /** Include the canonical target in CAS, so changing a symlink cannot redirect an outstanding edit. */
@@ -73,7 +74,7 @@ export async function flushPromptReload(session: AgentSession, retry = false): P
 	state.dirty = false;
 	state.promise = (async () => {
 		try {
-			await session.reload();
+			await reloadSession(session);
 			state.refreshed();
 		} catch (e) {
 			state.error = (e as Error).message;
