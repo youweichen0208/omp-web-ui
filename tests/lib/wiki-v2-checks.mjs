@@ -4,6 +4,12 @@ import { join } from 'node:path';
 export async function checkWikiV2(page, cwd) {
 	await page.locator('.wiki-tree-row[title="toolbar.md"]').click();
 	const editor = page.locator('.wiki-prose .fp-rich-document');
+	await page.locator('.wiki-properties dt', { hasText: 'protocol_id' }).waitFor();
+	assert.equal(await page.locator('.wiki-properties dt').count(), 3);
+	assert(!(await editor.innerText()).includes('protocol_id'));
+	await page.locator('.wiki-properties summary').click();
+	assert.equal(await page.locator('.wiki-properties').getAttribute('open'), null);
+	await page.locator('.wiki-properties summary').click();
 	await page.locator('.wiki-document-heading h1', { hasText: 'Toolbar fixture' }).waitFor();
 	if (await page.locator('.wiki-chat-panel').isVisible()) await page.locator('.wiki-chat-toggle').click();
 	const end = async () => { await editor.evaluate(el => { el.focus(); const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }); await page.keyboard.press('Enter'); };
@@ -13,6 +19,15 @@ export async function checkWikiV2(page, cwd) {
 		assert.equal(await page.locator('.wiki-document-toolbar').evaluate(el => el.getBoundingClientRect().height), 44);
 		assert.equal(await page.locator('.wiki-document-heading h1').evaluate(el => getComputedStyle(el).fontSize), '34px');
 		assert.equal(await editor.locator('h2').evaluate(el => getComputedStyle(el).fontSize), '22px');
+		assert(await page.locator('.wiki-chat-toggle').evaluate(el => innerWidth - el.getBoundingClientRect().right >= 16));
+		const headingGap = await editor.locator("h2").evaluate(el => el.getBoundingClientRect().top - document.querySelector(".wiki-document-heading").getBoundingClientRect().bottom);
+		assert(Math.abs(headingGap - 28) < 1, `heading gap ${headingGap}`);
+		const spacing = await editor.evaluate(el => {
+			const paragraphs = [...el.querySelectorAll('.rich-block:not([hidden]) > p')];
+			return paragraphs[1].getBoundingClientRect().top - paragraphs[0].getBoundingClientRect().bottom;
+		});
+		assert(Math.abs(spacing - 14.5 * .75) < 1, `paragraph gap ${spacing}`);
+		assert.equal(await page.locator('.wiki-tree-row').first().evaluate(el => el.getBoundingClientRect().height), 30);
 		await page.screenshot({ path: `tests/scratch/wiki34-${width}.png` });
 	}
 	await page.getByRole('button', { name: '宽版（隐藏两侧）', exact: true }).click();
@@ -40,6 +55,7 @@ export async function checkWikiV2(page, cwd) {
 	await page.locator('.wiki-save-status.saved').waitFor();
 	const markdown = readFileSync(join(cwd, 'toolbar.md'), 'utf8');
 	assert(markdown.includes('Header marker'));
+	assert(markdown.includes('protocol_id：fixture-v1\\\n准备日期：2026-10-08\\\n状态：**草稿**'));
 	assert(markdown.includes('```mermaid\nflowchart LR'));
 	assert(!markdown.includes('<svg') && !markdown.includes('wiki-mermaid-preview'));
 	await end();

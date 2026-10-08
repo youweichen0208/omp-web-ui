@@ -21,7 +21,7 @@ mkdirSync(join(cwd, '.obsidian'));
 writeFileSync(join(cwd, '.obsidian', 'hidden.md'), '---\ntitle: Different page title\n---\n# Different body title\n\nHidden searchable document.');
 writeFileSync(join(cwd, 'large.md'), Buffer.alloc(2 * 1024 * 1024 + 1, 'x'));
 writeFileSync(join(cwd, 'README.md'), readFileSync(join(cwd, 'README.md'), 'utf8').replace('tags: [风控, 交易]', 'title: 风控规则\ntags: [风控, 交易, Alpha, Beta, Gamma, Delta, Omega, Theta]') + '\n```js\nconst color = "#ff475040"; // #notatag\n```\n\n#abc #abcd #abcdef #abcdef12 `#inline`\n');
-writeFileSync(join(cwd, 'toolbar.md'), '# Toolbar fixture\n\n## 标题测试\n\n正文内容。\n');
+writeFileSync(join(cwd, 'toolbar.md'), '# Toolbar fixture\n\nprotocol_id：fixture-v1\\\n准备日期：2026-10-08\\\n状态：**草稿**\n\n## 标题测试\n\n正文内容。\n\n第二段内容。\n');
 const requests = [];
 const mock = createServer(async (req, res) => {
 	let body = ''; for await (const chunk of req) body += chunk;
@@ -135,15 +135,17 @@ try {
 	};
 	await page.route('**/api/wiki', mixedIndex);
 	await page.getByRole('button', { name: '刷新文件', exact: true }).click();
-	await page.locator('.wiki-index-reason', { hasText: '3 种原因' }).waitFor();
+	await page.locator('.wiki-index-reason', { hasText: '跳过 3' }).waitFor();
 	assert(!(await page.locator('.wiki-index-status').innerText()).includes('3 项受限：文件无法读取'));
+	assert((await page.locator('.wiki-index-status').innerText()).includes('已索引 5,124 / 统计中'));
+	assert((await page.locator('.wiki-index-status').getAttribute('title')).includes('文件无法读取'));
 	await page.locator('.wiki-index-status').click();
 	assert.equal(await page.locator('.wiki-index-summary li').count(), 3);
 	assert((await page.locator('.wiki-index-summary').innerText()).includes('1 项受限：文件无法读取或路径不可访问'));
 	await page.keyboard.press('Escape');
 	await page.unroute('**/api/wiki', mixedIndex);
 	await page.getByRole('button', { name: '刷新文件', exact: true }).click();
-	await page.locator('.wiki-index-reason', { hasText: '1 项受限：单个文件超过 2 MB' }).waitFor();
+	await page.locator('.wiki-index-reason', { hasText: '跳过 1' }).waitFor();
 	await page.locator('.wiki-index-status').click();
 	await page.getByRole('dialog').getByText('large.md', { exact: true }).waitFor();
 	await page.getByRole('dialog').getByText('单个文件超过 2 MB', { exact: true }).waitFor();
@@ -199,6 +201,9 @@ try {
 	assert.equal(await page.locator('.wiki-prose a').first().textContent(), '参数配置');
 	await page.locator('.wiki-prose a').first().click();
 	await page.locator('.wiki-document h1:visible', { hasText: '参数配置' }).waitFor();
+	assert.equal(await page.locator('.wiki-path-parent').innerText(), '交易系统 /');
+	assert(!(await page.locator('.wiki-breadcrumb').innerText()).includes(cwd));
+	assert.equal(await page.locator('.wiki-breadcrumb').getAttribute('title'), `${cwd}/交易系统/参数配置.md`);
 	// Re-enter from a different file after Wiki has already mounted: the click wins over cached/internal navigation.
 	await page.getByRole('tab', { name: '对话', exact: true }).click();
 	await page.locator('.file-name', { hasText: 'README.md' }).click();
@@ -346,12 +351,14 @@ try {
 	assert(readFileSync(join(cwd, 'README.md'), 'utf8').includes('隔夜持仓'));
 	await page.locator('.wiki-changes header button').click();
 	await page.setViewportSize({ width: 390, height: 844 });
+	assert(await page.locator('.wiki-chat-toggle').evaluate(el => innerWidth - el.getBoundingClientRect().right >= 16));
 	assert(!(await page.locator('.wiki-toc').isVisible()));
 	const closedWidth = (await page.locator('.wiki-main').boundingBox()).width;
 	await page.locator('.wiki-chat-toggle').click();
 	await page.getByRole('dialog', { name: 'Wiki 对话面板', exact: true }).waitFor();
 	assert.equal((await page.locator('.wiki-main').boundingBox()).width, closedWidth, 'mobile chat overlays instead of squeezing article');
 	assert(await page.getByRole('textbox', { name: '问 pi', exact: true }).isVisible());
+	assert.equal(await page.getByRole('textbox', { name: '问 pi', exact: true }).evaluate(el => getComputedStyle(el).resize), 'none');
 	await page.screenshot({ path: '/tmp/pi-wiki-chat-mobile.png' });
 	await page.locator('.wiki-chat-panel').getByRole('button', { name: '收起对话面板', exact: true }).click();
 	await page.locator('.wiki-scroll').evaluate(el => el.scrollTop = el.scrollHeight);

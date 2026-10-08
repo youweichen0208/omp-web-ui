@@ -32,12 +32,12 @@ export function WikiIndexIndicator({ status }: { status: WikiIndexStatus }) {
 	const count = (n: number) => n.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 	const issueCount = status.issues.length;
 	const groups = wikiIndexIssueGroups(status.issues);
-	const summary = t("wikiIndexStatus", { indexed: count(status.indexed), total: count(status.total) + (status.totalIsLowerBound ? "+" : "") });
+	const summary = t("wikiIndexStatus", { indexed: count(status.indexed), total: status.totalIsLowerBound ? t("wikiIndexCounting") : count(status.total) });
 	if (!open && !issueCount && !status.totalIsLowerBound && status.indexed === status.total) return null;
 	return <>
-		<button className={`wiki-index-status ${issueCount ? "limited" : ""}`} onClick={() => setOpen(true)} title={summary}>
+		<button className={`wiki-index-status ${issueCount ? "limited" : ""}`} onClick={() => setOpen(true)} title={[summary, ...groups.map(group => t("wikiIndexIssueCount", { count: count(group.count), reason: t(reasons[group.reason]) }))].join("\n")}>
 			{issueCount > 0 && <i />}<span>{summary}</span>
-			{issueCount > 0 && <span className="wiki-index-reason"> · {t("wikiIndexIssueCount", { count: issueCount, reason: groups.length === 1 ? t(reasons[groups[0].reason]) : t("wikiIndexMultipleReasons", { count: groups.length }) })}</span>}
+			{issueCount > 0 && <span className="wiki-index-reason"> · {t("wikiIndexSkipped", { count: count(issueCount) })}</span>}
 		</button>
 		{open && <WikiReadingDialog title={summary} onClose={() => setOpen(false)}>
 			<p>{t(status.totalIsLowerBound ? "wikiIndexPartial" : issueCount ? "wikiIndexHint" : "wikiIndexComplete")}</p>

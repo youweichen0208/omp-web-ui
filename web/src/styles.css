@@ -11388,3 +11388,28 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 }
 
 .wiki-index-summary { flex: none; margin: 0 0 12px; padding-left: 20px; font-size: 12px; line-height: 1.8; color: var(--text-dim); }
+
+/* 34a reading refinements: spacing belongs to the content, not each source wrapper. */
+.design-workspace.wiki-mode .topbar { padding-right: 16px; }
+.wiki-breadcrumb > .wiki-path-parent { flex: 0 1 auto; min-width: 0; gap: 0; }
+.wiki-path-segment { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wiki-path-tail { flex: none; }
+.wiki-breadcrumb > b { flex: 0 1 auto; min-width: 0; }
+.wiki-workbench .wiki-tree-row { height: 30px; min-height: 30px; }
+.wiki-tree-spacer { width: 12px; flex: none; }
+.wiki-composer textarea { resize: none; }
+.wiki-document-heading { margin-bottom: 28px; }
+.wiki-document-meta { margin-bottom: 0; }
+.wiki-prose .fp-rich-document .rich-block { display: contents; }
+.wiki-prose .fp-rich-document .rich-block[hidden] { display: none; }
+.wiki-prose.md p, .wiki-prose .fp-markdown .md p { margin: .75em 0; }
+.wiki-prose .fp-rich-document > .rich-block:not([hidden]):not(.rich-block:not([hidden]) ~ .rich-block) > :first-child { margin-top: 0; }
+.wiki-prose .fp-rich-document p:empty { margin: 0; min-height: 0; }
+.wiki-properties { margin-top: 14px; font-size: 12.5px; line-height: 1.6; }
+.wiki-properties summary { cursor: pointer; color: var(--text-dim); }
+.wiki-properties dl { margin: 8px 0 0; }
+.wiki-properties dl > div { display: grid; grid-template-columns: minmax(80px, 120px) minmax(0, 1fr); gap: 12px; padding: 3px 0; }
+.wiki-properties dt { color: var(--text-dim); overflow-wrap: anywhere; }
+.wiki-properties dd { margin: 0; overflow-wrap: anywhere; }
+.wiki-properties dd p { margin: 0; }
+.wiki-index-status { color: var(--yellow-fg); }

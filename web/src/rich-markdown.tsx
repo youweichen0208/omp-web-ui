@@ -12,6 +12,8 @@ import { gfm } from "turndown-plugin-gfm";
 import type { Root, RootContent } from "mdast";
 import { renderWikiLinks, wikiMetadata } from "./wiki-document";
 
+import { wikiProperties } from "./wiki-properties";
+
 interface SourceBlock {
 	raw: string;
 	prefix: string;
@@ -131,6 +133,7 @@ export function prepareRichDocument(source: string, wiki = false): RichDocument 
 	const definitions = nodes.filter((node) => node.type === "definition").map((node) => source.slice(node.position?.start.offset, node.position?.end.offset)).join("\n");
 	const frontMatter = source.match(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/)?.[0];
 	const metadata = wiki ? wikiMetadata(source) : null;
+	const properties = wiki ? wikiProperties(source).ranges : [];
 	let firstHeading = true;
 	let end = 0;
 	if (frontMatter) {
@@ -143,7 +146,7 @@ export function prepareRichDocument(source: string, wiki = false): RichDocument 
 		if (start === undefined || stop === undefined || start < end) continue;
 		const raw = source.slice(start, stop);
 		const protectedBlock = needsSource(node);
-		const hidden = !!metadata && firstHeading && node.type === "heading" && node.depth === 1 && metadata.readingBody !== metadata.body;
+		const hidden = properties.some(range => range.start === start && range.end === stop) || (!!metadata && firstHeading && node.type === "heading" && node.depth === 1 && metadata.readingBody !== metadata.body);
 		if (node.type === "heading" && node.depth === 1) firstHeading = false;
 		blocks.push({
 			raw, prefix: source.slice(end, start), protected: protectedBlock, hidden,

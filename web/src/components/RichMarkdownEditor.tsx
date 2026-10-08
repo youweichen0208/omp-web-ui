@@ -1,3 +1,4 @@
+import { WikiTableIcon, WikiQuoteIcon } from "./WikiIcons";
 import { WikiToolbar, WikiInsertPopover, type WikiInsertPopup } from "./WikiToolbar";
 import { TableSizePicker } from "./TableSizePicker";
 import { CodeLanguagePicker } from "./CodeLanguagePicker";
@@ -6,7 +7,7 @@ import { createPortal } from "react-dom";
 import { WikiReadingDialog } from "./WikiReading";
 import { TEXT_HIGHLIGHT_COLORS } from "../remark-text-highlight";
 import { Fragment, memo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { FiCalendar, FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare, FiLink, FiImage } from "react-icons/fi";
+import { FiCalendar, FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiList, FiCheckSquare, FiMinus, FiLink, FiImage } from "react-icons/fi";
 import { markdownImageUrl } from "../markdown-image";
 import { withToken } from "../auth-token";
 import { getClientId } from "../use-chat";
@@ -328,7 +329,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	] as const;
 	const wikiOrder = ["zw", "bt2", "bt3", "lb", "bg", "tp", "rw", "yy", "dmk", "sl", "date"];
 	const items = wiki ? allItems.filter(item => wikiOrder.includes(item.alias)).sort((a, b) => wikiOrder.indexOf(a.alias) - wikiOrder.indexOf(b.alias)) : allItems.filter(item => item.alias !== "date");
-	const icons = { wikiMentionDate: <FiCalendar />, richImage: <FiImage />, richWikiLink: <FiLink />, richHighlightBlock: <FiSquare />, richHeading: <FiType />, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <FiList />, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
+	const icons = { wikiMentionDate: <FiCalendar />, richImage: <FiImage />, richWikiLink: <FiLink />, richHighlightBlock: <FiSquare />, richHeading: <FiType />, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <WikiTableIcon />, richList: <FiList />, richOrderedList: <FiList />, richTaskList: <FiCheckSquare />, richQuote: <WikiQuoteIcon />, richDivider: <FiMinus /> };
 	const itemLabel = (item: typeof items[number]) => item.label === "richHeading" ? `${t(item.label)} ${"argument" in item ? item.argument.slice(1) : ""}` : t(item.label);
 	const isBlock = (item: typeof items[number]) => item.action === "insertHTML";
 	const hints: Record<string, string> = { date: "@", zw: "", bt1: "#", bt2: "##", bt3: "###", lb: "-", bh: "1.", rw: "[]", yy: ">", dmk: "```", glk: ":::", bg: "3 × 3", fgx: "---", tp: "![]", sl: "[[" };
