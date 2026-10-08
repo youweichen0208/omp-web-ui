@@ -101,7 +101,8 @@ mac:
 # 没有正式签名证书时，arm64 (Apple Silicon) 完全不签名的 app 会被系统判定为
 # 「已损坏」，比「无法验证开发者」更严重——右键打开都绕不过，只能让用户手动
 # `xattr -cr`。用 afterPack 钩子做一次免费的 ad-hoc 签名（不需要开发者账号），
-# 把体验降级成常见的「无法验证开发者」，用户右键打开就能用。见 build/afterPack.cjs。
+# 把体验降级成「无法验证开发者」：macOS 14 及更早右键打开即可，macOS 15 及以后需在
+# 「系统设置 → 隐私与安全性」点「仍要打开」。见 build/afterPack.cjs。
 afterPack: build/afterPack.cjs
 
 # Windows

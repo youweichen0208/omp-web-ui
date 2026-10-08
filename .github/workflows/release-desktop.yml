@@ -4,12 +4,17 @@
 # 也支持手动触发（workflow_dispatch），比如某个平台构建失败要单独重跑。
 #
 # 当前不签名（Mac / Windows 都没配证书）：
-#   - macOS：用户首次打开会被 Gatekeeper 拦「无法验证开发者」，右键选
-#     「打开」即可跳过，不影响正常使用。
-#   - Windows：SmartScreen 可能会有一次「未知发布者」提示，点「仍要运行」即可。
-# 以后要签名的话，mac 端加 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
-# APPLE_TEAM_ID / CSC_LINK / CSC_KEY_PASSWORD 几个 repo secrets，
-# electron-builder 会自动识别并签名+公证，不需要改这个 workflow。
+#   - macOS：只有 ad-hoc 签名、未公证，首次打开会被 Gatekeeper 拦。
+#     macOS 14 及更早：右键 App →「打开」→「打开」。
+#     macOS 15 及以后右键也会被拦：需在「系统设置 → 隐私与安全性」底部点「仍要打开」，
+#     或运行 `xattr -dr com.apple.quarantine /Applications/pi.app`。
+#     ad-hoc 签名每个版本都不同，应用内自动更新在 macOS 上可能无法安装，待真机验证。
+#   - Windows：未签名，每个新版本首次运行 SmartScreen 都会提示「未知发布者」，
+#     点「更多信息 → 仍要运行」即可。
+# 以后要正式签名：只加 repo secrets（APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
+# APPLE_TEAM_ID / CSC_LINK / CSC_KEY_PASSWORD）不会生效——electron-builder.yml
+# 里 mac.identity: null 强制关闭签名，hardenedRuntime: false 不满足公证要求，也没有配置
+# 公证；Windows 的 signExecutable: false 同理。需同时修改 electron-builder.yml。
 #
 # Reference: https://www.electron.build/configuration/publish
 
