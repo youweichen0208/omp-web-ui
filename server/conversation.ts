@@ -65,6 +65,11 @@ export interface Conversation {
 	/** Names of in-flight tools, so a quiet command is not mistaken for a silent model. */
 	runningToolNames: Map<string, string>;
 	toolsExecutedSincePrompt: boolean;
+	/** Automatic requests to re-issue a tool call written as text, for the current
+	 *  user prompt. Cleared by the next prompt from the user. */
+	toolTextContinues: number;
+	/** A real tool ran since the last automatic request (the model is making progress). */
+	toolRanSinceContinue: boolean;
 
 	/** Wizard execution is per conversation; dialog transport itself remains
 	 * client-wide because the browser can display one dialog at a time. */

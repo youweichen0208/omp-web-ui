@@ -170,3 +170,13 @@ Wiki 复用当前工作区，使用原生内存会话，离开后释放，不写
 ### 压缩结果展示
 
 压缩状态展示 manual/threshold/overflow 的本地化原因及可用的压缩前 token 数。compaction_end 保留 completed/aborted/error 结果供快照与重连恢复；成功时以前置 result.tokensBefore 和 SDK estimateTokens 对重建后上下文的估算展示变化，压缩后数值标记 ≈。取消或失败不展示虚假的压缩后数值。完成结果不是恢复中，不提供取消按钮，可在浏览器关闭提示。SDK agent_settled 仍是运行结束的唯一判据。
+
+## 未执行的工具调用
+
+部分模型（实测 DeepSeek V4 Pro / Volc）偶尔把工具调用写进正文（`<invoke name=…>`、DSML，或只剩 `<parameter …>…</parameter></invoke>` 后半截，开头被泄露的推理吞掉）。SDK 只看到一段普通回答，运行随之结束，任务停在半途。
+
+- 识别：`server/tool-text.ts` 的 `unexecutedToolText` 是唯一实现，服务端与界面共用。严格规则要求完整的 `<invoke name>`…`</invoke>`；兜底规则只看正文**结尾**是否为若干 `<parameter>` 加 `</invoke>`，所以闭合代码块、行内代码和其后还有正文的示例都不算。文本永远不会被当作工具调用执行。
+- 自动继续：`agent_settled` 时若最后一条助手消息没有真实工具调用、正文以上述标记结尾、未中止、无排队消息，则以可见的用户消息 `TOOL_TEXT_CONTINUE_PROMPT` 请模型重新调用，并发出一条 warning 通知。
+- 防循环：上次自动请求之后必须至少执行过一次真实工具才能再次请求；每条用户消息最多 `TOOL_TEXT_MAX_CONTINUES`（5）次；用户发出新消息时计数清零。被拦下时停止运行，消息上的恢复卡片仍提供手动重试或换模型重试。
+- 回归：`tests/tool-text-continue-test.mjs`（单次泄露、执行后再次泄露、持续泄露只续一次、普通回答不续）与 `tests/unit/tool-text.test.ts`。
+

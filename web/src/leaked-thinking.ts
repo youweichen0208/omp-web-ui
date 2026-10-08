@@ -38,20 +38,8 @@ function lastCloseEnd(s: string): number {
 	return end;
 }
 
-/** Match protocol markers outside Markdown code, retaining offsets into the original. */
-export function maskMarkdownCode(text: string): string {
-	let fence: { marker: string; length: number } | undefined;
-	const masked = text.split("\n").map(line => {
-		const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-		const inCode = !!fence || !!marker;
-		if (marker) {
-			if (!fence) fence = { marker: marker[1][0], length: marker[1].length };
-			else if (marker[1][0] === fence.marker && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
-		}
-		return inCode ? line.replace(/</g, "\0") : line;
-	}).join("\n");
-	return masked.replace(/(`+)([\s\S]*?)\1(?!`)/g, code => code.replace(/</g, "\0"));
-}
+import { maskMarkdownCode } from "../../server/tool-text.js";
+export { maskMarkdownCode };
 
 // Only a trailing closing sequence with an explicit DSML marker qualifies.
 // Ordinary XML such as </invoke>, and tags being discussed in prose, stay intact.

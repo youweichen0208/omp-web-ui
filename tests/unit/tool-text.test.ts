@@ -24,3 +24,22 @@ test("recovery belongs only to the latest settled failed user turn", () => {
 	expect(latestToolTextFailure([failed])).toBeNull();
 	expect(latestToolTextFailure([user, { ...failed, content: [...failed.content, { type: "toolCall", id: "tool", name: "edit", argumentsText: "{}" }] }])).toBeNull();
 });
+
+test("recognises the call from its tail when the opening tag is not in the visible text", () => {
+	// Field case: leaked reasoning, then only the parameters and </invoke>.
+	const fragment = '<parameter name="command">cd /repo && grep -rn "x" a.py 2>/dev/null | head -30</parameter> </invoke>';
+	expect(unexecutedToolText(`先验证改动。</think>\n${fragment}`)).toEqual({ before: "先验证改动。</think>", raw: fragment, tools: [] });
+	// An unclosed ``` earlier masks the opening tag; the tail still identifies it and keeps the tool name.
+	const opened = `说明：\n\`\`\`\n草稿\n<invoke name="bash">\n${fragment}`;
+	expect(unexecutedToolText(opened)?.tools).toEqual(["bash"]);
+	expect(unexecutedToolText(opened)?.raw.startsWith('<invoke name="bash">')).toBe(true);
+	// function_calls wrapper is accepted as well.
+	expect(unexecutedToolText(`<function_calls><invoke name="bash">${fragment}</function_calls>`)?.tools).toEqual(["bash"]);
+});
+
+test("the tail fallback still ignores closed code, inline code and calls followed by prose", () => {
+	const fragment = '<parameter name="command">ls</parameter></invoke>';
+	for (const text of [`\`\`\`xml\n${fragment}\n\`\`\``, `\`${fragment}\``, `${fragment}\n然后我会看结果。`, "</parameter></invoke>", '<parameter name="command">ls</parameter>']) {
+		expect(unexecutedToolText(text), text).toBeNull();
+	}
+});
