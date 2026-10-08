@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WikiService, WikiConflictError, wikiPath } from "../../server/wiki-service.js";
-import { wikiMetadata, resolveWikiLink, wikiReferences } from "../../server/wiki-links.js";
+import { wikiMetadata, resolveWikiLink, wikiReferences, wikiLinkIndex } from "../../server/wiki-links.js";
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function fixture() {
@@ -116,6 +116,31 @@ describe("Wiki workspace", () => {
 		expect((await service.documentReferences(cwd, "notes.md")).backlinks.map(link => link.path)).toEqual(["index.md", "new.md"]);
 	});
 
+	it("indexes a large code project without parsing source files as Markdown", async () => {
+		const { cwd, service } = fixture();
+		// Link-like text in source files used to be parsed and resolved against every path.
+		const source = "const doc = '[[notes]] [x](index.md) #tag';\n".repeat(200);
+		for (let d = 0; d < 20; d++) { mkdirSync(join(cwd, `src${d}`)); for (let i = 0; i < 100; i++) writeFileSync(join(cwd, `src${d}`, `module${i}.ts`), source); }
+		const started = performance.now();
+		const state = await service.state(cwd);
+		expect(performance.now() - started).toBeLessThan(10000);
+		expect(state.entries.find(e => e.path === "src0/module0.ts")).toMatchObject({ kind: "code", tags: [] });
+		expect(state.tags.map(t => t.name)).not.toContain("tag");
+		expect((await service.documentReferences(cwd, "notes.md")).backlinks.map(link => link.path)).toEqual(["index.md"]);
+		expect((await service.search(cwd, "const doc")).results[0].path).toMatch(/^src/);
+	}, 30000);
+
+	it("reuses parsed documents across rebuilds and re-parses changed ones", async () => {
+		const { cwd, service } = fixture();
+		await service.index(cwd);
+		writeFileSync(join(cwd, "notes.md"), "# Renamed\n\n#fresh [[index]]\n");
+		service.invalidate(cwd);
+		const state = await service.state(cwd);
+		expect(state.entries.find(e => e.path === "notes.md")).toMatchObject({ title: "Renamed", tags: ["fresh"] });
+		expect(state.tags).toContainEqual({ name: "knowledge", count: 1 });
+		expect((await service.documentReferences(cwd, "index.md")).backlinks.map(link => link.path)).toEqual(["notes.md"]);
+	});
+
 	it("indexes tags, full-text snippets, code references and backlinks", async () => {
 		const { cwd, service } = fixture();
 		const state = await service.state(cwd);
@@ -203,6 +228,8 @@ describe("Wiki metadata and link resolution", () => {
 		expect(resolveWikiLink("a/index.md", "notes#section", files)).toBe("a/notes.md");
 		expect(resolveWikiLink("index.md", "notes", files)).toBeUndefined();
 		expect(resolveWikiLink("a/index.md", "unique", files)).toBe("unique.md");
+		const index = wikiLinkIndex(files);
+		for (const [source, target] of [["a/index.md", "notes#section"], ["index.md", "notes"], ["a/index.md", "unique"], ["a/x.md", "../b/notes.md"]]) expect(resolveWikiLink(source, target, index)).toBe(resolveWikiLink(source, target, files));
 		expect(wikiReferences('`[[not a link]]`\n[[real]]')).toHaveLength(1);
 		expect(wikiReferences('See `src/main.ts`')[0].target).toBe('src/main.ts');
 	});

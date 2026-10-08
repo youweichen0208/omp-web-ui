@@ -1982,9 +1982,11 @@ export class ClientSession {
 		// lifecycle. Removal is deferred until the new chat exists so the active
 		// conversation stays valid during the (async) runtime creation.
 		const displaced = replaceActive ?? this.displaceActive();
-		// Carry the model chosen in the active chat over to the new chat so it
-		// doesn't silently revert to the ModelRuntime default model.
+		// Carry the model and thinking level chosen in the active chat over to the
+		// new chat so they don't silently revert to the defaults. Some models reject
+		// the default "off" level (e.g. always-thinking GLM), so this matters for Wiki.
 		const prevModel = this.conv.session.agent.state.model ?? null;
+		const prevThinking = this.conv.session.thinkingLevel;
 		try {
 			const conversationId = this.nextConversationId();
 			const terminals = this.makeTerminalManager(conversationId, this.cwd);
@@ -2011,6 +2013,8 @@ export class ClientSession {
 					// model no longer resolvable — keep the default
 				}
 			}
+			// setModel applied the default level for the model; restore the chosen one (clamped by the SDK).
+			if (prevModel) this.session.setThinkingLevel(prevThinking);
 			this.emitConversations();
 
 			this.pushTerminals();

@@ -3,7 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { decodeText, looksLikeText, previewKind } from "./text-sniff.js";
-import { wikiMetadata, wikiReferences, resolveWikiLink } from "./wiki-links.js";
+import { wikiMetadata, wikiReferences, resolveWikiLink, wikiLinkIndex } from "./wiki-links.js";
 import { readWikiPdf } from "./wiki-pdf.js";
 import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, WikiSearchResult, WikiDirectory, WikiIndexStatus, WikiDocumentContent, WikiDocumentReferences } from "./protocol.js";
 
@@ -43,12 +43,16 @@ function kindOf(path: string, text: boolean): WikiEntry["kind"] {
 	if (previewKind(path) === "image") return "image";
 	return text || previewKind(path) === "text" ? "code" : "other";
 }
+type ParsedDocument = { tags: string[]; title?: string; references: ReturnType<typeof wikiReferences> };
 type WikiIndex = { at: number; entries: WikiEntry[]; texts: Map<string, string>; limited: boolean; status: WikiIndexStatus; references: Map<string, ReturnType<typeof wikiReferences>>; backlinks: Map<string, WikiDocument["backlinks"]> };
 export class WikiService {
 	private active = new Set<string>();
 	private cache = new Map<string, WikiIndex>();
 	private scans = new Map<string, Promise<WikiIndex>>();
 	private generations = new Map<string, number>();
+	/** Markdown parse results by content hash. The index is rebuilt after every save and
+	 *  Wiki request; only changed documents are parsed again. */
+	private parsed = new Map<string, Map<string, ParsedDocument>>();
 	constructor(private dataDir: string) { mkdirSync(dataDir, { recursive: true }); }
 	private key(cwd: string) { return hash(realpathSync(cwd)); }
 	private folder(cwd: string) { const dir = join(this.dataDir, this.key(cwd)); mkdirSync(join(dir, "blobs"), { recursive: true }); return dir; }
@@ -102,6 +106,14 @@ export class WikiService {
 	}
 	private async buildIndex(cwd: string): Promise<WikiIndex> {
 		const entries: WikiEntry[] = [], texts = new Map<string, string>();
+		const previous = this.parsed.get(this.key(cwd)), parsed = new Map<string, ParsedDocument>(), documents = new Map<string, ParsedDocument>();
+		const parse = (data: Buffer, text: string): ParsedDocument => {
+			const id = hash(data), known = previous?.get(id) ?? parsed.get(id);
+			if (known) { parsed.set(id, known); return known; }
+			const metadata = wikiMetadata(text), result = { tags: metadata.tags, title: metadata.title, references: wikiReferences(text) };
+			parsed.set(id, result);
+			return result;
+		};
 		let limited = false, bytes = 0, visited = 0;
 		const status: WikiIndexStatus = { indexed: 0, total: 0, totalIsLowerBound: false, issues: [] };
 		const walk = async (path: string, depth: number) => {
@@ -122,20 +134,26 @@ export class WikiService {
 					if (info.isDirectory()) { entries.push({ path: p, name: child.name, kind: "directory", size: 0, modified: info.mtimeMs, tags: [], symlink: child.isSymbolicLink() }); if (!child.isSymbolicLink()) await walk(p, depth + 1); continue; }
 					if (!info.isFile()) continue;
 					status.total++; counted = true; size = info.size;
-					let text: string | undefined;
+					let text: string | undefined, document: ParsedDocument | undefined;
 					if (info.size <= MAX_FILE && bytes + info.size <= MAX_SNAPSHOT) {
 						const data = await readFile(abs); bytes += data.length; status.indexed++;
-						if (!/\.pdf$/i.test(p) && previewKind(p) !== "image" && looksLikeText(data)) { text = decodeText(data); texts.set(p, text); }
+						if (!/\.pdf$/i.test(p) && previewKind(p) !== "image" && looksLikeText(data)) {
+							text = decodeText(data); texts.set(p, text);
+							// Tags, titles and links only exist in documents; parsing source
+							// files as Markdown made indexing a code project take minutes.
+							if (kindOf(p, true) === "document") { document = parse(data, text); documents.set(p, document); }
+						}
 					} else { limited = true; status.issues.push({ path: p, size: info.size, reason: info.size > MAX_FILE ? "file-size" : "byte-budget" }); }
-					const metadata = text === undefined ? { tags: [] } : wikiMetadata(text);
-					entries.push({ path: p, name: child.name, kind: kindOf(p, text !== undefined), size: info.size, modified: info.mtimeMs, tags: metadata.tags, title: "title" in metadata ? metadata.title : undefined });
+					entries.push({ path: p, name: child.name, kind: kindOf(p, text !== undefined), size: info.size, modified: info.mtimeMs, tags: document?.tags ?? [], title: document?.title });
 				} catch { limited = true; if (!counted && !child.isDirectory()) status.total++; if (child.isDirectory()) status.totalIsLowerBound = true; status.issues.push({ path: p, size, reason: "unreadable", subtree: child.isDirectory() }); }
 			}
 		};
 		await walk("", 0);
-		const paths = entries.map(e => e.path), references = new Map<string, ReturnType<typeof wikiReferences>>(), backlinks = new Map<string, WikiDocument["backlinks"]>();
-		for (const [source, body] of texts) {
-			const refs = wikiReferences(body); references.set(source, refs);
+		const paths = wikiLinkIndex(entries.map(e => e.path)), references = new Map<string, ReturnType<typeof wikiReferences>>(), backlinks = new Map<string, WikiDocument["backlinks"]>();
+		this.parsed.delete(this.key(cwd)); this.parsed.set(this.key(cwd), parsed);
+		if (this.parsed.size > 8) this.parsed.delete(this.parsed.keys().next().value!);
+		for (const [source, { references: refs }] of documents) {
+			references.set(source, refs);
 			for (const ref of refs) {
 				const target = resolveWikiLink(source, ref.target, paths);
 				if (!target || target === source) continue;

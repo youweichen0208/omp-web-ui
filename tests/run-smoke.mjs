@@ -49,6 +49,7 @@ const ALL = [
 	"global-search-test",
 	"file-editor-protocol-test",
 	"wiki-protocol-test",
+	"wiki-thinking-level-test",
 	"current-file-protocol-test",
 	"left-panel-delete-test",
 	"plugin-bgtask-test",
