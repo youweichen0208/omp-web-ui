@@ -69,7 +69,7 @@ pi-web-ui/
 │   ├── ensure-bash.ts          # Windows 轻量 bash 兜底（busybox-w32）
 │   ├── control-socket.ts       # 本地控制 socket（status / quiesce / unquiesce）
 │   ├── terminals.ts            # TerminalManager（PTY 管理 + 增量输出/按键工具）
-│   ├── node-sources.ts         # Xshell / SSH config 元数据解析与只读命令判定
+│   ├── node-sources.ts         # Xshell / SSH config 元数据解析
 │   └── node-workbench.ts       # 内置 SSH 节点：来源同步/凭据/确认/PTY/SFTP/手动终端和文件操作
 ├── web/                        # 前端（React + Vite，编译到 web/dist/）
 │   ├── vite.config.ts          # dev 端口 5173，/ws 代理到后端

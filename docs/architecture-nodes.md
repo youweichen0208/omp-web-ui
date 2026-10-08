@@ -34,7 +34,7 @@
 
 ## 验证补充
 
-`tests/unit/node-sources.test.ts` 覆盖来源解析、敏感字段剔除和只读命令判定；`tests/node-workbench-test.mjs` 覆盖同步合并、删除/失败保留、手动终端、SFTP 和隔离。浏览器测试覆盖 UTF-16 Xshell 导入、凭据验证、自动更新、节点切换和窄屏布局，不调用真实模型。Windows 下 Xshell 的自定义数据目录和非标准会话字段仍需实际安装环境验证。
+`tests/unit/node-sources.test.ts` 覆盖来源解析和敏感字段剔除；`tests/node-workbench-test.mjs` 覆盖同步合并、删除/失败保留、手动终端、SFTP 和隔离。浏览器测试覆盖 UTF-16 Xshell 导入、凭据验证、自动更新、节点切换和窄屏布局，不调用真实模型。Windows 下 Xshell 的自定义数据目录和非标准会话字段仍需实际安装环境验证。
 
 Xshell 公钥登录节点可在凭据弹窗指定本机 OpenSSH 私钥路径（不是 `.pub` 公钥或 Xshell 密钥名称）；私钥口令允许留空。测试通过后保存 `localKeyPath` 本机绑定，来源配置仍只读，正常同步不会覆盖绑定；来源主机、用户或认证资料改变则清除绑定。绑定只解除私钥路径缺失限制，不会绕过代理等不支持项。错误路径或验证失败不覆盖已保存绑定。
 

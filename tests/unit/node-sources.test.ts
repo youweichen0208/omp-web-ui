@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseXshell, parseSshConfig, isReadOnlyCommand } from "../../server/node-sources.js";
+import { parseXshell, parseSshConfig } from "../../server/node-sources.js";
 
 describe("node source adapters", () => {
 	it("imports Xshell metadata without carrying password ciphertext", () => {
@@ -19,8 +19,4 @@ describe("node source adapters", () => {
 	it("does not execute or silently approximate Include and Match", () => {
 		expect(parseSshConfig("Include hosts/*\nHost api\n Match exec bad-command\n User root")[0].unsupported).toEqual(["include", "match"]);
 	});
-});
-describe("read-only command grammar", () => {
-	it.each(["whoami", "pwd", "tail -n 50 /var/log/nginx/error.log", "systemctl status app --no-pager", "journalctl -u app -n 20 --no-pager"])("permits %s", (command) => expect(isReadOnlyCommand(command)).toBe(true));
-	it.each(["sudo systemctl restart app", "cat /a > /b", "pwd; rm /a", "cat $(touch /tmp/a)", "tail /a\nrm /a", "find / -exec rm {} +", "journalctl --vacuum-time=1s", "curl -X DELETE localhost", "env whoami"])("requires approval for %s", (command) => expect(isReadOnlyCommand(command)).toBe(false));
 });

@@ -100,12 +100,3 @@ export async function detectSources(): Promise<Pick<NodeSource, "kind" | "path" 
 	return found.filter((s) => s !== null);
 }
 export function sourcePath(value: string): string { return resolve(value.startsWith("~/") ? join(homedir(), value.slice(2)) : value); }
-
-/** Deliberately small grammar: shell composition and unknown flags require human approval. */
-export function isReadOnlyCommand(command: string): boolean {
-	if (!/^[a-zA-Z0-9_./ :@=-]+$/.test(command)) return false;
-	return /^(pwd|whoami|hostname|uptime|uname(?: -[amnrsv]+)?|id|df(?: -h)?|free(?: -[hm])?)$/.test(command.trim())
-		|| /^(?:cat|head|tail)(?: -n [1-9][0-9]{0,3})? \/[a-zA-Z0-9_./-]+$/.test(command.trim())
-		|| /^systemctl (?:status|is-active|is-failed) [a-zA-Z0-9_.@-]+(?: --no-pager)?$/.test(command.trim())
-		|| /^journalctl -u [a-zA-Z0-9_.@-]+(?: -n [1-9][0-9]{0,3})? --no-pager$/.test(command.trim());
-}
