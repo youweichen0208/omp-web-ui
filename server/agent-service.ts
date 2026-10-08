@@ -34,6 +34,12 @@ import {
 	type Conversation,
 } from "./conversation.js";
 import { browseDirs } from "./dir-browser.js";
+import { unexecutedToolText } from "./tool-text.js";
+
+/** Sent once per user prompt when the reply ends with a tool call written as text. */
+/** Upper bound of automatic requests per user prompt (each also needs real tool progress). */
+export const TOOL_TEXT_MAX_CONTINUES = 5;
+export const TOOL_TEXT_CONTINUE_PROMPT = "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。";
 import { clientIdleMsFromEnv, isClientEvictable } from "./client-eviction.js";
 import { PiConfigProbe, checkUpdate, installPiAgent, isPiCliInstalled } from "./pi-environment.js";
 export { QuiesceRejectedError };
@@ -634,6 +640,8 @@ export class ClientSession {
 			stallNoticed: false,
 			runningToolNames: new Map(),
 			toolsExecutedSincePrompt: false,
+			toolTextContinues: 0,
+			toolRanSinceContinue: false,
 
 			deltaSeq: 0,
 			thinkingTimings: new ThinkingTimings(),
@@ -869,6 +877,7 @@ export class ClientSession {
 				});
 				conv.runningToolNames.set(event.toolCallId, event.toolName);
 				conv.toolsExecutedSincePrompt = true;
+				conv.toolRanSinceContinue = true;
 				// Record the moment the tool actually starts so tool_status can
 				// report real execution time (vs. time spent waiting on the model).
 				conv.toolStartTimes.set(event.toolCallId, Date.now());
@@ -944,6 +953,7 @@ export class ClientSession {
 
 				conv.lastTaskEndedAt = Date.now();
 				this.scheduleSessionsRefresh();
+				void this.continueAfterToolText(conv);
 
 				// Deferred settings reload: settings (system prompt / skills /
 				// extensions) changed while the run was streaming — applying now
@@ -1642,6 +1652,7 @@ export class ClientSession {
 			await conv.tree?.waitForVerification();
 			if (this.conv !== conv || conv.session !== s) throw new Error("Conversation changed");
 			if (!s.isStreaming) { conv.toolsExecutedSincePrompt = false; conv.lastTaskEndedAt = undefined; }
+			conv.toolTextContinues = 0;
 			this.coordinatePlan(conv);
 			await deliverPrompt(s, text, asides, queue, acknowledge);
 		} catch (err) {
@@ -1712,6 +1723,39 @@ export class ClientSession {
 		await this.abort();
 		if (this.conv !== conv || isRecovering(conv.recovery) || conv.toolsExecutedSincePrompt || conv.session.messages.findLast(m => m.role === "user")?.timestamp !== user.timestamp) return;
 		await this.prompt(text);
+	}
+
+	/**
+	 * A model sometimes writes a tool call as text (`<invoke …>` / DSML) instead of
+	 * calling the tool. The SDK sees a plain answer and the run ends, leaving the task
+	 * half done. Ask the model to re-issue it through the tool channel. Loop guard:
+	 * after an automatic request the model must run at least one real tool before it
+	 * can be asked again, and at most TOOL_TEXT_MAX_CONTINUES times per user prompt.
+	 * The request is a visible user message and the run can be stopped as usual; when
+	 * the guard stops it, the recovery card offers a manual retry.
+	 */
+	private async continueAfterToolText(conv: Conversation): Promise<void> {
+		const session = conv.session;
+		if (this.disposed || conv.wiki || session.isStreaming || isRecovering(conv.recovery)) return;
+		if (conv.queueSteering.length || conv.queueFollowUp.length || this.quiesceBlocked()) return;
+		if (conv.toolTextContinues >= TOOL_TEXT_MAX_CONTINUES || (conv.toolTextContinues > 0 && !conv.toolRanSinceContinue)) return;
+		const messages = session.messages;
+		const userIndex = messages.findLastIndex(message => message.role === "user");
+		const last = messages[messages.length - 1];
+		if (userIndex < 0 || !last || last.role !== "assistant" || messages.indexOf(last) <= userIndex) return;
+		if (last.stopReason === "aborted" || last.stopReason === "error") return;
+		if (last.content.some(block => block.type === "toolCall")) return;
+		const text = last.content.map(block => block.type === "text" ? block.text : "").join("\n");
+		if (!unexecutedToolText(text)) return;
+		conv.toolTextContinues += 1;
+		conv.toolRanSinceContinue = false;
+		this.emit({ type: "notice", level: "warning", conversationId: conv.id, text: `模型把工具调用写成了文本，未执行；已自动请它重新调用（${conv.toolTextContinues}/${TOOL_TEXT_MAX_CONTINUES}）。` });
+		try {
+			if (conv.session !== session || session.isStreaming) return;
+			await deliverPrompt(session, TOOL_TEXT_CONTINUE_PROMPT, [], false, () => {});
+		} catch (error) {
+			this.emit({ type: "notice", level: "error", conversationId: conv.id, text: `自动继续失败：${(error as Error).message}` });
+		}
 	}
 
 	/** Re-push the current list on request (panel opened); prunes dead entries first. */

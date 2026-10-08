@@ -34,6 +34,7 @@ const ALL = [
 	"ws-malformed-test",
 	"security-headers-test",
 	"token-env-leak-test",
+	"tool-text-continue-test",
 	"clear-provider-key-test",
 	"component-updates-test",
 	"extensions-test",
