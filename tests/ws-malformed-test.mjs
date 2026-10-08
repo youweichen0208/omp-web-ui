@@ -59,7 +59,15 @@ try {
 	assert((await fetch(`http://127.0.0.1:${PORT}/api/health`)).ok, 'server still answers HTTP');
 	assert(notices.some(t => /请求处理失败/.test(t)), 'synchronous failures are reported to the client');
 	ws.close();
-	console.log('PASS malformed messages are contained; server stays up');
+	// A clientId that could leave uploads/<clientId>/ is refused at the handshake (4400).
+	for (const bad of ['../../escape', 'a/b', '.hidden']) {
+		const evil = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+		const closed = new Promise(resolve => evil.on('close', code => resolve(code)));
+		await new Promise(resolve => evil.on('open', resolve));
+		evil.send(JSON.stringify({ type: 'hello', clientId: bad }));
+		assert.equal(await closed, 4400, `clientId ${bad} must be rejected`);
+	}
+	console.log('PASS malformed messages are contained; server stays up; unsafe clientIds are refused');
 } finally {
 	server.kill();
 	await sleep(300);

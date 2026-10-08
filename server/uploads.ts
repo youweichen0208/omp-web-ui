@@ -10,7 +10,7 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 /** Same resolution as index.ts DATA_DIR — kept in sync by env contract. */
 export function resolveDataDir(): string {
@@ -34,7 +34,12 @@ export function saveUpload(
 	buf: Buffer,
 	dataDir = resolveDataDir(),
 ): { abs: string; displayName: string } {
-	const dir = join(uploadsRoot(dataDir), clientId);
+	const root = uploadsRoot(dataDir);
+	const dir = join(root, clientId);
+	// Belt and braces: the id is validated at the socket, but never write outside uploads/.
+	if (relative(root, dir).startsWith("..") || isAbsolute(relative(root, dir)) || relative(root, dir) === "") {
+		throw new Error("invalid upload location");
+	}
 	mkdirSync(dir, { recursive: true });
 	const displayName =
 		name

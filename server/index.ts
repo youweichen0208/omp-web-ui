@@ -47,6 +47,7 @@ import { readSqlitePreview } from "./sqlite-preview.js";
 import { saveMarkdownImage } from "./markdown-images.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { ensureWindowsBash, windowsBashDir } from "./ensure-bash.js";
+import { isValidClientId } from "./client-id.js";
 import { securityHeaders } from "./security-headers.js";
 import { needsTokenCookie, tokenCookie, tokenMatches } from "./token-auth.js";
 import { createOriginPolicy } from "./origin-policy.js";
@@ -884,6 +885,10 @@ wss.on("connection", (ws) => {
 		}
 
 		if (msg.type === "hello") {
+			if (msg.clientId !== undefined && msg.clientId !== "" && !isValidClientId(msg.clientId)) {
+				ws.close(4400, "invalid clientId");
+				return;
+			}
 			const cid = msg.clientId || randomUUID();
 			clientId = cid;
 			service
