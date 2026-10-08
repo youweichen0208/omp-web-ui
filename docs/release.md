@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.16 Wiki 编辑与对话修复
+
+从 origin/develop 发布，修复斜杠代码／表格菜单定位、新对话思考强度继承，以及 Wiki 索引导致保存和发送卡顿的问题。SDK 1.0.4、协议 v41 不变。发布 GitHub 源码与三平台桌面 Release；说明见 `.github/release-notes/v0.99.16.md`。
+
 ## 0.99.15 对话与代码改动（35a）
 
 按第 23 个设计包实现独立代码改动面板、每轮成功文件汇总和历史命令折叠，支持本轮／整个分支／未提交、词级差异、文件定位、搜索与窄屏抽屉。包含 develop 上的 pi-harness 包名和命令更名。版本按本次要求从未发布的 1.0.0 准备状态调整为 0.99.15；SDK 1.0.4 不变，协议 v41。发布 GitHub 源码与三平台桌面 Release；说明见 `.github/release-notes/v0.99.15.md`。
