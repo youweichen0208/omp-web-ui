@@ -346,7 +346,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		if (!savedRange.current || !root.current.contains(range.startContainer)) { range.selectNodeContents(root.current); range.collapse(false); }
 		const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return true;
 	};
-	const insertToolbar = (id: string, dimensions?: { columns: number; rows: number }, language?: string) => {
+	const insertToolbar = (id: string, dimensions?: { columns: number; rows: number }, language?: string, popupAnchor?: Pick<DOMRect, "left" | "bottom">) => {
 		if (!restoreInsert()) return;
 		const anchor = window.getSelection()?.anchorNode;
 		const originalBlock = (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("p,h1,h2,h3,h4,h5,h6");
@@ -354,7 +354,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		const emptyBlock = !originalBlock?.textContent?.trim();
 		let formattedTag: string | undefined;
 		if ((id === "bg" && !dimensions) || (id === "dmk" && language === undefined)) {
-			const rect = savedRange.current?.getBoundingClientRect();
+			const rect = popupAnchor ?? savedRange.current?.getBoundingClientRect();
 			setInsertPopup({ kind: id === "bg" ? "table" : "code", x: insertPopup?.x ?? rect?.left ?? 16, y: insertPopup?.y ?? (rect?.bottom ?? 80) + 6 }); return;
 		}
 		setInsertPopup(null);
@@ -426,9 +426,11 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		const selection = window.getSelection();
 		selection?.removeAllRanges();
 		selection?.addRange(range);
+		// Deleting the slash text can leave an empty block whose caret rect is all zeros.
+		const popupAnchor = range.getBoundingClientRect();
 		closeMenu();
 		document.execCommand("delete");
-		if (wiki) { prepareInsert(); insertToolbar(item.alias); return; }
+		if (wiki) { prepareInsert(); insertToolbar(item.alias, undefined, undefined, popupAnchor); return; }
 		if (item.action === "image") { imageRange.current = selection?.getRangeAt(0).cloneRange() ?? null; imageInput.current?.click(); update(); return; }
 		if (item.action === "wikiLink") { linkRange.current = selection?.getRangeAt(0).cloneRange() ?? null; setLinkInput("[["); update(); return; }
 		if (wiki && item.alias === "bg") command("insertHTML", `<table><thead><tr>${[1, 2, 3].map(n => `<th ${n === 1 ? "data-slash-insert" : ""}>${t("richColumn")} ${n}</th>`).join("")}</tr></thead><tbody>${[1, 2].map(() => "<tr><td>…</td><td>…</td><td>…</td></tr>").join("")}</tbody></table><p><br></p>`);
