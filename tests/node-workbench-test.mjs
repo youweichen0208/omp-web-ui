@@ -46,8 +46,9 @@ try {
 	assert.equal((await call("chat_prompt", nodeId, { text: "test" })).event, "failure");
 
 	assert.equal((await call("terminal_input", nodeId, { data: "hello\r" }, "term-a", conversationId)).event, "result");
-	await new Promise((r) => setTimeout(r, 50));
-	assert(events.some((e) => e.event === "terminal_output" && e.nodeId === nodeId && e.terminalId === "term-a" && e.data.text.includes("echo:hello")));
+	const echoed = () => events.some((e) => e.event === "terminal_output" && e.nodeId === nodeId && e.terminalId === "term-a" && e.data.text.includes("echo:hello"));
+	for (let i = 0; i < 250 && !echoed(); i++) await new Promise((r) => setTimeout(r, 20)); // poll: a fixed sleep made this timing-dependent
+	assert(echoed());
 	const output = await service.execute("client-a", nodeId, "term-a", "pwd");
 	assert.match(output, /echo:pwd/);
 	assert(events.some((e) => e.event === "terminal_output" && e.nodeId === nodeId && e.terminalId === "term-a" && e.data.text.includes("echo:pwd")));

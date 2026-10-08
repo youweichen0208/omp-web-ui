@@ -233,6 +233,7 @@ export async function startMockSsh(pluginDir, port, publicKeys = []) {
 		try {
 			srv = new Server({ hostKeys: [HOST_KEY] }, (client) => {
 				client.on("error", () => {}); // 客户端断开等 socket 错误不炸测试进程
+				client.setNoDelay(true); // 与 sshd 一致：交互式小包不被 Nagle 合并
 				client.on("authentication", (ctx) => {
 					if (ctx.username === "tester" && ctx.method === "publickey" && publicKeys.some((key) => key.getPublicSSH().equals(ctx.key.data) && (!ctx.signature || key.verify(ctx.blob, ctx.signature, ctx.hashAlgo) === true))) return ctx.accept();
 					if (ctx.username === "tester" && ctx.password === "secret123") return ctx.accept();

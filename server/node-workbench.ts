@@ -355,7 +355,8 @@ export class NodeWorkbench {
 		try {
 			await new Promise<void>((ok, reject) => {
 				let settled = false;
-				client.once("ready", () => { settled = true; ok(); });
+				// Interactive terminal: small keystroke packets must not wait for Nagle/delayed-ACK (~40ms each way).
+				client.once("ready", () => { client.setNoDelay(true); settled = true; ok(); });
 				client.on("error", (e) => { if (!settled) { settled = true; reject(e); } else this.drop(c); });
 				client.on("close", () => { if (!settled) { settled = true; reject(new Error("SSH 连接已关闭")); } this.drop(c); });
 				client.connect(opts);
