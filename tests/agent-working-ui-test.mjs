@@ -118,7 +118,7 @@ assert((await output.getAttribute('class')).includes('has-overflow'));
 await output.evaluate(e=>e.scrollLeft=e.scrollWidth);await sleep(100);
 assert(!(await output.getAttribute('class')).includes('has-overflow'));
 emit({messages:[{...messages[4],timestamp:Date.now()}],isStreaming:true,streamingMessage:null});
-await page.locator('.waiting-indicator', {hasText:'理解你的问题'}).waitFor();
+await page.locator('.waiting-indicator', {hasText:'Understanding your question'}).waitFor();
 assert.equal(await page.locator('.waiting-brand i').count(),3);
 emit({messages:conversation,isStreaming:true,streamingMessage:{id:'stream-thinking',role:'assistant',model:'glm-5.3',content:[{type:'thinking',thinking:'Working on the request',durationMs:0}]}});
 await page.locator('.thinking.live').waitFor();

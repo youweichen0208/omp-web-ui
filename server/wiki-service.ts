@@ -10,6 +10,12 @@ import type { WikiEntry, WikiState, WikiDocument, WikiRevision, WikiChange, Wiki
 const MAX_FILE = 2 * 1024 * 1024;
 const MAX_SNAPSHOT = 64 * 1024 * 1024;
 const IGNORED = new Set([".git", "node_modules", ".pi-web", ".DS_Store"]);
+// Generated dependencies and duplicate checkouts must not consume the main
+// workspace's index or undo budget. Explicit directory/file requests stay usable.
+const TRAVERSAL_IGNORED_DIRS = new Set([".venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+function skipTraversalDirectory(parent: string, name: string) {
+	return TRAVERSAL_IGNORED_DIRS.has(name) || (name === "worktrees" && basename(parent) === ".claude");
+}
 const hash = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
 type Snapshot = { files: Map<string, Buffer>; skipped: string[]; limited?: boolean };
 export class WikiConflictError extends Error {}
@@ -104,7 +110,7 @@ export class WikiService {
 			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); } catch { limited = true; status.totalIsLowerBound = true; status.issues.push({ path, reason: "unreadable", subtree: true }); return; }
 			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 			for (const child of children) {
-				if (IGNORED.has(child.name)) continue;
+				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(path, child.name)) continue;
 				if (visited >= 20000) { limited = true; status.totalIsLowerBound = true; status.issues.push({ path: path || ".", reason: "entry-limit", subtree: true }); break; }
 				visited++;
 				const p = path ? `${path}/${child.name}` : child.name;
@@ -217,7 +223,7 @@ export class WikiService {
 			catch { skip(path); return; }
 			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 			for (const child of children) {
-				if (IGNORED.has(child.name)) continue;
+				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(path, child.name)) continue;
 				if (visited++ >= 20000) { skip(path); break; }
 				const p = path ? `${path}/${child.name}` : child.name;
 				try {

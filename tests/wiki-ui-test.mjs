@@ -122,6 +122,28 @@ try {
 	await page.getByRole('treeitem', { name: '.obsidian', exact: true }).waitFor();
 	assert.equal(await page.evaluate(cwd => localStorage.getItem(`pi-wiki-hidden:${cwd}`), cwd), 'true');
 	await page.getByRole('treeitem', { name: '隐藏文件夹 · 1', exact: true }).click();
+	const mixedIndex = async route => {
+		const response = await route.fetch();
+		if (!['state', 'refresh'].includes(route.request().postDataJSON()?.action) || !response.ok()) return route.fulfill({ response });
+		const data = await response.json();
+		data.index = { indexed: 5124, total: 17918, totalIsLowerBound: true, issues: [
+			{ path: 'blocked-dir', reason: 'unreadable', subtree: true },
+			{ path: 'large.md', reason: 'file-size', size: 3 * 1024 * 1024 },
+			{ path: 'budget.md', reason: 'byte-budget', size: 100 },
+		] };
+		await route.fulfill({ response, json: data });
+	};
+	await page.route('**/api/wiki', mixedIndex);
+	await page.getByRole('button', { name: '刷新文件', exact: true }).click();
+	await page.locator('.wiki-index-reason', { hasText: '3 种原因' }).waitFor();
+	assert(!(await page.locator('.wiki-index-status').innerText()).includes('3 项受限：文件无法读取'));
+	await page.locator('.wiki-index-status').click();
+	assert.equal(await page.locator('.wiki-index-summary li').count(), 3);
+	assert((await page.locator('.wiki-index-summary').innerText()).includes('1 项受限：文件无法读取或路径不可访问'));
+	await page.keyboard.press('Escape');
+	await page.unroute('**/api/wiki', mixedIndex);
+	await page.getByRole('button', { name: '刷新文件', exact: true }).click();
+	await page.locator('.wiki-index-reason', { hasText: '1 项受限：单个文件超过 2 MB' }).waitFor();
 	await page.locator('.wiki-index-status').click();
 	await page.getByRole('dialog').getByText('large.md', { exact: true }).waitFor();
 	await page.getByRole('dialog').getByText('单个文件超过 2 MB', { exact: true }).waitFor();

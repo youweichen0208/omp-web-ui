@@ -33,6 +33,29 @@ describe("Wiki workspace", () => {
 		expect(readFileSync(join(cwd, "notes.md"), "utf8")).toBe("External");
 	});
 
+	it("background indexing and undo snapshots skip worktree copies and Python dependencies", async () => {
+		const { cwd, service } = fixture();
+		const ignored = [".claude/worktrees/copy", ".venv/lib", "services/runner/.venv/lib", "src/__pycache__", ".pytest_cache"];
+		for (const path of ignored) {
+			mkdirSync(join(cwd, path), { recursive: true });
+			writeFileSync(join(cwd, path, "oversized.md"), Buffer.alloc(2 * 1024 * 1024 + 1));
+		}
+		mkdirSync(join(cwd, ".claude/skills"), { recursive: true });
+		writeFileSync(join(cwd, ".claude/skills/guide.md"), "# Keep workspace skills");
+		writeFileSync(join(cwd, ".claude/worktrees/copy/note.md"), "# Copy content");
+		const index = await service.index(cwd);
+		expect(index.status).toMatchObject({ indexed: 4, total: 4, totalIsLowerBound: false, issues: [] });
+		expect(index.texts.has(".claude/skills/guide.md")).toBe(true);
+		const snapshot = await service.begin(cwd);
+		expect(snapshot.files.size).toBe(4);
+		expect(snapshot.skipped).toEqual([]);
+		service.cancel(cwd);
+		// Exclusion is only for automatic traversal; explicit browsing still works.
+		expect((await service.directory(cwd, ".claude")).entries.some(e => e.path === ".claude/worktrees")).toBe(true);
+		expect((await service.documentContent(cwd, ".claude/worktrees/copy/note.md")).text).toBe("# Copy content");
+		expect((await service.index(join(cwd, ".claude/worktrees/copy"))).texts.has("note.md")).toBe(true);
+	});
+
 	it("snapshot traversal excludes history, symlinks and oversized files", async () => {
 		const { cwd, root } = fixture();
 		const data = join(cwd, "history");

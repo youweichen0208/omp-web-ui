@@ -83,7 +83,7 @@ try {
 	assert(await page.locator('[data-tool-call-id="attempt-1"]').evaluate(el=>el.classList.contains('empty')));
 	for (const id of ['attempt-2','read-3']) socket.send(JSON.stringify({type:'tool_status',conversationId:snapshot.state.conversationId,toolCallId:id,toolName:'bash',isError:false,running:false,durationMs:50}));
 	assert(!(await page.locator('.bash-row-stats').allTextContents()).some(text=>text.includes('0.0s') || text.includes('<0.1s')));
-	await page.locator('.trailing-working .waiting-indicator', { hasText: '阅读命令结果' }).waitFor();
+	await page.locator('.trailing-working .waiting-indicator', { hasText: 'Reading command results' }).waitFor();
 	const spacing = await page.evaluate(() => { const card = document.querySelector('.bash-group').getBoundingClientRect(); const status = document.querySelector('.trailing-working .waiting-indicator').getBoundingClientRect(); return { gap: status.top - card.bottom, offset: status.left - card.left }; });
 	assert(spacing.gap >= 0 && spacing.gap < 18 && Math.abs(spacing.offset) <= 2, JSON.stringify(spacing));
 	await page.screenshot({path:'/tmp/pi-reading-hierarchy.png'});
@@ -116,13 +116,13 @@ try {
 	await page.clock.runFor(299);
 	assert.equal(await page.locator('.waiting-indicator').count(),0);
 	await page.clock.runFor(1);
-	await page.locator('.waiting-label',{hasText:'理解你的问题'}).waitFor();
+	await page.locator('.waiting-label',{hasText:'Understanding your question'}).waitFor();
 	assert.equal(await page.locator('.waiting-brand i').count(),3);
 	assert.equal(await page.locator('.waiting-duration').count(),0);
 	await page.clock.runFor(3700);
-	assert.equal(await page.locator('.waiting-duration').innerText(),'4 秒');
+	assert.equal(await page.locator('.waiting-duration').innerText(),'4 sec');
 	await page.clock.runFor(61000);
-	assert.equal(await page.locator('.waiting-duration').innerText(),'1 分 05 秒');
+	assert.equal(await page.locator('.waiting-duration').innerText(),'1 min 05 sec');
 	await page.locator('.waiting-stop').click();
 	assert.equal(submitted.at(-1).type,'abort');
 	await page.emulateMedia({reducedMotion:'reduce'});
@@ -134,7 +134,7 @@ try {
 	await publish({streamingMessage:null,queue:{steering:['Please check auth'],followUp:[]}});
 	await publish({messages:[...snapshot.state.messages,{id:'steered-user',role:'user',content:[{type:'text',text:'Please check auth'}]}],queue:{steering:[],followUp:[]}});
 	await page.clock.runFor(300);
-	await page.locator('.waiting-label',{hasText:'处理你的插话'}).waitFor();
+	await page.locator('.waiting-label',{hasText:'Processing your direction'}).waitFor();
 	await publish({isStreaming:false});
 	assert.equal(await page.locator('.waiting-indicator').count(),0);
 	assert.deepEqual(errors,[]);

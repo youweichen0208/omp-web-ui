@@ -11430,3 +11430,5 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 	.wiki-breadcrumb .wiki-path-parent, .wiki-breadcrumb > b { display: none; }
 	.wiki-mode #wiki-toolbar-slot { gap: 4px; }
 }
+
+.wiki-index-summary { flex: none; margin: 0 0 12px; padding-left: 20px; font-size: 12px; line-height: 1.8; color: var(--text-dim); }
