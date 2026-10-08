@@ -11399,7 +11399,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-document-heading { margin-bottom: 28px; }
 .wiki-document-meta { margin-bottom: 0; }
 /* Native formatBlock requires a box for each editable block to preserve its text. */
-.wiki-prose .fp-rich-document .rich-block { display: flow-root; }
+.wiki-prose .fp-rich-document .rich-block { display: block; }
 .wiki-prose .fp-rich-document .rich-block[hidden] { display: none; }
 .wiki-prose.md p, .wiki-prose .fp-markdown .md p { margin: .75em 0; }
 .wiki-prose .fp-rich-document > .rich-block:not([hidden]):not(.rich-block:not([hidden]) ~ .rich-block) > :first-child { margin-top: 0; }
