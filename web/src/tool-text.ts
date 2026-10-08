@@ -2,7 +2,7 @@ import type { UiMessage } from "../../server/protocol.js";
 import { toolTextIncidents } from "../../server/tool-text-incidents.js";
 export { toolTextIncidents, projectToolTextMessages } from "../../server/tool-text-incidents.js";
 export type { ToolTextIncident } from "../../server/tool-text-incidents.js";
-export { unexecutedToolText } from "../../server/tool-text.js";
+export { TOOL_TEXT_CONTINUE_PROMPT, unexecutedToolText } from "../../server/tool-text.js";
 
 /** The recovery action always belongs to the original user, never the reminder. */
 export function latestToolTextFailure(messages: readonly UiMessage[], streaming = false) {

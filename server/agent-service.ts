@@ -37,7 +37,6 @@ import { browseDirs } from "./dir-browser.js";
 import { projectToolTextMessages } from "./tool-text-incidents.js";
 import { unexecutedToolText, TOOL_TEXT_CONTINUE_PROMPT } from "./tool-text.js";
 
-/** Sent once per user prompt when the reply ends with a tool call written as text. */
 /** Upper bound of automatic requests per user prompt (each also needs real tool progress). */
 export const TOOL_TEXT_MAX_CONTINUES = 1;
 export { TOOL_TEXT_CONTINUE_PROMPT } from "./tool-text.js";

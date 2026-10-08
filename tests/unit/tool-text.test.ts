@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { latestToolTextFailure, unexecutedToolText } from "../../web/src/tool-text.js";
+import { TOOL_TEXT_CONTINUE_PROMPT, latestToolTextFailure, unexecutedToolText } from "../../web/src/tool-text.js";
 
 const call = '<invoke name="edit"> <parameter name="path">fixture.py</parameter> <parameter name="edits">[{"oldText":"default","newText":"multi"}]</parameter> </invoke>';
 test("identifies the reported complete tool instruction without interpreting or executing arguments", () => {
@@ -42,4 +42,21 @@ test("the tail fallback still ignores closed code, inline code and calls followe
 	for (const text of [`\`\`\`xml\n${fragment}\n\`\`\``, `\`${fragment}\``, `${fragment}\n然后我会看结果。`, "</parameter></invoke>", '<parameter name="command">ls</parameter>']) {
 		expect(unexecutedToolText(text), text).toBeNull();
 	}
+});
+
+test("after the automatic request, a reply without any tool call is reported as stopped", () => {
+	const user = { id: "user", role: "user" as const, content: [{ type: "text" as const, text: "验证一下改动" }] };
+	const leak = { id: "leak", role: "assistant" as const, content: [{ type: "text" as const, text: call }] };
+	const nudge = { id: "nudge", role: "user" as const, content: [{ type: "text" as const, text: TOOL_TEXT_CONTINUE_PROMPT }] };
+	const announce = { id: "announce", role: "assistant" as const, content: [{ type: "text" as const, text: "你说得对。让我通过真正的工具调用创建验证脚本文件。" }] };
+	expect(latestToolTextFailure([user, leak, nudge, announce])).toEqual({ user, message: announce });
+	expect(latestToolTextFailure([user, leak, nudge, announce], true)).toBeNull();
+	// The model did act after the request: a later plain answer is a normal ending.
+	const acted = { id: "acted", role: "assistant" as const, content: [{ type: "toolCall" as const, id: "t", name: "write", argumentsText: "{}" }] };
+	expect(latestToolTextFailure([user, leak, nudge, acted, { ...announce, id: "done", content: [{ type: "text" as const, text: "完成。" }] }])).toBeNull();
+	// The same plain reply to an ordinary user message is never a failure.
+	expect(latestToolTextFailure([{ ...nudge, content: [{ type: "text" as const, text: "继续" }] }, announce])).toBeNull();
+	// A text-written call after the request keeps the "text" kind.
+
+	expect(latestToolTextFailure([user, leak, nudge, { ...announce, content: [{ type: "text" as const, text: call }] }])?.user).toBe(user);
 });
