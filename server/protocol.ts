@@ -1228,6 +1228,10 @@ export type ServerMessage =
 			untrackedTruncated?: boolean;
 			/** commit payload */
 			text?: string;
+			/** diff payload: untracked files left out of `text` (count cap). */
+			omittedUntracked?: number;
+			/** diff payload: the full-file context exceeded the output cap, so `text` has 3 lines of context. */
+			reducedContext?: boolean;
   }
 	| {
 			type: "path_completions";
