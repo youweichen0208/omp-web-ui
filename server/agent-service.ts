@@ -1864,6 +1864,9 @@ export class ClientSession {
 			const manager = conv.session.sessionManager;
 			const header = manager.getHeader();
 			const wikiManager = conv.wiki ? SessionManager.inMemory(conv.cwd, undefined, [...(header ? [header] : []), ...manager.getEntries()]) : null;
+			// Reopen THIS conversation's file. continueRecent() would pick the most
+			// recently written session of the project, which may be another open chat.
+			const sessionFile = conv.session.sessionFile;
 			conv.toolStartTimes.clear();
 			await conv.runtime.dispose();
 			const runtime = await createAgentSessionRuntime(
@@ -1871,7 +1874,7 @@ export class ClientSession {
 				{
 					cwd: conv.cwd,
 					agentDir: this.agentDir,
-					sessionManager: wikiManager ?? SessionManager.continueRecent(conv.cwd),
+					sessionManager: wikiManager ?? (sessionFile ? SessionManager.open(sessionFile) : SessionManager.create(conv.cwd)),
 				},
 			);
 			conv.runtime = runtime;
@@ -1880,7 +1883,8 @@ export class ClientSession {
 			conv.recovery = {};
 			conv.session = runtime.session;
 			this.emit({ type: "notice", level: "warning", text: reason });
-			await this.bindSession();
+			// Rebind the recovered conversation itself, which may be in the background.
+			await this.bindSession(conv);
 			this.emitConversations();
 			void this.pushSlashCommands();
 		} catch (err) {
