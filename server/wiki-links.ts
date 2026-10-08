@@ -69,7 +69,15 @@ export function withoutCode(text: string): string {
 	for (const [start, end] of ranges) { result += text.slice(at, start) + text.slice(start, end).replace(/[^\n]/g, " "); at = end; }
 	return result + text.slice(at);
 }
-export function resolveWikiLink(source: string, target: string, paths: string[]): string | undefined {
+/** Path lookups for resolving many links against one workspace listing. */
+export type WikiLinkIndex = { paths: Set<string>; byName: Map<string, string[]> };
+const linkName = (path: string) => (path.split("/").at(-1) ?? "").replace(/\.(md|txt)$/i, "");
+export function wikiLinkIndex(paths: string[]): WikiLinkIndex {
+	const byName = new Map<string, string[]>();
+	for (const p of paths) { const name = linkName(p), list = byName.get(name); if (list) list.push(p); else byName.set(name, [p]); }
+	return { paths: new Set(paths), byName };
+}
+export function resolveWikiLink(source: string, target: string, paths: string[] | WikiLinkIndex): string | undefined {
 	let raw: string;
 	try { raw = decodeURIComponent(target.split("|")[0].split("#")[0]).replaceAll("\\", "/"); } catch { return; }
 	if (!raw || /^(?:[a-z]+:|\/)/i.test(raw)) return;
@@ -79,10 +87,11 @@ export function resolveWikiLink(source: string, target: string, paths: string[])
 		return out.join("/");
 	};
 	const parent = source.includes("/") ? source.slice(0, source.lastIndexOf("/") + 1) : "";
+	const index = Array.isArray(paths) ? wikiLinkIndex(paths) : paths;
 	for (const candidate of [normalize(parent + raw), normalize(raw)]) {
-		for (const p of [candidate, candidate + ".md", candidate + ".txt"]) if (paths.includes(p)) return p;
+		for (const p of [candidate, candidate + ".md", candidate + ".txt"]) if (index.paths.has(p)) return p;
 	}
-	const matches = paths.filter(p => p.split("/").at(-1)?.replace(/\.(md|txt)$/i, "") === raw.replace(/\.(md|txt)$/i, ""));
+	const matches = index.byName.get(raw.replace(/\.(md|txt)$/i, "")) ?? [];
 	return matches.length === 1 ? matches[0] : undefined;
 }
 export function wikiReferences(text: string): { target: string; snippet: string; line: number }[] {
