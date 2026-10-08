@@ -26,7 +26,8 @@ export async function updateAuthFile(
 	const release = await lockfile.lock(authPath, {
 		realpath: false,
 		stale: 30_000,
-		retries: { retries: 10, minTimeout: 20, maxTimeout: 200 },
+		// Same order of patience as the SDK (it waits up to 30s): contention is brief but real.
+		retries: { retries: 30, minTimeout: 20, maxTimeout: 500 },
 	});
 	try {
 		const raw = readFileSync(authPath, "utf8").replace(/^﻿/, "");
