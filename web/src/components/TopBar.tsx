@@ -207,7 +207,7 @@ export function TopBar({
 				<span className="brand-name">pi-web-ui</span>
 				{desktopAPI && (
 					<span className="desktop-window-title" title={chat.state?.cwd ?? ""}>
-						pi <span className="desktop-title-separator">/</span> {projectName || t("desktopWorkspace")}
+						pi-harness <span className="desktop-title-separator">/</span> {projectName || t("desktopWorkspace")}
 					</span>
 				)}
 				<span className={`conn-dot ${connClass}`} title={connLabel} />

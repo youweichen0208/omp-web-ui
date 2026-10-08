@@ -221,7 +221,7 @@ function createWindow() {
 		height: 800,
 		minWidth: 800,
 		minHeight: 600,
-		title: "pi",
+		title: "pi-harness",
 		backgroundColor: "#ffffff",
 		show: false,
 		...(process.platform === "darwin"

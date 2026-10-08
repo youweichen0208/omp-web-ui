@@ -1362,7 +1362,7 @@ export function useChat() {
 		terminal: terminalApi,
 	};
 	const extension = chat.extensionUi[chat.activeConversationId];
-	useEffect(() => { document.title = extension?.title || "pi-web-ui"; }, [extension?.title]);
+	useEffect(() => { document.title = extension?.title || "pi-harness"; }, [extension?.title]);
 	const scopedChat = { ...chat, notices: chat.notices.filter(n => !n.conversationId || n.conversationId === chat.activeConversationId), widgets: extension?.widgets ?? [], statuses: extension?.statuses ?? [], dialog: chat.pendingDialogs.find(d => d.conversationId === chat.activeConversationId) ?? null };
 	const displayChat = switching ? {
 		...chat,
