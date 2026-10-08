@@ -17,17 +17,16 @@ interface RightPanelProps {
 	messages: UiMessage[];
 	streamingMessage: UiMessage | null;
 	taskProgress?: TaskProgress | null;
-	conversationTitle: string;
+	conversationId: string;
 	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
 	send: (msg: { type: "list_files"; path?: string }) => boolean;
 	onAttach: (path: string, name: string, mode: AttachMode, isDir?: boolean) => void;
 	onPreview: (path: string, name: string) => void;
 	onNotice: (level: "info" | "warning" | "error", text: string) => void;
-	onViewChanges: (hash?: string) => void;
 }
 
-export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, taskProgress, conversationTitle, agentSilence, cwd, send, onAttach, onPreview, onNotice, onViewChanges }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
 	const t = useT();
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
@@ -149,7 +148,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		{directories[path]?.truncated && <div className="panel-empty files-truncated">{t("filesTruncated")}</div>}
 	</>;
 	const otherDirectories = directoryEntries("").filter(({ entry }) => entry.type === "dir" && !changed.some((change) => change.path === entry.path || change.path.startsWith(`${entry.path}/`)) && (showHidden || !entry.name.startsWith("."))).length;
-	return <aside className={`panel panel-right${taskProgress ? " has-task-progress" : ""}`}>
+	return <aside className="panel panel-right has-task-progress">
 		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
@@ -174,7 +173,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 			{compactTree && !onlyChanged && otherDirectories > 0 && <button type="button" className="tree-other-directories" onClick={() => setShowOtherDirectories(true)}>{t("otherDirectories", { n: otherDirectories })}</button>}
 		</div>
-		{taskProgress && <div className="panel-lower"><TaskProgressPanel task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} conversationTitle={conversationTitle} onPreview={onPreview} onViewChanges={onViewChanges} /></div>}
+		<div className="panel-lower"><TaskProgressPanel key={conversationId} task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} onPreview={onPreview} /></div>
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (
 				<div className="panel-widgets">
 					{widgets

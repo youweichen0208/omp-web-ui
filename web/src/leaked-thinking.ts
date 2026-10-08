@@ -38,22 +38,43 @@ function lastCloseEnd(s: string): number {
 	return end;
 }
 
+/** Match protocol markers outside Markdown code, retaining offsets into the original. */
+export function maskMarkdownCode(text: string): string {
+	let fence: { marker: string; length: number } | undefined;
+	const masked = text.split("\n").map(line => {
+		const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+		const inCode = !!fence || !!marker;
+		if (marker) {
+			if (!fence) fence = { marker: marker[1][0], length: marker[1].length };
+			else if (marker[1][0] === fence.marker && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
+		}
+		return inCode ? line.replace(/</g, "\0") : line;
+	}).join("\n");
+	return masked.replace(/(`+)([\s\S]*?)\1(?!`)/g, code => code.replace(/</g, "\0"));
+}
+
+// Only a trailing closing sequence with an explicit DSML marker qualifies.
+// Ordinary XML such as </invoke>, and tags being discussed in prose, stay intact.
+const DSML_TAIL_RE = /(?:\s*<\/(?:[｜|]DSML[｜|])?(?:parameter|invoke|tool_calls)>)+\s*$/i;
+const THINK_TAG_RE = /<\/?(?:ant)?think(?:ing)?>/gi;
+
 export function splitLeakedThinking(text: string): LeakedThinkingSplit | null {
-	const trailing = text.match(TRAILING_TAGS_RE);
-	// Only treat end-of-block tags as peelable junk when a closing tag still
-	// remains before them — that's what marks the earlier text as reasoning
-	// and the text between as the real reply. When they are the *only* tags,
-	// `prose</think>` is an ordinary leaked-reasoning run and folds whole.
-	const peelable =
-		trailing != null && lastCloseEnd(text.slice(0, trailing.index)) !== -1;
-	const trailingJunk = peelable ? trailing[0].trim() : "";
+	let masked = maskMarkdownCode(text);
+	const dsml = masked.match(DSML_TAIL_RE);
+	const hasDsmlTail = !!dsml && /[｜|]DSML[｜|]/i.test(dsml[0]);
+	if (hasDsmlTail) {
+		text = text.slice(0, dsml.index).trimEnd();
+		masked = masked.slice(0, dsml.index).trimEnd();
+	}
+	const trailing = masked.match(TRAILING_TAGS_RE);
+	const peelable = trailing != null && lastCloseEnd(masked.slice(0, trailing.index)) !== -1;
+	const trailingJunk = peelable ? text.slice(trailing.index).trim() : "";
 	const body = peelable ? text.slice(0, trailing.index) : text;
+	const lastEnd = lastCloseEnd(peelable ? masked.slice(0, trailing.index) : masked);
+	if (lastEnd === -1) return hasDsmlTail ? { leaked: "", visible: text.trim() } : null;
 
-	const lastEnd = lastCloseEnd(body);
-	if (lastEnd === -1) return null;
-
-	const leaked = [body.slice(0, lastEnd).trim(), trailingJunk]
-		.filter(Boolean)
-		.join("\n");
-	return { leaked, visible: body.slice(lastEnd).trim() };
+	const leaked = [body.slice(0, lastEnd).trim(), trailingJunk].filter(Boolean).join("\n");
+	// Empty delimiter fragments must not create an "Additional model content" row.
+	const hasContent = maskMarkdownCode(leaked).replace(THINK_TAG_RE, "").trim().length > 0;
+	return { leaked: hasContent ? leaked : "", visible: body.slice(lastEnd).trim() };
 }

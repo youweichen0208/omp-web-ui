@@ -29,6 +29,7 @@ import { GrepSummary, liveNestedCalls, ReadGroup, ToolCallBlock, type ToolView }
 import { EditWriteCard, EditWriteGroup } from "./EditWriteCard";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
+import { unexecutedToolText } from "../tool-text";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
 import { isRasterImage, fileToProcessedImage } from "../image-paste";
 import { splitFrontmatter } from "../read-presentation";
@@ -789,18 +790,25 @@ function Block({
 		// it folds away the moment the tag completes. Skipping this during
 		// streaming meant the leak sat in plain view for the whole turn,
 		// which is precisely when the user is watching.
-		const leak = splitLeakedThinking(text.text);
-		const body = leak ? leak.visible : text.text;
-		if (!body.trim() && !leak?.leaked.trim() && !text.truncated) return null;
+		const failedCall = !user && !streaming ? unexecutedToolText(text.text) : null;
+		const displayText = failedCall ? failedCall.before : text.text;
+		const leak = user ? null : splitLeakedThinking(displayText);
+		const body = leak ? leak.visible : displayText;
+		if (!body.trim() && !leak?.leaked.trim() && !failedCall && !text.truncated) return null;
 		return (
 			<div className={`msg-text${!user && !isLast && isProcessNarration(body) ? " process-narration" : ""}`}>
-				{leak && <LeakedThinkingBlock text={leak.leaked} />}
+				{leak?.leaked && <LeakedThinkingBlock text={leak.leaked} />}
 				{body &&
 					(live ? (
 						<StreamMarkdown text={user ? preserveUserTree(body) : body} />
 					) : (
 						<Markdown text={user ? preserveUserTree(body) : body} fileLinks={user} />
 					))}
+				{failedCall && <div className="unexecuted-tool" role="status">
+					<strong>{t("unexecutedToolTitle", { tools: failedCall.tools.join(", ") })}</strong>
+					<p>{t("unexecutedToolHint")}</p>
+					<details><summary>{t("unexecutedToolOriginal")}</summary><pre>{failedCall.raw}</pre></details>
+				</div>}
 				{text.truncated && <div className="trunc-note">{t("truncated")}</div>}
 			</div>
 		);

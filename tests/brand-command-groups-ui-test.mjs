@@ -82,8 +82,8 @@ try {
 	await page.evaluate(() => window.dispatchEvent(new CustomEvent('pi:reveal-tool', { detail: { toolCallId: 'cmd-0' } })));
 	await page.locator('[data-tool-call-id="cmd-0"] .bash-numbered-output').waitFor();
 	assert.equal(await page.locator('.bash-row').count(), 10);
-	assert.equal(await page.locator('.task-progress-source').count(), 0);
-	assert.match(await page.locator('.task-progress-meta').textContent(), /10 条命令/);
+	assert.equal(await page.locator('.task-plan-list').count(), 0);
+	assert.equal(await page.locator('.task-progress-meta').count(), 0);
 	assert.equal(await page.locator('.task-artifact-row').count(), 0);
 	const colors = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return ['--green', '--red', '--yellow-fg', '--accent'].map(key => s.getPropertyValue(key).trim()); });
 	assert.deepEqual(colors, ['#3e9b5f', '#c9483a', '#8a5a00', '#2f7aae']);
@@ -140,9 +140,9 @@ try {
 	snapshot.state.taskProgress = deriveTaskProgress(snapshot.state.conversationId, snapshot.state.messages, null, true);
 	snapshot.state.stats = { ...snapshot.state.stats, tokens: { input: 6, cacheRead: 94, cacheWrite: 0, output: 10 }, contextUsage: { tokens: 600, contextWindow: 10000, percent: 6 } };
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
-	await page.locator('.task-progress-meta', { hasText: /本轮.*2 条命令.*0:2/ }).waitFor();
+	await page.locator('.task-progress.running').waitFor();
 	assert.equal(await page.locator('.task-progress.done').count(), 0);
-	assert.deepEqual((await page.locator('.task-file-result > button').allTextContents()).map(path => path.split('/').at(-1)), ['progress.json', 'ARCHITECTURE.md']);
+	assert.equal(await page.locator('.task-file-result').count(), 0);
 	assert.equal(await page.locator('.task-artifact-row').count(), 0);
 	for (let i = 0; i < reads.length; i++) socket.send(JSON.stringify({ type: 'tool_status', conversationId: snapshot.state.conversationId, toolCallId: reads[i].id, toolName: 'bash', isError: false, durationMs: i * 80, running: false }));
 	assert.equal(await page.locator('.bash-group-duration').count(), 0);
@@ -170,7 +170,7 @@ try {
 	snapshot.state.isStreaming = false;
 	snapshot.state.taskProgress = deriveTaskProgress(snapshot.state.conversationId, snapshot.state.messages, null, false, Date.now());
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
-	await page.locator('.task-progress.done .task-progress-meta', { hasText: '完成' }).waitFor();
+	await page.locator('.task-progress.done').waitFor();
 	// A failed plan completion after successful commands is not a successful turn.
 	snapshot.state.messages.push({ id: 'a-plan-error', role: 'assistant', content: [{ type: 'toolCall', id: 'bad-plan', name: 'plan', argumentsText: '{"action":"update","status":"completed"}' }] }, { id: 'r-plan-error', role: 'toolResult', toolName: 'plan', toolCallId: 'bad-plan', isError: true, content: [{ type: 'text', text: 'Validation failed for tool "plan": steps is required' }] });
 	snapshot.state.taskProgress = deriveTaskProgress(snapshot.state.conversationId, snapshot.state.messages, null, false, Date.now());
@@ -222,7 +222,7 @@ try {
 	await input.press('Escape'); await page.waitForTimeout(100); assert.equal(submitted.at(-1).type, 'abort');
 	assert.equal(await page.locator('.composer-action.stop').evaluate(el => el.getBoundingClientRect().width), 28);
 	assert.equal(await page.locator('.composer-action.send').evaluate(el => el.getBoundingClientRect().width), 28);
-	assert.equal(await page.locator('.messages .agent-working').count(), 1);
+	assert.equal(await page.locator('.messages .waiting-indicator').count(), 1);
 	await page.screenshot({ path: '/tmp/pi-design16-running.png' });
 	snapshot.state.isStreaming = false; snapshot.state.queue = { steering: [], followUp: [] };
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));

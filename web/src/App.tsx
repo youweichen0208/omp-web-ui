@@ -989,6 +989,7 @@ export function App() {
 									liveOutputs={chat.liveOutputs}
 									toolStatuses={chat.toolStatuses}
 									onEdit={onEditMessage}
+									onStop={() => send({ type: "abort" })}
 									thinkingWrap={chat.settings?.thinkingWrap ?? false}
 								toolsWrap={chat.settings?.toolsWrap ?? true}
 								pendingEcho={chat.pendingEcho}
@@ -1054,7 +1055,7 @@ export function App() {
 									messages={conversationState?.messages ?? []}
 									streamingMessage={conversationState?.streamingMessage ?? null}
 									taskProgress={conversationState?.taskProgress}
-									conversationTitle={activeConversationTitle}
+									conversationId={chat.activeConversationId}
 									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}
 									onAttach={(path, name, mode, isDir) => {
@@ -1063,7 +1064,6 @@ export function App() {
 									}}
 									onPreview={openPreview}
 									onNotice={(level, text) => pushNotice(level, text)}
-									onViewChanges={(hash) => { if (hash) setCommitJump({ hash, token: Date.now() }); visited.current.add("git"); setView("git"); setDrawer(null); }}
 								/>
 							</div>
 							{previewFile && (

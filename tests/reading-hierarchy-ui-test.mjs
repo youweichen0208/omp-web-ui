@@ -65,6 +65,7 @@ try {
 		{ id: 'read-more', role:'assistant',content:[{type:'toolCall',id:'read-3',name:'bash',argumentsText:JSON.stringify({command:"sed -n '40,70p' src/auth.py"})}]},
 		{ id: 'read-result', role:'toolResult',toolName:'bash',toolCallId:'read-3',content:[{type:'text',text:'auth result'}]},
 	];
+	forceRunning = true;
 	snapshot.state.messages = messages;
 	snapshot.state.isStreaming = true;
 	snapshot.state.taskProgress = deriveTaskProgress(snapshot.state.conversationId, messages, null, true);
@@ -75,16 +76,16 @@ try {
 	assert.equal(await page.locator('.bash-readable-title', { hasText: 'auth.py 40–70 行' }).count(), 1);
 	assert.equal(await page.locator('.process-narration').count(), 1);
 	assert.equal(await page.locator('.process-narration .md').evaluate(el=>getComputedStyle(el).fontSize), '12.5px');
-	assert.equal(await page.locator('.task-file-result').count(), 2);
+	assert.equal(await page.locator('.task-file-result').count(), 0);
 	assert.equal(await page.locator('.task-artifact-row').count(), 0);
 	await page.locator('[data-tool-call-id="attempt-2"] > .bash-row-head').click();
 	assert.match(await page.locator('[data-tool-call-id="attempt-1"] .bash-row-stats').innerText(), /0 行/);
 	assert(await page.locator('[data-tool-call-id="attempt-1"]').evaluate(el=>el.classList.contains('empty')));
 	for (const id of ['attempt-2','read-3']) socket.send(JSON.stringify({type:'tool_status',conversationId:snapshot.state.conversationId,toolCallId:id,toolName:'bash',isError:false,running:false,durationMs:50}));
 	assert(!(await page.locator('.bash-row-stats').allTextContents()).some(text=>text.includes('0.0s') || text.includes('<0.1s')));
-	await page.locator('.trailing-working .agent-working', { hasText: '等待模型' }).waitFor();
-	const spacing = await page.evaluate(() => { const card = document.querySelector('.bash-group').getBoundingClientRect(); const status = document.querySelector('.trailing-working .agent-working').getBoundingClientRect(); return { gap: status.top - card.bottom, offset: status.left - card.left }; });
-	assert(spacing.gap >= 0 && spacing.gap < 18 && Math.abs(spacing.offset) < 2, JSON.stringify(spacing));
+	await page.locator('.trailing-working .waiting-indicator', { hasText: '阅读命令结果' }).waitFor();
+	const spacing = await page.evaluate(() => { const card = document.querySelector('.bash-group').getBoundingClientRect(); const status = document.querySelector('.trailing-working .waiting-indicator').getBoundingClientRect(); return { gap: status.top - card.bottom, offset: status.left - card.left }; });
+	assert(spacing.gap >= 0 && spacing.gap < 18 && Math.abs(spacing.offset) <= 2, JSON.stringify(spacing));
 	await page.screenshot({path:'/tmp/pi-reading-hierarchy.png'});
 	await page.setViewportSize({width:390,height:900}); await page.waitForTimeout(300);
 	assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -95,14 +96,47 @@ try {
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
 	await page.setViewportSize({width:1440,height:1000});
 	await page.locator('.task-file-counts').waitFor();
-	assert.equal(await page.locator('.task-file-result').count(),2);
+	assert.equal(await page.locator('.task-file-result').count(),1);
 	assert.match(await page.locator('.task-file-counts').innerText(), /\+1.*−1/);
 	// A single command has no redundant group header; the conclusion stays black.
 	snapshot.state.messages = [messages[0],messages[4],messages[5],{id:'conclusion',role:'assistant',content:[{type:'text',text:'检查通过，权限映射正确。'}]}];
 	snapshot.state.isStreaming = false; snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
-	await page.locator('.trailing-working .agent-working').waitFor({state:'detached'});
+	await page.locator('.trailing-working .waiting-indicator').waitFor({state:'detached'});
 	assert.equal(await page.locator('.bash-group-head').count(),0);
 	assert.equal(await page.locator('.process-narration').count(),0);
+	// 31a: deterministic phase clocks, instant content handoff, reduced motion and native stop.
+	await page.clock.install();
+	await page.clock.pauseAt(new Date());
+	const publish = async (patch) => {
+		Object.assign(snapshot.state, patch); snapshot.state.rev += 1;
+		socket.send(JSON.stringify(snapshot)); await page.waitForTimeout(60);
+	};
+	await publish({messages:[{id:'waiting-user',role:'user',content:[{type:'text',text:'Waiting fixture'}]}],isStreaming:true,streamingMessage:null,queue:{steering:[],followUp:[]}});
+	assert.equal(await page.locator('.waiting-indicator').count(),0);
+	await page.clock.runFor(299);
+	assert.equal(await page.locator('.waiting-indicator').count(),0);
+	await page.clock.runFor(1);
+	await page.locator('.waiting-label',{hasText:'理解你的问题'}).waitFor();
+	assert.equal(await page.locator('.waiting-brand i').count(),3);
+	assert.equal(await page.locator('.waiting-duration').count(),0);
+	await page.clock.runFor(3700);
+	assert.equal(await page.locator('.waiting-duration').innerText(),'4 秒');
+	await page.clock.runFor(61000);
+	assert.equal(await page.locator('.waiting-duration').innerText(),'1 分 05 秒');
+	await page.locator('.waiting-stop').click();
+	assert.equal(submitted.at(-1).type,'abort');
+	await page.emulateMedia({reducedMotion:'reduce'});
+	assert.equal(await page.locator('.waiting-brand i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
+	assert.equal(await page.locator('.waiting-label').evaluate(el=>getComputedStyle(el).animationName),'none');
+	await publish({streamingMessage:{id:'live-wait',role:'assistant',content:[{type:'text',text:'Content arrived'}]}});
+	assert.equal(await page.locator('.waiting-indicator').count(),0);
+	assert.equal(await page.locator('.trailing-working').evaluate(el=>getComputedStyle(el).display),'none');
+	await publish({streamingMessage:null,queue:{steering:['Please check auth'],followUp:[]}});
+	await publish({messages:[...snapshot.state.messages,{id:'steered-user',role:'user',content:[{type:'text',text:'Please check auth'}]}],queue:{steering:[],followUp:[]}});
+	await page.clock.runFor(300);
+	await page.locator('.waiting-label',{hasText:'处理你的插话'}).waitFor();
+	await publish({isStreaming:false});
+	assert.equal(await page.locator('.waiting-indicator').count(),0);
 	assert.deepEqual(errors,[]);
 	console.log('PASS reading hierarchy: labels, retries, grouping, files, waiting and narrow layout');
 

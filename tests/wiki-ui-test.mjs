@@ -226,7 +226,7 @@ try {
 	await page.keyboard.press('Meta+j');
 	assert.equal(await page.locator('.wiki-chat-panel').count(), 0);
 	await page.getByRole('button', { name: '发送', exact: true }).click();
-	await page.locator('.wiki-chat-panel .waiting-header-status .working-dots').waitFor();
+	await page.locator('.wiki-chat-panel .waiting-indicator .waiting-brand').waitFor();
 	await page.locator('.wiki-chat-panel .thinking.live').waitFor();
 	assert((await page.locator('.wiki-chat-panel .thinking.live').innerText()).includes('先核对文档'));
 	await page.locator('.wiki-chat-answer', { hasText: '已更新两个文档' }).waitFor({ timeout: 20000 });

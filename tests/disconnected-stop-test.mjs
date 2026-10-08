@@ -37,7 +37,7 @@ try {
 		});
 	});
 	await page.goto(`http://localhost:${PORT}`);
-	await page.locator('.agent-working').waitFor();
+	await page.locator('.waiting-indicator').waitFor();
 	const firstConversation=conversations;
 	assert.equal(sent.filter(msg=>msg.type==='abort').length,0);
 	// Keep the reconnect offline long enough to click Stop and inspect the state.

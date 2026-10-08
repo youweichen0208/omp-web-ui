@@ -95,6 +95,7 @@ interface MessageListProps {
 	) => void;
 	/** Kill the running bash command from its tool card (agent run continues). */
 	onKillBash?: () => void;
+	onStop?: () => void;
 	/** 思考文本是否换行（设置面板开关；false = 不换行横向滚动）。 */
 	thinkingWrap?: boolean;
 	/** 工具调用是否默认展开（设置面板开关；false = 默认折叠）。 */
@@ -133,7 +134,7 @@ function ReloadEvent({ event }: { event: ReloadStatus }) {
 	</div>;
 }
 
-export const MessageList = memo(function MessageList({ state, connected = true, silenceNotified = false, liveOutputs, toolStatuses, onEdit, onKillBash, thinkingWrap, toolsWrap, pendingEcho, reloadEvents = [] }: MessageListProps) {
+export const MessageList = memo(function MessageList({ state, connected = true, silenceNotified = false, liveOutputs, toolStatuses, onEdit, onKillBash, onStop, thinkingWrap, toolsWrap, pendingEcho, reloadEvents = [] }: MessageListProps) {
 	const t = useT();
 	const timeline = useMemo(() => {
 		const events = [
@@ -812,7 +813,7 @@ export const MessageList = memo(function MessageList({ state, connected = true, 
 						thinkingWrap={thinkingWrap}
 					/>
 				)}
-				<div className="trailing-working"><ConversationWorkingStatus compact state={state} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} /></div>
+				<div className="trailing-working"><ConversationWorkingStatus onStop={onStop} state={state} connected={connected} silenceNotified={silenceNotified} toolStatuses={toolStatuses} /></div>
 				{/* 乐观本地回显：刚点发送、服务端确认（snapshot_delta 追加）之前，
 				 *  立刻把用户刚输入的文字显示出来，避免等待服务端往返的空白期。
 				 *  一旦真实消息落地（reducer 里 appended.length>0）就会清空 pendingEcho，

@@ -78,3 +78,20 @@ describe("splitLeakedThinking", () => {
 		expect(splitLeakedThinking("partial tag mid-stream </thin")).toBeNull();
 	});
 });
+
+describe("protocol-only assistant fragments", () => {
+	it("does not create an Additional model content row for empty thinking delimiters", () => {
+		expect(splitLeakedThinking("</think>\n</think>")).toEqual({ leaked: "", visible: "" });
+	});
+	it("hides the reported DSML closing suffix without hiding the answer", () => {
+		const suffix = "</｜DSML｜parameter> </invoke> </｜DSML｜tool_calls>";
+		expect(splitLeakedThinking(suffix)).toEqual({ leaked: "", visible: "" });
+		expect(splitLeakedThinking(`检查完成。\n${suffix}`)).toEqual({ leaked: "", visible: "检查完成。" });
+	});
+	it("preserves meaningful folded reasoning while removing empty trailing protocol noise", () => {
+		expect(splitLeakedThinking("检查实现</think>\n结果正确\n</｜DSML｜parameter> </invoke> </｜DSML｜tool_calls>")).toEqual({ leaked: "检查实现</think>", visible: "结果正确" });
+	});
+	it("does not treat quoted code or ordinary XML as protocol noise", () => {
+		for (const text of ["示例：`</think>`", "```xml\n</｜DSML｜parameter> </invoke> </｜DSML｜tool_calls>\n```", "正文 </invoke>", "```xml\n</think>\n```", "解释 </｜DSML｜parameter> 的作用"]) expect(splitLeakedThinking(text)).toBeNull();
+	});
+});

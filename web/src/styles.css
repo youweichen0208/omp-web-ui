@@ -9512,7 +9512,6 @@ body { -webkit-font-smoothing: antialiased; }
 .bash-git-status.git-untracked { color: #a8a8a8; }
 .bash-git-status.git-deleted { color: #e68f8f; }
 .task-raw-summary { color: var(--text-dim); font: 11px/1.5 var(--sans); margin-bottom: 4px; }
-.task-plan-change { margin: 8px 14px 0; color: var(--accent); font: 11px var(--sans); }
 .task-plan-list { min-height: 0; overflow-y: auto; padding: 9px 13px 14px; }
 .task-plan-step { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; color: var(--text-faint); font: 12px/1.45 var(--sans); }
 .task-plan-step > div { min-width: 0; overflow: hidden; }
@@ -9672,7 +9671,6 @@ html.pi-desktop .design-workspace .view-switch { min-width: 0; overflow-x: auto;
 .task-plan-step-detail .task-artifact-row > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-plan-step-detail .task-artifact-row code { font: 11px/1.5 var(--mono); white-space: nowrap; }
 .task-plan-step-detail .task-artifact-row > .task-artifact-change { flex: none; }
-.task-plan-change { flex: none; margin: auto 12px 12px; padding: 8px 10px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--accent); font: 12px/1.5 var(--sans); overflow-wrap: anywhere; }
 
 /* Compact workspace toolbar: underline navigation and quiet sidebar controls. */
 .design-workspace .topbar,
@@ -11041,7 +11039,6 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .plan-settings p { margin: 6px 0; color: var(--text-muted); font-size: 12px; }
 .todo-checklist-item details p { white-space: pre-wrap; margin: 6px 0; color: var(--text-muted); }
 .todo-checklist > .task-outline-criteria { margin: 8px 12px; }
-.task-unassigned-records { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
 
 /* ---- Wiki reference-inspired document chrome ---- */
 .wiki-document-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 46px; padding: 8px 24px; border-bottom: 1px solid var(--wiki-line); }
@@ -11146,10 +11143,6 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .bash-row.empty .bash-readable-title { color: var(--text-faint); }
 .bash-group-items > .bash-row:first-child { border-top: 0; }
 .trailing-working:empty { display: none; }
-.trailing-working .agent-working { width: 100%; margin: 4px 0 0; font-size: 12.5px; }
-.trailing-working .working-dots { width: 6px; }
-.trailing-working .working-dots i { width: 6px; height: 6px; background: var(--amber); animation: none; }
-.trailing-working .working-dots i:not(:first-child) { display: none; }
 .task-file-result { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border-soft); font-size: 12px; }
 .task-file-result > span:first-child { color: var(--text-faint); flex: none; }
 .task-file-result > button { min-width: 0; flex: 1; padding: 0; border: 0; background: none; color: var(--text); font: 12px var(--mono); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -11158,4 +11151,63 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .task-file-counts > span:last-child { color: var(--red); }
 .bash-row-head:not(:has(.bash-command-secondary)) .bash-readable-title { flex: 1; max-width: none; font-family: var(--mono); }
 .trailing-working { width: calc(100% - 2 * var(--composer-gutter, 28px)); max-width: 780px; margin: 0 auto; }
-.messages:has(.bash-group) .trailing-working { margin-top: -24px; }
+/* Ignore empty tool-result wrappers when locating the last visible message. */
+.design-workspace .messages > [data-lazy-id]:has(~ .trailing-working:not(:empty)):not(:has(~ [data-lazy-id] .msg)):not(:has(~ .msg)) .msg,
+.design-workspace .messages > .msg:has(+ .trailing-working:not(:empty)) { margin-bottom: 0; }
+.messages > [data-lazy-id]:has(~ .trailing-working:not(:empty)):not(:has(~ [data-lazy-id] .msg)):not(:has(~ .msg)) .bash-group:last-child { margin-bottom: 0; }
+.wiki-chat-messages > :has(+ .waiting-indicator) { margin-bottom: 0; }
+
+/* 31a: a single, quiet brand indicator after the last visible response. */
+.waiting-indicator { display: flex; align-items: center; gap: 10px; min-height: 20px; padding-left: 2px; margin-top: 8px; white-space: nowrap; color: oklch(0.55 0.01 80); font-size: 13px; }
+.waiting-brand { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.waiting-brand i { width: 6px; height: 6px; border-radius: 1.5px; background: #EE8C7C; animation: waiting-brand-pulse 1.2s ease-in-out infinite; }
+.waiting-brand i:nth-child(2) { background: #3E8FC0; animation-delay: .18s; }
+.waiting-brand i:nth-child(3) { background: #F2BC4E; animation-delay: .36s; }
+.waiting-label { font-weight: 500; background: linear-gradient(90deg, oklch(0.55 0.01 80) 30%, oklch(0.75 0.01 80) 50%, oklch(0.55 0.01 80) 70%); background-size: 250% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: waiting-text-shimmer 1.8s linear infinite; }
+.waiting-duration { color: oklch(0.62 0.01 80); font-size: 12px; font-variant-numeric: tabular-nums; }
+.waiting-stop { padding: 0; border: 0; background: none; color: oklch(0.45 0.01 80); font: inherit; cursor: pointer; }
+.waiting-stop:hover { color: #C9483A; }
+@keyframes waiting-brand-pulse { 0%, 100% { opacity: .25; transform: scale(.75); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes waiting-text-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) {
+	.waiting-brand i { animation: none; opacity: 1; transform: none; }
+	.waiting-label { animation: none; background: none; color: oklch(0.55 0.01 80); }
+}
+
+/* ---- Right sidebar: progress and outputs share one scroll area ---- */
+.panel-lower:has(.task-sections) { padding: 10px; border-top: 0; }
+.task-sections { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg-elev); }
+.task-sections-scroll { min-height: 0; overflow-y: auto; overflow-x: hidden; flex: 1; overscroll-behavior: contain; }
+.task-section + .task-section { border-top: 1px solid var(--border); }
+.task-section-heading { display: flex; align-items: center; gap: 7px; width: 100%; padding: 12px; border: 0; background: transparent; color: var(--text); font: 600 13px/1.5 var(--sans); text-align: left; cursor: pointer; }
+.task-section-heading > svg, .task-plan-step-head > svg { flex: none; width: 13px; transition: transform .15s; }
+.task-section-heading > svg.open, .task-plan-step-head > svg.open { transform: rotate(90deg); }
+.task-sections button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.task-section-content { padding-bottom: 12px; }
+.task-section-empty { padding: 12px 18px 16px; color: var(--text-faint); text-align: center; }
+.task-section-empty p { margin: 12px auto 0; max-width: 240px; font: 12px/1.7 var(--sans); }
+.task-empty-circles { display: flex; align-items: center; justify-content: center; gap: 9px; height: 32px; }
+.task-empty-circles i { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 50%; }
+.task-empty-circles i:nth-child(2) { width: 24px; height: 24px; }
+.task-empty-file { width: 30px; height: 34px; color: var(--border); stroke-width: 1.3; }
+.task-sections .task-progress-status, .task-sections .task-outline-criteria { display: block; margin: 0 12px 10px; font: 12px/1.6 var(--sans); overflow-wrap: anywhere; }
+.task-sections .task-plan-list { overflow: visible; padding: 0 6px; }
+.task-sections .task-plan-step { position: relative; margin-bottom: 5px; }
+.task-sections .task-plan-step-title { white-space: normal; overflow: visible; overflow-wrap: anywhere; display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+.task-sections .task-plan-step-head { align-items: flex-start; }
+.task-sections .task-plan-step .task-plan-mark { width: 16px; height: 16px; margin-top: 2px; border: 1px solid var(--border); border-radius: 50%; font: 11px/1 var(--sans); }
+.task-sections .task-plan-step.done .task-plan-mark { border-color: var(--green); }
+.task-sections .task-plan-step.running .task-plan-mark { border-color: var(--progress-text); }
+.task-sections .task-plan-step-head > svg { margin-top: 3px; }
+.task-sections .task-file-result { padding: 8px 12px; border-bottom: 0; align-items: flex-start; }
+.task-sections .task-file-result > svg { flex: none; width: 15px; height: 18px; color: var(--text-faint); }
+.task-sections .task-file-result > button { white-space: normal; overflow-wrap: anywhere; font-family: var(--sans); }
+.task-sections .task-file-result small { display: block; color: var(--text-faint); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
+
+/* ---- Tool instructions returned as text, not executed by the SDK ---- */
+.unexecuted-tool { margin: 10px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--red) 35%, var(--border)); border-radius: var(--r-md); background: var(--bg-elev); color: var(--text); font: 12px/1.6 var(--sans); overflow-wrap: anywhere; }
+.unexecuted-tool > strong { color: var(--red); font-weight: 600; }
+.unexecuted-tool > p { margin: 6px 0; color: var(--text-dim); }
+.unexecuted-tool summary { cursor: pointer; color: var(--text-dim); }
+.unexecuted-tool summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.unexecuted-tool pre { max-height: 320px; overflow: auto; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 var(--mono); }
