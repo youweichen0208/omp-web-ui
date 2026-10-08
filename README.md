@@ -20,7 +20,7 @@ pi-harness --port 9000 --cwd /path/to/project
 
 ### 版本与升级
 
-正式版通过 `npm install -g @youweichen/pi-harness@latest` 安装，桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/pi-harness/releases)。1.0.0 起 npm 包名为 `@youweichen/pi-harness`，命令为 `pi-harness`；旧包 `@youweichen/pi-web-ui` 不再更新。可运行 `npm view @youweichen/pi-harness dist-tags --json` 核对 npm 标签。
+正式版通过 `npm install -g @youweichen/pi-harness@latest` 安装，桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/pi-harness/releases)。1.0.0 起 npm 包名为 `@youweichen/pi-harness`，命令为 `pi-harness`；旧包 `@youweichen/pi-web-ui` 不再更新，也不会自动迁移。旧版开机自启服务仍会启动旧包并占用同一端口，升级前先运行 `pi-web-ui server uninstall` 和 `npm uninstall -g @youweichen/pi-web-ui`，再安装新包；需要开机自启时重新运行 `pi-harness server install`（带上原来的 `--port`／`--cwd`）。可运行 `npm view @youweichen/pi-harness dist-tags --json` 核对 npm 标签。
 
 ## SSH 节点工作台
 
