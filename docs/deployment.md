@@ -25,12 +25,26 @@ pi-harness server shortcut [--port --cwd --data-dir --name]  # 桌面「一键�
                                            #   macOS→桌面 .command 双击启动器（已装 launchd 则 kickstart，否则终端前台）
                                            #   Linux→桌面 .desktop 图标 + ~/.local/share/pi-harness 启动脚本（systemctl 优先）
 pi-harness server status|restart|stop|uninstall
-# Docker：docker-compose.yml（端口映射 + 挂载数据目录）
+# Docker：docker compose up -d（见下文「Docker」）
 ```
 
 macOS 服务的 launchd 标识为 `com.youweichen.pi-harness`（`--name` 自定义时为 `com.<name>.server`）。
 
 > uninstall 会自动移除桌面图标；未装服务时桌面快捷方式启动的实例在 status/stop 中单独报告（PS1 前台+记录 PID）。
+
+## Docker
+
+`docker compose up -d` 构建并启动。镜像以 `node` 用户运行，需要保留的数据都放在卷 `/data` 下：
+
+| 路径 | 环境变量 | 内容 |
+| --- | --- | --- |
+| `/data/pi-agent` | `PI_CODING_AGENT_DIR` | pi 配置、`auth.json`、模型、技能与对话会话（`sessions/`） |
+| `/data/pi-harness` | `PI_WEB_DATA_DIR` | 客户端状态、上传文件、插件、Wiki 改动记录 |
+| `/workspace` | `PI_WEB_CWD` | 智能体工作的项目，按需绑定主机目录 |
+
+会话写在 `PI_CODING_AGENT_DIR` 下，所以配置目录必须可写，不要以只读方式挂载。要沿用主机已有的 pi 配置，可把主机的 `~/.pi/agent` 读写挂载到 `/data/pi-agent`；否则首次打开页面按引导配置。
+
+compose 默认只把端口映射到 `127.0.0.1`，并设置 `PI_WEB_ALLOW_HOSTS=localhost,127.0.0.1`：容器内必须监听 `0.0.0.0`，这会关闭默认的 loopback Host 白名单，显式白名单用来防 DNS rebinding。智能体可以在容器内执行命令；对局域网或公网开放前，先设置 `PI_WEB_TOKEN`，把访问用的主机名加入 `PI_WEB_ALLOW_HOSTS`，再修改端口映射。
 
 ## Windows 下载选择
 

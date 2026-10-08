@@ -22,8 +22,16 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/web/dist ./web/dist
 ENV PORT=8787
+# Everything that must survive a rebuild lives under /data: pi config, auth and
+# chat sessions (PI_CODING_AGENT_DIR) and pi-harness state, uploads and Wiki
+# history (PI_WEB_DATA_DIR). Without these the server would write to the
+# node user's home, which is not a volume.
+ENV PI_CODING_AGENT_DIR=/data/pi-agent \
+    PI_WEB_DATA_DIR=/data/pi-harness \
+    PI_WEB_CWD=/workspace
+RUN mkdir -p /data/pi-agent /data/pi-harness /workspace \
+    && chown -R node:node /data /workspace
 EXPOSE 8787
-# Session data (per-client chat history) lives here — mount a volume.
-VOLUME ["/app/.pi-web"]
+VOLUME ["/data"]
 USER node
 CMD ["node", "dist/server/index.js"]
