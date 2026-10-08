@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.14 Wiki 文档页 v2 与工具恢复状态
+
+实现 34a Wiki 工具栏、表格/代码插入、Mermaid、本地衬线标题和宽版；实现 33a 工具异常统一状态、单次提醒与恢复卡片，修复自动提醒误确认历史计划。合入 develop 的 PR #22，保留 #21。SDK 1.0.4、协议 v40 不变。GitHub 桌面发布由三平台构建及产物回归完成后公开；说明见 `.github/release-notes/v0.99.14.md`。
+
 ## 0.99.13 主题令牌与 Wiki 样式修复
 
 统一 Codemode、MCP、Extensions、Wiki 与输出状态配色，清理重复输入框样式和历史圆角；Wiki 输入框仅在聚焦且有内容时显示蓝色描边，代码配色统一跟随应用外观。新增全前端设计令牌检查并接入 npm test / CI。包含 develop 已合入的未执行工具调用恢复与认证锁等待修复。SDK 保持 1.0.4、协议保持 v40。本次发布 GitHub 源码和三平台桌面 Release，不发布 npm。发布说明见 `.github/release-notes/v0.99.13.md`。
