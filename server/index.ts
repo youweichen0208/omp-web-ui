@@ -506,6 +506,16 @@ function serializeShared(msg: ServerMessage): string {
 	return s;
 }
 
+/** Async handlers are fired with `void`; a rejection there is a bug in one request,
+ *  not a reason to exit. Log with the stack so it can still be found. */
+process.on("unhandledRejection", (reason) => {
+	console.error("[server] unhandled rejection:", reason instanceof Error ? reason.stack ?? reason.message : reason);
+});
+
+function reportBadMessage(type: unknown, err: unknown): void {
+	console.error(`[ws] handler for "${String(type)}" threw:`, err instanceof Error ? err.stack ?? err.message : err);
+}
+
 wss.on("connection", (ws) => {
 	// Count attached sockets (the control socket reports REAL sockets, not
 	// cached client-session objects).
@@ -569,7 +579,18 @@ wss.on("connection", (ws) => {
 	const removePluginSender = pluginMgr.addSender(send, () => clientId);
 	let detachNodes: (() => void) | undefined;
 
+	/** One malformed or unexpected message must never take the whole server (and every
+	 *  client's running agent) down: report it to this client and keep going. */
 	const dispatch = (msg: ClientMessage): void => {
+		try {
+			dispatchUnsafe(msg);
+		} catch (err) {
+			reportBadMessage(msg?.type, err);
+			send({ type: "notice", level: "error", text: `请求处理失败（${String(msg?.type)}）：${(err as Error).message}` });
+		}
+	};
+
+	const dispatchUnsafe = (msg: ClientMessage): void => {
 		if (!clientId) {
 			pending.push(msg);
 			return;

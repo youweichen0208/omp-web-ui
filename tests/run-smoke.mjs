@@ -31,6 +31,7 @@ const ALL = [
 	"app-updater-test",
 	"desktop-server-auth-test",
 	"client-eviction-test",
+	"ws-malformed-test",
 	"clear-provider-key-test",
 	"component-updates-test",
 	"extensions-test",
