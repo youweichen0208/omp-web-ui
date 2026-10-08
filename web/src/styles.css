@@ -11325,15 +11325,13 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-breadcrumb .wiki-save-status.failed { color: var(--red); }
 .wiki-document-toolbar { height: 44px; min-height: 44px; padding: 0 24px; gap: 8px; }
 .wiki-editor-toolbar-slot { flex: 1; min-width: 0; }
-.wiki-insert-toolbar { display: flex; align-items: center; gap: 4px; height: 43px; }
-.wiki-tool-group { display: flex; align-items: center; gap: 4px; }
+.wiki-insert-toolbar { display: flex; align-items: center; gap: 4px; height: 43px; overflow-x: auto; }
+.wiki-tool-group { display: flex; flex: none; align-items: center; gap: 4px; }
 .wiki-tool-group + .wiki-tool-group::before { content: ""; width: 1px; height: 14px; margin: 0 6px; background: var(--border-soft); }
 .wiki-insert-toolbar button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim); padding: 0; cursor: pointer; }
 .wiki-insert-toolbar button:hover, .wiki-insert-toolbar button[aria-expanded=true], .wiki-insert-toolbar button[aria-pressed=true] { background: var(--bg-elev2); color: var(--text); }
 .wiki-insert-toolbar button:disabled { opacity: .4; cursor: default; }
 .wiki-insert-toolbar svg { width: 17px; height: 17px; stroke-width: 1.6; }
-.wiki-insert-toolbar .wiki-more-insert { width: 43px; gap: 3px; }
-.wiki-more-insert svg + svg { width: 10px; }
 .wiki-insert-toolbar .wiki-width-toggle { margin-left: auto; }
 .wiki-workbench .wiki-document { box-sizing: border-box; width: 100%; max-width: 888px; padding: 44px 64px 72px; }
 .wiki-workbench.is-focused .wiki-document { max-width: 1128px; padding-top: 44px; }
@@ -11362,24 +11360,15 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-language-picker button[aria-selected=true], .wiki-language-picker button:hover { background: var(--bg-elev2); }
 .wiki-language-picker code { font: 12px var(--mono); }
 .wiki-language-picker small { font-size: 11px; color: var(--text-dim); }
-.wiki-more-popover { width: 300px; padding: 5px; }
-.wiki-more-popover .fp-slash-options { display: block; }
-.wiki-more-popover button { display: flex; align-items: center; width: 100%; min-height: 42px; gap: 10px; padding: 6px 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text); text-align: left; }
-.wiki-more-popover button:hover, .wiki-more-popover button:focus { background: var(--bg-elev2); }
-.wiki-more-popover svg { width: 17px; height: 17px; stroke-width: 1.6; }
-.wiki-more-popover button > span { display: flex; flex: 1; flex-direction: column; }
-.wiki-more-popover small { color: var(--text-dim); font-size: 11px; }
 .wiki-mermaid-preview { background: var(--bg); border-bottom: 1px solid var(--border-soft); margin-bottom: 12px; white-space: normal; }
 .wiki-prose [data-wiki-placeholder]::before { content: attr(data-wiki-placeholder); color: var(--text-faint); pointer-events: none; position: absolute; }
 @media (max-width: 760px) {
 	.wiki-workbench .wiki-document { padding: 28px 22px 72px; }
 	.wiki-document-toolbar { padding: 0 8px; overflow-x: auto; }
-	.wiki-insert-toolbar { min-width: 375px; }
 	.wiki-breadcrumb .wiki-path-parent { display: none; }
 	.wiki-document-heading h1 { font-size: 30px; }
 }
 
-.wiki-more-popover button > .wiki-insert-icon { flex: none; width: 28px; }
 .design-workspace.wiki-mode .topbar .brand > .brand-logo { width: 15px; height: 15px; border-radius: 0; }
 
 .wiki-prose .fp-markdown .md :not(pre) > code { padding: 1px 5px; }
@@ -11409,7 +11398,8 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-composer textarea { resize: none; }
 .wiki-document-heading { margin-bottom: 28px; }
 .wiki-document-meta { margin-bottom: 0; }
-.wiki-prose .fp-rich-document .rich-block { display: contents; }
+/* Native formatBlock requires a box for each editable block to preserve its text. */
+.wiki-prose .fp-rich-document .rich-block { display: flow-root; }
 .wiki-prose .fp-rich-document .rich-block[hidden] { display: none; }
 .wiki-prose.md p, .wiki-prose .fp-markdown .md p { margin: .75em 0; }
 .wiki-prose .fp-rich-document > .rich-block:not([hidden]):not(.rich-block:not([hidden]) ~ .rich-block) > :first-child { margin-top: 0; }

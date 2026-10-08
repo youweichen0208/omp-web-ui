@@ -21,6 +21,16 @@ try {
 	await page.locator('.file-name', { hasText: 'note.md' }).click();
 	const editor = page.locator('.wiki-prose .fp-rich-document');
 	await editor.locator('code .hljs-keyword').first().waitFor();
+	const toolbar = page.locator('.wiki-insert-toolbar');
+	assert.deepEqual(await toolbar.locator('button').evaluateAll(buttons => buttons.slice(0, -1).map(button => button.getAttribute('aria-label'))), ['正文', '标题 2', '标题 3', '列表', '插入表格', '图片', '任务列表', '引用', '代码块', '文档链接', '提及日期']);
+	await editor.locator('p').last().fill('Insert here.');
+	for (const [label, tag] of [['标题 2', 'h2'], ['标题 2', 'h2'], ['标题 3', 'h3'], ['正文', 'p']]) {
+		await toolbar.getByRole('button', { name: label, exact: true }).click();
+		assert.equal(await editor.locator(tag).last().textContent(), 'Insert here.');
+	}
+	await toolbar.getByRole('button', { name: '提及日期', exact: true }).click();
+	assert.ok((await editor.locator('p').last().textContent()).includes(new Date().toLocaleDateString('sv-SE')));
+	console.log('PASS complete toolbar, explicit headings/paragraph and date insertion');
 	for (const [alias, label, kind] of [['dmk', '代码块', 'code'], ['bg', '插入表格', 'table']]) {
 		for (const input of ['mouse', 'keyboard']) {
 			await editor.locator('p').last().fill('');
@@ -56,6 +66,18 @@ try {
 	await page.locator('.wiki-save-status.saved').waitFor();
 	assert.ok(readFileSync(join(base, 'note.md'), 'utf8').includes('```python\nprint("anchored")'));
 	console.log('PASS toolbar positioning and insertion/save');
+	await page.screenshot({ path: '/tmp/pi-wiki-toolbar-full.png' });
+	await page.setViewportSize({ width: 800, height: 900 });
+	await page.locator('.wiki-chat-panel > header button[aria-label]').click();
+	await toolbar.getByRole('button', { name: '提及日期', exact: true }).click();
+	assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'toolbar does not widen the page');
+	await toolbar.getByRole('button', { name: '代码块', exact: true }).click();
+	const narrowPopup = await page.locator('.wiki-code-popover').boundingBox();
+	assert.ok(narrowPopup.x >= 0 && narrowPopup.x + narrowPopup.width <= 800, 'scrolled toolbar picker remains inside viewport');
+	await page.keyboard.press('Escape');
+	await page.screenshot({ path: '/tmp/pi-wiki-toolbar-narrow.png' });
+	console.log('PASS narrow toolbar scrolling and popup bounds');
+
 } finally {
 	await browser?.close();
 	if (server) { server.kill('SIGTERM'); if (server.exitCode === null) await new Promise(r => server.once('exit', r)); }

@@ -358,8 +358,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			setInsertPopup({ kind: id === "bg" ? "table" : "code", x: insertPopup?.x ?? rect?.left ?? 16, y: insertPopup?.y ?? (rect?.bottom ?? 80) + 6 }); return;
 		}
 		setInsertPopup(null);
-		if (id === "heading") { const node = window.getSelection()?.anchorNode; const current = node?.parentElement?.closest("h2,h3,p")?.tagName; formattedTag = current === "H2" ? "h3" : current === "H3" ? "p" : "h2"; command("formatBlock", formattedTag); }
-		else if (id === "bg" && dimensions) {
+		if (id === "bg" && dimensions) {
 			command("insertHTML", `<table><thead><tr>${Array.from({ length: dimensions.columns }, (_, i) => `<th ${i === 0 ? 'data-slash-insert' : ''}>${t("richColumn")} ${i + 1}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: dimensions.rows - 1 }, () => `<tr>${'<td><br></td>'.repeat(dimensions.columns)}</tr>`).join('')}</tbody></table><p><br></p>`);
 		} else if (id === "dmk") command("insertHTML", `<pre><code data-slash-insert class="language-${language || 'plaintext'}">${language === 'mermaid' ? 'flowchart LR\n  A --> B' : '<br>'}</code></pre><p><br></p>`);
 		else {
@@ -511,7 +510,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{wiki?.toolbarHost && createPortal(<WikiToolbar readOnly={readOnly} focused={!!wiki.focused} onWidth={wiki.onWidth ?? (() => {})} items={items.map(item => ({ id: item.alias, label: itemLabel(item), hint: hints[item.alias] ?? "", help: t(help[item.alias]), icon: icons[item.label] }))} popup={insertPopup} onPrepare={prepareInsert} onSelect={id => insertToolbar(id)} onPopup={setInsertPopup} />, wiki.toolbarHost)}
 		{diagrams.map(({ host, code }, index) => createPortal(<MermaidDiagram code={code} />, host, String(index)))}
 		{insertPopup && !readOnly && <WikiInsertPopover popup={insertPopup} onClose={() => { setInsertPopup(null); restoreInsert(); }}>
-			{insertPopup.kind === "table" ? <TableSizePicker onInsert={(columns, rows) => insertToolbar("bg", { columns, rows })} /> : insertPopup.kind === "code" ? <CodeLanguagePicker onInsert={language => insertToolbar("dmk", undefined, language)} /> : <div className="wiki-more-items" role="menu" onKeyDown={e => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")], index = buttons.indexOf(document.activeElement as HTMLButtonElement); buttons[(index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus(); } }}>{items.map(item => <button type="button" role="menuitem" key={item.alias} onClick={() => insertToolbar(item.alias)}><span className="wiki-insert-icon">{icons[item.label]}</span><span>{itemLabel(item)}<small>{t(help[item.alias])}</small></span><kbd>{hints[item.alias]}</kbd></button>)}</div>}
+			{insertPopup.kind === "table" ? <TableSizePicker onInsert={(columns, rows) => insertToolbar("bg", { columns, rows })} /> : <CodeLanguagePicker onInsert={language => insertToolbar("dmk", undefined, language)} />}
 		</WikiInsertPopover>}
 		{!wiki && <div className="fp-rich-toolbar" role="toolbar" aria-label={t("richFormatToolbar")}>
 			{formatTools.map((tool) => <Fragment key={tool.label}>
