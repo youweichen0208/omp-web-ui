@@ -1,5 +1,5 @@
 /**
- * pi-web-ui 插件管理器 —— 可选界面组件的加载与桥接。
+ * pi-harness 插件管理器 —— 可选界面组件的加载与桥接。
  *
  * 一个插件 = <dataDir>/plugins/<id>/ 目录：
  *   manifest.json   元数据 { id?, name, version?, description? }（id 缺省取目录名）
@@ -162,7 +162,7 @@ interface LoadedPlugin {
 }
 
 /** 宿主提供的插件设施版本——manifest 声明的 apiVersion 高于此值则拒绝激活，
- *  插件能拿到明确的「请升级 pi-web-ui」而不是在新接口上莫名 undefined。 */
+ *  插件能拿到明确的「请升级 pi-harness」而不是在新接口上莫名 undefined。 */
 export const PLUGIN_API_VERSION = 1;
 
 /** 插件通过 host.registerCommand 注册的斜杠命令。run 的返回值若为非空字符串，
@@ -661,7 +661,7 @@ export class PluginManager {
 					// 声明式设置 schema + 当前存值（⚙ 面板自动渲染表单用）
 					settingsSchema: parseSettingsSchema(m.settings),
 					settingsValues: storedSettingsValues(dir, parseSettingsSchema(m.settings)),
-				// 安装来源（pi-web-ui install 写入的 .pi-source.json）——
+				// 安装来源（pi-harness install 写入的 .pi-source.json）——
 				// 设置面板据此显示「更新」按钮；手工拷入的插件没有此文件。
 				source: await readFile(join(dir, ".pi-source.json"), "utf8")
 					.then((raw) => {
@@ -700,7 +700,7 @@ export class PluginManager {
 			apiVersion = Number(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).apiVersion ?? 1) || 1;
 		} catch {}
 		if (apiVersion > PLUGIN_API_VERSION) {
-			const msg = `插件要求宿主 API v${apiVersion}，当前宿主 v${PLUGIN_API_VERSION} —— 请升级 pi-web-ui`;
+			const msg = `插件要求宿主 API v${apiVersion}，当前宿主 v${PLUGIN_API_VERSION} —— 请升级 pi-harness`;
 			console.error(`[plugin:${info.id}] ${msg}`);
 			this.loaded.set(info.id, { info: { ...info, error: msg }, toolHandlers, attachHandlers, cwdHandlers, httpRoutes, settingsHandlers: new Set() });
 			return;

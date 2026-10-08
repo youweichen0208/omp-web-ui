@@ -2,7 +2,7 @@
  * Regression test: crypto.randomUUID must never crash the app.
  *
  * crypto.randomUUID is ONLY available in secure contexts (HTTPS or localhost).
- * When pi-web-ui is served over plain HTTP on a LAN IP / remote host, or in
+ * When pi-harness is served over plain HTTP on a LAN IP / remote host, or in
  * browsers without the API (Safari < 15.4), it is `undefined` — the WebSocket
  * `onopen` handler used to throw before sending `hello`, so the session never
  * attached (UI stuck, every feature dead), and opening a terminal crashed too.

@@ -74,7 +74,7 @@ try {
 		await page.addInitScript(({ platform, lang }) => {
 			if (platform !== "web") window.electronAPI = { platform, windowAction() {}, onWindowState() { return () => {}; } };
 			localStorage.setItem("pi-left-collapsed", "true");
-			localStorage.setItem("pi-web-ui:lang", lang);
+			localStorage.setItem("pi-harness:lang", lang);
 		}, { platform, lang });
 		await page.goto(`http://127.0.0.1:${port}`);
 		await page.locator(".todo-checklist-item").last().waitFor();

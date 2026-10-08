@@ -117,16 +117,16 @@ try {
 		await page.waitForFunction(() => !document.querySelector('.settings-modal'));
 		for (let i = 0; i < 100 && !terminalCommands.length; i++) await sleep(50);
 		assert.equal(terminalCommands.length, 1);
-		assert.equal(terminalCommands[0].command.command, 'npm install -g @youweichen/pi-web-ui@999.0.0');
+		assert.equal(terminalCommands[0].command.command, 'npm install -g @youweichen/pi-harness@999.0.0');
 		staleRegistry = true;
-		await page.evaluate(() => localStorage.setItem('pi-web-ui:appearance', 'dark'));
+		await page.evaluate(() => localStorage.setItem('pi-harness:appearance', 'dark'));
 		await page.reload();
 		await page.locator('.topbar-more .chip').waitFor();
 		assert.equal(await page.locator('html').getAttribute('data-appearance'), 'dark');
 		await page.locator('.topbar-more .chip').click();
 		await page.locator('.dd-menu').getByRole('button', { name: '所有设置', exact: true }).click();
 		await page.getByRole('button', { name: '组件更新', exact: true }).click();
-		await page.locator('.component-update-row', { hasText: 'pi-web-ui' }).getByText(/已是最新/).waitFor();
+		await page.locator('.component-update-row', { hasText: 'pi-harness' }).getByText(/已是最新/).waitFor();
 		assert(await page.getByRole('button', { name: '自动更新', exact: true }).isDisabled(), 'old registry latest cannot downgrade');
 		assert.deepEqual(errors, []);
 

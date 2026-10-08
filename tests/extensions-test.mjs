@@ -81,7 +81,7 @@ try{
   await skills.getByRole('button',{name:'重载当前会话',exact:true}).click();
   await page.screenshot({path:'tests/scratch/settings-v2-skills.png',fullPage:true});
   await page.getByRole('button',{name:'更新',exact:true}).click();await panel.getByText('local-tools',{exact:true}).waitFor();
-  assert(!await panel.getByText('pi-web-ui',{exact:true}).count());assert(!await panel.getByText('footer.js',{exact:true}).count());
+  assert(!await panel.getByText('pi-harness',{exact:true}).count());assert(!await panel.getByText('footer.js',{exact:true}).count());
   await panel.getByRole('switch').waitFor();assert(!await panel.getByRole('switch').isChecked());
   await panel.getByRole('switch').check();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===true);
   await panel.getByRole('switch').uncheck();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===false);
@@ -96,7 +96,7 @@ try{
   await page.getByRole('button',{name:'技能',exact:true}).click();await skills.getByRole('switch',{name:'启用 design-fixture',exact:true}).waitFor();assert(await skills.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
   await page.getByRole('button',{name:'Extensions',exact:true}).click();await panel.getByText('local-tools',{exact:true}).waitFor();
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'tests/scratch/extensions-mobile.png',fullPage:true});assert(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
-  await page.setViewportSize({width:1440,height:1050});await page.evaluate(()=>localStorage.setItem('pi-web-ui:lang','en'));await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).first().click();await page.getByText('All settings',{exact:true}).click();await page.getByRole('button',{name:'Extensions',exact:true}).click();await page.locator('.ext-header').getByRole('button',{name:'Install from npm / git',exact:true}).waitFor();await page.locator('.extensions-panel').getByText('local-tools',{exact:true}).waitFor();await page.screenshot({path:'tests/scratch/extensions-en.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1050});await page.evaluate(()=>localStorage.setItem('pi-harness:lang','en'));await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).first().click();await page.getByText('All settings',{exact:true}).click();await page.getByRole('button',{name:'Extensions',exact:true}).click();await page.locator('.ext-header').getByRole('button',{name:'Install from npm / git',exact:true}).waitFor();await page.locator('.extensions-panel').getByText('local-tools',{exact:true}).waitFor();await page.screenshot({path:'tests/scratch/extensions-en.png',fullPage:true});
   assert.deepEqual(errors,[]);await browser.close();browser=undefined;
  }
  console.log('PASS native packages: auth/origin/cwd, list, toggle, preview, install, local remove, browser desktop/mobile');

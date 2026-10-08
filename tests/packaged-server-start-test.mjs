@@ -29,7 +29,7 @@ console.log("PASS Markdown parser dependencies resolve inside the packaged app")
 const { agentRuntimeEnvironment } = await import(pathToFileURL(join(appRoot, "electron/agent-runtime-env.mjs")).href);
 if (process.platform === "win32") {
 	const helper = readFileSync(join(appRoot, "node_modules/node-pty/lib/conpty_console_list_agent.js"), "utf8");
-	assert.match(helper, /pi-web-ui: the console may already be gone during ConPTY teardown/);
+	assert.match(helper, /pi-harness: the console may already be gone during ConPTY teardown/);
 	console.log("PASS packaged node-pty includes the ConPTY cleanup patch");
 }
 // Loading the lazy provider is essential: startup alone does not import it.

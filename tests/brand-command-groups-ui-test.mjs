@@ -244,7 +244,7 @@ try {
 	assert.equal(await page.locator('.change-line.add').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(230, 244, 234)');
 	assert.equal(await page.locator('.change-marker').evaluate(el => getComputedStyle(el).color), 'rgb(62, 155, 95)');
 	// English has longer control labels; verify the same narrow layout.
-	await page.evaluate(() => localStorage.setItem('pi-web-ui:lang', 'en'));
+	await page.evaluate(() => localStorage.setItem('pi-harness:lang', 'en'));
 	forceRunning = true;
 	await page.reload(); await page.locator('.inputbox textarea').waitFor();
 	snapshot.state.isStreaming = true; snapshot.state.queue = { steering: ['skill:server-ops'], followUp: ['pending message'] };

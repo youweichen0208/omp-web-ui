@@ -19,7 +19,7 @@ const mails = [
 	{
 		id: 1,
 		from: "alice@example.com",
-		subject: "欢迎使用 pi-web-ui 插件",
+		subject: "欢迎使用 pi-harness 插件",
 		date: new Date().toISOString(),
 		body:
 			"这是一个由插件提供的界面组件：目录放在 <dataDir>/plugins/demo-mailbox/，" +

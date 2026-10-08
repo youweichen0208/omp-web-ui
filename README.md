@@ -1,26 +1,26 @@
-# pi-web-ui
+# pi-harness
 
 [中文](#快速开始) · [English](#english)
 
-pi-web-ui 是独立维护的 [pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) Web 与桌面界面。在浏览器或 Electron 窗口中使用 Agent 对话、文件树与预览、附件、终端、模型管理，以及内置的 SSH 节点工作台。
+pi-harness 是独立维护的 [pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) Web 与桌面界面。在浏览器或 Electron 窗口中使用 Agent 对话、文件树与预览、附件、终端、模型管理，以及内置的 SSH 节点工作台。
 
-SSH 工作台让 macOS 或 Windows 上的本机 pi-web-ui 服务连接 Linux/macOS 节点：左侧按组管理节点，中间开多个 SSH 终端标签并通过 SFTP 浏览文件，右侧是各节点独立的 Agent 对话。Agent 使用当前选中的远端终端执行命令，输出在终端中可见。节点的实际操作权限由远端账号或容器决定。
+SSH 工作台让 macOS 或 Windows 上的本机 pi-harness 服务连接 Linux/macOS 节点：左侧按组管理节点，中间开多个 SSH 终端标签并通过 SFTP 浏览文件，右侧是各节点独立的 Agent 对话。Agent 使用当前选中的远端终端执行命令，输出在终端中可见。节点的实际操作权限由远端账号或容器决定。
 
 ## 快速开始
 
 需要 Node.js **22.19.0 或更高版本**，以及至少一个已配置的 pi 模型服务商（`~/.pi/agent`）。
 
 ```bash
-npm install -g @youweichen/pi-web-ui
-pi-web-ui                         # 打开 http://127.0.0.1:8787
-pi-web-ui --port 9000 --cwd /path/to/project
+npm install -g @youweichen/pi-harness
+pi-harness                        # 打开 http://127.0.0.1:8787
+pi-harness --port 9000 --cwd /path/to/project
 ```
 
-不安装到全局也可以运行 `npx @youweichen/pi-web-ui`。升级后若使用开机自启服务，运行 `pi-web-ui server restart`，让服务端加载新版本。
+不安装到全局也可以运行 `npx @youweichen/pi-harness`。升级后若使用开机自启服务，运行 `pi-harness server restart`，让服务端加载新版本。
 
 ### 版本与升级
 
-正式版通过 `npm install -g @youweichen/pi-web-ui@latest` 安装，桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/pi-harness/releases)。从 npm 0.9.0 升级会直接跳到 1.0.0，Pi SDK 从 1.0.0 升至 1.0.4，请先阅读 [1.0.0 发布说明](https://github.com/youweichen0208/pi-harness/blob/develop/.github/release-notes/v1.0.0.md)。可运行 `npm view @youweichen/pi-web-ui dist-tags --json` 核对 npm 标签。
+正式版通过 `npm install -g @youweichen/pi-harness@latest` 安装，桌面安装包见 [GitHub Releases](https://github.com/youweichen0208/pi-harness/releases)。1.0.0 起 npm 包名为 `@youweichen/pi-harness`，命令为 `pi-harness`；旧包 `@youweichen/pi-web-ui` 不再更新。可运行 `npm view @youweichen/pi-harness dist-tags --json` 核对 npm 标签。
 
 ## SSH 节点工作台
 
@@ -43,8 +43,8 @@ pi-web-ui --port 9000 --cwd /path/to/project
 ## 运行与部署
 
 ```bash
-pi-web-ui server install    # macOS: launchd；Windows: 计划任务；Linux: systemd
-pi-web-ui server status     # 也支持 start、stop、restart、uninstall
+pi-harness server install   # macOS: launchd；Windows: 计划任务；Linux: systemd
+pi-harness server status    # 也支持 start、stop、restart、uninstall
 ```
 
 默认只监听 `127.0.0.1`。如果需要从其他设备访问，请参阅 [部署手册](https://github.com/youweichen0208/pi-harness/blob/develop/docs/deployment.md) 配置监听地址与 `PI_WEB_TOKEN` 鉴权；不要直接把未保护的 Web 界面暴露到公网。Docker 与环境变量也见 [部署手册](https://github.com/youweichen0208/pi-harness/blob/develop/docs/deployment.md) 和 [环境变量列表](https://github.com/youweichen0208/pi-harness/blob/develop/docs/env-vars.md)。
@@ -66,9 +66,9 @@ npm run test:smoke
 
 ## English
 
-pi-web-ui is an independently maintained web and Electron interface for the pi coding agent SDK. It includes chat, file browsing and editing, attachments, a local terminal, model management, and a built-in SSH node workbench with grouped hosts, multiple PTY tabs, SFTP files, and a separate Agent conversation for each node.
+pi-harness is an independently maintained web and Electron interface for the pi coding agent SDK. It includes chat, file browsing and editing, attachments, a local terminal, model management, and a built-in SSH node workbench with grouped hosts, multiple PTY tabs, SFTP files, and a separate Agent conversation for each node.
 
-Requires Node.js **>= 22.19.0** and a configured pi model provider. Install with `npm install -g @youweichen/pi-web-ui`, then run `pi-web-ui`. See the [SSH workbench guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/ssh-workbench.md), [Xshell guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/xshell.md), and [deployment guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/deployment.md).
+Requires Node.js **>= 22.19.0** and a configured pi model provider. Install with `npm install -g @youweichen/pi-harness`, then run `pi-harness`. See the [SSH workbench guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/ssh-workbench.md), [Xshell guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/xshell.md), and [deployment guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/deployment.md).
 
 ## License
 

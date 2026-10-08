@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * pi-web-ui CLI.
+ * pi-harness CLI.
  *
- *   pi-web-ui                              启动生产服务器（前台，Ctrl+C 停止，自动打开浏览器）
- *   pi-web-ui --port 9000 --cwd /path      同上，覆盖端口 / 工作目录 / 数据目录
- *   pi-web-ui --no-browser                 启动但不自动打开浏览器
- *   pi-web-ui --version | --help
- *   pi-web-ui server install [选项]         安装系统服务（开机自启）并启动
- *   pi-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
- *   pi-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
- *   pi-web-ui server start|stop|restart|status [选项]
- *   pi-web-ui install <源> [选项]           安装 GitHub 上的界面插件（见下方「界面插件」）
- *   pi-web-ui plugins / uninstall <id>      列出 / 卸载界面插件
+ *   pi-harness                              启动生产服务器（前台，Ctrl+C 停止，自动打开浏览器）
+ *   pi-harness --port 9000 --cwd /path      同上，覆盖端口 / 工作目录 / 数据目录
+ *   pi-harness --no-browser                 启动但不自动打开浏览器
+ *   pi-harness --version | --help
+ *   pi-harness server install [选项]         安装系统服务（开机自启）并启动
+ *   pi-harness server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
+ *   pi-harness server uninstall [选项]       卸载系统服务（同时移除桌面图标）
+ *   pi-harness server start|stop|restart|status [选项]
+ *   pi-harness install <源> [选项]           安装 GitHub 上的界面插件（见下方「界面插件」）
+ *   pi-harness plugins / uninstall <id>      列出 / 卸载界面插件
  *
  * 系统服务：
- *   - macOS   → launchd 用户代理，label 默认 com.youweichen.pi-web-ui
+ *   - macOS   → launchd 用户代理，label 默认 com.youweichen.pi-harness
  *              （--name 自定义时 com.<name>.server），无需 sudo
  *   - Linux   → systemd 单元 <name>.service（/etc/systemd/system/，自动 sudo）
  *   - Windows → 计划任务（Task Scheduler / schtasks，登录后自启，无需管理员），
  *              隐藏窗口启动（无黑窗）；PowerShell 启动脚本与任务 XML 生成在
- *              %APPDATA%\pi-web-ui\
+ *              %APPDATA%\pi-harness\
  *
  * 环境变量（前台与系统服务均适用）：PORT / PI_WEB_CWD / PI_WEB_DATA_DIR /
  * PI_CODING_AGENT_DIR。
@@ -50,7 +50,6 @@ import { homedir, tmpdir, userInfo } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
-import { LEGACY_LAUNCHD_LABEL, legacyLaunchdPlan, relabelPlist } from "./launchd-legacy.mjs";
 
 const BIN_DIR = dirname(fileURLToPath(import.meta.url));
 /** <pkg>/dist/server/index.js — the actual server entry. */
@@ -63,26 +62,26 @@ try {
 	// version is best-effort — the server itself doesn't need it
 }
 
-const HELP = `pi-web-ui v${pkg.version} — web chat for the pi coding agent
+const HELP = `pi-harness v${pkg.version} — web chat for the pi coding agent
 
 用法:
-  pi-web-ui                               启动服务器（前台，Ctrl+C 停止，自动打开浏览器）
-  pi-web-ui --port 9000 --cwd /path       启动并指定端口 / 工作目录 / 数据目录
-  pi-web-ui --no-browser                  启动但不自动打开浏览器
-  pi-web-ui server install [选项]         安装系统服务（开机自启）并启动
-  pi-web-ui server shortcut [选项]        在桌面创建「一键启动」图标（启动服务并打开浏览器）
-  pi-web-ui server uninstall [选项]       卸载系统服务（同时移除桌面图标）
-  pi-web-ui server start|stop|restart|status [选项]
-  pi-web-ui server quiesce [选项]          进入排空模式：拒绝新的对话/消息/编辑，存量运行继续跑完
-  pi-web-ui server unquiesce [选项]        解除排空模式，恢复接收新工作
-  pi-web-ui --version / --help
+  pi-harness                              启动服务器（前台，Ctrl+C 停止，自动打开浏览器）
+  pi-harness --port 9000 --cwd /path      启动并指定端口 / 工作目录 / 数据目录
+  pi-harness --no-browser                 启动但不自动打开浏览器
+  pi-harness server install [选项]        安装系统服务（开机自启）并启动
+  pi-harness server shortcut [选项]       在桌面创建「一键启动」图标（启动服务并打开浏览器）
+  pi-harness server uninstall [选项]      卸载系统服务（同时移除桌面图标）
+  pi-harness server start|stop|restart|status [选项]
+  pi-harness server quiesce [选项]        进入排空模式：拒绝新的对话/消息/编辑，存量运行继续跑完
+  pi-harness server unquiesce [选项]      解除排空模式，恢复接收新工作
+  pi-harness --version / --help
 
 server 选项:
   --port <n>        端口（默认 8787，或 $PORT）
   --cwd <dir>       工作目录（默认 $PI_WEB_CWD 或当前目录）
   --data-dir <dir>  会话数据目录（默认 <cwd>/.pi-web）
-  --name <name>     服务名（默认 pi-web-ui；macOS 的 launchd label
-                    为 com.youweichen.pi-web-ui，自定义名时为 com.<name>.server）
+  --name <name>     服务名（默认 pi-harness；macOS 的 launchd label
+                    为 com.youweichen.pi-harness，自定义名时为 com.<name>.server）
   --print           只打印将生成的配置文件，不实际安装
 
 平台: macOS → launchd 用户代理 · Linux → systemd · Windows → 计划任务（schtasks）
@@ -90,9 +89,9 @@ server 选项:
 快捷方式: Windows → 桌面 .lnk · macOS → 桌面 .command 启动器 · Linux → 桌面 .desktop 图标
 
 界面插件（安装到 <data-dir>/plugins/，服务运行中刷新浏览器即生效）:
-  pi-web-ui install <源>            从 GitHub 安装界面插件
-  pi-web-ui uninstall <id>          卸载已安装的界面插件
-  pi-web-ui plugins                 列出已安装的界面插件
+  pi-harness install <源>           从 GitHub 安装界面插件
+  pi-harness uninstall <id>         卸载已安装的界面插件
+  pi-harness plugins                列出已安装的界面插件
 
   源写法: owner/repo · https://github.com/owner/repo · 本地目录路径
           URL 带 /tree/<分支>/<子目录> 可指定分支与仓库内子目录；任意写法
@@ -115,9 +114,9 @@ function checkNodeVersion() {
 		(v[0] === NODE_MIN[0] && v[1] === NODE_MIN[1] && v[2] < NODE_MIN[2]);
 	if (tooOld) {
 		console.error(
-			`✖ pi-web-ui 需要 Node.js >= ${NODE_MIN.join(".")}（当前 ${process.versions.node}）。\n` +
+			`✖ pi-harness 需要 Node.js >= ${NODE_MIN.join(".")}（当前 ${process.versions.node}）。\n` +
 				`  pi SDK 的代码使用了 import attributes（with）语法，旧版 Node 无法解析。\n` +
-				`  请升级 Node：https://nodejs.org（或 nvm-windows / fnm）后重装：npm i -g pi-web-ui`,
+				`  请升级 Node：https://nodejs.org（或 nvm-windows / fnm）后重装：npm i -g @youweichen/pi-harness`,
 		);
 		process.exit(1);
 	}
@@ -288,8 +287,8 @@ function uid() {
 /** launchd label / systemd unit name / Windows task name for a service name. */
 function serviceLabel(name) {
 	if (isMac) {
-		return name === "pi-web-ui"
-			? "com.youweichen.pi-web-ui"
+		return name === "pi-harness"
+			? "com.youweichen.pi-harness"
 			: `com.${name}.server`;
 	}
 	return name;
@@ -304,34 +303,15 @@ function launchAgentPlist(name) {
 	);
 }
 
-/** Remove (or, for commands that only operate on the service, migrate) the pre-1.0 agent. */
-function cleanupLegacyLaunchd(action, opts) {
-	if (!isMac || (opts.name ?? "pi-web-ui") !== "pi-web-ui") return;
-	const legacy = join(homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`);
-	const target = launchAgentPlist("pi-web-ui");
-	const plan = legacyLaunchdPlan({ legacyExists: existsSync(legacy), targetExists: existsSync(target), action });
-	if (plan === "none") return;
-	const content = plan === "migrate" ? relabelPlist(readFileSync(legacy, "utf8"), LEGACY_LAUNCHD_LABEL, serviceLabel("pi-web-ui")) : null;
-	run("launchctl", ["bootout", `gui/${uid()}/${LEGACY_LAUNCHD_LABEL}`], { ignoreError: true, silent: true });
-	if (content) {
-		writeFileSync(target, content);
-		run("launchctl", ["bootstrap", `gui/${uid()}`, target], { ignoreError: true });
-		console.log(`已将开机自启服务迁移为 ${serviceLabel("pi-web-ui")}（配置不变）`);
-	} else {
-		console.log(`已移除旧版开机自启服务 ${LEGACY_LAUNCHD_LABEL}`);
-	}
-	rmSync(legacy, { force: true });
-}
-
 function systemdUnitPath(name) {
 	return `/etc/systemd/system/${name}.service`;
 }
 
-/** Windows: per-user config dir (%APPDATA%\pi-web-ui) holding the .cmd wrapper + task XML. */
+/** Windows: per-user config dir (%APPDATA%\pi-harness) holding the .cmd wrapper + task XML. */
 function winServiceDir() {
 	return join(
 		process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
-		"pi-web-ui",
+		"pi-harness",
 	);
 }
 
@@ -348,7 +328,7 @@ function winTaskXmlPath(name) {
 }
 
 function winLogPath() {
-	return join(homedir(), "pi-web-ui.log");
+	return join(homedir(), "pi-harness.log");
 }
 
 /** True when a scheduled task with this name exists (schtasks exits 0). */
@@ -363,12 +343,12 @@ function winTaskExists(name) {
 // 桌面快捷方式（server shortcut）
 // ---------------------------------------------------------------------------
 
-const SHORTCUT_LNK_NAME = "pi-web-ui.lnk"; // Windows 桌面快捷方式
-const SHORTCUT_MAC_NAME = "pi-web-ui.command"; // macOS 双击启动器
-const SHORTCUT_LINUX_NAME = "pi-web-ui.desktop"; // Linux 桌面图标
+const SHORTCUT_LNK_NAME = "pi-harness.lnk"; // Windows 桌面快捷方式
+const SHORTCUT_MAC_NAME = "pi-harness.command"; // macOS 双击启动器
+const SHORTCUT_LINUX_NAME = "pi-harness.desktop"; // Linux 桌面图标
 
 /** 快捷方式图标（品牌 .ico，随包发布；.lnk / .desktop 指向它）。 */
-const APP_ICO_NAME = "pi-web-ui-logo.ico"; // 复制到用户目录后的稳定文件名（避开 pi-web-ui.ico —— Windows 对该路径有损坏的图标缓存残留，见 issue #xxx）
+const APP_ICO_NAME = "pi-harness-logo.ico"; // 复制到用户目录后的稳定文件名（不用 <name>.ico：Windows 会残留损坏的图标缓存）
 const APP_ICO_SOURCE = join(BIN_DIR, "..", "web", "public", "icon.ico"); // 包内品牌图标源文件（10 帧多分辨率，DPI 密度帧保证桌面/任务栏各尺寸颜色不失真）
 /** Branded SVG logo (source of truth: web/public/favicon.svg) — used on Linux. */
 const APP_SVG_PACKAGE = join(BIN_DIR, "..", "web", "public", "favicon.svg");
@@ -465,7 +445,7 @@ function buildWinShortcutPs1(env, cwd, taskName, url, logPath, pidPath) {
 		.join("\r\n");
 	const node = realNode();
 	return [
-		"# Generated by: pi-web-ui server shortcut (rerun to change)",
+		"# Generated by: pi-harness server shortcut (rerun to change)",
 		"# Runs hidden from the desktop shortcut: if the server is already up it",
 		"# opens the browser; a scheduled task (if installed) is used; otherwise",
 		"# the server runs in the foreground of this hidden window and its PID is",
@@ -492,7 +472,7 @@ function buildWinShortcutPs1(env, cwd, taskName, url, logPath, pidPath) {
 		"    Start-Sleep -Milliseconds 250",
 		"    if (Test-Up) { Open-Browser; exit 0 }",
 		"  }",
-		"  Write-Host ('✖ pi-web-ui 服务未在 30 秒内就绪，请查看日志: ' + $log)",
+		"  Write-Host ('✖ pi-harness 服务未在 30 秒内就绪，请查看日志: ' + $log)",
 		"  exit 1",
 		"}",
 		"",
@@ -581,7 +561,7 @@ function installWinShortcut(opts) {
 		`$lnk.TargetPath = ${psQuote(winWscript())}`,
 		`$lnk.Arguments = ${psQuote(vbsPath)}`,
 		`$lnk.WorkingDirectory = ${psQuote(cwd)}`,
-		"$lnk.Description = 'pi-web-ui — 双击启动服务并打开浏览器'",
+		"$lnk.Description = 'pi-harness — 双击启动服务并打开浏览器'",
 		`$lnk.IconLocation = ${psQuote(winIcoPath())} + ',0'`,
 		"$lnk.Save()",
 		`Write-Output (Join-Path $desktop ${psQuote(SHORTCUT_LNK_NAME)})`,
@@ -604,7 +584,7 @@ function installWinShortcut(opts) {
 	const lnk = (res.stdout ?? "").trim();
 	console.log(`✅ 已创建桌面快捷方式: ${lnk}`);
 	console.log(`   双击 : 服务未运行则启动（隐藏窗口，无黑窗），就绪后自动打开浏览器`);
-	console.log(`   停止 : pi-web-ui server stop（快捷方式启动的实例也会一并停止）`);
+	console.log(`   停止 : pi-harness server stop（快捷方式启动的实例也会一并停止）`);
 	console.log(`   端口 : ${port}`);
 	console.log(`   目录 : ${cwd}`);
 }
@@ -616,14 +596,14 @@ function buildMacShortcut(label, plist, url, env) {
 		.join("\n");
 	const node = realNode();
 	return `#!/bin/bash
-# pi-web-ui 启动器 — generated by: pi-web-ui server shortcut
+# pi-harness 启动器 — generated by: pi-harness server shortcut
 # 双击运行：确保服务在运行，然后打开浏览器。
 #   · 已安装 launchd 服务（登录自启）→ kickstart，图标主要用于「启动 + 打开」
 #   · 未安装服务 → 在本终端前台运行（关闭窗口即停止）
 LABEL=${shQuote(label)}
 PLIST=${shQuote(plist)}
 URL=${shQuote(url)}
-LOG=/tmp/pi-web-ui-shortcut.log
+LOG=/tmp/pi-harness-shortcut.log
 NODE=${shQuote(node)}
 ENTRY=${shQuote(SERVER_ENTRY)}
 ${exports}
@@ -675,10 +655,10 @@ function installMacShortcut(opts) {
 
 /** Linux: launcher script run by the .desktop icon. */
 function buildLinuxStartScript(unitName, url) {
-	const log = join(homedir(), ".local", "share", "pi-web-ui", "pi-web-ui.log");
+	const log = join(homedir(), ".local", "share", "pi-harness", "pi-harness.log");
 	const node = realNode();
 	return `#!/bin/bash
-# pi-web-ui 启动器 — generated by: pi-web-ui server shortcut
+# pi-harness 启动器 — generated by: pi-harness server shortcut
 # 双击运行：确保服务在运行，然后打开浏览器。
 #   · systemd 单元已安装 → systemctl start（系统单元需要授权，失败则前台运行）
 #   · 未安装 → 在本进程前台运行（终端关闭即停止）
@@ -710,18 +690,18 @@ if [ -n "\${SERVER_PID:-}" ]; then wait "$SERVER_PID"; fi
 function installLinuxShortcut(opts) {
 	const { name, port, cwd, dataDir } = serviceOptions(opts);
 	const url = `http://localhost:${port}`;
-	const scriptDir = join(homedir(), ".local", "share", "pi-web-ui");
+	const scriptDir = join(homedir(), ".local", "share", "pi-harness");
 	const scriptPath = join(scriptDir, `${name}-start.sh`);
 	const desktopPath = join(homedir(), "Desktop", SHORTCUT_LINUX_NAME);
 	const icoPath = join(scriptDir, APP_ICO_NAME); // 备用；优先 SVG
-	const svgPath = join(scriptDir, "pi-web-ui.svg");
+	const svgPath = join(scriptDir, "pi-harness.svg");
 	const script = buildLinuxStartScript(name, url);
 	const desktopIcon = existsSync(APP_SVG_PACKAGE) ? svgPath : APP_ICO_NAME;
 	const desktop = `[Desktop Entry]
 Version=1.0
 Type=Application
-Name=pi-web-ui
-Comment=启动 pi-web-ui 服务并打开浏览器
+Name=pi-harness
+Comment=启动 pi-harness 服务并打开浏览器
 Exec=${shQuote(scriptPath)}
 Icon=${shQuote(desktopIcon)}
 Terminal=false
@@ -775,7 +755,7 @@ function removeShortcut(name) {
 	} else if (isLinux) {
 		const p = join(homedir(), "Desktop", SHORTCUT_LINUX_NAME);
 		if (existsSync(p)) rmSync(p);
-		rmSync(join(homedir(), ".local", "share", "pi-web-ui"), {
+		rmSync(join(homedir(), ".local", "share", "pi-harness"), {
 			recursive: true,
 			force: true,
 		});
@@ -801,7 +781,7 @@ function buildWinStartPs1(env, cwd, logPath) {
 		.map(([k, v]) => `$env:${k} = ${psQuote(v)}`)
 		.join("\r\n");
 	return [
-		"# Generated by: pi-web-ui server install (rerun to change)",
+		"# Generated by: pi-harness server install (rerun to change)",
 		"# Starts the server with a hidden console window (no black cmd box).",
 		sets,
 		`Set-Location ${psQuote(cwd)}`,
@@ -821,7 +801,7 @@ function buildWinTaskXml(ps1Path, cwd) {
 	return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>pi-web-ui — web chat for the pi coding agent (auto-start at logon)</Description>
+    <Description>pi-harness — web chat for the pi coding agent (auto-start at logon)</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -883,7 +863,7 @@ function buildPlist(label, cwd, env) {
 		.join("\n");
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Generated by: pi-web-ui server install (do not edit by hand — rerun to change) -->
+<!-- Generated by: pi-harness server install (do not edit by hand — rerun to change) -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -911,9 +891,9 @@ ${entries}
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/tmp/pi-web-ui.log</string>
+  <string>/tmp/pi-harness.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/pi-web-ui.err</string>
+  <string>/tmp/pi-harness.err</string>
 </dict>
 </plist>
 `;
@@ -924,9 +904,9 @@ function buildUnit(cwd, env) {
 	const envLines = Object.entries(env)
 		.map(([k, v]) => `Environment=${k}=${v}`)
 		.join("\n");
-	return `# Generated by: pi-web-ui server install (do not edit by hand — rerun to change)
+	return `# Generated by: pi-harness server install (do not edit by hand — rerun to change)
 [Unit]
-Description=pi-web-ui — web chat for the pi coding agent
+Description=pi-harness — web chat for the pi coding agent
 After=network.target
 
 [Service]
@@ -958,7 +938,7 @@ function ensureRootForSystemctl() {
 
 /** Shared option normalization for install. */
 function serviceOptions(opts) {
-	const name = opts.name ?? "pi-web-ui";
+	const name = opts.name ?? "pi-harness";
 	const port = String(opts.port ?? process.env.PORT ?? "8787");
 	if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
 		fail(`无效端口: ${port}`);
@@ -1013,9 +993,9 @@ function installLaunchd(opts) {
 	console.log(`   端口 : ${port}`);
 	console.log(`   目录 : ${cwd}`);
 	console.log(`   访问 : http://localhost:${port}`);
-	console.log(`   日志 : /tmp/pi-web-ui.log  /tmp/pi-web-ui.err`);
-	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   日志 : /tmp/pi-harness.log  /tmp/pi-harness.err`);
+	console.log(`   管理 : pi-harness server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-harness server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function installSystemd(opts) {
@@ -1035,12 +1015,12 @@ function installSystemd(opts) {
 	console.log(`   目录 : ${cwd}`);
 	console.log(`   访问 : http://localhost:${port}`);
 	console.log(`   日志 : journalctl -u ${name}.service -f`);
-	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   管理 : pi-harness server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-harness server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function uninstallLaunchd(opts) {
-	const name = opts.name ?? "pi-web-ui";
+	const name = opts.name ?? "pi-harness";
 	const label = serviceLabel(name);
 	const plist = launchAgentPlist(name);
 	run("launchctl", ["bootout", `gui/${uid()}/${label}`], {
@@ -1054,7 +1034,7 @@ function uninstallLaunchd(opts) {
 }
 
 function uninstallSystemd(opts) {
-	const name = opts.name ?? "pi-web-ui";
+	const name = opts.name ?? "pi-harness";
 	ensureRootForSystemctl();
 	run("systemctl", ["disable", "--now", `${name}.service`], {
 		ignoreError: true,
@@ -1102,12 +1082,12 @@ function installWindows(opts) {
 	console.log(
 		`   说明 : 登录后自启（与 launchd 用户代理一致）；stop 停止，uninstall 移除`,
 	);
-	console.log(`   管理 : pi-web-ui server status|restart|stop|uninstall`);
-	console.log(`   提示 : pi-web-ui server shortcut 可在桌面创建「一键启动」图标`);
+	console.log(`   管理 : pi-harness server status|restart|stop|uninstall`);
+	console.log(`   提示 : pi-harness server shortcut 可在桌面创建「一键启动」图标`);
 }
 
 function uninstallWindows(opts) {
-	const name = opts.name ?? "pi-web-ui";
+	const name = opts.name ?? "pi-harness";
 	if (winTaskExists(name)) {
 		run("schtasks", ["/Delete", "/TN", name, "/F"], { ignoreError: true });
 	}
@@ -1143,8 +1123,8 @@ function controlPath(opts) {
 			? resolve(process.env.PI_WEB_DATA_DIR)
 			: join(homedir(), ".pi-web");
 	return isWin
-		? `\\\\.\\pipe\\pi-web-ui-${String(opts.port ?? process.env.PORT ?? "8787")}`
-		: join(dir, "pi-web-ui.sock");
+		? `\\\\.\\pipe\\pi-harness-${String(opts.port ?? process.env.PORT ?? "8787")}`
+		: join(dir, "pi-harness.sock");
 }
 
 /** Send one control command to a RUNNING server; resolves null if unreachable. */
@@ -1206,13 +1186,13 @@ async function setQuiesce(opts, on) {
 	console.log(
 		on
 			? "⏸  已进入排空模式（quiesce）：拒绝新的对话/消息/编辑，存量运行继续跑完。\n" +
-				"    跑完后用 pi-web-ui server unquiesce 恢复。"
+				"    跑完后用 pi-harness server unquiesce 恢复。"
 			: "▶  已解除排空模式（unquiesce）：恢复接收新的对话/消息/编辑。",
 	);
 }
 
 function controlService(action, opts) {
-	const name = opts.name ?? "pi-web-ui";
+	const name = opts.name ?? "pi-harness";
 
 	if (isMac) {
 		const label = serviceLabel(name);
@@ -1229,7 +1209,7 @@ function controlService(action, opts) {
 				const state = (res.stdout.match(/state = (\w+)/) ?? [])[1] ?? "loaded";
 				console.log(`${label}: ${state}（已加载，开机自启中）`);
 			} else {
-				console.log(`${label}: 未安装（运行 pi-web-ui server install 安装）`);
+				console.log(`${label}: 未安装（运行 pi-harness server install 安装）`);
 			}
 			return;
 		}
@@ -1240,7 +1220,7 @@ function controlService(action, opts) {
 			} else {
 				const plist = launchAgentPlist(name);
 				if (!existsSync(plist)) {
-					fail(`找不到 ${plist}，请先运行 pi-web-ui server install`);
+					fail(`找不到 ${plist}，请先运行 pi-harness server install`);
 				}
 				run("launchctl", ["bootstrap", `gui/${uid()}`, plist]);
 			}
@@ -1249,7 +1229,7 @@ function controlService(action, opts) {
 		}
 
 		if (action === "restart") {
-			if (!loaded()) fail(`${label} 未加载，请先 pi-web-ui server start`);
+			if (!loaded()) fail(`${label} 未加载，请先 pi-harness server start`);
 			run("launchctl", ["kickstart", "-k", target]);
 			console.log(`✅ 已重启 ${label}`);
 			return;
@@ -1285,7 +1265,7 @@ function controlService(action, opts) {
 			const pid = winReadPid(name);
 			const instAlive = pid && pidAlive(pid);
 			if (!exists) {
-				console.log(`${name}: 未安装（运行 pi-web-ui server install 安装）`);
+				console.log(`${name}: 未安装（运行 pi-harness server install 安装）`);
 				if (instAlive) console.log(`   快捷方式实例 : 运行中 (PID ${pid})`);
 				return;
 			}
@@ -1309,7 +1289,7 @@ function controlService(action, opts) {
 				{ encoding: "utf8" },
 			);
 			if (ps.status !== 0 || (ps.stdout ?? "").includes("NOT_INSTALLED")) {
-				console.log(`${name}: 未安装（运行 pi-web-ui server install 安装）`);
+				console.log(`${name}: 未安装（运行 pi-harness server install 安装）`);
 				return;
 			}
 			console.log(`${name}: 计划任务\n${(ps.stdout ?? "").trim()}`);
@@ -1321,14 +1301,14 @@ function controlService(action, opts) {
 		}
 
 		if (action === "start") {
-			if (!exists) fail(`${name} 不存在，请先运行 pi-web-ui server install`);
+			if (!exists) fail(`${name} 不存在，请先运行 pi-harness server install`);
 			run("schtasks", ["/Run", "/TN", name]);
 			console.log(`✅ 已启动 ${name}`);
 			return;
 		}
 
 		if (action === "restart") {
-			if (!exists) fail(`${name} 不存在，请先运行 pi-web-ui server install`);
+			if (!exists) fail(`${name} 不存在，请先运行 pi-harness server install`);
 			run("schtasks", ["/End", "/TN", name], {
 				ignoreError: true,
 				silent: true,
@@ -1374,9 +1354,9 @@ function controlService(action, opts) {
 const PLUGIN_ID_RE = /^[A-Za-z0-9_-]+$/;
 
 const PLUGIN_HELP = `用法:
-  pi-web-ui install <源> [选项]     安装 GitHub 上的界面插件
-  pi-web-ui uninstall <id> [选项]   卸载已安装的界面插件
-  pi-web-ui plugins [选项]          列出已安装的界面插件
+  pi-harness install <源> [选项]    安装 GitHub 上的界面插件
+  pi-harness uninstall <id> [选项]  卸载已安装的界面插件
+  pi-harness plugins [选项]         列出已安装的界面插件
 
 源写法（任选其一）:
   owner/repo                                        简写
@@ -1511,7 +1491,7 @@ function locatePluginRoot(checkout, subpath, repoLabel) {
 	if (existsSync(join(checkout, "manifest.json"))) return checkout;
 	const hits = findManifestDirs(checkout);
 	if (hits.length === 0)
-		fail(`"${repoLabel}" 里没找到 manifest.json —— 不是 pi-web-ui 界面插件`);
+		fail(`"${repoLabel}" 里没找到 manifest.json —— 不是 pi-harness 界面插件`);
 	if (hits.length > 1)
 		fail(
 			`${repoLabel} 里有多个插件（多个 manifest.json），请用子目录写法指定其中一个:\n  ` +
@@ -1528,14 +1508,14 @@ async function pluginInstallCmd(argv) {
 		return;
 	}
 	if (positionals.length !== 1)
-		fail(`用法: pi-web-ui install <源> [--name <id>] [--data-dir <dir>] [--force]\n${PLUGIN_HELP}`);
+		fail(`用法: pi-harness install <源> [--name <id>] [--data-dir <dir>] [--force]\n${PLUGIN_HELP}`);
 	const rawSpec = positionals[0];
 	const pluginsDir = join(pluginDataDir(opts), "plugins");
 	// 本地目录直接装（离线开发调试），否则从 GitHub 拉取
 	const localCandidate = resolve(rawSpec.replace(/^file:\/\//, ""));
 	const isLocal = existsSync(localCandidate);
 	const src = isLocal ? null : parsePluginSource(rawSpec);
-	const tmp = mkdtempSync(join(tmpdir(), "pi-web-ui-plugin-"));
+	const tmp = mkdtempSync(join(tmpdir(), "pi-harness-plugin-"));
 	let backupTs = null;
 	try {
 		let checkout;
@@ -1608,7 +1588,7 @@ async function pluginInstallCmd(argv) {
 			/* 尽力而为：没有来源信息只是不显示更新按钮 */
 		}
 		// 记录本次安装的远端 sha（git ls-remote HEAD，离线也支持本地 git 源）：
-		// 供 `pi-web-ui plugins --check-updates` 对比更新。失败静默（无 sha = 保守可更新）。
+		// 供 `pi-harness plugins --check-updates` 对比更新。失败静默（无 sha = 保守可更新）。
 		try {
 			const sha = await resolveRemoteSha(rawSpec);
 			if (sha) writeFileSync(join(target, ".pi-git-sha"), sha + "\n");
@@ -1620,7 +1600,7 @@ async function pluginInstallCmd(argv) {
 		);
 		if (manifest.description) console.log(`  ${manifest.description}`);
 		console.log(`  位置: ${target}`);
-		console.log(`  生效: 服务运行中刷新浏览器即可加载；未运行则下次启动生效。卸载: pi-web-ui uninstall ${id}`);
+		console.log(`  生效: 服务运行中刷新浏览器即可加载；未运行则下次启动生效。卸载: pi-harness uninstall ${id}`);
 	} finally {
 		rmSync(tmp, { recursive: true, force: true });
 	}
@@ -1636,7 +1616,7 @@ function pluginUninstallCmd(argv) {
 	const id = positionals[0];
 	if (!PLUGIN_ID_RE.test(id)) fail(`非法插件 id: ${id}`);
 	const target = join(pluginDataDir(opts), "plugins", id);
-	if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-web-ui plugins 查看已装列表）`);
+	if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-harness plugins 查看已装列表）`);
 	rmSync(target, { recursive: true, force: true });
 	console.log(`✔ 已卸载插件 ${id} —— 运行中的服务刷新浏览器后消失。`);
 }
@@ -1653,7 +1633,7 @@ function pluginListCmd(argv) {
 		const id = String(opts.rollback);
 		if (!PLUGIN_ID_RE.test(id)) fail(`非法插件 id: ${id}`);
 		const target = join(dataDir, "plugins", id);
-		if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-web-ui plugins 查看已装列表）`);
+		if (!existsSync(target)) fail(`未安装插件 "${id}"（pi-harness plugins 查看已装列表）`);
 		const ts = restorePluginBackup(dataDir, id);
 		if (!ts) fail(`插件 "${id}" 没有更新备份（从未覆盖安装 / 备份已用完）`);
 		console.log(`✔ 已回滚插件 ${id} 到 ${ts} 的快照 —— 运行中的服务刷新浏览器后生效。`);
@@ -1681,7 +1661,7 @@ function pluginListCmd(argv) {
 		}
 	}
 	if (rows.length === 0) {
-		console.log(`尚未安装任何界面插件（目录: ${pluginsDir}）\n安装示例: pi-web-ui install owner/repo`);
+		console.log(`尚未安装任何界面插件（目录: ${pluginsDir}）\n安装示例: pi-harness install owner/repo`);
 		return;
 	}
 	console.log(`已安装的界面插件（${pluginsDir}）:\n${rows.join("\n")}`);
@@ -1704,7 +1684,7 @@ async function checkUpdatesCmd(dataDir) {
 		const label = r.name && r.name !== r.id ? `${r.id}（${r.name}）` : r.id;
 		if (r.updatable) {
 			console.log(`  🔄 ${label}${r.version ? ` v${r.version}` : ""}  可更新（已装 ${r.localSha ?? "未知"} → 远端 ${r.remoteSha}）`);
-			console.log(`     更新: pi-web-ui install ${r.source} --name ${r.id} --force`);
+			console.log(`     更新: pi-harness install ${r.source} --name ${r.id} --force`);
 			any = true;
 		} else if (r.remoteSha) {
 			console.log(`  ✓ ${label}${r.version ? ` v${r.version}` : ""}  已是最新（${r.remoteSha}）`);
@@ -1724,14 +1704,12 @@ async function serverCmd(argv) {
 	if (positionals.length === 0) {
 		console.log(HELP);
 		console.log("--- 当前服务状态 ---");
-		cleanupLegacyLaunchd("status", opts);
 		controlService("status", opts);
 		return;
 	}
 	const action = positionals[0];
 	if (positionals.length > 1)
 		fail(`多余的参数: ${positionals.slice(1).join(" ")}`);
-	if (["install", "uninstall", "start", "stop", "restart", "status", "shortcut"].includes(action) && !opts.print) cleanupLegacyLaunchd(action, opts);
 	switch (action) {
 		case "shortcut": {
 			if (isWin) {

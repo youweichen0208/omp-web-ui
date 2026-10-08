@@ -63,8 +63,8 @@ async function waitFor(pred, timeoutMs = 15000, desc = "") {
 function control(cmd) {
 	const path =
 		process.platform === "win32"
-			? `\\\\.\\pipe\\pi-web-ui-${PORT}`
-			: join(DATA, "pi-web-ui.sock");
+			? `\\\\.\\pipe\\pi-harness-${PORT}`
+			: join(DATA, "pi-harness.sock");
 	return new Promise((resolvePromise) => {
 		const sock = createConnection(path);
 		let done = false;

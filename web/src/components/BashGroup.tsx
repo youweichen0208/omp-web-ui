@@ -99,7 +99,7 @@ function BashRow({ block, view, onKill, revealed, messageId, attempts, historica
 				<button type="button" onClick={() => void copy("command")}>{t(copied === "command" ? "copied" : "bashCopyCommand")}</button>
 				<button type="button" disabled={!output} onClick={() => void copy("output")}>{t(copied === "output" ? "copied" : "bashCopyOutput")}</button>
 				{truncated && view.result?.toolOutputUrl && <ToolOutputDownload url={view.result.toolOutputUrl} />}
-				<button type="button" title={t("bashOpenTerminalHint")} onClick={() => window.dispatchEvent(new CustomEvent("pi-web-ui:plugin-run-command", { detail: { title: compactCommandLabel(commandLines[0]), command } }))}>{t("bashOpenTerminal")}</button>
+				<button type="button" title={t("bashOpenTerminalHint")} onClick={() => window.dispatchEvent(new CustomEvent("pi-harness:plugin-run-command", { detail: { title: compactCommandLabel(commandLines[0]), command } }))}>{t("bashOpenTerminal")}</button>
 				{state === "run" && onKill && <button type="button" onClick={onKill}>{t("stopBash")}</button>}
 			</div>
 			{history}

@@ -654,7 +654,7 @@ function BashFailure({ diagnostics, output, wrap }: { diagnostics: ReturnType<ty
 	const t = useT();
 	const [raw, setRaw] = useState(false);
 	return <div className="bash-failure">
-		<div className="bash-failure-list">{diagnostics.map((item, index) => <div key={`${item.path}:${item.line}:${index}`} className="bash-failure-line"><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("pi-web-ui:open-tool-file", { detail: item }))}>{item.path}:{item.line}{item.column ? `:${item.column}` : ""}</button><span>{item.message}</span></div>)}</div>
+		<div className="bash-failure-list">{diagnostics.map((item, index) => <div key={`${item.path}:${item.line}:${index}`} className="bash-failure-line"><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("pi-harness:open-tool-file", { detail: item }))}>{item.path}:{item.line}{item.column ? `:${item.column}` : ""}</button><span>{item.message}</span></div>)}</div>
 		<button type="button" className="bash-failure-toggle" onClick={() => setRaw((value) => !value)}>{raw ? t("collapseCode") : t("bashShowRaw")}</button>
 		{raw && <pre className={wrap ? "wrap" : ""}>{output}</pre>}
 	</div>;

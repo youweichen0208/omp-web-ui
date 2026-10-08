@@ -70,7 +70,7 @@ export const NATIVE_COMMANDS: {
 	{ name: "reload", description: "重新加载扩展、技能与模板", descriptionEn: "Reload extensions, skills & templates" },
 	{ name: "help", description: "显示全部命令", descriptionEn: "Show all commands" },
 	{ name: "copy", description: "复制上一条助手回复", descriptionEn: "Copy last assistant reply" },
-	{ name: "pi-web-ui:quit", description: "退出服务", descriptionEn: "Quit server (supervisor will restart)" },
+	{ name: "pi-harness:quit", description: "退出服务", descriptionEn: "Quit server (supervisor will restart)" },
 ];
 
 /** Parse a prompt into "/command args" — returns null when it isn't one. */
@@ -293,11 +293,11 @@ export class SlashCommandsService {
 					});
 				}
 				return true;
-			case "pi-web-ui:quit": {
+			case "pi-harness:quit": {
 				this.host.emit({
 					type: "notice",
 					level: "info",
-					text: "正在退出 pi-web-ui… supervisor 将自动重启服务",
+					text: "正在退出 pi-harness… supervisor 将自动重启服务",
 				});
 				setTimeout(() => {
 					const didSchedule = this.host.onQuit?.() ?? false;

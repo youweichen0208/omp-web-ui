@@ -67,7 +67,7 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: pi-web-ui-windows
+          name: pi-harness-windows
           path: |
             release/*.exe
             release/*.zip

@@ -6,7 +6,7 @@
  * 从地址栏移除（避免链接分享/历史记录泄露）→ 之后所有请求统一追加查询参数，
  * 服务端同时下发 HttpOnly cookie 兜底后续导航。
  */
-const KEY = "pi-web-ui:token";
+const KEY = "pi-harness:token";
 
 /** 应用启动时调用一次：吸收 URL 里的 ?token= 并清洗地址栏。 */
 export function initAuthToken(): void {

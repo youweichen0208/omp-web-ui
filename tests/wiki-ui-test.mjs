@@ -90,7 +90,7 @@ try {
 	page.on('websocket', ws => ws.on('framereceived', ({ payload }) => { try { const msg = JSON.parse(String(payload)); if (msg.type === 'snapshot') { activeConversation = msg.state.conversationId; activeSnapshot = msg.state; } } catch {} }));
 	page.on('response', async response => { if (response.url().endsWith('/api/wiki') && response.request().postDataJSON()?.action === 'new-conversation' && response.ok()) wikiConversations.push((await response.json()).conversationId); });
 	const errors = []; page.on('pageerror', e => { errors.push(e.message); console.error('Browser error:', e.message); });
-	await page.addInitScript(cwd => { localStorage.setItem(`pi-wiki-file:${cwd}`, '交易系统/参数配置.md'); localStorage.setItem('pi-web-ui:appearance', 'dark'); localStorage.setItem(`pi-wiki-chat:${cwd}`, 'false'); }, cwd);
+	await page.addInitScript(cwd => { localStorage.setItem(`pi-wiki-file:${cwd}`, '交易系统/参数配置.md'); localStorage.setItem('pi-harness:appearance', 'dark'); localStorage.setItem(`pi-wiki-chat:${cwd}`, 'false'); }, cwd);
 	await page.goto(`http://127.0.0.1:${port}`);
 	await page.locator('.conn-dot.ok').first().waitFor({ state: 'attached', timeout: 20000 });
 	assert.equal(await page.getByRole('tab', { name: 'Wiki 模式', exact: true }).count(), 0);
@@ -166,13 +166,13 @@ try {
 	assert.equal(await page.locator('.wiki-toc').count(), 0);
 	assert((await page.locator('.wiki-document-meta').innerText()).includes('分钟读完'));
 	const readingCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
-	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'light'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
+	await page.evaluate(() => { localStorage.setItem('pi-harness:code-theme', 'light'); window.dispatchEvent(new Event('pi-harness:code-theme')); });
 	assert.equal(readingCode, "rgb(36, 37, 34)");
 	assert.equal(await page.locator(".wiki-prose .codeblock").evaluate(el => getComputedStyle(el).backgroundColor), readingCode);
 	assert.equal(await page.locator('.wiki-prose select[data-code-language]').first().inputValue(), 'js');
 	await page.locator('.wiki-scroll').evaluate(el => { el.scrollTo({ top: 0, behavior: 'instant' }); el.dispatchEvent(new Event('scroll')); });
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-dark.png' });
-	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
+	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; localStorage.setItem('pi-harness:code-theme', 'dark'); window.dispatchEvent(new Event('pi-harness:code-theme')); });
 	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
 	await page.waitForFunction(() => {
 		const code = document.querySelector('.wiki-prose .codeblock');
@@ -218,7 +218,7 @@ try {
 	await page.locator('.fp-leave').waitFor();
 	await page.locator('.fp-leave').getByRole('button', { name: '取消', exact: true }).click();
 	assert.equal(await page.locator('.fp-editor').inputValue(), 'unsaved code draft');
-	await page.evaluate(() => window.dispatchEvent(new CustomEvent('pi-web-ui:open-tool-file', { detail: { path: '交易系统/参数配置.md' } })));
+	await page.evaluate(() => window.dispatchEvent(new CustomEvent('pi-harness:open-tool-file', { detail: { path: '交易系统/参数配置.md' } })));
 	await page.locator('.fp-leave').getByRole('button', { name: '放弃修改', exact: true }).click();
 	await page.locator('.wiki-document h1:visible', { hasText: '参数配置' }).waitFor();
 	assert.equal(readFileSync(join(cwd, 'risk', 'guard.py'), 'utf8'), 'def check_stop(loss):\n    return loss >= 0.02\n');

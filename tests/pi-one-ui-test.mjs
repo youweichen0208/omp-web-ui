@@ -17,7 +17,7 @@ try {
 	for(const locale of ['zh','en']) {
 		const page=await browser.newPage({viewport:{width:900,height:800}}),errors=[];
 		page.on('pageerror',error=>errors.push(error.message));
-		await page.addInitScript(locale=>{localStorage.setItem('pi-web-ui:lang',locale);window.electronAPI={platform:'darwin',windowAction(){},onWindowState(){return()=>{};}};},locale);
+		await page.addInitScript(locale=>{localStorage.setItem('pi-harness:lang',locale);window.electronAPI={platform:'darwin',windowAction(){},onWindowState(){return()=>{};}};},locale);
 		await page.routeWebSocket('**/ws', route => { const upstream=route.connectToServer(); route.onMessage(m=>upstream.send(m)); upstream.onMessage(wire=>{ const message=JSON.parse(wire.toString()); if(message.type==='snapshot'||message.type==='snapshot_delta') message.state.piConfigured=true; route.send(JSON.stringify(message)); }); });
 		await page.goto(`http://127.0.0.1:${port}`); await page.waitForTimeout(600);
 		assert.equal(await page.getByRole('tab',{name:locale==='zh'?'生图':'Images',exact:true}).count(),0);

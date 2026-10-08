@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# pi-web-ui — multi-stage build. Builds the server (tsc) + frontend (vite),
+# pi-harness — multi-stage build. Builds the server (tsc) + frontend (vite),
 # then runs a slim runtime image. `docker compose up -d` = one-command deploy
 # with auto-restart on boot (`restart: unless-stopped`).
 FROM node:22-bookworm-slim AS build

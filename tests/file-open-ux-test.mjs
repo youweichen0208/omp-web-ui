@@ -89,7 +89,7 @@ try {
 	await page.mouse.down();
 	await page.mouse.move(handle.x - 80, handle.y + 120);
 	await page.mouse.up();
-	const savedShare = await page.evaluate(() => Number(localStorage.getItem("pi-web-ui:editor-share")));
+	const savedShare = await page.evaluate(() => Number(localStorage.getItem("pi-harness:editor-share")));
 	assert(savedShare > 0.45 && savedShare < 0.7);
 	await page.locator(".fp-back").click();
 	await page.locator(".fp-leave").getByRole("button", { name: "放弃修改" }).click();

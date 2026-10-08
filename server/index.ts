@@ -4,7 +4,7 @@ import { installCodemodeImageRoutes } from "./codemode-image-routes.js";
 import { installWikiRoutes } from "./wiki-routes.js";
 
 /**
- * pi-web-ui server entry.
+ * pi-harness server entry.
  *
  * - Serves the built frontend (web/dist) in production; in dev, Vite serves it
  *   on :5173 and proxies /ws to this server.
@@ -346,7 +346,7 @@ if (existsSync(webDist)) {
 		// with an unhandled ENOENT stack trace.
 		res.sendFile(join(webDist, "index.html"), (err) => {
 			if (err && !res.headersSent) {
-				res.status(503).send("正在更新 pi-web-ui，请稍后刷新…");
+				res.status(503).send("正在更新 pi-harness，请稍后刷新…");
 			}
 		});
 	});
@@ -357,7 +357,7 @@ if (existsSync(webDist)) {
 	// UI-less 404 with no explanation.
 	console.error(
 		"✖ 更新后的安装不完整（缺少 web/dist/index.html）。\n" +
-			"  请手动执行 npm i -g @youweichen/pi-web-ui@latest 修复后重新启动。",
+			"  请手动执行 npm i -g @youweichen/pi-harness@latest 修复后重新启动。",
 	);
 	process.exit(1);
 }
@@ -460,9 +460,9 @@ service.onClientCwdChanged = (cwd) => pluginMgr.notifyCwd(cwd);
 // ---------------------------------------------------------------------------
 // Self-update
 // ---------------------------------------------------------------------------
-// In-app updates now run `npm i -g @youweichen/pi-web-ui@latest` in a visible terminal
+// In-app updates now run `npm i -g @youweichen/pi-harness@latest` in a visible terminal
 // tab (frontend-initiated); after it finishes the user restarts via
-// `pi-web-ui server restart`. The PI_WEB_RESTART_CHILD port-wait handshake
+// `pi-harness server restart`. The PI_WEB_RESTART_CHILD port-wait handshake
 // below stays: an externally orchestrated replacement child still needs it.
 
 function scheduleQuit(): boolean {
@@ -471,14 +471,14 @@ function scheduleQuit(): boolean {
 	const inDocker = existsSync("/.dockerenv");
 	if (isLaunchd || isSystemd || inDocker) {
 		setTimeout(() => {
-			console.log("pi-web-ui:quit — shutting down (supervisor will restart)…");
+			console.log("pi-harness:quit — shutting down (supervisor will restart)…");
 			if (isSystemd) process.exit(3);
 			void shutdown();
 		}, 300);
 		return true;
 	}
 	setTimeout(() => {
-		console.log("pi-web-ui:quit — shutting down (restart to reload)…");
+		console.log("pi-harness:quit — shutting down (restart to reload)…");
 		void shutdown();
 	}, 300);
 	return true;
@@ -993,7 +993,7 @@ if (process.env[RESTART_CHILD_ENV] === "1") {
 
 httpServer.listen(PORT, HOST, () => {
 	console.log("");
-	console.log("  ⚡ pi-web-ui — web chat for the pi coding agent");
+	console.log("  ⚡ pi-harness — web chat for the pi coding agent");
 	console.log(`    http://localhost:${PORT}`);
 	console.log(`    workspace   : ${CWD}`);
 	console.log(`    session dir : ${SESSION_DIR_ROOT}`);
@@ -1006,7 +1006,7 @@ httpServer.listen(PORT, HOST, () => {
 scheduleUploadCleanup();
 
 // Local control socket (status / quiesce / unquiesce) — same data dir the
-// CLI uses, so `pi-web-ui server status|quiesce|unquiesce` just works.
+// CLI uses, so `pi-harness server status|quiesce|unquiesce` just works.
 const stopControl = startControlServer({ service, dataDir: DATA_DIR, port: PORT });
 
 let shuttingDown = false;

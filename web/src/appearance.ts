@@ -1,7 +1,7 @@
 import { THEME_CHANGE_EVENT } from "./theme";
 
 export type Appearance = "light" | "dark" | "system";
-const KEY = "pi-web-ui:appearance";
+const KEY = "pi-harness:appearance";
 
 export function getAppearance(): Appearance {
 	try {

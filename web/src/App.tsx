@@ -149,7 +149,7 @@ const PANEL_MIN = 180;
 const PANEL_MAX = 520;
 const PANEL_DEFAULT = 240;
 type PanelSide = "left" | "right" | "editor";
-const panelWidthKey = (side: PanelSide) => `pi-web-ui:${side}-panel-width`;
+const panelWidthKey = (side: PanelSide) => `pi-harness:${side}-panel-width`;
 function readPanelWidth(side: PanelSide): number {
 	const v = Number(localStorage.getItem(panelWidthKey(side)));
 	return Number.isFinite(v) && v >= PANEL_MIN && v <= PANEL_MAX ? v : side === "editor" ? 480 : side === "right" ? 300 : PANEL_DEFAULT;
@@ -371,7 +371,7 @@ export function App() {
 	const [rightWidth, setRightWidth] = useState(() => readPanelWidth("right"));
 	const resizeLeft = useCallback((w: number) => setLeftWidth(w), []);
 	const [editorShare, setEditorShare] = useState(() => {
-		const stored = Number(localStorage.getItem("pi-web-ui:editor-share"));
+		const stored = Number(localStorage.getItem("pi-harness:editor-share"));
 		return Number.isFinite(stored) && stored >= 0.15 && stored <= 0.85 ? stored : 0.45;
 	});
 	const resizeRight = useCallback((w: number) => setRightWidth(w), []);
@@ -383,7 +383,7 @@ export function App() {
 		if (available > 0) {
 			const share = Math.min(0.85, Math.max(0.15, w / available));
 			setEditorShare(share);
-			localStorage.setItem("pi-web-ui:editor-share", String(share));
+			localStorage.setItem("pi-harness:editor-share", String(share));
 		}
 	}, []);
 	// Mobile: which side panel is open as a drawer (null = both closed).
@@ -488,8 +488,8 @@ export function App() {
 			};
 			window.setTimeout(reveal, 100);
 		};
-		window.addEventListener("pi-web-ui:open-tool-file", onToolFile);
-		return () => window.removeEventListener("pi-web-ui:open-tool-file", onToolFile);
+		window.addEventListener("pi-harness:open-tool-file", onToolFile);
+		return () => window.removeEventListener("pi-harness:open-tool-file", onToolFile);
 	}, [openPreview, chat.state?.cwd]);
 	// Setup modal: one-time prompt when the pi agent config is missing.
 	const [setupDismissed, setSetupDismissed] = useState(false);
@@ -538,8 +538,8 @@ export function App() {
 			}
 			setView("terminal");
 		};
-		window.addEventListener("pi-web-ui:plugin-run-command", onPluginRunCommand);
-		return () => window.removeEventListener("pi-web-ui:plugin-run-command", onPluginRunCommand);
+		window.addEventListener("pi-harness:plugin-run-command", onPluginRunCommand);
+		return () => window.removeEventListener("pi-harness:plugin-run-command", onPluginRunCommand);
 	}, [chat, terminal, send]);
 
 	// Ctrl+K / Cmd+K opens global search (also reachable via the topbar button).
@@ -567,7 +567,7 @@ export function App() {
 		saveSoundSettings(sound);
 	}, [sound]);
 
-	// Maintenance watcher: when a `pi remove …` / `pi-web-ui install|uninstall …`
+	// Maintenance watcher: when a `pi remove …` / `pi-harness install|uninstall …`
 	// command tab transitions running → exited, re-discover extensions/skills
 	// (extensions_reload) or re-scan the UI-plugin dir (plugins_reload).
 	useEffect(() => {
@@ -580,8 +580,8 @@ export function App() {
 			if (cmd.startsWith("pi remove ")) {
 				send({ type: "extensions_reload" });
 			} else if (
-				cmd.startsWith("pi-web-ui install ") ||
-				cmd.startsWith("pi-web-ui uninstall ")
+				cmd.startsWith("pi-harness install ") ||
+				cmd.startsWith("pi-harness uninstall ")
 			) {
 				send({ type: "plugins_reload" });
 			}
@@ -1042,7 +1042,7 @@ export function App() {
 							/>
 						</main>
 						{!isMobile && (!isNarrow || !!previewFile) && (!filesCollapsed || !!previewFile) && (
-							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("pi-web-ui:editor-share", "0.45"); } : undefined} />
+							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("pi-harness:editor-share", "0.45"); } : undefined} />
 						)}
 						<div
 							className={`panel-drawer drawer-right ${filesCollapsed && !previewFile ? "files-collapsed" : ""} ${drawer === "right" ? "open" : ""}`}

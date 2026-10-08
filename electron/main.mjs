@@ -1,6 +1,6 @@
 import { createAppUpdater } from "./app-updater.mjs";
 /**
- * pi-web-ui Electron 桌面版主进程。
+ * pi-harness Electron 桌面版主进程。
  *
  * 架构：
  *   - 主进程 fork 一个隐藏子进程跑 server（ELECTRON_RUN_AS_NODE=1），
@@ -15,7 +15,7 @@ import { createAppUpdater } from "./app-updater.mjs";
  *   如有 Vite dev server (:5173)，优先加载它获取 HMR。
  *
  * 与当前 server/index.ts 的耦合点（重构时请对照检查）：
- *   - 就绪标记：server 启动后 stdout 打印 "⚡ pi-web-ui"（见 server/index.ts
+ *   - 就绪标记：server 启动后 stdout 打印 "⚡ pi-harness"（见 server/index.ts
  *     httpServer.listen 回调），本文件靠这行判断 server 已就绪。
  *   - PI_WEB_PKG_ROOT：告诉 server 去哪找 web/dist（resolvePkgRoot()），
  *     打包后指向 process.resourcesPath（electron-builder extraResources）。
@@ -138,7 +138,7 @@ async function startServer(reusePort) {
 		process.stderr.write(`[server:err] ${text}`);
 	});
 
-	// 等待 server 就绪：监听 stdout 中的 "⚡ pi-web-ui" 标记（见 server/index.ts）
+	// 等待 server 就绪：监听 stdout 中的 "⚡ pi-harness" 标记（见 server/index.ts）
 	await new Promise((resolvePromise, rejectPromise) => {
 		const timeout = setTimeout(() => {
 			rejectPromise(
@@ -148,7 +148,7 @@ async function startServer(reusePort) {
 
 		const checkOutput = (chunk) => {
 			const text = chunk.toString();
-			if (text.includes("⚡ pi-web-ui") || text.includes("http://localhost")) {
+			if (text.includes("⚡ pi-harness") || text.includes("http://localhost")) {
 				clearTimeout(timeout);
 				resolvePromise(undefined);
 			}
@@ -535,7 +535,7 @@ function setupAutoUpdater() {
 
 // ── 应用生命周期 ──
 
-app.setAppUserModelId("com.youweichen.pi-web-ui");
+app.setAppUserModelId("com.youweichen.pi-harness");
 
 // 确保只有一个实例
 const gotLock = app.requestSingleInstanceLock();

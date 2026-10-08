@@ -9,26 +9,26 @@ Pi 1.0 的原生 MCP 配置入口和旧界面 MCP 桥不同，见 [插件文档]
 ## CLI
 
 ```bash
-pi-web-ui --port 9000 --cwd /path          # 前台
-pi-web-ui install <源> [--name --force --data-dir]  # 安装 GitHub 界面插件到 <dataDir>/plugins/
+pi-harness --port 9000 --cwd /path         # 前台
+pi-harness install <源> [--name --force --data-dir]  # 安装 GitHub 界面插件到 <dataDir>/plugins/
 #                                源: owner/repo · https://github.com/o/r[/tree/分支/子目录] · #分支 · 本地目录；刷新浏览器即生效
-pi-web-ui plugins / uninstall <id>          # 列出 / 卸载界面插件
-pi-web-ui plugins --check-updates          # 逐个对比远端 HEAD，列出可更新插件
-pi-web-ui plugins --rollback <id>          # 回滚到最近一份更新前备份（<dataDir>/plugin-backups/）
-pi-web-ui server install [--port --cwd --data-dir --name]   # 开机自启：
+pi-harness plugins / uninstall <id>         # 列出 / 卸载界面插件
+pi-harness plugins --check-updates         # 逐个对比远端 HEAD，列出可更新插件
+pi-harness plugins --rollback <id>         # 回滚到最近一份更新前备份（<dataDir>/plugin-backups/）
+pi-harness server install [--port --cwd --data-dir --name]  # 开机自启：
                                            #   macOS→launchd（无需 sudo）
                                            #   Linux→systemd（自动 sudo）
                                            #   Windows→计划任务（登录自启，隐藏窗口无黑窗）
-pi-web-ui server shortcut [--port --cwd --data-dir --name]  # 桌面「一键启动」图标（启动服务并打开浏览器）：
+pi-harness server shortcut [--port --cwd --data-dir --name]  # 桌面「一键启动」图标（启动服务并打开浏览器）：
                                            #   Windows→桌面 .lnk（WScript.Shell COM，OneDrive 安全；服务未运行则在本
                                            #     隐藏窗口前台启动并记录 PID，server stop/uninstall 可止停）
                                            #   macOS→桌面 .command 双击启动器（已装 launchd 则 kickstart，否则终端前台）
-                                           #   Linux→桌面 .desktop 图标 + ~/.local/share/pi-web-ui 启动脚本（systemctl 优先）
-pi-web-ui server status|restart|stop|uninstall
+                                           #   Linux→桌面 .desktop 图标 + ~/.local/share/pi-harness 启动脚本（systemctl 优先）
+pi-harness server status|restart|stop|uninstall
 # Docker：docker-compose.yml（端口映射 + 挂载数据目录）
 ```
 
-macOS 服务的 launchd 标识为 `com.youweichen.pi-web-ui`（`--name` 自定义时为 `com.<name>.server`）。1.0 之前的版本使用上游遗留的旧标识：执行 `server install`／`uninstall` 时直接卸载并删除旧服务；执行 `start`／`stop`／`restart`／`status`／`shortcut` 时把旧服务的配置迁到新标识后删除旧文件，开机自启不中断。旧标识只保留在 `bin/launchd-legacy.mjs` 中用于这次清理；回归见 `tests/launchd-legacy-test.mjs`。旧版创建的桌面 `.command` 启动器仍指向旧标识，重新运行 `server shortcut` 即可更新。
+macOS 服务的 launchd 标识为 `com.youweichen.pi-harness`（`--name` 自定义时为 `com.<name>.server`）。
 
 > uninstall 会自动移除桌面图标；未装服务时桌面快捷方式启动的实例在 status/stop 中单独报告（PS1 前台+记录 PID）。
 
@@ -70,7 +70,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - 桌面 Pi SDK 精确锁定为 1.0.4；终端 `pi update` 只更新外部 CLI。
 - 打包排除仓库里的 `.pi`、`.omp` 和 `.env*`。产物运行 `tests/packaged-server-start-test.mjs`、`tests/native-tools-desktop-test.mjs`、`tests/provider-auth-test.mjs`，检查终端、Codemode worker、SDK 文档、OAuth lazy 模块。
 
-- 通过 stdout 里的 `⚡ pi-web-ui` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
+- 通过 stdout 里的 `⚡ pi-harness` 标记（见 `server/index.ts` 的 `httpServer.listen` 回调）
   判断 server 就绪，再让 `BrowserWindow` 加载 `http://127.0.0.1:{随机空闲端口}`。
 - 子进程意外退出后，主进程在同一端口最多重启 3 次（间隔 1/2/4 秒），窗口保留原 URL，
   WebSocket 会自行重连；三次均失败时显示错误弹窗。退出应用时不会触发重启。
@@ -104,20 +104,20 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   安装前系统对话框提示保存文件并确认，不在普通退出时自动安装。检查/下载错误在设置页显示，
   开发模式禁用安装。`electron/app-updater.mjs` 管理状态及重复请求，preload 仅暴露固定操作，
   主进程校验请求来自主窗口主 frame；内置 Pi 跟随应用版本升级。
-- 浏览器版的应用更新在可见终端运行固定的 `npm install -g @youweichen/pi-web-ui@<版本>`；
+- 浏览器版的应用更新在可见终端运行固定的 `npm install -g @youweichen/pi-harness@<版本>`；
   registry 版本不高于当前版本时禁用，避免旧 npm 标签导致降级。成功后手动执行
-  `pi-web-ui server restart`。原生扩展更新继续使用 Pi 包管理器。
+  `pi-harness server restart`。原生扩展更新继续使用 Pi 包管理器。
 
 注意：这个 Electron 壳子和 CLI 共用同一份 `server/index.ts`，改 server 端代码
 时两边都要重新验证——尤其是 `resolvePkgRoot()`（`PI_WEB_PKG_ROOT` 覆盖逻辑）和
-启动就绪标记（`⚡ pi-web-ui` 字符串），main.mjs 依赖这两处约定。
+启动就绪标记（`⚡ pi-harness` 字符串），main.mjs 依赖这两处约定。
 
 交叉构建 Windows 版的坑：
 
 - `npmRebuild: true` 会触发 `@electron/rebuild` 用 node-gyp 从源码重编译 `node-pty`；node-gyp **不支持跨平台编译**，在 mac/Linux 上给 Windows target 跑会直接报错 `node-gyp does not support cross-compiling native modules from source`。在真机 Windows 上构建，或者 CI 用 windows runner 时不受影响，正常走 `npmRebuild: true` 即可。
 - 在非 Windows 机器上要出 zip（`-c.npmRebuild=false`）时，跳过的是重编译这一步，实际用的是 `node-pty` 包自带的 `prebuilds/win32-x64/pty.node`（跟 mac 版同理，不是本项目编译的，是 node-pty 官方发布时带的预编译产物）。electron-builder 会自动把 `.node` 原生模块解到 `app.asar.unpacked/`（不进 asar 压缩包），不需要手动配 `asarUnpack`。这条路径下**终端功能在 Windows 上是否正常没有用真机验证过**，其余功能（聊天/文件树/模型管理）不依赖 node-pty，应该没问题。
 - `npm run build:electron:win` 默认的 `nsis`/`portable` 两个 target 要跑 `makensis`，在非 Windows 机器上必须装 `wine`（本仓库开发用的沙箱环境没有 root 权限装不了）——要出正式的安装包，得在真机 Windows 上跑，或者接 GitHub Actions 的 `windows-latest` runner。
-- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/pi-web-ui`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `pi-web-ui`，干净的，不带 scope）。
+- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/pi-harness`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `pi-harness`，干净的，不带 scope）。
 
 桌面测试可设置 `PI_WEB_DATA_DIR` 指向临时数据目录；未设置时继续使用 `~/.pi-web-desktop`。Chromium 配置可用 `--user-data-dir` 隔离。
 
