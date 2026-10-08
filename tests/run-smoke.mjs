@@ -35,6 +35,7 @@ const ALL = [
 	"security-headers-test",
 	"token-env-leak-test",
 	"force-reset-session-test",
+	"long-history-cache-test",
 	"tool-text-continue-test",
 	"clear-provider-key-test",
 	"component-updates-test",
