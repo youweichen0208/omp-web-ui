@@ -2,23 +2,26 @@
 # pi-harness — multi-stage build. Builds the server (tsc) + frontend (vite),
 # then runs a slim runtime image. `docker compose up -d` = one-command deploy
 # with auto-restart on boot (`restart: unless-stopped`).
-FROM node:22-bookworm-slim AS build
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
+# Both dependency installs need node-gyp on Linux (node-pty has no Linux
+# prebuild). git is also required by the runtime's SCM and native tools.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates python3 make g++ git \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
 COPY package.json package-lock.json ./
-RUN npm ci
+COPY scripts/check-lockfile.mjs ./scripts/check-lockfile.mjs
+RUN npm run check:lockfile && npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-bookworm-slim
-WORKDIR /app
+FROM base
 ENV NODE_ENV=production
-# node-pty falls back to node-gyp when no prebuilt binary matches — keep the
-# toolchain around so `npm ci` works on any platform.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY scripts/check-lockfile.mjs ./scripts/check-lockfile.mjs
+RUN npm run check:lockfile && npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/web/dist ./web/dist
 ENV PORT=8787

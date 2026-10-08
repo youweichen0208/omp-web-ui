@@ -5,14 +5,14 @@ import type { AgentMessage } from "../serialize.js";
 import { latestPlan } from "./state.js";
 
 const histories = new WeakMap<SessionManager, { leaf: string | null; messages?: UiMessage[] }>();
-export function taskHistoryFromSession(manager: SessionManager, serialize: (message: AgentMessage) => UiMessage | null): UiMessage[] | undefined {
+export function taskHistoryFromSession(manager: SessionManager, serialize: (message: AgentMessage, entryId: string) => UiMessage | null): UiMessage[] | undefined {
 	const leaf = manager.getLeafId();
 	const previous = histories.get(manager);
 	if (previous?.leaf === leaf) return previous.messages;
 	const branch = manager.getBranch();
 	const messages = latestPlan(branch) ? branch.flatMap(entry => {
 		if (entry.type !== "message") return [];
-		const message = serialize(entry.message);
+		const message = serialize(entry.message, entry.id);
 		return message ? [{ ...message, entryId: entry.id }] : [];
 	}) : undefined;
 	histories.set(manager, { leaf, messages });

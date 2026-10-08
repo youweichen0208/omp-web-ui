@@ -65,6 +65,11 @@ export async function checkWikiV2(page, cwd) {
 	assert.equal(toolbarActions, 11);
 	await page.keyboard.type('/');
 	await page.locator('.wiki-slash-menu').waitFor();
+	// Browser caret scrolling after input must keep the menu open.
+	await page.keyboard.press('ArrowDown');
+	await page.locator('.wiki-scroll').evaluate(el => el.dispatchEvent(new Event('scroll')));
+	await page.locator('.wiki-slash-menu').waitFor();
+	assert.equal(await page.locator('.wiki-slash-menu [role="option"]').nth(1).getAttribute('aria-selected'), 'true');
 	assert.equal(await page.locator('.wiki-slash-menu [role="option"]').count(), toolbarActions);
 	await page.keyboard.press('Escape');
 	await page.keyboard.press('Backspace');

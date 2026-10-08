@@ -12,6 +12,8 @@
  *
  * 用法：node tests/run-smoke.mjs [name1 name2 …]   # 无参 = 全量
  */
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +37,9 @@ const ALL = [
 	"security-headers-test",
 	"token-env-leak-test",
 	"force-reset-session-test",
+	"pi-native-review-repro",
 	"long-history-cache-test",
+	"long-history-browser-test",
 	"changes-panel-ui-test",
 	"tool-text-continue-test",
 	"clear-provider-key-test",
@@ -111,17 +115,21 @@ for (const name of targets) {
 		continue;
 	}
 	const file = join(here, `${name}.mjs`);
+	const isolated = mkdtempSync(join(tmpdir(), "pi-smoke-"));
+	const agentDir = join(isolated, "agent"), dataDir = join(isolated, "data");
+	mkdirSync(agentDir); mkdirSync(dataDir);
 	process.stdout.write(`\n▶ ${name}\n`);
 	const ok = await new Promise((resolveRun) => {
 		const child = spawn(process.execPath, [file], {
 			// 测试脚本内相对路径（如 dist/server/index.js）以仓库根为基准
 			cwd: dirname(here),
 			stdio: "inherit",
-			env: process.env,
+			env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_WEB_DATA_DIR: dataDir },
 		});
 		child.on("exit", (code) => resolveRun(code === 0));
 		child.on("error", () => resolveRun(false));
 	});
+	rmSync(isolated, { recursive: true, force: true });
 	results.push({ name, ok });
 }
 

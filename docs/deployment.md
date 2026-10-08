@@ -32,7 +32,11 @@ macOS 服务的 launchd 标识为 `com.youweichen.pi-harness`（`--name` 自定�
 
 > uninstall 会自动移除桌面图标；未装服务时桌面快捷方式启动的实例在 status/stop 中单独报告（PS1 前台+记录 PID）。
 
+开机自启安装保留显式 `PI_CODING_AGENT_DIR`，转换为绝对路径写入服务配置，避免服务启动后切回默认代理目录。桌面子进程诊断日志仅保留最后 64 Ki 个字符，不随长时间运行累计。
+
 ## Docker
+
+构建和运行阶段都安装 Python、make、g++，供 Linux node-pty 原生编译；git 随运行镜像提供。两个依赖安装阶段先检查 lockfile。
 
 `docker compose up -d` 构建并启动。镜像以 `node` 用户运行，需要保留的数据都放在卷 `/data` 下：
 
@@ -45,6 +49,10 @@ macOS 服务的 launchd 标识为 `com.youweichen.pi-harness`（`--name` 自定�
 会话写在 `PI_CODING_AGENT_DIR` 下，所以配置目录必须可写，不要以只读方式挂载。要沿用主机已有的 pi 配置，可把主机的 `~/.pi/agent` 读写挂载到 `/data/pi-agent`；否则首次打开页面按引导配置。
 
 compose 默认只把端口映射到 `127.0.0.1`，并设置 `PI_WEB_ALLOW_HOSTS=localhost,127.0.0.1`：容器内必须监听 `0.0.0.0`，这会关闭默认的 loopback Host 白名单，显式白名单用来防 DNS rebinding。智能体可以在容器内执行命令；对局域网或公网开放前，先设置 `PI_WEB_TOKEN`，把访问用的主机名加入 `PI_WEB_ALLOW_HOSTS`，再修改端口映射。
+
+### 旧容器迁移
+
+重建旧容器前先停止服务并备份。旧版默认实际数据可能在容器的 `/home/node/.pi/agent` 和 `/home/node/.pi-web`，不是旧 compose 声明的 `/app/.pi-web` 卷；若设置过自定义环境变量，以容器配置里的实际目录为准。先用 `docker cp <旧容器>:<实际目录> <备份目录>` 导出两个目录，再将其内容分别复制到新卷的 `/data/pi-agent` 与 `/data/pi-harness`，设置为 UID/GID 1000 可写。核对新容器能列出旧会话、配置和附件后，才删除旧容器及备份；已有同名文件时先合并核对，不覆盖新数据。新容器的 `/data` 命名卷会在普通容器重建后保留，`docker compose down -v` 会删除卷，不能用于保留数据的升级。
 
 ## Windows 下载选择
 
@@ -132,7 +140,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
 - `npmRebuild: true` 会触发 `@electron/rebuild` 用 node-gyp 从源码重编译 `node-pty`；node-gyp **不支持跨平台编译**，在 mac/Linux 上给 Windows target 跑会直接报错 `node-gyp does not support cross-compiling native modules from source`。在真机 Windows 上构建，或者 CI 用 windows runner 时不受影响，正常走 `npmRebuild: true` 即可。
 - 在非 Windows 机器上要出 zip（`-c.npmRebuild=false`）时，跳过的是重编译这一步，实际用的是 `node-pty` 包自带的 `prebuilds/win32-x64/pty.node`（跟 mac 版同理，不是本项目编译的，是 node-pty 官方发布时带的预编译产物）。electron-builder 会自动把 `.node` 原生模块解到 `app.asar.unpacked/`（不进 asar 压缩包），不需要手动配 `asarUnpack`。这条路径下**终端功能在 Windows 上是否正常没有用真机验证过**，其余功能（聊天/文件树/模型管理）不依赖 node-pty，应该没问题。
 - `npm run build:electron:win` 默认的 `nsis`/`portable` 两个 target 要跑 `makensis`，在非 Windows 机器上必须装 `wine`（本仓库开发用的沙箱环境没有 root 权限装不了）——要出正式的安装包，得在真机 Windows 上跑，或者接 GitHub Actions 的 `windows-latest` runner。
-- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/pi-harness`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `pi-harness`，干净的，不带 scope）。
+- `artifactName` 模板别用 `${name}`——`package.json` 的 `name` 是 `@youweichen/pi-harness`（带 npm scope），`${name}` 里那个斜杠会被当成路径分隔符，实际文件会跑到 `release/@youweichen/` 子目录里而不是 `release/` 根目录，CI 里按 `release/*.exe` 收集产物会直接漏掉。已经全部改成 `${productName}`（就是 `pi`，干净的，不带 scope）。
 
 桌面测试可设置 `PI_WEB_DATA_DIR` 指向临时数据目录；未设置时继续使用 `~/.pi-web-desktop`。Chromium 配置可用 `--user-data-dir` 隔离。
 
@@ -159,3 +167,5 @@ Extensions 包管理的 `extensions-worker` 与服务端一起编译打包，在
 服务端 Wiki 解析使用 `unified` 与 `remark-parse`，必须列入生产依赖。打包启动检查要求这两个模块解析到产物自身目录，禁止借用仓库上层 node_modules；仅清空 NODE_PATH 不会禁止 Node 向父目录查找模块。
 
 会话文件校验的 `session-record-worker` 随服务端编译打包，使用 Node worker_threads 处理超长 JSON 记录；不启动额外 Electron 窗口。开发态使用源文件 URL，生产与桌面态使用 dist 中的 JavaScript。
+
+三平台发布上传前还验证实际安装产物：macOS 从 DMG 复制应用、Windows 静默安装 NSIS、Linux 安装 deb。`packaged-upgrade-test.mjs` 使用 v0.99.16 已发布运行时生成隔离配置、凭据、会话与附件，再由新安装运行时读取；不调用真实模型或使用用户数据。

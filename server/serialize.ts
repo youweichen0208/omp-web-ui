@@ -1,4 +1,5 @@
 import { codemodeDetails } from "./codemode-presentation.js";
+import { createHash } from "node:crypto";
 /**
  * Serializes pi SDK AgentMessage[] into the browser-friendly UiMessage[] shape
  * defined in protocol.ts. Keeps payloads bounded (tool outputs and text blocks
@@ -268,15 +269,14 @@ export function serializeStreamingMessage(m: AgentMessage): UiMessage | null {
 }
 
 /** Stable discriminator for messages sharing a role and millisecond timestamp. */
+const fingerprints = new WeakMap<AgentMessage, string>();
 export function contentFingerprint(message: AgentMessage): string {
-	const content = "content" in message ? message.content : undefined;
-	const first = Array.isArray(content) ? content[0] : undefined;
-	if (first?.type === "image") return `img:${first.data.length}`;
-	const text = typeof content === "string" ? content : first?.type === "text" ? first.text : "";
-	let hash = 5381;
-	for (let i = 0; i < text.length && i < 512; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
-	// Custom messages often carry string content. Their type and structured
-	// details also affect rendering (including localized recovery statuses).
-	const custom = message.role === "custom" ? JSON.stringify([message.customType, message.display, message.details]) : "";
-	return `txt:${hash.toString(36)}:${text.length}:${custom}`;
+	const cached = fingerprints.get(message);
+	if (cached) return cached;
+	// Persisted messages are immutable. Hash all blocks once, including image
+	// bytes, thinking, tool arguments and custom metadata; a prefix/length is
+	// not an identity. Streaming messages never use this cache.
+	const fingerprint = createHash("sha256").update(JSON.stringify(message)).digest("hex");
+	fingerprints.set(message, fingerprint);
+	return fingerprint;
 }

@@ -103,3 +103,5 @@ Wiki 复用当前对话的扩展弹窗、多行 editor、输入替换和原生�
 34a 规范见 `wiki-doc-v2-design.md`。顶栏显示目录路径、文件名、保存状态、最近改动和对话开关。`WikiToolbar` 提供分组 SVG 插入按钮；`TableSizePicker` 支持 8×6 鼠标/键盘选择；`CodeLanguagePicker` 支持搜索和 Mermaid。工具栏直接展示斜杠菜单的全部 11 个插入项，正文、H2、H3 独立设置格式，日期可直接插入；不再使用更多菜单，窄栏横向滚动。编辑块使用 `display: block`：原生 `formatBlock` 在 `display: contents` 中会丢失段落；`flow-root` 会阻止相邻块外边距合并，使段距从 .75em 翻倍（`wiki-ui-test` 检查）。Mermaid 图和代码并存，图形装饰标记 `data-rich-ui`，保存时剔除。
 
 宽版隐藏两侧并使用 1000px 正文；打开对话、新文档或最近改动退出。宽版不持久化。正文维持 800ms 自动保存、Cmd+S 和导航保存，未编辑块保留原文。默认焦点位于文末；空段落提示不写入 Markdown。本地字体仅用于标题，以 unicode-range 按需加载，并随文件附带 OFL 许可证。
+
+开头属性提取只解析属性候选段及正文边界见证，正文首段再长也不解析其全部行内 Markdown；保留连续正文、Setext 标题、缩进和 CRLF 的判定以及属性原文范围。

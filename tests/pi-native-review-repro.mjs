@@ -1,4 +1,4 @@
-/** Audit reproductions, not acceptance tests: assertions document known defects.
+/** Regression checks for release-review findings.
  * Run after build: node tests/pi-native-review-repro.mjs [evidence.json]
  * No model requests. Force reset invokes the real recovery method directly;
  * reload uses a controlled host so the race is deterministic, not a browser E2E.
@@ -62,18 +62,21 @@ try {
 	const reload = slash.exec("reload", "", { conversationId: "A", requestId: "reload-A" });
 	await started; active = sessionB; release(); await reload;
 	const done = events.find(event => event.type === "reload_status" && event.phase === "done");
-	assert.equal(done.conversationId, "A"); assert.deepEqual(done.resources.skills, ["B-only"]);
-	evidence.cases.push({ id: "reload-result-ownership", reproduced: true, boundary: "real SlashCommandsService, controlled session host", reportedConversation: done.conversationId, reportedSkills: done.resources.skills });
+	assert.equal(done.conversationId, "A"); assert.deepEqual(done.resources.skills, ["A-only"]);
+	evidence.cases.push({ id: "reload-result-ownership", reproduced: false, boundary: "real SlashCommandsService, controlled session host", reportedConversation: done.conversationId, reportedSkills: done.resources.skills });
 
-	let count = 0, peak = 0, finish;
+	let count = 0, peak = 0, finish, startedReload;
+	const firstReload = new Promise(resolve => { startedReload = resolve; });
 	const blocker = new Promise(resolve => { finish = resolve; });
-	const session = { ...sessionA, isIdle: true, subscribe: () => () => {}, reload: async () => { peak = Math.max(peak, ++count); await blocker; count--; } };
+	const session = { ...sessionA, isIdle: true, subscribe: () => () => {}, reload: async () => { peak = Math.max(peak, ++count); startedReload(); await blocker; count--; } };
 	const concurrentSlash = new SlashCommandsService({ getSession: () => session, emit: () => {} });
 	const fileReload = queuePromptReload(session, () => {});
 	const slashReload = concurrentSlash.exec("reload", "", { conversationId: "A", requestId: "reload-parallel" });
-	assert.equal(peak, 2, "known defect: different host reload paths overlap");
+	await firstReload;
+	assert.equal(peak, 1, "different host reload paths share a session queue");
 	finish(); await Promise.all([fileReload, slashReload]);
-	evidence.cases.push({ id: "reload-missing-shared-mutex", reproduced: true, boundary: "real prompt-file queue and SlashCommandsService; controlled reload, does not prove actual SDK corruption", concurrentReloadCalls: peak });
+	assert.equal(peak, 1, "queued reloads never overlap");
+	evidence.cases.push({ id: "reload-missing-shared-mutex", reproduced: false, boundary: "real prompt-file queue and SlashCommandsService; controlled reload, does not prove actual SDK corruption", concurrentReloadCalls: peak });
 	if (process.argv[2]) writeFileSync(process.argv[2], JSON.stringify(evidence, null, 2) + "\n");
 	console.log(JSON.stringify(evidence, null, 2));
 } finally {

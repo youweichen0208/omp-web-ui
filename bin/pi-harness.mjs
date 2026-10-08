@@ -969,6 +969,7 @@ function serviceEnv(port, cwd, dataDir) {
 	if (!isWin && process.env.LANG) env.LANG = process.env.LANG;
 	if (!isWin && process.env.LC_ALL) env.LC_ALL = process.env.LC_ALL;
 	if (dataDir) env.PI_WEB_DATA_DIR = dataDir;
+	if (process.env.PI_CODING_AGENT_DIR) env.PI_CODING_AGENT_DIR = resolve(process.env.PI_CODING_AGENT_DIR);
 	return env;
 }
 

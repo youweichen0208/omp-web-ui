@@ -6,6 +6,8 @@
 
 从 origin/develop 发布，功能在 0.99.16 的基础上，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、口令 cookie 只发给已认证请求、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、强制恢复打开原会话、长会话缓存与消息 ID 稳定、改动面板未跟踪文件与大差异、Wiki 段间距与大文档输入、Docker 数据持久化与默认只绑本机、SSH `TCP_NODELAY`、生产依赖漏洞清零、npm 包、命令、服务与应用标识统一改名为 pi-harness（不兼容旧包），并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v41。旧包 `@youweichen/pi-web-ui` 停在 0.9.0，新包从 1.0.0 开始；说明见 `.github/release-notes/v1.0.0.md`。
 
+复审补齐 Linux 原生构建工具链、恢复销毁竞态、完整消息身份与历史摘要窗口化、跨入口 reload 串行、桌面日志上限和 CLI 配置目录继承；部署手册补充旧容器数据迁移。
+
 ## 0.99.16 Wiki 编辑与对话修复
 
 从 origin/develop 发布，修复斜杠代码／表格菜单定位、新对话思考强度继承，以及 Wiki 索引导致保存和发送卡顿的问题。SDK 1.0.4、协议 v41 不变。发布 GitHub 源码与三平台桌面 Release；说明见 `.github/release-notes/v0.99.16.md`。

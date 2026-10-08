@@ -252,11 +252,21 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 	// 视口缓冲带之外的重型消息替换为等高占位 div；滚动临近时换回真实内容并
 	// 在同一帧内补偿 scrollTop。占位保留 data-msg-id，导航/跳转/搜索不受影响。
 	/** 当前处于占位状态的消息 id。 */
-	const [hidden, setHidden] = useState<Set<string>>(() => scrollPositions.get(state.conversationId)?.hidden ?? new Set());
+	const [hiddenState, setHidden] = useState<Set<string>>(() => scrollPositions.get(state.conversationId)?.hidden ?? new Set());
 	/** 用户跳转过的消息——永久保持真实渲染，避免占位符闪现。 */
 	const [pinned, setPinned] = useState<Set<string>>(() => new Set());
 	/** 已实测的消息高度（隐藏时用作占位高度）。 */
 	const heightsRef = useRef(scrollPositions.get(state.conversationId)?.heights ?? new Map<string, number>());
+	// Newly received old rows start as placeholders, even when the first
+	// snapshot arrives after mount. Do not build thousands of summary DOMs
+	// just to measure and immediately remove them.
+	const hidden = useMemo(() => {
+		const next = new Set(hiddenState);
+		for (const message of state.messages.slice(0, recentStart)) {
+			if (!heightsRef.current.has(message.id)) next.add(message.id);
+		}
+		return next;
+	}, [hiddenState, state.messages, recentStart]);
 	/** 所有受管外层元素（sweep 测量用；挂载时注册，消息移除时清理）。 */
 	const elsRef = useRef(new Map<string, HTMLDivElement>());
 	const sweepRafRef = useRef(0);
@@ -296,7 +306,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 			items.push({ id, top: b.top, bottom: b.bottom });
 			// 显示中的元素顺手记录实测高度——pickAlways 的预算与占位高度都靠它；
 			// 只在隐藏时测量的话，「初始就显示」的消息会永远停留在估算值。
-			if (!hiddenRef.current.has(id)) heightsRef.current.set(id, b.bottom - b.top);
+			heightsRef.current.set(id, b.bottom - b.top);
 		}
 		const plan = planWindow(items, viewport, alwaysRef.current, hiddenRef.current);
 		// 收起时用刚实测的高度做占位 ⇒ 流总高度不变 ⇒ 无需任何 scrollTop 补偿。
@@ -306,7 +316,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 			const el = elsRef.current.get(id);
 			if (el) heightsRef.current.set(id, el.offsetHeight);
 		}
-		setHidden((prev) => applyPlan(prev, plan));
+		setHidden(() => applyPlan(hiddenRef.current, plan));
 	}, []);
 
 	const scheduleSweep = useCallback(() => {
@@ -321,7 +331,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 	// 初始挂载：首帧绘制前就把远端内容换成占位（大会话 attach 不再全量布局绘制）
 	useLayoutEffect(() => {
 		sweep();
-	}, [sweep]);
+	}, [sweep, state.messages, expanded]);
 
 	// 搜索关闭瞬间重新收起远端内容（打开期间强制全渲染以兼容 DOM 高亮/Range 收集）
 	const prevSearchRef = useRef(searchOpen);
@@ -404,8 +414,9 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 		const top = el.getBoundingClientRect().top;
 		const height = Math.max(el.scrollHeight, 1);
 		const next: Record<string, number> = {};
+		const nodes = new Map(Array.from(el.querySelectorAll<HTMLElement>("[data-msg-id]"), node => [node.dataset.msgId!, node]));
 		for (const question of questionsRef.current) {
-			const node = el.querySelector<HTMLElement>(`[data-msg-id="${question.id}"]`);
+			const node = nodes.get(question.id);
 			if (node) next[question.id] = Math.max(0.02, Math.min(0.98, (node.getBoundingClientRect().top - top + el.scrollTop) / height));
 		}
 		setMarkerPositions((previous) => Object.keys(next).length === Object.keys(previous).length &&
@@ -430,8 +441,9 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 		const containerTop = el.getBoundingClientRect().top;
 		const margin = 140;
 		let best = -1;
+		const nodes = new Map(Array.from(el.querySelectorAll<HTMLElement>("[data-msg-id]"), node => [node.dataset.msgId!, node]));
 		for (let i = 0; i < qs.length; i++) {
-			const node = el.querySelector<HTMLElement>(`[data-msg-id="${qs[i].id}"]`);
+			const node = nodes.get(qs[i].id);
 			if (!node) continue;
 			if (node.getBoundingClientRect().top <= containerTop + margin) best = i;
 			else break;
@@ -753,11 +765,15 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 						const group = collapsed.groupAt.get(i);
 						if (!group) return null;
 						return withGap(
-							<CollapsedGroup
-								key={m.id}
-								messages={group}
-								onExpand={expandGroup}
-							/>
+							<LazyMount key={m.id} id={m.id}
+								show={!virtualOn || alwaysSet.has(m.id) || pinned.has(m.id) || !hidden.has(m.id)}
+								height={heightsRef.current.get(m.id) ?? 30}
+								containerRef={scrollRef} onMeasured={storeHeight} lazyRef={attachEl}>
+								<CollapsedGroup
+									messages={group}
+									onExpand={expandGroup}
+								/>
+							</LazyMount>
 						);
 					}
 					if (bashGroups.owners.has(m.id)) return changeSummaries.has(m.id) ? <ChangeSummaryCard key={m.id} files={changeSummaries.get(m.id)!} /> : null;

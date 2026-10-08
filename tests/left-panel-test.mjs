@@ -41,11 +41,7 @@ try {
 }
 
 // Free the port from any straggler before spawning.
-try {
-	await freePort(PORT);
-} catch {
-	/* port free */
-}
+await freePort(PORT);
 await sleep(500);
 const server = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,
