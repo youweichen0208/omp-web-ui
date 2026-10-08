@@ -5,6 +5,12 @@
  * is never promoted to an executable call.
  */
 
+/**
+ * The visible user message sent when a reply ended with a tool call written as
+ * text. The UI recognises it to explain a run that still stopped afterwards.
+ */
+export const TOOL_TEXT_CONTINUE_PROMPT = "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。";
+
 /** Match protocol markers outside Markdown code, retaining offsets into the original. */
 export function maskMarkdownCode(text: string): string {
 	let fence: { marker: string; length: number } | undefined;

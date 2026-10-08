@@ -33,6 +33,7 @@ export function useToolRecovery(chat: ChatState, send: (message: ClientMessage) 
 	}, [busy]);
 	return {
 		messageId: failure?.message.id,
+		kind: failure?.kind,
 		disabled: !writable || busy,
 		retry: (modelId?: string) => {
 			const { state, failure, writable, send } = current.current;

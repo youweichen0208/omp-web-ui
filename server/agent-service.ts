@@ -34,12 +34,10 @@ import {
 	type Conversation,
 } from "./conversation.js";
 import { browseDirs } from "./dir-browser.js";
-import { unexecutedToolText } from "./tool-text.js";
+import { TOOL_TEXT_CONTINUE_PROMPT, unexecutedToolText } from "./tool-text.js";
 
-/** Sent once per user prompt when the reply ends with a tool call written as text. */
 /** Upper bound of automatic requests per user prompt (each also needs real tool progress). */
 export const TOOL_TEXT_MAX_CONTINUES = 5;
-export const TOOL_TEXT_CONTINUE_PROMPT = "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。";
 import { clientIdleMsFromEnv, isClientEvictable } from "./client-eviction.js";
 import { PiConfigProbe, checkUpdate, installPiAgent, isPiCliInstalled } from "./pi-environment.js";
 export { QuiesceRejectedError };
@@ -1749,7 +1747,7 @@ export class ClientSession {
 		if (!unexecutedToolText(text)) return;
 		conv.toolTextContinues += 1;
 		conv.toolRanSinceContinue = false;
-		this.emit({ type: "notice", level: "warning", conversationId: conv.id, text: `模型把工具调用写成了文本，未执行；已自动请它重新调用（${conv.toolTextContinues}/${TOOL_TEXT_MAX_CONTINUES}）。` });
+		this.emit({ type: "notice", level: "info", conversationId: conv.id, text: `模型把工具调用写成了文本，未执行；已自动请它重新调用（${conv.toolTextContinues}/${TOOL_TEXT_MAX_CONTINUES}）。` });
 		try {
 			if (conv.session !== session || session.isStreaming) return;
 			await deliverPrompt(session, TOOL_TEXT_CONTINUE_PROMPT, [], false, () => {});
