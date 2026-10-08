@@ -480,6 +480,7 @@ export type ClientMessage =
 	/** SCM refresh payload: status + branches + numstat (history loads
 	 *  lazily via scm_history so big repos don't pay for it every refresh). */
 	| { type: "scm_status"; reqId: number }
+	| { type: "scm_diff"; reqId: number; scope: "branch" | "work"; base?: string }
 	/** Lightweight footer query: no worktree status/diff scan. */
 	| { type: "get_git_branch" }
 	/** Commit graph for the history tab (lazy-loaded). */
@@ -1201,7 +1202,8 @@ export type ServerMessage =
 			type: "scm_data";
 			cwd: string;
 			reqId: number;
-			kind: "status" | "history" | "filediff" | "commit";
+			kind: "status" | "history" | "filediff" | "commit" | "diff";
+			base?: string;
 			ok: boolean;
 			error?: string;
 			/** status payload — fields optional so one wire type carries every

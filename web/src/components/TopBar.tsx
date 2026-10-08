@@ -1,3 +1,5 @@
+import { useChanges } from "../changes-context";
+import { ChangeCounts } from "./ChangeSummaryCard";
 import { toolTextIncidents } from "../tool-text";
 import { openSessionTree } from "../tree-events";
 import { createPortal } from "react-dom";
@@ -91,6 +93,7 @@ export function TopBar({
 	onSoundPreview,
 }: TopBarProps) {
 	const { locale, setLocale, t } = useI18n();
+	const changes = useChanges();
 	const [langOpen, setLangOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [menuHost, setMenuHost] = useState<HTMLElement | null>(null);
@@ -215,8 +218,9 @@ export function TopBar({
 			</div>
 
 			{view !== "nodes" && <button type="button" className="project-panel-toggle" title={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-label={t(leftCollapsed ? "expandProjects" : "collapseProjects")} aria-expanded={!leftCollapsed} onClick={() => onOpenPanel("left")}><FiSidebar /></button>}
-			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><strong title={conversationTitle}>{conversationTitle}</strong>{(interrupted || reminding || currentStep >= 0 || !!task?.plan?.awaitingConfirmation) && <button type="button" className={`header-task-progress${interrupted ? " interrupted" : reminding ? " reminding" : ""}`} title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{interrupted ? t("toolRecoveryInterrupted") : reminding ? t("working") : task?.plan?.awaitingConfirmation ? t("taskProgress") : t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
+			<div id="wiki-toolbar-slot" /><div className="header-location"><span title={chat.state?.cwd}>{projectName || t("desktopWorkspace")}</span><i>/</i><button className="conversation-title-button" title={t("treeTitle")} onClick={() => openSessionTree()}><strong title={conversationTitle}>{conversationTitle}</strong><span aria-hidden="true">⌄</span></button>{view === "chat" && chat.gitBranch?.branch && <code className="changes-current-branch">{chat.gitBranch.branch}</code>}{(interrupted || reminding || currentStep >= 0 || !!task?.plan?.awaitingConfirmation) && <button type="button" className={`header-task-progress${interrupted ? " interrupted" : reminding ? " reminding" : ""}`} title={t("taskProgress")} onClick={onOpenTask}><span aria-hidden="true">●</span>{interrupted ? t("toolRecoveryInterrupted") : reminding ? t("working") : task?.plan?.awaitingConfirmation ? t("taskProgress") : t("taskPlanPosition", { current: currentStep + 1, total: planItems.length })}</button>}</div>
 			<div className="topbar-actions">
+				{view === "chat" && changes && (changes.files.length > 0 || gitChangeCount > 0 || changes.open) && <button className="changes-toggle" aria-pressed={changes.open} title="⌘D" onClick={() => changes.set({ open: !changes.open })}><FiLayers aria-hidden="true" />{t("changesTitle")} <ChangeCounts files={changes.files} /></button>}
 				<div
 					className="view-switch"
 					role="tablist"

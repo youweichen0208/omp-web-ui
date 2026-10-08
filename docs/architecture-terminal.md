@@ -32,6 +32,10 @@ Windows ConPTY 关闭终端时还有一个 node-pty 1.1.0 竞态：console-list 
 
 客户端发 `scm_status`（status+branches(含远程,for-each-ref)+numstat）/ `scm_history`（提交图，懒加载——切到「提交树」tab 才查）/ `scm_filediff`（单文件 staged+worktree diff；未跟踪文本返回最多 512KB 的内容，二进制与目录返回类型提示）/ `scm_commit`（hash 白名单校验后 git show），服务端必回一条 `scm_data`（echo reqId + kind，ok/error/notRepo），前端按 reqId 匹配 pending 槽位——每个请求必有且仅有一个响应，UI 不会卡在 loading；sendScm 在 socket 断开时不占槽位不置 busy。路径校验：filediff 的 path 必须 resolve 后仍在工作区内；未跟踪文件预览还校验真实路径，防止符号链接越界；非 git 仓库返回 ok:true + notRepo:true。15s 超时/maxBuffer 16MB。
 
+### 对话改动面板（35a，协议 v41）
+
+`scm_diff` 接收 `scope: branch | work` 与可选 `base`，返回 `scm_data(kind: diff)` 的统一 patch、实际 base、cwd 和 reqId。分支采用 `base...HEAD`，未提交采用 `git diff HEAD`，同时附加经过路径/符号链接校验的未跟踪文件预览。基准先通过 `rev-parse --verify --end-of-options` 解析成 commit hash，禁用外部 diff/textconv，不执行 shell。无 HEAD 仓库显示 index 与工作区；非仓库返回 notRepo。前端只接收当前请求与 cwd 的结果，关闭面板停止轮询。本轮直接复用成功工具输出，不查询工作区 diff。
+
 ### git 目录 watcher
 
 首次 scm_status 时 `git rev-parse --absolute-git-dir` 定位 .git 并 fs.watch（非递归——HEAD/index/packed-refs 都在顶层，覆盖 commit/stage/checkout），事件去抖 600ms 推 `scm_changed` → 前端静默 refresh（外部 CLI/IDE 改仓库实时反映）；setCwd/dispose/notRepo 时 unwatch；watch 失败静默降级为 30s 可见轮询兜底。

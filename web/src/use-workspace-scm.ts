@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { ClientMessage, ScmFileEntry, ServerMessage } from "./types";
+import type { ClientMessage, ScmBranchEntry, ScmFileEntry, ServerMessage } from "./types";
 
 // Shared by the header and file tree; SCMPanel owns positive request IDs.
 let statusId = -100;
 const emptyFiles: ScmFileEntry[] = [];
 export function useWorkspaceScm(cwd: string, ready: boolean, dirty: number, data: ServerMessage | null, send: (message: ClientMessage) => boolean) {
 	const request = useRef(0);
-	const [status, setStatus] = useState<{ cwd: string; files: ScmFileEntry[]; notRepo: boolean } | null>(null);
+	const [status, setStatus] = useState<{ cwd: string; files: ScmFileEntry[]; notRepo: boolean; base: string; branch: string; branches: ScmBranchEntry[] } | null>(null);
 	useEffect(() => {
 		if (!ready || !cwd) return;
 		const refresh = () => {
@@ -25,7 +25,7 @@ export function useWorkspaceScm(cwd: string, ready: boolean, dirty: number, data
 	}, [cwd, ready, dirty, send]);
 	useEffect(() => {
 		if (data?.type !== "scm_data" || data.kind !== "status" || data.reqId !== request.current || data.cwd !== cwd) return;
-		setStatus({ cwd, files: data.ok ? (data.files ?? []).map((file) => ({ ...file, path: file.path.replaceAll("\\", "/") })) : [], notRepo: !!data.notRepo });
+		setStatus({ cwd, files: data.ok ? (data.files ?? []).map((file) => ({ ...file, path: file.path.replaceAll("\\", "/") })) : [], base: data.base ?? "", branch: data.branch ?? "", branches: data.branches ?? [], notRepo: !!data.notRepo });
 	}, [data, cwd]);
-	return status?.cwd === cwd ? status : { cwd, files: emptyFiles, notRepo: false };
+	return status?.cwd === cwd ? status : { cwd, files: emptyFiles, notRepo: false, base: "", branch: "", branches: [] };
 }

@@ -98,6 +98,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   rebuild 成 Electron 的 Node ABI，不需要手动 `electron-rebuild`；本机需要装好
   Xcode Command Line Tools（mac）/ Visual Studio Build Tools（win）。
 - 聊天任务清单与 Web 共用 `TodoChecklist`：连续更新合并、后续变化行及历史任务定位一起随 `web/dist` 构建进入桌面包。`tests/todo-chat-browser-test.mjs` 覆盖 Web 和 macOS/Windows 桌面外壳的 900px 布局、键盘跳转、历史折叠与清空后编号复用；它不替代原生安装包验证。
+- 35a 改动面板打开时对话顶栏为 48px、对话列 600px；Windows/Linux 面板工具栏为右侧窗口控制区预留 132px，macOS 沿用原生红绿灯避让。小于 1200px 使用抽屉。
 - 图标：来自用户提供的 `icon-1a/1a-flat` 素材。`web/public/favicon.svg` 用于网页与侧栏，PNG 用于 favicon、触屏快捷方式及 Electron 窗口/托盘；`build/icon.png`（1024×1024）、`build/icon.ico`、`build/icon.icns` 用于桌面安装包。平台格式从同一 PNG 生成。
 - 自动更新：`electron-updater` 使用 GitHub Releases feed；安装版启动时检查版本，
   在「设置 → 组件更新」点击「自动更新」下载，显示进度后点击「重启并安装」。

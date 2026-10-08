@@ -132,6 +132,7 @@ pi-harness/
 | `Message.tsx` / `MessageList.tsx` / `WorkingStatus.tsx` | 消息渲染、流式等待标题与静默状态、tool 结果关联；编辑重问、惰性窗口化、问题导航；等待态切换与间距见 `docs/ui-design.md` |
 | `PlanChecklist.tsx` | Web/桌面共用清单卡和变化行；修改计划更新合并、替换隔离或步骤跳转时，读取 `web/src/plan-presentation.ts`、`docs/architecture-plan.md` 和 `docs/ui-design.md` |
 | `ToolCallBlock.tsx` / `BashGroup.tsx` / `EditWriteCard.tsx` / `ThinkingBlock.tsx` | 通用工具卡片、连续命令分组、编辑与写入的逐行 diff 卡片、思考块；修改命令合并/折叠/跳转时读取 `web/src/bash-groups.ts` 和 `docs/ui-design.md` 的 27a 规则；编辑卡片的数据整理在 `web/src/edit-write-presentation.ts`，交互规则见 `docs/ui-design.md` |
+| `ChangesPanel.tsx` / `ChangeSummaryCard.tsx` | 35a 对话改动面板及每轮汇总；修改范围、定位、折叠、搜索或轮次统计前读取 `docs/chat-diff-design.md` 与 `docs/architecture-terminal.md`；本轮共用 `task-outputs.ts`，Git 范围走 `scm_diff`（协议 v41） |
 | `TerminalPanel.tsx` / `TermXterm.tsx` | 终端视图 + xterm 实例桥接 |
 | `SCMPanel.tsx` | 源代码管理（Git）视图：status/branch/diff；提交/推送/拉取/切换分支 |
 | `TopBar.tsx` / `FooterBar.tsx` | 顶栏（项目／会话标题、后台任务、视图切换、文件栏开关）、状态栏（版本／分支／消息／工作目录）；模型与思考强度在 `ChatInput.tsx` 底部 |

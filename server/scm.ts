@@ -45,6 +45,7 @@ export interface ScmCommitEntry {
 }
 
 export interface ScmStatusData {
+	base?: string;
 	notRepo: boolean;
 	branch: string;
 	detached: boolean;
@@ -61,12 +62,14 @@ export interface ScmStatusData {
 /** Run one git command; throws Error with a readable message on failure. */
 async function git(cwd: string, args: string[]): Promise<string> {
 	try {
-		const { stdout } = await exec("git", ["-c", "core.quotepath=false", ...args], {
+		const command = exec("git", ["-c", "core.quotepath=false", ...args], {
 			cwd,
 			timeout: GIT_TIMEOUT_MS,
 			maxBuffer: MAX_GIT_OUTPUT,
 			windowsHide: true,
 		});
+		command.child.stdin?.end();
+		const { stdout } = await command;
 		return stdout;
 	} catch (err) {
 		const e = err as { message?: string; stderr?: string; killed?: boolean; code?: string };
@@ -314,7 +317,10 @@ export async function scmStatus(
 		const prev = merged[path];
 		merged[path] = [(prev?.[0] ?? 0) + pair[0], (prev?.[1] ?? 0) + pair[1]];
 	}
+	const branches = parseBranches(branchText);
+	const base = (await git(cwd, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).catch(() => "")).trim() || ["main", "master", "develop"].find(name => branches.some(branch => branch.name === name)) || "HEAD";
 	return {
+		base,
 		notRepo: false,
 		branch: header.branch,
 		detached: header.detached,
@@ -323,7 +329,7 @@ export async function scmStatus(
 		behind: header.behind,
 		upstreamGone: header.upstreamGone,
 		files: parseStatusFiles(statusText),
-		branches: parseBranches(branchText),
+		branches,
 		stats: merged,
 	};
 }
@@ -400,4 +406,41 @@ export async function scmCurrentBranch(cwd: string): Promise<{ branch: string | 
 			return { branch: null, detached: false, notRepo: (await gitDirOf(cwd)) === null };
 		}
 	}
+}
+
+/** Whole-scope patches for the changes panel. Resolve refs before constructing
+ * revision expressions: user input can never become an option or pathspec. */
+export async function scmDiff(cwd: string, options: { scope: "branch" | "work"; base?: string }): Promise<{ text: string; base?: string }> {
+	const commit = async (ref: string) => (await git(cwd, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`])).trim();
+	const args = ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--find-renames", "--relative", "--unified=100000"];
+	if (options.scope === "branch") {
+		let base = options.base;
+		if (!base) {
+			base = (await git(cwd, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).catch(() => "")).trim();
+			if (!base) for (const candidate of ["main", "master", "develop", "HEAD"]) {
+				if (await commit(candidate).catch(() => "")) { base = candidate; break; }
+			}
+		}
+		if (!base || base.length > 1024 || base.includes("\0")) throw new Error("Invalid base branch");
+		const [baseHash, head] = await Promise.all([commit(base), commit("HEAD")]);
+		return { text: await git(cwd, [...args, `${baseHash}...${head}`, "--", "."]), base };
+	}
+	if (options.scope !== "work") throw new Error("Invalid diff scope");
+	const head = await commit("HEAD").catch(async () => (await git(cwd, ["hash-object", "-t", "tree", "--stdin"])).trim());
+	// Git recognizes the empty tree without writing an object, including SHA-256 repos.
+	let text = await git(cwd, [...args, head, "--", "."]);
+	const paths = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z", "--", "."])).split("\0").filter(Boolean);
+	for (const path of paths) {
+		const preview = await scmFileDiff(cwd, path);
+		const a = JSON.stringify(`a/${path}`), b = JSON.stringify(`b/${path}`);
+		text += `diff --git ${a} ${b}\nnew file mode 100644\n--- /dev/null\n+++ ${b}\n`;
+		if (preview.untrackedKind !== "text") text += `Binary files /dev/null and ${b} differ\n`;
+		else {
+			const lines = preview.untrackedText ? preview.untrackedText.replace(/\n$/, "").split("\n") : [];
+			if (lines.length) text += `@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+			if (preview.untrackedTruncated) text += "\\ Preview truncated\n";
+		}
+		if (Buffer.byteLength(text, "utf8") > MAX_GIT_OUTPUT) throw new Error("Diff exceeds 16 MiB; narrow the changes before retrying");
+	}
+	return { text };
 }

@@ -700,6 +700,9 @@ wss.on("connection", (ws) => {
 			case "get_git_branch":
 				void cs.gitBranch();
 				break;
+			case "scm_diff":
+				void cs.scmQuery("diff", msg.reqId, { scope: msg.scope, base: msg.base });
+				break;
 			case "scm_status":
 				void cs.scmQuery("status", msg.reqId);
 				break;

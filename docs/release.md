@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 0.99.15 对话与代码改动（35a）
+
+按第 23 个设计包实现独立代码改动面板、每轮成功文件汇总和历史命令折叠，支持本轮／整个分支／未提交、词级差异、文件定位、搜索与窄屏抽屉。包含 develop 上的 pi-harness 包名和命令更名。版本按本次要求从未发布的 1.0.0 准备状态调整为 0.99.15；SDK 1.0.4 不变，协议 v41。发布 GitHub 源码与三平台桌面 Release；说明见 `.github/release-notes/v0.99.15.md`。
+
 ## 1.0.0 首个正式版
 
 从 origin/develop 发布，功能与 0.99.14 一致，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、SSH `TCP_NODELAY`、生产依赖漏洞清零、npm 包、命令、服务与应用标识统一改名为 pi-harness（不兼容旧包）、标题改为 pi-harness，并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v40 不变。旧包 `@youweichen/pi-web-ui` 停在 0.9.0，新包从 1.0.0 开始；说明见 `.github/release-notes/v1.0.0.md`。

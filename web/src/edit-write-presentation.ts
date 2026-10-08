@@ -32,7 +32,7 @@ export interface EditWriteChange {
 const functionLine = /^\s*(?:(?:async\s+)?def\s+\w+|(?:export\s+)?(?:async\s+)?function\s+\w+|(?:public|private|protected)\s+\w+\s*\(|(?:async\s+)?\w+\s*\([^)]*\)\s*[:{])/;
 
 /** SDK edit details contain one line number per row and ` ...` gaps. */
-export function parseEditDiff(diff: string): ChangeHunk[] {
+export function parseEditDiff(diff: string, context = 2): ChangeHunk[] {
 	const segments: ChangeLine[][] = [[]];
 	let offset = 0;
 	for (const raw of diff.replace(/\r\n/g, "\n").split("\n")) {
@@ -56,18 +56,18 @@ export function parseEditDiff(diff: string): ChangeHunk[] {
 		const ranges: Array<{ first: number; last: number }> = [];
 		for (const index of changed) {
 			const previous = ranges.at(-1);
-			if (previous && index - previous.last <= 5) previous.last = index;
+			if (previous && index - previous.last <= context * 2 + 1) previous.last = index;
 			else ranges.push({ first: index, last: index });
 		}
 		return ranges.map(({ first, last }) => {
-			const visible = segment.slice(Math.max(0, first - 2), Math.min(segment.length, last + 3));
+			const visible = segment.slice(Math.max(0, first - context), Math.min(segment.length, last + context + 1));
 			const functionName = [...segment.slice(0, first)].reverse().find((line) => functionLine.test(line.text))?.text.trim();
 			return { line: segment[first].newLine ?? segment[first].oldLine ?? 1, ...(functionName ? { functionName } : {}), lines: visible };
 		});
 	});
 }
 
-export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): EditWriteChange | null {
+export function editWriteChange(block: UiToolCallBlock, result?: UiMessage, context = 2): EditWriteChange | null {
 	if (block.name !== "edit" && block.name !== "write") return null;
 	let args: Record<string, unknown> = {};
 	try { args = JSON.parse(block.argumentsText ?? "{}"); } catch { /* streamed arguments may be incomplete */ }
@@ -81,7 +81,7 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 	}
 	const details = result?.details as { diff?: unknown; firstChangedLine?: unknown; diffTruncated?: boolean } | undefined;
 	const diff = !error && typeof details?.diff === "string" ? details.diff : "";
-	let hunks = parseEditDiff(diff);
+	let hunks = parseEditDiff(diff, context);
 	let fromArguments = false;
 	if (!error && result && hunks.length === 0) {
 		const edits = Array.isArray(args.edits) ? args.edits : [args];
@@ -95,8 +95,8 @@ export function editWriteChange(block: UiToolCallBlock, result?: UiMessage): Edi
 			while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix++;
 			let suffix = 0;
 			while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - suffix - 1] === newLines[newLines.length - suffix - 1]) suffix++;
-			const contextBefore = oldLines.slice(Math.max(0, prefix - 2), prefix).map((text) => ({ marker: " " as const, text }));
-			const contextAfter = oldLines.slice(oldLines.length - suffix, Math.min(oldLines.length, oldLines.length - suffix + 2)).map((text) => ({ marker: " " as const, text }));
+			const contextBefore = oldLines.slice(Math.max(0, prefix - context), prefix).map((text) => ({ marker: " " as const, text }));
+			const contextAfter = oldLines.slice(oldLines.length - suffix, Math.min(oldLines.length, oldLines.length - suffix + context)).map((text) => ({ marker: " " as const, text }));
 			return [{ line: 1, lines: [
 				...contextBefore,
 				...oldLines.slice(prefix, oldLines.length - suffix).map((text) => ({ marker: "-" as const, text })),

@@ -26,7 +26,7 @@ export function UsagePopover({ stats }: { stats?: Stats }) {
 	const sessionRate = stats ? cacheHitPercent(stats.tokens) : null;
 	if (!(percent !== null && percent > 0) && !(sessionRate !== null && sessionRate > 0)) return null;
 	return <div className="usage-control" ref={root} onPointerEnter={() => setOpen(true)} onPointerLeave={() => { if (!pinned.current) setOpen(false); }}>
-		<button type="button" className={`usage-trigger${percent !== null && percent >= 80 ? " warn" : ""}`} aria-label={`${t("usageContextTitle")} ${percent ?? "—"}%`} aria-expanded={open} onPointerDown={() => { pinned.current = !pinned.current; setOpen(pinned.current); }} onClick={(event) => { if (event.detail === 0) { pinned.current = !pinned.current; setOpen(pinned.current); } }}>
+		<button type="button" className={`usage-trigger${percent !== null && percent >= 80 ? " warn" : ""}`} title={`${t("usageContextTitle")} · ${t("usageCacheTitle")}`} aria-label={`${t("usageContextTitle")} ${percent ?? "—"}%`} aria-expanded={open} onPointerDown={() => { pinned.current = !pinned.current; setOpen(pinned.current); }} onClick={(event) => { if (event.detail === 0) { pinned.current = !pinned.current; setOpen(pinned.current); } }}>
 			{percent !== null && percent > 0 && <><span className="usage-context-label">{t("context")}</span><span className="usage-percent">{percent}%</span></>}
 			{sessionRate !== null && sessionRate > 0 && <span className="usage-cache-short">{percent !== null && percent > 0 ? "· " : ""}{t("usageCacheShort")} <strong className={sessionRate < 50 ? "warn" : ""}>{sessionRate}%</strong></span>}
 		</button>

@@ -1,3 +1,5 @@
+import { useChangeLinks } from "../changes-context";
+import { remarkChangeLinks } from "../remark-change-links";
 import { remarkTextHighlight } from "../remark-text-highlight";
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
@@ -42,8 +44,17 @@ const sourceLineComponents: Components = {
 };
 
 export function MarkdownBody({ text, imageSrc, sourceLines, fileLinks }: MarkdownProps) {
+	const changes = useChangeLinks();
+	const links = changes && !sourceLines ? [...remarkPlugins, remarkChangeLinks(changes.files.map(file => file.path))] : remarkPlugins;
 	return (
-		<ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={{ pre: ({ children, ...props }) => <PreWithCopy {...props} fileLinks={fileLinks}>{children}</PreWithCopy>, ...(fileLinks ? { a: ({ node: _node, href, ...props }) => <a {...props} href={href} onClick={(event) => { if (href?.startsWith("#pi-file=")) { event.preventDefault(); openLocalFile(href.slice(9)); } }} /> } : {}), ...(sourceLines ? sourceLineComponents : {}), ...(imageSrc ? { img: ({ node: _node, src, ...props }) => <img {...props} src={imageSrc(src ?? "")} /> } : {}) }}>
+		<ReactMarkdown remarkPlugins={links} rehypePlugins={rehypePlugins} components={{ pre: ({ children, ...props }) => <PreWithCopy {...props} fileLinks={fileLinks}>{children}</PreWithCopy>, a: ({ node: _node, href, children, ...props }) => {
+			const pr = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)(?:[?#].*)?$/.exec(href ?? "");
+			return <a {...props} href={href} className={pr ? "pr-reference" : undefined} onClick={event => {
+				if (href?.startsWith("#pi-change=")) { event.preventDefault(); const path = decodeURIComponent(href.slice(11)); changes?.show(changes.files, path); }
+				else if (fileLinks && href?.startsWith("#pi-file=")) { event.preventDefault(); openLocalFile(href.slice(9)); }
+				else if (changes && href && !/^(?:[a-z]+:|#|\/\/)/i.test(href) && /\.[a-z0-9]+(?:#L\d+)?$/i.test(href)) { event.preventDefault(); const [path, line] = href.split("#L"); const file = changes.files.find(file => file.path === path); if (file) changes.show(changes.files, file.path); else window.dispatchEvent(new CustomEvent("pi-harness:open-tool-file", { detail: { path: decodeURIComponent(path), line: Number(line) || 1 } })); }
+			}}>{pr ? `#${pr[1]}` : children}</a>;
+		}, ...(sourceLines ? sourceLineComponents : {}), ...(imageSrc ? { img: ({ node: _node, src, ...props }) => <img {...props} src={imageSrc(src ?? "")} /> } : {}) }}>
 			{text}
 		</ReactMarkdown>
 	);

@@ -1,3 +1,4 @@
+import { useChangesAvailable } from "../changes-context";
 import { ToolRecoveryCard, type ToolRecoveryActions } from "./ToolRecoveryCard";
 import { isProcessNarration } from "../command-reading";
 import { navigateSibling } from "../tree-events";
@@ -116,6 +117,8 @@ interface MessageProps {
 	incident?: ToolTextIncident;
 	recovery?: ToolRecoveryActions;
 	toolsRunning?: boolean;
+	bashActive?: boolean;
+	bashTitle?: string;
 	toolMessageIds?: ReadonlyMap<string, string>;
 	planViews?: ReadonlyMap<string, PlanPresentation>;
 	continuation?: boolean;
@@ -164,6 +167,8 @@ export const Message = memo(function Message({
 	incident,
 	recovery,
 	toolsRunning,
+	bashActive,
+	bashTitle,
 	toolMessageIds,
 	planViews,
 	continuation,
@@ -187,6 +192,7 @@ export const Message = memo(function Message({
 	toolsWrap,
 }: MessageProps) {
 	const t = useT();
+	const changesPanel = useChangesAvailable();
 	// Inline edit-and-re-ask editor (user messages only).
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState("");
@@ -367,8 +373,9 @@ export const Message = memo(function Message({
 					changes.push(next);
 					i++;
 				}
-				if (changes.length >= 3) elements.push(<EditWriteGroup key={`${message.id}-${first.id}`} items={changes.map((item) => ({ block: item, view: viewFor(item) }))} retriedIds={retriedEditIds} />);
-				else elements.push(...changes.map((item) => <EditWriteCard key={`${message.id}-${item.id}`} item={{ block: item, view: viewFor(item) }} retried={retriedEditIds?.has(item.id)} />));
+				const visibleChanges = changesPanel ? changes.filter(item => !toolResults.get(item.id) || toolResults.get(item.id)?.isError) : changes;
+				if (visibleChanges.length >= 3) elements.push(<EditWriteGroup key={`${message.id}-${first.id}`} items={visibleChanges.map((item) => ({ block: item, view: viewFor(item) }))} retriedIds={retriedEditIds} />);
+				else elements.push(...visibleChanges.map((item) => <EditWriteCard key={`${message.id}-${item.id}`} item={{ block: item, view: viewFor(item) }} retried={retriedEditIds?.has(item.id)} />));
 				continue;
 			}
 			if (first?.name === "bash") {
@@ -378,7 +385,7 @@ export const Message = memo(function Message({
 					if (next?.name !== "bash") break;
 					calls.push(next); i++;
 				}
-				elements.push(<BashGroup key={first.id} items={calls.map((item) => ({ block: item, view: { ...viewFor(item), streaming: toolsRunning ?? streaming }, messageId: toolMessageIds?.get(item.id) ?? message.id }))} onKill={onKillBash} />);
+				elements.push(<BashGroup active={bashActive ?? toolsRunning ?? streaming} title={bashTitle} key={first.id} items={calls.map((item) => ({ block: item, view: { ...viewFor(item), streaming: toolsRunning ?? streaming }, messageId: toolMessageIds?.get(item.id) ?? message.id }))} onKill={onKillBash} />);
 				continue;
 			}
 			if (first?.name === "read") {

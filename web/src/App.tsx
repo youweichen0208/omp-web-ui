@@ -1,3 +1,6 @@
+import { ChangesProvider } from "./changes-context";
+import { taskChanges } from "./changes";
+import { ChangesPanel } from "./components/ChangesPanel";
 import { toolTextIncidents } from "./tool-text";
 import { useToolRecovery } from "./use-tool-recovery";
 import { randomUuid } from "./uuid";
@@ -367,6 +370,14 @@ export function App() {
 	}, [enabledPlugins, chat.pluginsEpoch]);
 	// 左右面板可拖拽宽度（桌面端）：localStorage 持久化，双击手柄复位。
 	const [leftCollapsed, setLeftCollapsed] = useState(() => localStorage.getItem("pi-left-collapsed") === "true");
+	const [changesOpen, setChangesOpen] = useState(false);
+	const changesLeftRestore = useRef<boolean | null>(null);
+	const onChangesOpen = useCallback((open: boolean) => {
+		setChangesOpen(open);
+		if (open) setLeftCollapsed(previous => { changesLeftRestore.current = previous; return true; });
+		else if (changesLeftRestore.current !== null) { setLeftCollapsed(changesLeftRestore.current); changesLeftRestore.current = null; }
+	}, []);
+	const changedFiles = useMemo(() => taskChanges(conversationState?.taskProgress, conversationState?.messages ?? [], conversationState?.cwd ?? ""), [conversationState?.taskProgress, conversationState?.messages, conversationState?.cwd]);
 	const [leftWidth, setLeftWidth] = useState(() => readPanelWidth("left"));
 	const [rightWidth, setRightWidth] = useState(() => readPanelWidth("right"));
 	const resizeLeft = useCallback((w: number) => setLeftWidth(w), []);
@@ -856,8 +867,8 @@ export function App() {
 		// drop attaches. The plain preventDefault used to merely stop the browser
 		// navigating away; children with their own handlers (input bar / edit
 		// composer) call stopPropagation and keep priority.
-		<div
-			className={`app design-workspace ${view === "wiki" ? "wiki-mode" : ""} ${leftCollapsed ? "left-collapsed" : ""} ${previewFile && view === "chat" ? "document-open" : ""}`}
+		<ChangesProvider conversationId={conversationState?.conversationId ?? ""} files={changedFiles} active={view === "chat"} onOpenChange={onChangesOpen}><div
+			className={`app design-workspace ${changesOpen && view === "chat" ? "changes-open" : ""} ${view === "wiki" ? "wiki-mode" : ""} ${leftCollapsed ? "left-collapsed" : ""} ${previewFile && view === "chat" ? "document-open" : ""}`}
 			style={{ "--left-w": `${leftWidth}px`, "--right-w": `${rightWidth}px` } as CSSProperties}
 			onDragOver={(e) => {
 				if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
@@ -940,6 +951,7 @@ export function App() {
 					onOpenPanel={(side) => {
 						if (side === "left" && !isMobile) {
 							setDrawer(null);
+							changesLeftRestore.current = null;
 							setLeftCollapsed((value) => { localStorage.setItem("pi-left-collapsed", String(!value)); return !value; });
 						} else if (side === "right" && !isMobile && !isNarrow && !previewFile) setFilesCollapsed((value) => !value);
 						else {
@@ -1041,6 +1053,7 @@ export function App() {
 								onSent={clearAttachments}
 							/>
 						</main>
+						<ChangesPanel key={conversationState?.conversationId ?? ""} cwd={conversationState?.cwd ?? ""} data={chat.scmData} send={send} ready={chat.ready && !switching} notRepo={workspaceScm.notRepo} branch={workspaceScm.branch} defaultBase={workspaceScm.base} branches={workspaceScm.branches} dirty={chat.scmDirty} />
 						{!isMobile && (!isNarrow || !!previewFile) && (!filesCollapsed || !!previewFile) && (
 							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("pi-harness:editor-share", "0.45"); } : undefined} />
 						)}
@@ -1183,6 +1196,6 @@ export function App() {
 					onPreviewFile={openPreview}
 				/>
 			)}
-		</div>
+		</div></ChangesProvider>
 	);
 }

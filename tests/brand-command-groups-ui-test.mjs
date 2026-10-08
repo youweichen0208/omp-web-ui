@@ -56,6 +56,8 @@ try {
 		});
 	});
 	await page.goto(`http://localhost:${port}`);
+	await page.locator('.bash-group.historical-step .bash-group-head').waitFor();
+	await page.locator('.bash-group-head').click();
 	await page.locator('.bash-group-head', { hasText: '运行了 10 条命令' }).waitFor();
 	assert.equal(await page.locator('.bash-group').count(), 1);
 	assert.equal(await page.locator('.bash-row').count(), 8);
@@ -87,9 +89,7 @@ try {
 	assert.equal(await page.locator('.task-artifact-row').count(), 0);
 	const colors = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return ['--green', '--red', '--yellow-fg', '--accent'].map(key => s.getPropertyValue(key).trim()); });
 	assert.deepEqual(colors, ['#3e9b5f', '#c9483a', '#8a5a00', '#2f7aae']);
-	await page.locator('.usage-trigger').click();
-	await page.locator('.usage-popover').waitFor();
-	await page.keyboard.press('Escape');
+	assert.equal(await page.locator('.usage-trigger').count(), 0, 'zero usage stays hidden');
 	await page.mouse.move(0, 0);
 	await page.waitForTimeout(1800);
 	assert.equal(await page.locator('.bash-group-location').count(), 0);
@@ -127,6 +127,7 @@ try {
 	snapshot.state.messages.push(snapshot.state.streamingMessage, { id: 'user-next', role: 'user', content: [{ type: 'text', text: 'Next task' }] });
 	snapshot.state.streamingMessage = null;
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
+	await page.locator('.bash-group.historical-step .bash-group-head').click();
 	await page.locator('[data-tool-call-id="live-call"].err').waitFor();
 	assert.equal(await page.locator('.bash-row.run').count(), 0);
 	// Completed tools remain part of a running turn until the model settles.
@@ -153,8 +154,12 @@ try {
 	await page.locator('[data-tool-call-id="read-0"]').getByRole('button', { name: '复制命令', exact: true }).click();
 	assert.equal(await page.evaluate(() => navigator.clipboard.readText()), JSON.parse(reads[0].argumentsText).command);
 	assert.match(await page.locator('.usage-cache-short').innerText(), /缓存 94%/);
+	await page.locator('.usage-trigger').click();
+	await page.locator('.usage-popover').waitFor();
+	await page.keyboard.press('Escape');
+
 	await page.locator('.inputbox textarea').first().focus();
-	assert.equal(await page.locator('.inputbox').evaluate(el => getComputedStyle(el).boxShadow), 'none');
+	assert.match(await page.locator('.inputbox').evaluate(el => getComputedStyle(el).boxShadow), /^(none|rgba\(0, 0, 0, 0\) 0px 0px 0px 0px)$/); // CSS minification may serialize none as a transparent zero-sized shadow.
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
 	await page.screenshot({ path: '/tmp/pi-command-refinement-light.png' });
 	for (const width of [900, 390]) {
@@ -239,10 +244,14 @@ try {
 	assert.equal(await input.inputValue(), 'line one\n');
 	// Light diff rows and their markers follow the supplied palette.
 	snapshot.state.messages.push({ id: 'write-demo', role: 'assistant', content: [{ type: 'toolCall', id: 'write-demo-call', name: 'write', argumentsText: JSON.stringify({ path: 'demo.ts', content: 'const value = 1;' }) }] }, { id: 'write-demo-result', role: 'toolResult', toolCallId: 'write-demo-call', toolName: 'write', content: [{ type: 'text', text: 'Successfully wrote file' }] });
+	snapshot.state.taskProgress = deriveTaskProgress(snapshot.state.conversationId, snapshot.state.messages, null, true);
 	snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
-	await page.locator('.change-line.add').waitFor();
-	assert.equal(await page.locator('.change-line.add').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(230, 244, 234)');
-	assert.equal(await page.locator('.change-marker').evaluate(el => getComputedStyle(el).color), 'rgb(62, 155, 95)');
+	await page.keyboard.press('ControlOrMeta+d');
+	await page.locator('.changes-line.add').waitFor();
+	assert.equal(await page.locator('.changes-line.add').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(230, 244, 234)');
+	assert.equal(await page.locator('.changes-line.add .changes-line-sign').evaluate(el => getComputedStyle(el).color), 'rgb(62, 155, 95)');
+	await page.keyboard.press('ControlOrMeta+d');
+	await page.locator('.changes-panel').waitFor({state:'detached'});
 	// English has longer control labels; verify the same narrow layout.
 	await page.evaluate(() => localStorage.setItem('pi-harness:lang', 'en'));
 	forceRunning = true;

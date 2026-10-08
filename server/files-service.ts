@@ -23,6 +23,7 @@ import {
 	scmCurrentBranch,
 	scmHistory,
 	scmFileDiff,
+	scmDiff,
 	scmCommitDetail,
 } from "./scm.js";
 
@@ -383,15 +384,20 @@ export class FilesService {
 	}
 
 	async scmQuery(
-		kind: "status" | "history" | "filediff" | "commit",
+		kind: "status" | "history" | "filediff" | "commit" | "diff",
 		reqId: number,
-		arg?: { path?: string; hash?: string },
+		arg?: { path?: string; hash?: string; scope?: "branch" | "work"; base?: string },
 	): Promise<void> {
 		const cwd = this.host.getActiveCwd();
 		if (kind === "status") this.watchGitDir(cwd);
 		try {
 			if (kind === "status") {
 				const data = await scmStatus(cwd);
+				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, ...data });
+				return;
+			}
+			if (kind === "diff" && (arg?.scope === "branch" || arg?.scope === "work")) {
+				const data = await scmDiff(cwd, { scope: arg.scope, base: arg.base });
 				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, ...data });
 				return;
 			}

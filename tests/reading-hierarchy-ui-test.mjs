@@ -98,11 +98,12 @@ try {
 	await page.locator('.task-file-counts').waitFor();
 	assert.equal(await page.locator('.task-file-result').count(),1);
 	assert.match(await page.locator('.task-file-counts').innerText(), /\+1.*−1/);
-	// A single command has no redundant group header; the conclusion stays black.
+	// 35a: even one historical command folds into a step; the conclusion stays black.
 	snapshot.state.messages = [messages[0],messages[4],messages[5],{id:'conclusion',role:'assistant',content:[{type:'text',text:'检查通过，权限映射正确。'}]}];
 	snapshot.state.isStreaming = false; snapshot.state.rev += 1; socket.send(JSON.stringify(snapshot));
 	await page.locator('.trailing-working .waiting-indicator').waitFor({state:'detached'});
-	assert.equal(await page.locator('.bash-group-head').count(),0);
+	assert.equal(await page.locator('.bash-group.historical-step .bash-group-head').count(),1);
+	assert.equal(await page.locator('.bash-row').count(),0);
 	assert.equal(await page.locator('.process-narration').count(),0);
 	// 31a: deterministic phase clocks, instant content handoff, reduced motion and native stop.
 	await page.clock.install();

@@ -1,3 +1,6 @@
+import { ReplyActions } from "./ReplyActions";
+import { turnChangeSummaries } from "../changes";
+import { ChangeSummaryCard } from "./ChangeSummaryCard";
 import { projectToolTextMessages, toolTextIncidents } from "../tool-text";
 import type { ToolRecoveryActions } from "./ToolRecoveryCard";
 import { ConversationWorkingStatus } from "./WorkingStatus";
@@ -226,6 +229,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 	const timeGaps = useMemo(() => messageTimeGaps(state.messages), [state.messages]);
 	const predecessors = assistantPredecessors(messages);
 	const streamingHasContent = state.streamingMessage?.content.some((block) => block.type === "text" ? (typeof block.text === "string" && !!block.text.trim()) || !!block.truncated : block.type === "thinking" ? typeof block.thinking === "string" && !!block.thinking.trim() : true) ?? false;
+	const changeSummaries = useMemo(() => turnChangeSummaries(state.messages, state.taskProgress, state.cwd, state.isStreaming), [state.messages, state.taskProgress, state.cwd, state.isStreaming]);
 	const lastUserIndex = state.messages.findLastIndex((message) => message.role === "user");
 	const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
 	// Only the last KEEP_RECENT persisted messages are fully rendered; older
@@ -756,7 +760,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 							/>
 						);
 					}
-					if (bashGroups.owners.has(m.id)) return null;
+					if (bashGroups.owners.has(m.id)) return changeSummaries.has(m.id) ? <ChangeSummaryCard key={m.id} files={changeSummaries.get(m.id)!} /> : null;
 					const qIdx = m.role === "user" ? qnIndex.get(m.id) : undefined;
 					const show =
 						!virtualOn ||
@@ -791,6 +795,8 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 							toolStatuses={toolStatuses}
 							streaming={state.isStreaming && connected && i > lastUserIndex}
 							toolsRunning={state.isStreaming && i > lastUserIndex}
+							bashActive={state.isStreaming && i > lastUserIndex && !state.messages.slice(i + 1).some(message => message.role === "assistant" && message.content.some(block => block.type === "text" && typeof block.text === "string" && block.text.trim())) && !state.streamingMessage?.content.some(block => block.type === "text" && typeof block.text === "string" && block.text.trim())}
+							bashTitle={state.messages.slice(lastUserIndex < i ? lastUserIndex : 0, i + 1).findLast(message => message.role === "assistant" && message.content.some(block => block.type === "text" && typeof block.text === "string" && block.text.trim()))?.content.filter(block => block.type === "text").map(block => block.type === "text" && typeof block.text === "string" ? block.text : "").join(" ").slice(0, 80)}
 							onKillBash={onKillBash}
 							toolsWrap={toolsWrap}
 							thinkingWrap={thinkingWrap}
@@ -800,6 +806,14 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 							questionAttachments={questionAttachments.get(m.id)}
 							onCollapse={isExpandedOld ? collapse : undefined}
 						/>
+						{changeSummaries.has(m.id) && <ChangeSummaryCard files={changeSummaries.get(m.id)!} />}
+						{m.role === "assistant" && <ReplyActions message={m} last={m.id === state.messages.findLast(message => message.role === "assistant")?.id} regenerate={!state.isStreaming && connected && !state.tree?.verifying && onEdit ? () => {
+							const user = state.messages.slice(0, i).findLast(message => message.role === "user" && message.origin !== "auto-reminder");
+							if (!user) return;
+							const text = user.questionText ?? user.content.map(block => block.type === "text" ? block.text : "").join("\n");
+							const skill = parseSkillBlock(text);
+							onEdit(user.id, skill ? `/skill:${skill.name}${skill.userMessage ? ` ${skill.userMessage}` : ""}` : text, questionAttachments.get(user.id), { entryId: user.entryId });
+						} : undefined} />}
 						</LazyMount>
 					);
 				})}

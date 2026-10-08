@@ -40,7 +40,7 @@ function allowedPalette(decl) {
 }
 
 function validRadius(value) {
-	return /^(?:var\(--r-(?:sm|md|lg|switch|waiting|wiki-grid|wiki-code)\)|50%|0|inherit)(?:[\s/]+(?:var\(--r-(?:sm|md|lg|switch|waiting|wiki-grid|wiki-code)\)|50%|0))*$/.test(value.trim());
+	return /^(?:var\(--r-(?:sm|md|lg|switch|waiting|wiki-grid|wiki-code|diff-word)\)|50%|0|inherit)(?:[\s/]+(?:var\(--r-(?:sm|md|lg|switch|waiting|wiki-grid|wiki-code|diff-word)\)|50%|0))*$/.test(value.trim());
 }
 
 export function checkCss(source, file = "styles.css") {

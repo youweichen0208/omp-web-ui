@@ -18,11 +18,12 @@ function stateOf(view: ToolView) {
 }
 
 /** Presentation only: tool IDs and the authoritative result lookup stay intact. */
-export function BashGroup({ items, onKill }: { items: Item[]; onKill?: () => void }) {
+export function BashGroup({ items, onKill, active = false, title }: { items: Item[]; onKill?: () => void; active?: boolean; title?: string }) {
 	const t = useT();
 	const cwd = useContext(WorkspacePathContext);
 	const attempts = consecutiveAttempts(items, item => commandReading(commandPresentation(bashCommand(item.block.argumentsText) ?? "", cwd).command).title);
-	const [open, setOpen] = useState(true);
+	const [open, setOpen] = useState(active);
+	useEffect(() => setOpen(active), [active]);
 	const [all, setAll] = useState(false);
 	const [revealed, setRevealed] = useState<string>();
 	const latest = attempts.map(group => group[group.length - 1]);
@@ -39,15 +40,15 @@ export function BashGroup({ items, onKill }: { items: Item[]; onKill?: () => voi
 		window.addEventListener("pi:reveal-tool", jump);
 		return () => window.removeEventListener("pi:reveal-tool", jump);
 	}, [items]);
-	return <section className={`bash-group ${state}`}>
-		{items.length > 1 && <button type="button" className="bash-group-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+	return <section className={`bash-group ${state} ${!open ? "historical-step" : ""}`}>
+		{(!active || items.length > 1) && <button type="button" className="bash-group-head" aria-expanded={open} onClick={() => setOpen(!open)}>
 			<span className={`bash-state ${state}`} aria-label={t(failed ? "error" : running ? "running" : "done")}>{failed ? "✗" : running ? "●" : "✓"}</span>
-			<strong>{t(running ? "bashGroupRunning" : "bashGroupCount", { n: items.length })}</strong>
+			<strong>{!open ? title || commandReading(commandPresentation(bashCommand(items[0].block.argumentsText) ?? "", cwd).command).title : t(running ? "bashGroupRunning" : "bashGroupCount", { n: items.length })}</strong>{!open && <span> · {t("changesCommands", { n: items.length })}</span>}
 			{failed > 0 && <span className="bash-state err">{t("bashGroupFailed", { n: failed })}</span>}
 			{measured && seconds(durations.reduce<number>((sum, ms) => sum + (ms ?? 0), 0)) && <span className="bash-group-duration">{seconds(durations.reduce<number>((sum, ms) => sum + (ms ?? 0), 0))}</span>}
 			{open ? <FiChevronDown /> : <FiChevronRight />}
 		</button>}
-		{(open || items.length === 1) && <div className="bash-group-items">
+		{(open || (active && items.length === 1)) && <div className="bash-group-items">
 			{!all && attempts.length > 8 && <button type="button" className="bash-group-more" onClick={() => setAll(true)}>{t("bashGroupEarlier", { n: attempts.length - 8 })}</button>}
 			{(all ? attempts : attempts.slice(-8)).map(group => group.length === 1 ? <BashRow key={group[0].block.id} {...group[0]} onKill={onKill} revealed={revealed === group[0].block.id} /> : <BashRow key={group[0].block.id} {...group[group.length - 1]} onKill={onKill} revealed={group.some(item => item.block.id === revealed)} attempts={group.length} history={<div className="bash-attempt-history">{group.slice(0, -1).map(item => <BashRow key={item.block.id} {...item} revealed={item.block.id === revealed} historical />)}</div>} />)}
 		</div>}

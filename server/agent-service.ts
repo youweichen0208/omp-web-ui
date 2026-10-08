@@ -2573,9 +2573,9 @@ export class ClientSession {
 	async gitBranch(): Promise<void> { return this.files.gitBranch(); }
 
 	async scmQuery(
-		kind: "status" | "history" | "filediff" | "commit",
+		kind: "status" | "history" | "filediff" | "commit" | "diff",
 		reqId: number,
-		arg?: { path?: string; hash?: string },
+		arg?: { path?: string; hash?: string; scope?: "branch" | "work"; base?: string },
 	): Promise<void> {
 		return this.files.scmQuery(kind, reqId, arg);
 	}

@@ -2,7 +2,7 @@ import type { TaskProgress, UiMessage, UiToolCallBlock } from "../../server/prot
 import { editWriteChange } from "./edit-write-presentation.js";
 
 /** Normalize lexical aliases only; never infer filesystem changes from shell text. */
-function outputPath(path: string, cwd: string): string {
+export function outputPath(path: string, cwd: string): string {
 	const normalize = (value: string) => {
 		const parts: string[] = [];
 		for (const part of value.replace(/\\/g, "/").split("/")) {
