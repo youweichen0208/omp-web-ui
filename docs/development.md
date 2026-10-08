@@ -12,14 +12,15 @@ npm run check:lockfile  # 安装前校验 lockfile 下载地址为 HTTPS npm 官
 npm run check:protocol  # 守护协议单源 shim 机制（CI 必跑）
 npm run build        # build:web (vite) + build:server (tsc)
 npm start            # 跑编译产物 dist/server/index.js（生产）
-npm test             # vitest 纯函数单测（tests/unit/，毫秒级零 token）
+npm run check:design # 设计令牌检查（硬编码颜色与非令牌圆角报错）
+npm test             # 设计令牌检查 + vitest 纯函数单测（tests/unit/，毫秒级零 token）
 npm run test:smoke   # 零 token 协议冒烟聚合跑器（tests/run-smoke.mjs，自包含测试）
 npm run test:freeze  # 冻结/重连回归测试（Playwright，需要本机 chromium headless）
 ```
 
 ## CI
 
-GitHub Actions ubuntu-latest（`.github/workflows/ci.yml`，push/PR → main 或 develop 触发）：`check:lockfile → npm ci → check:protocol → typecheck → build → vitest → test:smoke`。
+GitHub Actions ubuntu-latest（`.github/workflows/ci.yml`，push/PR → main 或 develop 触发）：`check:lockfile → npm ci → check:protocol → typecheck → build → npm test（设计检查 + vitest）→ test:smoke`。
 
 SSH 节点另有 macOS/Windows CI job：两平台分别构建服务端并运行 `node-workbench-test.mjs` 的 mock SSH 测试。浏览器工作台交互可在 macOS 本地运行 `node tests/node-workbench-browser-test.mjs`（先 `npm run build`）。
 
@@ -30,7 +31,7 @@ SSH 节点另有 macOS/Windows CI job：两平台分别构建服务端并运行 
 - **缩进用 Tab**；前端组件小写文件名（`copy-button.tsx` 例外）；代码注释中英混写，UI 文案默认中文。
 - **i18n**：所有用户可见字符串走 `useT()`；改 `i18n.tsx` 必须同时加 `zh` 和 `en` 两个 key（`en` 的类型是 `Record<keyof typeof zh, string>`，漏一个会编译报错，这是特性不是 bug）。
 - **通知文案**：服务端 notice 直接写中文，不需要 i18n。
-- **样式**：全部在 `styles.css`，按 `/* ---- 组件名 ---- */` 分区；颜色用 CSS 变量（`--bg-elev*`、`--border*`、`--text*`、`--accent*`、`--amber`、`--green`、`--red`）。
+- **样式**：全部在 `styles.css`，按 `/* ---- 组件名 ---- */` 分区；颜色用 CSS 变量（`--bg-elev*`、`--border*`、`--text*`、`--accent*`、`--yellow-fg`、`--green`、`--red`）。
 - 文件列表 `IGNORED_ENTRIES`（node_modules/.git/dist 等）在 `files-service.ts` 顶部维护（分平台两套）。
 - 新增协议消息 → 只改 server/protocol.ts（见 `docs/architecture-core.md`「协议单源」），再在两端 dispatch/onmessage switch 各加分支。
 

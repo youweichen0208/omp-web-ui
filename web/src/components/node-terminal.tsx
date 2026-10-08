@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal,  } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { buildTermTheme, THEME_CHANGE_EVENT } from "../theme";
 import { randomUuid } from "../uuid";
 import { useT } from "../i18n";
 import type { ClientMessage, ServerMessage,  } from "../types";
@@ -15,7 +16,9 @@ export function RemoteTerminal({ nodeId, tab, active, send, initialOutput }: { n
 	useEffect(() => {
 		if (!ref.current) return;
 		const style = getComputedStyle(ref.current);
-		const term = new Terminal({ theme: { background: style.getPropertyValue("--node-terminal-bg").trim(), foreground: style.getPropertyValue("--node-terminal-fg").trim(), selectionBackground: "#645384", cursor: "#dcd8d4" }, fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: 13, scrollback: 8000, allowProposedApi: true });
+		const term = new Terminal({ theme: { ...buildTermTheme(), background: style.getPropertyValue("--node-terminal-bg").trim(), foreground: style.getPropertyValue("--node-terminal-fg").trim() }, fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: 13, scrollback: 8000, allowProposedApi: true });
+		const updateTheme = () => { term.options.theme = { ...buildTermTheme(), background: style.getPropertyValue("--node-terminal-bg").trim(), foreground: style.getPropertyValue("--node-terminal-fg").trim() }; };
+		window.addEventListener(THEME_CHANGE_EVENT, updateTheme);
 		const fit = new FitAddon(); term.loadAddon(fit); term.open(ref.current);
 		if (initialOutput) term.write(initialOutput);
 
@@ -31,7 +34,7 @@ export function RemoteTerminal({ nodeId, tab, active, send, initialOutput }: { n
 
 		window.addEventListener("pi-node-event", listener);
 		const ro = new ResizeObserver(() => { if (!ref.current?.clientWidth || !ref.current.clientHeight) return; try { fit.fit(); if (!closed.current) request("terminal_resize", { cols: term.cols, rows: term.rows }); } catch { /* hidden panel */ } }); ro.observe(ref.current);
-		return () => { ro.disconnect(); input.dispose(); selectionChange.dispose(); window.removeEventListener("pi-node-event", listener); term.dispose(); };
+		return () => { window.removeEventListener(THEME_CHANGE_EVENT, updateTheme); ro.disconnect(); input.dispose(); selectionChange.dispose(); window.removeEventListener("pi-node-event", listener); term.dispose(); };
 	}, [nodeId, tab.id, tab.conversationId, send]);
 	return <div className="node-terminal-wrap" style={{ display: active ? "block" : "none" }}><div ref={ref} className="node-xterm" />{selection && <div className="node-selection-menu"><button onClick={() => void navigator.clipboard.writeText(selection).then(() => setCopyError(t("nodeCopied"))).catch((e) => setCopyError(String(e)))}>{t("nodeCopy")}</button>{copyError && <span role="status">{copyError}</span>}</div>}</div>;
 }

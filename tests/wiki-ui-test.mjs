@@ -51,6 +51,29 @@ try {
 	browser = await chromium.launch({ executablePath: CHROME_PATH || chromium.executablePath() });
 	const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 	page.setDefaultTimeout(10000);
+	const assertComposerStates = async () => {
+		const input = page.getByRole('textbox', { name: '问 pi', exact: true });
+		for (const text of ['', '   ', 'draft']) {
+			await input.fill(text);
+			for (const focused of [true, false]) {
+				await input.evaluate((el, focus) => focus ? el.focus() : el.blur(), focused);
+				const style = await input.evaluate(el => {
+					const box = el.closest('.wiki-composer'), cs = getComputedStyle(box), probe = document.createElement('span');
+					probe.style.color = 'var(--input-border)'; box.append(probe);
+					const neutral = getComputedStyle(probe).color;
+					probe.style.color = 'var(--accent)';
+					const accent = getComputedStyle(probe).color;
+					probe.remove();
+					return { radius: cs.borderRadius, shadow: cs.boxShadow, border: cs.borderTopColor, neutral, accent };
+				});
+				assert.equal(style.radius, '8px');
+				assert.equal(style.shadow, 'none');
+				assert.equal(style.border, focused && text.trim() ? style.accent : style.neutral, `composer focus=${focused}, text=${JSON.stringify(text)}`);
+			}
+		}
+		await input.fill('');
+		await input.blur();
+	};
 	let holdSnapshots = false, releaseSnapshots;
 	await page.routeWebSocket('**/ws', ws => {
 		const upstream = ws.connectToServer(), pending = [];
@@ -74,6 +97,10 @@ try {
 	assert.equal(await page.locator('.wiki-workbench').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 36, 35)');
 	assert.equal(await page.locator('.wiki-sidebar').evaluate(el => Math.round(el.getBoundingClientRect().width)), 250);
 	await page.locator('.wiki-chat-panel').waitFor();
+	await assertComposerStates();
+	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; });
+	await assertComposerStates();
+	await page.evaluate(() => { document.documentElement.dataset.appearance = 'dark'; });
 	assert.equal(Math.round((await page.locator('.wiki-chat-panel').boundingBox()).width), 400);
 	assert((await page.locator('.wiki-chat-model').innerText()).includes('Wiki test'));
 	assert.equal(await page.locator('.wiki-main > .wiki-composer-area').count(), 0, 'panel open hides floating input');
@@ -103,6 +130,7 @@ try {
 	assert.equal(await page.locator('.wiki-pill-send').isDisabled(), true);
 	assert(!(await page.getByRole('textbox', { name: '问 pi', exact: true }).isVisible()));
 	await page.keyboard.press('/');
+	await assertComposerStates();
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('retain this draft');
 	await page.keyboard.press('Escape');
 	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
@@ -114,19 +142,20 @@ try {
 	await page.waitForFunction(() => document.querySelector('.wiki-toc button:last-child')?.getAttribute('aria-current') === 'location');
 	assert((await page.locator('.wiki-document-meta').innerText()).includes('分钟读完'));
 	const readingCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
-	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
+	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'light'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
 	assert.equal(readingCode, "rgb(36, 37, 34)");
 	assert.equal(await page.locator(".wiki-prose .codeblock").evaluate(el => getComputedStyle(el).backgroundColor), readingCode);
 	assert.equal(await page.locator('.wiki-prose select[data-code-language]').first().inputValue(), 'js');
 	await page.locator('.wiki-scroll').evaluate(el => { el.scrollTo({ top: 0, behavior: 'instant' }); el.dispatchEvent(new Event('scroll')); });
 	await page.waitForFunction(() => document.querySelector('.wiki-toc button:first-of-type')?.getAttribute('aria-current') === 'location');
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-dark.png' });
-	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; localStorage.setItem('pi-web-ui:code-theme', 'light'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
+	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
 	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
 	await page.waitForFunction(() => {
 		const code = document.querySelector('.wiki-prose .codeblock');
 		return getComputedStyle(code).backgroundColor !== "rgb(36, 37, 34)";
 	});
+	await assertComposerStates();
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-light-expanded.png' });
 	await page.getByRole('button', { name: '专注阅读', exact: true }).click();
 	assert.equal(await page.locator('.wiki-sidebar').isVisible(), false);

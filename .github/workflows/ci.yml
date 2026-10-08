@@ -34,9 +34,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # 纯函数单测（毫秒级、零 token）
-      - name: Unit tests
-        run: npx vitest run
+      # 设计令牌检查与纯函数单测（零 token）
+      - name: Design tokens and unit tests
+        run: npm test
 
       # 零 token 协议冒烟（每个测试自起隔离 server：独立端口 + 临时 data-dir）
       - name: Protocol smoke tests

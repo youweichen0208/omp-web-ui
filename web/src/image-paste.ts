@@ -15,6 +15,9 @@ export interface ProcessedImage {
 	size: number;
 }
 
+// JPEG has no alpha channel; flatten image content onto white independently of the UI theme.
+const JPEG_MATTE_COLOR = "#ffffff";
+
 /** Largest edge (px) we send to the model — covers ~1.5K vision crops. */
 const MAX_DIMENSION = 1568;
 /** Must match server MAX_PASTED_IMAGE_BYTES (agent-service.ts). */
@@ -82,7 +85,7 @@ export async function fileToProcessedImage(
 			const ctx = canvas.getContext("2d");
 			if (!ctx) continue;
 			if (mime !== "image/png") {
-				ctx.fillStyle = "#ffffff";
+				ctx.fillStyle = JPEG_MATTE_COLOR;
 				ctx.fillRect(0, 0, w, h);
 			}
 			ctx.drawImage(bitmap, 0, 0, w, h);

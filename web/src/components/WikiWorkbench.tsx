@@ -284,7 +284,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 		if (!heading) return;
 		if (window.matchMedia("(max-width: 1099px)").matches) toggleChat(false);
 		heading.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
-		heading.animate([{ backgroundColor: "transparent" }, { backgroundColor: "#b9a9ee66", offset: .15 }, { backgroundColor: "transparent" }], { duration: 1500 });
+		heading.animate([{ backgroundColor: "transparent" }, { backgroundColor: getComputedStyle(heading).getPropertyValue("--accent-soft").trim(), offset: .15 }, { backgroundColor: "transparent" }], { duration: 1500 });
 	};
 	const errorBanner = (error || sessionError) && <div className="wiki-error" role="alert"><span>{error || sessionError}</span>{sessionError && <button onClick={() => void openDocument(path)}>{t("wikiRetrySession")}</button>}<button onClick={() => setError("")} aria-label={t("close")}><FiX /></button>{doc && <button onClick={() => navigate(() => void load(path))}>{t("wikiReload")}</button>}</div>;
 
@@ -293,7 +293,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 					<button className="wiki-expand-composer" onClick={expandComposer} aria-label={t("wikiExpandComposer")}><span className="wiki-pill-file">{path.split("/").at(-1) || t("wikiMode")}</span><span>{input.trim() || t("wikiCompactPlaceholder")}</span><kbd>/</kbd></button>
 					{streaming ? <button className="wiki-pill-send stop" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-pill-send" aria-label={t("wikiSend")} disabled><FiArrowUp /></button>}
 				</div>}
-				<div className="wiki-composer" hidden={!composerOpen && !chatOpen}>
+				<div className={`wiki-composer${input.trim() ? " has-draft" : ""}`} hidden={!composerOpen && !chatOpen}>
 					{(selection || refs.length > 0) && <div className="wiki-context-chips">{selection && <button className="wiki-quoted-selection" onClick={() => setSelection("")} title={t("wikiSelected")}><b>{t("wikiSelected")}</b><span>{selection}</span><FiX /></button>}{refs.map(ref => <button key={ref} onClick={() => setRefs(r => r.filter(p => p !== ref))}>@{ref}<FiX /></button>)}</div>}
 					{suggestions.length > 0 && <div className="wiki-mentions">{suggestions.map(value => <button key={value} className={suggestions[mentionCursor] === value ? "selected" : ""} onClick={() => chooseMention(value)}>{mention![1]}{value}</button>)}</div>}
 					<textarea ref={inputRef} aria-label={t("wikiAsk")} placeholder={doc?.entry.kind === "code" ? t("wikiAskCode", { file: doc.entry.name }) : t("wikiAskPlaceholder")} value={input} onChange={e => { setInput(e.target.value); setMentionCursor(0); }} onKeyDown={e => { if (suggestions.length && !e.nativeEvent.isComposing) { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setMentionCursor(i => (i + (e.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length); return; } if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); chooseMention(suggestions[mentionCursor] ?? suggestions[0]); return; } } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); } }} />
