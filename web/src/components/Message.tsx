@@ -393,7 +393,10 @@ export const Message = memo(function Message({
 				elements.push(<GrepSummary key={`${message.id}-${first.id}`} block={first} view={viewFor(first)} wrap={toolsWrap} />);
 				continue;
 			}
-			elements.push(<Block key={`${message.id}-${i}`} block={block} modelName={message.model ?? ""} recovery={recovery?.messageId === message.id ? recovery : undefined} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
+			elements.push(<Block key={`${message.id}-${i}`} block={block} modelName={message.model ?? ""} recovery={recovery?.messageId === message.id && recovery.kind !== "stopped" ? recovery : undefined} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
+		}
+		if (recovery?.messageId === message.id && recovery.kind === "stopped") {
+			elements.push(<ToolRecoveryCard key={`${message.id}-stopped`} stopped model={message.model || t("unknown")} recovery={recovery} />);
 		}
 		return elements;
 	};
