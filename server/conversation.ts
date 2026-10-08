@@ -88,6 +88,8 @@ export interface Conversation {
 	nextMsgId: number;
 	/** Per-timestamp 1-based user-message seq (drives the `u-<ts>-<seq>` id suffix). */
 	userSeqByTs: Map<number, number>;
+	/** The seq assigned to each user message, so a cache miss never renumbers it. */
+	userSeqByKey: Map<string, number>;
 	uiMessageCache: Map<string, UiMessage>;
 	lastMessagesSig: string;
 	lastMessagesArray: UiMessage[];

@@ -11,7 +11,7 @@
 | `PI_WEB_UPLOAD_RETENTION_DAYS` | `14` | 上传文件保留天数（`<dataDir>/uploads/`，启动时扫一次 + 每 6 小时一次）；0 = 关闭清理 |
 | `PI_WEB_SHELL` | 自动探测 | Windows 终端面板（node-pty）的 shell：默认优先 Git Bash（与 SDK bash 工具一致），可用此变量显式指定（如 `powershell.exe` / `cmd.exe`） |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | pi 配置目录（auth.json / models.json / skills） |
-| `PI_WEB_HOST` | `127.0.0.1` | 监听地址。**默认只绑 loopback**（本地个人工具，不暴露到网络）；局域网/容器访问需显式 `0.0.0.0`（docker-compose 已内置） |
+| `PI_WEB_HOST` | `127.0.0.1` | 监听地址。**默认只绑 loopback**（本地个人工具，不暴露到网络）；局域网/容器访问需显式 `0.0.0.0`（docker-compose 已内置，并同时设置 `PI_WEB_ALLOW_HOSTS`） |
 | `PI_WEB_ALLOW_ORIGINS` | 空 | 逗号分隔的额外 Origin 白名单（如 `http://localhost:5173` dev 代理、反代场景），用于绕过 WS 的 Origin/Host 同权威校验 |
 | `PI_WEB_ALLOW_HOSTS` | 空 | 请求 Host 的 hostname 白名单（逗号分隔）。**未设置且绑定 loopback 时默认只放行 `localhost` / `127.0.0.1` / `[::1]`**，防 DNS rebinding；绑定 `0.0.0.0` 或走反代时需自行设置（否则只做 Origin/Host 同权威校验） |
 | `PI_WEB_TOKEN` | 空 | **可选共享口令鉴权**：设置后所有 HTTP/WS 请求必须携带（`Authorization: Bearer` / `X-PI-Token` 头、`?token=` 参数或 `pi_web_token` cookie 任一匹配；浏览器首次经 `?token=xxx` 进入后存 localStorage 并下发 HttpOnly cookie）；`/api/health` 保持开放供探针。前端 `web/src/auth-token.ts` 统一注入；口令变化（或换端口重启）时服务端会重发 cookie，不会被旧 cookie 挡住；比较用常量时间；`/api/health` 不再返回工作区路径。**桌面版每次启动自动生成随机口令**（`electron/server-auth.mjs`），无需配置；回归：`tests/token-auth-test.mjs`（端口 8975）、`tests/desktop-server-auth-test.mjs` |

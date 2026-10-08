@@ -14,3 +14,14 @@ test("ordinary prose, fenced examples and properties later in the body remain co
 test("separate opening property paragraphs stop before prose", () => {
 	expect(wikiProperties("# Title\n\na: 1\n\nb: 2\n\nBody.\n\nc: 3").rows).toEqual([{ key: "a", value: "1" }, { key: "b", value: "2" }]);
 });
+test("bold keys may keep the colon inside the markers", () => {
+	expect(wikiProperties("# Title\n\n**作者:** 张三\n**状态**：草稿").rows).toEqual([{ key: "作者", value: "张三" }, { key: "状态", value: "草稿" }]);
+});
+test("only the opening region is parsed, so a large document stays fast to type in", () => {
+	const body = "Paragraph with **bold**, [link](x.md) and `code`.\n\n".repeat(40000);
+	const source = `# Title\n\nOwner: team\nStatus: draft\n\n${body}`;
+	wikiProperties(source);
+	const started = performance.now();
+	for (let i = 0; i < 20; i++) expect(wikiProperties(source).rows).toHaveLength(2);
+	expect((performance.now() - started) / 20).toBeLessThan(20);
+});

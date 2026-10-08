@@ -153,9 +153,9 @@ const STALL_NOTIFY_MS = (() => {
 	const v = Number(process.env.PI_WEB_STALL_NOTIFY_MS);
 	return Number.isFinite(v) && v >= 0 ? v : 180_000;
 })();
-/** Serialization-cache cap per conversation (see serializeCached): cached
- *  UiMessage objects are pure-function results, so eviction only costs a
- *  recompute on next access. Bounds memory for marathon sessions. */
+/** Serialization-cache headroom per conversation (see serializeCached): the
+ *  cache holds the current transcript plus this many stale entries (old
+ *  tool-result revisions, abandoned branches) before evicting the oldest. */
 const UI_MESSAGE_CACHE_CAP = 4096;
 /** Preview panel cap: only the first 512KB of a file is ever read/sent. */
 
@@ -649,6 +649,7 @@ export class ClientSession {
 			msgIds: new Map(),
 			nextMsgId: 1,
 			userSeqByTs: new Map(),
+			userSeqByKey: new Map(),
 			uiMessageCache: new Map(),
 			lastMessagesSig: "",
 			lastMessagesArray: [],
@@ -1080,9 +1081,16 @@ export class ClientSession {
 		// fails to resolve ("找不到要编辑的消息").
 		let seq = n;
 		if (m.role === "user") {
-			const ts = m.timestamp ?? 0;
-			seq = (conv.userSeqByTs.get(ts) ?? 0) + 1;
-			conv.userSeqByTs.set(ts, seq);
+			// Assigned once per message: re-serializing after cache eviction must
+			// keep the same id, or edits resolve the wrong message.
+			const known = conv.userSeqByKey.get(key);
+			if (known !== undefined) seq = known;
+			else {
+				const ts = m.timestamp ?? 0;
+				seq = (conv.userSeqByTs.get(ts) ?? 0) + 1;
+				conv.userSeqByTs.set(ts, seq);
+				conv.userSeqByKey.set(key, seq);
+			}
 		}
 		const measured = conv.thinkingTimings.annotate(serializeMessage(m, seq), m.timestamp ?? 0);
 		const msg = this.thinkingDurationStore.annotate(measured, conv.session.sessionFile, m.timestamp ?? 0);
@@ -1094,7 +1102,10 @@ export class ClientSession {
 			// insertion order, so dropping from the front evicts the oldest —
 			// recent messages (the ones every snapshot touches) always survive.
 			// Safe: a miss just recomputes an identical object on next access.
-			let excess = conv.uiMessageCache.size - UI_MESSAGE_CACHE_CAP;
+			// Every snapshot walks the whole transcript, so the cap must cover it:
+			// a cap below the message count evicts entries just before they are
+			// needed again and every snapshot re-serializes everything.
+			let excess = conv.uiMessageCache.size - (conv.session.agent.state.messages.length + UI_MESSAGE_CACHE_CAP);
 			while (excess-- > 0) {
 				const oldest = conv.uiMessageCache.keys().next().value;
 				if (oldest === undefined) break;
@@ -1864,6 +1875,9 @@ export class ClientSession {
 			const manager = conv.session.sessionManager;
 			const header = manager.getHeader();
 			const wikiManager = conv.wiki ? SessionManager.inMemory(conv.cwd, undefined, [...(header ? [header] : []), ...manager.getEntries()]) : null;
+			// Reopen THIS conversation's file. continueRecent() would pick the most
+			// recently written session of the project, which may be another open chat.
+			const sessionFile = conv.session.sessionFile;
 			conv.toolStartTimes.clear();
 			await conv.runtime.dispose();
 			const runtime = await createAgentSessionRuntime(
@@ -1871,7 +1885,7 @@ export class ClientSession {
 				{
 					cwd: conv.cwd,
 					agentDir: this.agentDir,
-					sessionManager: wikiManager ?? SessionManager.continueRecent(conv.cwd),
+					sessionManager: wikiManager ?? (sessionFile ? SessionManager.open(sessionFile) : SessionManager.create(conv.cwd)),
 				},
 			);
 			conv.runtime = runtime;
@@ -1880,7 +1894,8 @@ export class ClientSession {
 			conv.recovery = {};
 			conv.session = runtime.session;
 			this.emit({ type: "notice", level: "warning", text: reason });
-			await this.bindSession();
+			// Rebind the recovered conversation itself, which may be in the background.
+			await this.bindSession(conv);
 			this.emitConversations();
 			void this.pushSlashCommands();
 		} catch (err) {

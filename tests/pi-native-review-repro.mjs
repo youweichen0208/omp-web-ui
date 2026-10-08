@@ -43,10 +43,11 @@ try {
 	utimesSync(originalB, new Date(), new Date());
 	await client.forceResetConversation(a, "audit forced reset");
 	assert.equal(client.convs.get(a.id), a, "recovery operated on the retained A record");
-	assert.equal(a.session.sessionFile, originalB, "known defect: A recovered the most recent B file");
-	assert.equal(a.unsubscribe, undefined, "known defect: background A was not rebound");
+	// Fixed: see tests/force-reset-session-test.mjs.
+	assert.equal(a.session.sessionFile, originalA, "A reopens its own file");
+	assert.equal(typeof a.unsubscribe, "function", "background A is rebound");
 	assert.equal(client.activeId, b.id);
-	evidence.cases.push({ id: "force-reset-session-ownership", reproduced: true, boundary: "real ClientSession and SDK; direct recovery invocation, no stalled provider", restoredWrongSession: a.session.sessionFile !== originalA, restoredOtherOpenSession: a.session.sessionFile === b.session.sessionFile, resetConversationHasSubscriber: !!a.unsubscribe });
+	evidence.cases.push({ id: "force-reset-session-ownership", reproduced: false, boundary: "real ClientSession and SDK; direct recovery invocation, no stalled provider", restoredWrongSession: a.session.sessionFile !== originalA, restoredOtherOpenSession: a.session.sessionFile === b.session.sessionFile, resetConversationHasSubscriber: !!a.unsubscribe });
 	await client.dispose(); client = undefined;
 
 	const resources = name => ({ getExtensions: () => ({ extensions: [], errors: [] }), getSkills: () => ({ skills: [{ name }], diagnostics: [] }), getPrompts: () => ({ prompts: [], diagnostics: [] }) });
