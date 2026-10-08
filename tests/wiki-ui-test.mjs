@@ -1,5 +1,6 @@
 // Real workspace + SDK + local provider, isolated from the user's files/configuration.
 import assert from 'node:assert/strict';
+import { checkWikiV2 } from './lib/wiki-v2-checks.mjs';
 import { createServer } from 'node:http';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,6 +21,7 @@ mkdirSync(join(cwd, '.obsidian'));
 writeFileSync(join(cwd, '.obsidian', 'hidden.md'), '---\ntitle: Different page title\n---\n# Different body title\n\nHidden searchable document.');
 writeFileSync(join(cwd, 'large.md'), Buffer.alloc(2 * 1024 * 1024 + 1, 'x'));
 writeFileSync(join(cwd, 'README.md'), readFileSync(join(cwd, 'README.md'), 'utf8').replace('tags: [风控, 交易]', 'title: 风控规则\ntags: [风控, 交易, Alpha, Beta, Gamma, Delta, Omega, Theta]') + '\n```js\nconst color = "#ff475040"; // #notatag\n```\n\n#abc #abcd #abcdef #abcdef12 `#inline`\n');
+writeFileSync(join(cwd, 'toolbar.md'), '# Toolbar fixture\n\n## 标题测试\n\n正文内容。\n');
 const requests = [];
 const mock = createServer(async (req, res) => {
 	let body = ''; for await (const chunk of req) body += chunk;
@@ -129,7 +131,7 @@ try {
 	assert.equal(await page.locator('.wiki-pill-send').evaluate(el => getComputedStyle(el).borderRadius), '6px');
 	assert.equal(await page.locator('.wiki-pill-send').isDisabled(), true);
 	assert(!(await page.getByRole('textbox', { name: '问 pi', exact: true }).isVisible()));
-	await page.keyboard.press('/');
+	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
 	await assertComposerStates();
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('retain this draft');
 	await page.keyboard.press('Escape');
@@ -137,9 +139,7 @@ try {
 	assert.equal(await page.getByRole('textbox', { name: '问 pi', exact: true }).inputValue(), 'retain this draft');
 	await page.getByRole('textbox', { name: '问 pi', exact: true }).fill('');
 	await page.keyboard.press('Escape');
-	assert.equal(await page.locator('.wiki-toc button').count(), 2);
-	await page.locator('.wiki-toc button').last().click();
-	await page.waitForFunction(() => document.querySelector('.wiki-toc button:last-child')?.getAttribute('aria-current') === 'location');
+	assert.equal(await page.locator('.wiki-toc').count(), 0);
 	assert((await page.locator('.wiki-document-meta').innerText()).includes('分钟读完'));
 	const readingCode = await page.locator('.wiki-prose .codeblock').evaluate(el => getComputedStyle(el).backgroundColor);
 	await page.evaluate(() => { localStorage.setItem('pi-web-ui:code-theme', 'light'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
@@ -147,7 +147,6 @@ try {
 	assert.equal(await page.locator(".wiki-prose .codeblock").evaluate(el => getComputedStyle(el).backgroundColor), readingCode);
 	assert.equal(await page.locator('.wiki-prose select[data-code-language]').first().inputValue(), 'js');
 	await page.locator('.wiki-scroll').evaluate(el => { el.scrollTo({ top: 0, behavior: 'instant' }); el.dispatchEvent(new Event('scroll')); });
-	await page.waitForFunction(() => document.querySelector('.wiki-toc button:first-of-type')?.getAttribute('aria-current') === 'location');
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-dark.png' });
 	await page.evaluate(() => { document.documentElement.dataset.appearance = 'light'; localStorage.setItem('pi-web-ui:code-theme', 'dark'); window.dispatchEvent(new Event('pi-web-ui:code-theme')); });
 	await page.getByRole('button', { name: '展开提问框', exact: true }).click();
@@ -157,12 +156,13 @@ try {
 	});
 	await assertComposerStates();
 	await page.screenshot({ path: '/tmp/pi-wiki-reading-light-expanded.png' });
-	await page.getByRole('button', { name: '专注阅读', exact: true }).click();
+	await page.getByRole('button', { name: '宽版（隐藏两侧）', exact: true }).click();
 	assert.equal(await page.locator('.wiki-sidebar').isVisible(), false);
 	assert.equal(await page.locator('.wiki-toc').isVisible(), false);
 	assert.equal(await page.locator('.wiki-prose .fp-rich-document').getAttribute('contenteditable'), 'true');
 	await page.screenshot({ path: '/tmp/pi-wiki-focus-light.png' });
-	await page.getByRole('button', { name: '退出专注阅读', exact: true }).click();
+	await page.getByRole('button', { name: '标准宽度', exact: true }).click();
+	await checkWikiV2(page, cwd);
 	assert.equal(await page.locator('.wiki-sidebar').isVisible(), true);
 	await page.keyboard.press('Escape');
 	await page.evaluate(() => { document.documentElement.dataset.appearance = 'dark'; });
@@ -211,11 +211,7 @@ try {
 	await page.keyboard.press('End');
 	await page.keyboard.type(' Preview edit.');
 	await page.locator('.wiki-save-status.saving').waitFor();
-	await page.getByRole('button', { name: '编辑源码', exact: true }).click();
-	assert((await page.locator('.wiki-document textarea').inputValue()).includes('Preview edit.'));
-	assert((await page.locator('.wiki-document textarea').inputValue()).startsWith('---\ntitle:'));
-	await page.getByRole('button', { name: '渲染预览', exact: true }).click();
-	assert((await rendered.innerText()).includes('Preview edit.'));
+	assert.equal(await page.getByRole('button', { name: '编辑源码', exact: true }).count(), 0);
 	const beforePreviewSave = readFileSync(join(cwd, 'README.md'), 'utf8');
 	await page.keyboard.press('Meta+s');
 	await page.locator('.wiki-save-status.saved').waitFor();
@@ -228,20 +224,18 @@ try {
 	await page.keyboard.press('Meta+a');
 	await page.keyboard.type('Replacement body.');
 
-	await page.getByRole('button', { name: '编辑源码', exact: true }).click();
-	assert((await page.locator('.wiki-document textarea').inputValue()).startsWith('---\ntitle:'), 'select-all retains hidden metadata');
-	assert((await page.locator('.wiki-document textarea').inputValue()).includes('# 风控规则'), 'select-all retains hidden title');
-	await page.locator('.wiki-document textarea').fill('# 风控规则\n\n手动修改。\n');
 	await page.keyboard.press('Meta+s');
 	await page.locator('.wiki-save-status.saved').waitFor();
-	assert.equal(readFileSync(join(cwd, 'README.md'), 'utf8'), '# 风控规则\n\n手动修改。\n');
+	const replacement = readFileSync(join(cwd, 'README.md'), 'utf8');
+	assert(replacement.startsWith('---\ntitle:'), 'select-all retains hidden metadata');
+	assert(replacement.includes('# 风控规则'), 'select-all retains hidden title');
+	assert(replacement.includes('Replacement body.'));
 	await page.getByRole('button', { name: '最近改动', exact: true }).click();
 	await page.locator('.wiki-file-change').first().waitFor();
 	await page.getByRole('button', { name: '全部撤销', exact: true }).first().click();
 	await page.waitForFunction(() => document.querySelector('.wiki-file-change')?.classList.contains('undone'));
 	assert(readFileSync(join(cwd, 'README.md'), 'utf8').includes('仓位上限'));
 	await page.locator('.wiki-changes header button').click();
-	await page.getByRole('button', { name: '渲染预览', exact: true }).click();
 	// Selection toolbar routes quoted content into the visible request.
 	await page.locator('.wiki-prose p').first().evaluate(el => { const s = window.getSelection(), r = document.createRange(); r.selectNodeContents(el); s.removeAllRanges(); s.addRange(r); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
 	await page.locator('.wiki-format-popover').waitFor();
@@ -372,5 +366,5 @@ try {
 	assert.equal(new Set(wikiConversations).size, wikiConversations.length, 'each document navigation receives a fresh native conversation');
 	assert.deepEqual(errors, []);
 	console.log('PASS Wiki layout, links, search, source save, draft guard, selection, native request, batch undo/redo and mobile');
-} catch (e) { const page = browser?.contexts()[0]?.pages()[0]; if (page) { await page.screenshot({ path: '/tmp/pi-wiki-regression-failure.png' }); console.error(await page.locator('.wiki-document-heading').innerText().catch(() => 'No document')); } console.error(log.slice(-5000)); throw e; }
+} catch (e) { console.error(e); const page = browser?.contexts()[0]?.pages()[0]; if (page) { await page.screenshot({ path: '/tmp/pi-wiki-regression-failure.png' }); console.error(await page.locator('.wiki-document-heading').innerText().catch(() => 'No document')); } console.error(log.slice(-5000)); throw e; }
 finally { await browser?.close(); server.kill('SIGTERM'); await new Promise(r => server.once('exit', r)); await new Promise(r => mock.close(r)); rmSync(base, { recursive: true, force: true }); }

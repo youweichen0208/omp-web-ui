@@ -1,3 +1,7 @@
+import type { UiMessage } from "./protocol.js";
+
+export const TOOL_TEXT_CONTINUE_PROMPT = "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。";
+
 /**
  * Detection of tool calls a model wrote as plain text instead of calling the
  * tool (DSML or `<invoke>` markup on the text channel). Pure: shared by the
@@ -61,4 +65,14 @@ export function unexecutedToolText(text: string): UnexecutedToolText | null {
 	const first = opens.find(open => open.index !== undefined && open.index < tail.index)?.index ?? tail.index;
 	const begin = Math.min(first, tail.index);
 	return { before: text.slice(0, begin).trimEnd(), raw: text.slice(begin).trim(), tools: [...new Set(opens.map(open => open[1]))] };
+}
+
+/** Recognize the persisted recovery exchange, including pre-fix sessions. This
+ * only preserves task projection; it never grants execution authorization. */
+export function isToolTextContinuation(messages: readonly UiMessage[], index: number): boolean {
+	const message = messages[index], previous = messages[index - 1];
+	if (message?.role !== "user" || message.content.length !== 1 || message.content[0].type !== "text" || message.content[0].text !== TOOL_TEXT_CONTINUE_PROMPT) return false;
+	if (previous?.role !== "assistant" || previous.stopReason === "aborted" || previous.stopReason === "error" || previous.content.some(block => block.type === "toolCall")) return false;
+	const text = previous.content.map(block => block.type === "text" ? block.text : "").join("\n");
+	return !!unexecutedToolText(text);
 }

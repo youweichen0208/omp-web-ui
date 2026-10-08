@@ -1,3 +1,4 @@
+import { toolTextIncidents } from "./tool-text";
 import { useToolRecovery } from "./use-tool-recovery";
 import { randomUuid } from "./uuid";
 import { SessionTreeWorkbench } from "./components/SessionTreeWorkbench";
@@ -893,6 +894,7 @@ export function App() {
 				className={`panel-drawer drawer-left ${drawer === "left" ? "open" : ""}`}
 			>
 				<LeftPanel
+					incidentState={conversationState ? toolTextIncidents(conversationState.streamingMessage ? [...conversationState.messages, conversationState.streamingMessage] : conversationState.messages, conversationState.isStreaming).current?.state : undefined}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onNewChat={() => { setView("chat"); panelSend({ type: "new_chat" }); }}
 					send={panelSend}
@@ -1057,6 +1059,7 @@ export function App() {
 									messages={conversationState?.messages ?? []}
 									streamingMessage={conversationState?.streamingMessage ?? null}
 									taskProgress={conversationState?.taskProgress}
+									isStreaming={conversationState?.isStreaming}
 									conversationId={chat.activeConversationId}
 									agentSilence={chat.agentSilence}
 									cwd={chat.state?.cwd ?? ""}

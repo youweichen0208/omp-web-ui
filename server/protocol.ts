@@ -150,6 +150,8 @@ export type TreeResponse =
 	| { type: "tree_navigate_result"; conversationId: string; reqId: string; status: "ok" | "cancelled" | "aborted" | "busy" | "error"; editorText?: string; restoredQueue?: { steering: string[]; followUp: string[]; images?: { data: string; mimeType: string }[] }; error?: string };
 
 export interface UiMessage {
+	origin?: "auto-reminder";
+	toolText?: { incidentId: string; attempt: number };
 	questionText?: string;
 	userAttachments?: { path: string; mode: "inline" | "lines" | "reference"; preview: string; nativeRef: { entryId: string; index: number } }[];
 	entryId?: string;

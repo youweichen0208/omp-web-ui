@@ -88,18 +88,18 @@ try {
 	await endParagraph(); await page.keyboard.press('Enter'); await page.keyboard.type('/');
 	await page.locator('.wiki-slash-menu').waitFor();
 	assert.equal(await page.locator('.wiki-slash-menu').getByRole('option').first().innerText(), '正文\n普通正文段落');
-	assert.equal(await page.locator('.wiki-slash-menu').getByRole('option').count(), 14);
+	assert.equal(await page.locator('.wiki-slash-menu').getByRole('option').count(), 11);
 	assert(!(await page.locator('.wiki-slash-menu').innerText()).includes('标题 4'));
 	await page.screenshot({ path: '/tmp/pi-wiki-edit-slash.png' });
 	await page.keyboard.type('dm');
 	assert.equal(await page.locator('.wiki-slash-menu').getByRole('option').count(), 1);
-	await page.keyboard.press('Enter'); await page.keyboard.type('public class Demo {');
+	await page.keyboard.press('Enter'); await page.locator('.wiki-language-picker input').waitFor(); await page.keyboard.press('Enter'); await page.keyboard.type('public class Demo {');
 	await editor.locator('select[data-code-language]').last().selectOption('java');
 	await page.keyboard.press('Enter'); await page.keyboard.type('int n = 1;');
 	assert((await editor.locator('pre code').last().innerText()).includes('Demo {\nint n = 1;'));
 	await page.keyboard.press('Meta+s'); await saved(); assert(disk().includes('```java'));
 	// Space-prefixed slash and direct Markdown heading shorthand.
-	await endParagraph(); await page.keyboard.type(' /bg'); await page.locator('.wiki-slash-menu').getByRole('option').waitFor(); await page.keyboard.press('Enter');
+	await endParagraph(); await page.keyboard.type(' /bg'); await page.locator('.wiki-slash-menu').getByRole('option').waitFor(); await page.keyboard.press('Enter'); await page.locator('.wiki-table-picker').waitFor(); await page.keyboard.press('Enter');
 	assert.equal(await editor.locator('table tr').count(), 3); assert.equal(await editor.locator('table th, table td').count(), 9);
 	await endParagraph(); await page.keyboard.type('#### '); await page.keyboard.type('Fourth heading');
 	await editor.locator('h4', { hasText: 'Fourth heading' }).waitFor();

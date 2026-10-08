@@ -6,7 +6,7 @@
 
 `plan` 使用 `model-only`、`sequential`、`defaultActive: false`。启用后提供简短 promptSnippet 和规则，尊重用户、skill 的等待与授权要求。`annotations` 声明 `readOnlyHint: true`、`openWorldHint: false`：只返回用于会话记录的计划快照，不修改外部资源。未声明幂等；权限扩展仍自行决定确认策略。
 
-create/update 都提交完整状态：title、status、steps、currentStepId（无当前项时明确 null）、completedStepIds、completionCriteria，可选 changeSummary。标题最多 80 字符，步骤 1–16 个，步骤 ID 最多 64 字符且唯一，详情最多 500 字符，完成标准和变更说明最多 240 字符。完成 ID 必须唯一且属于步骤；当前项不能已完成。completed/cancelled/failed 不保留当前项，completed 要求全部步骤完成。
+create/update 都提交完整状态：title、status、steps、currentStepId（无当前项时明确 null）、completedStepIds、completionCriteria，可选 changeSummary。标题最多 80 字符，步骤 1–16 个，步骤 ID 最多 64 字符且唯一，详情最多 500 字符，完成标准和变更说明最多 240 字符。完成 ID 必须唯一且属于步骤；当前项不能已完成。步骤合并或不再需要时，模型应更新或移除被替代步骤并说明原因，不留下过期待办，不把未做工作标为完成。completed/cancelled/failed 不保留当前项，completed 要求全部步骤完成。
 
 create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision，只能更新当前分支最新且 active 的计划。冲突抛错并返回原因、正确操作和完整可编辑状态；没有计划或计划结束时提示 create。错误不会写入有效状态。工具描述和 steps 字段明确要求 update（包括完成）也提交完整步骤，不能当成部分更新。
 
@@ -30,7 +30,7 @@ create 生成新 planId，revision=1。update 另传 planId 和 expectedRevision
 
 序列化仅按工具名 plan 和 schema 白名单投影；失败、无效和未知版本按普通工具卡展示。第三方 todo 专用投影已移除，历史 task_plan 继续只读兼容。
 
-右栏以 assistant 内调用顺序配对成功结果重放。新用户请求使 active 计划区块进入“此前未完成计划 · 等待确认”；确认前任务整体使用当前请求的标题，运行时保持 running，结束后未完成计划进入 waiting。本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏仅将成功创建或修改的文件列入输出，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。本轮最近一次计划调用失败且尚未被成功调用修正时，运行中保持 running，任务结束后显示 failed，不能因其他命令成功而显示完成；之后成功更新清除该错误。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
+右栏以 assistant 内调用顺序配对成功结果重放。工具文本纠正消息（紧跟未执行调用文本的固定纠正提示）属于原任务，重放历史记录时也保留原任务来源、计划确认状态与工具归属；它不能确认此前未确认的计划。真正的新用户请求使 active 计划区块进入“此前未完成计划 · 等待确认”；确认前已完成步骤保持完成，其余步骤投影为 pending，不高亮或滚动到历史当前项；成功更新后按保存的 currentStepId 恢复。确认前任务整体使用当前请求的标题，运行时保持 running，结束后未完成计划进入 waiting。本轮成功 create/update 后才把之后的工具 ID 归给 currentStepId。此前工具仍在本轮执行记录中，右栏仅将成功创建或修改的文件列入输出，不追溯归入旧计划。历史轮次已确认的工具归属保持不变。失败更新不移动步骤。本轮最近一次计划调用失败且尚未被成功调用修正时，运行中保持 running，任务结束后显示 failed，不能因其他命令成功而显示完成；之后成功更新清除该错误。settled 不完成步骤，未结束计划等待继续；取消与执行失败保留状态。终态保留至下一条用户请求，已知新计划不会回退复活历史 task_plan。
 
 聊天按当前 conversationId 内的 planId 合并卡片；成功更新保留变化行和键盘可操作的查看入口，错误保持普通卡。替换取消记录保留在新卡，旧卡显示取消；历史分支仍从其自身 transcript 还原。右栏保留当前步骤、详情和完成标准。
 

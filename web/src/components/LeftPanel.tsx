@@ -26,6 +26,7 @@ import { useI18n } from "../i18n";
  *  and conversation lists on every delta. Add a prop here when adding a chat
  *  field usage — TypeScript enforces it at the call site. */
 interface LeftPanelProps {
+	incidentState?: "stopped" | "reminding" | "recovered";
 	onOpenSettings: () => void;
 	onNewChat: () => void;
 	ready: boolean;
@@ -70,7 +71,7 @@ function formatModified(ts: number, yesterday: string): string {
 }
 
 export const LeftPanel = memo(function LeftPanel({
-	onOpenSettings, onNewChat, ready, status, cwd, sessionFile, conversations, sessions, projects, dirBrowse, activeConversationId, send, active }: LeftPanelProps) {
+	incidentState, onOpenSettings, onNewChat, ready, status, cwd, sessionFile, conversations, sessions, projects, dirBrowse, activeConversationId, send, active }: LeftPanelProps) {
 	const { t, locale } = useI18n();
 	const currentFile = sessionFile;
 	const currentCwd = cwd;
@@ -194,7 +195,7 @@ export const LeftPanel = memo(function LeftPanel({
 								}}
 							>
 								<span
-									className={`session-dot${c.isStreaming ? " streaming" : ""}`}
+									className={`session-dot${c.id === activeConversationId && incidentState === "stopped" ? " interrupted" : c.id === activeConversationId && incidentState === "reminding" || c.isStreaming ? " streaming" : ""}`}
 									title={c.isStreaming ? t("streaming") : undefined}
 								/>
 								<span className="session-info">
@@ -277,7 +278,7 @@ export const LeftPanel = memo(function LeftPanel({
 									}}
 								>
 									<span
-										className={`session-dot${conv?.isStreaming ? " streaming" : ""}`}
+										className={`session-dot${conv?.id === activeConversationId && incidentState === "stopped" ? " interrupted" : conv?.id === activeConversationId && incidentState === "reminding" || conv?.isStreaming ? " streaming" : ""}`}
 										title={conv?.isStreaming ? t("streaming") : undefined}
 									/>
 									<span className="session-info">
@@ -312,7 +313,7 @@ export const LeftPanel = memo(function LeftPanel({
 	);
 	return (
 		<aside className="panel panel-left">
-			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/brand-mark.svg" alt="" /></span><strong>pi-web-ui</strong></div>
+			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/icon/1a-mark.svg" alt="" /></span><strong>pi-web-ui</strong></div>
 			<div className="sidebar-new"><button type="button" onClick={onNewChat}><span><FiPlus />{t("newChat")}</span><kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}N</kbd></button></div>
 			<div className="panel-projects">
 				{/* 加项目收进分组标题行：它是个偶尔用一次的动作，不值得在列表

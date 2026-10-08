@@ -34,12 +34,13 @@ import {
 	type Conversation,
 } from "./conversation.js";
 import { browseDirs } from "./dir-browser.js";
-import { unexecutedToolText } from "./tool-text.js";
+import { projectToolTextMessages } from "./tool-text-incidents.js";
+import { unexecutedToolText, TOOL_TEXT_CONTINUE_PROMPT } from "./tool-text.js";
 
 /** Sent once per user prompt when the reply ends with a tool call written as text. */
 /** Upper bound of automatic requests per user prompt (each also needs real tool progress). */
-export const TOOL_TEXT_MAX_CONTINUES = 5;
-export const TOOL_TEXT_CONTINUE_PROMPT = "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。";
+export const TOOL_TEXT_MAX_CONTINUES = 1;
+export { TOOL_TEXT_CONTINUE_PROMPT } from "./tool-text.js";
 import { clientIdleMsFromEnv, isClientEvictable } from "./client-eviction.js";
 import { PiConfigProbe, checkUpdate, installPiAgent, isPiCliInstalled } from "./pi-environment.js";
 export { QuiesceRejectedError };
@@ -1120,13 +1121,13 @@ export class ClientSession {
 			conv.treeProjectionRevision = tree.revision;
 		}
 		const occurrences = new Map<string, number>();
-		const rawMessages = conv.session.agent.state.messages
+		const rawMessages = projectToolTextMessages(conv.session.agent.state.messages
 			.map((m) => {
 				const value = this.serializeCached(m);
 				const key = messageKey(m), index = occurrences.get(key) ?? 0; occurrences.set(key, index + 1);
 				return value ? conv.tree?.decorate(value, conv.treeEntryIds?.get(key)?.[index]) ?? value : null;
 			})
-			.filter((m): m is NonNullable<typeof m> => m !== null);
+			.filter((m): m is NonNullable<typeof m> => m !== null));
 		// Reuse the previous array when nothing changed: the element objects are
 		// cached (reference-stable) anyway, and a stable array reference lets the
 		// frontend memoize derived maps instead of rebuilding them every 60ms.
@@ -1728,9 +1729,8 @@ export class ClientSession {
 	/**
 	 * A model sometimes writes a tool call as text (`<invoke …>` / DSML) instead of
 	 * calling the tool. The SDK sees a plain answer and the run ends, leaving the task
-	 * half done. Ask the model to re-issue it through the tool channel. Loop guard:
-	 * after an automatic request the model must run at least one real tool before it
-	 * can be asked again, and at most TOOL_TEXT_MAX_CONTINUES times per user prompt.
+	 * half done. Ask the model to re-issue it through the tool channel. Loop guard: at most TOOL_TEXT_MAX_CONTINUES reminder per user prompt,
+	 * even when a real tool ran between leaks.
 	 * The request is a visible user message and the run can be stopped as usual; when
 	 * the guard stops it, the recovery card offers a manual retry.
 	 */
@@ -1749,7 +1749,6 @@ export class ClientSession {
 		if (!unexecutedToolText(text)) return;
 		conv.toolTextContinues += 1;
 		conv.toolRanSinceContinue = false;
-		this.emit({ type: "notice", level: "warning", conversationId: conv.id, text: `模型把工具调用写成了文本，未执行；已自动请它重新调用（${conv.toolTextContinues}/${TOOL_TEXT_MAX_CONTINUES}）。` });
 		try {
 			if (conv.session !== session || session.isStreaming) return;
 			await deliverPrompt(session, TOOL_TEXT_CONTINUE_PROMPT, [], false, () => {});

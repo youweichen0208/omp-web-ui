@@ -203,6 +203,7 @@ function serializeElement(node: Node, root: HTMLElement): string {
 export function readRichDocument(root: HTMLElement, document: RichDocument): string {
 	// Editor-only controls must never affect source preservation or saved Markdown.
 	root = root.cloneNode(true) as HTMLElement;
+	root.querySelectorAll("[data-wiki-placeholder]").forEach(node => node.removeAttribute("data-wiki-placeholder"));
 	root.querySelectorAll("[data-rich-ui]").forEach((node) => node.remove());
 	root.querySelectorAll<HTMLImageElement>("img[data-rich-image-src]").forEach((img) => {
 		img.setAttribute("src", img.dataset.richImageSrc!);

@@ -38,7 +38,7 @@ async function scenario(port, replies) {
 	writeFileSync(join(agent, 'models.json'), JSON.stringify({ providers: { fixture: { api: 'openai-completions', baseUrl: `http://127.0.0.1:${model.address().port}/v1`, apiKey: 'x', models: [{ id: 'fixture', name: 'Fixture', input: ['text'], contextWindow: 64000, maxTokens: 1024 }] } } }));
 	writeFileSync(join(agent, 'settings.json'), JSON.stringify({ defaultProvider: 'fixture', defaultModel: 'fixture', compaction: { enabled: false }, retry: { enabled: false } }));
 	const server = spawn(process.execPath, [join(REPO, 'dist', 'server', 'index.js')], {
-		env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(root, 'data'), PI_CODING_AGENT_DIR: agent, HOME: root },
+		env: { ...process.env, PORT: String(port), PI_WEB_CWD: cwd, PI_WEB_DATA_DIR: join(root, 'data'), PI_CODING_AGENT_DIR: agent },
 		stdio: 'ignore', windowsHide: true,
 	});
 	try {
@@ -71,12 +71,13 @@ const fixed = await scenario(8974, n => n === 1 ? { text: LEAKED } : n === 2 ? {
 assert.equal(fixed.calls, 3, 'leaked reply, re-issued tool call, final answer');
 assert(fixed.text.includes('没有被执行'), 'the automatic request is a visible user message');
 assert(/AUTO_OK/.test(fixed.text.replace(/echo AUTO_OK/g, '')), 'the tool actually ran and returned its output');
-assert(fixed.notices.some(t => t.includes('已自动请它重新调用')), 'the user is told why the run continued');
+assert(fixed.text.includes('"origin":"auto-reminder"'), 'reminder is projected as an event');
+assert(fixed.text.includes('"incidentId"'), 'incident metadata survives native serialization');
 
-// 2) Progress resets the guard: leak, run, leak again, run, finish (the field case).
+// 2) Real progress does not reset the one-reminder limit within a user request.
 const repeated = await scenario(8978, n => [null, { text: LEAKED }, { tool: 'echo AUTO_OK' }, { text: LEAKED }, { tool: 'echo AUTO_OK' }, { text: '完成。' }][n] ?? { text: '完成。' });
-assert.equal(repeated.calls, 5, 'each leak after real progress is continued');
-assert.equal(repeated.notices.filter(t => t.includes('已自动请它重新调用')).length, 2);
+assert.equal(repeated.calls, 3, 'one reminder per user request even after real progress');
+assert.equal((repeated.text.match(/"origin":"auto-reminder"/g) ?? []).length, 1);
 
 // 3) A model that keeps writing calls as text without running anything is asked once, then stops.
 const stubborn = await scenario(8976, () => ({ text: LEAKED }));
@@ -86,4 +87,4 @@ assert.equal(stubborn.calls, 2, 'one automatic continuation, no loop');
 const plain = await scenario(8977, () => ({ text: '这是一个普通回答。' }));
 assert.equal(plain.calls, 1, 'plain answers end the run as before');
 
-console.log('PASS tool calls written as text are continued (guarded by real progress) and then executed');
+console.log('PASS tool calls written as text are reminded at most once per user request');

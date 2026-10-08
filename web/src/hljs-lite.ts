@@ -92,6 +92,13 @@ export function highlightLine(code: string, lang: string | null): string {
 	}
 }
 
+/** Wiki's unlabelled fences use a bounded set of common languages. */
+export function highlightWikiCode(code: string, lang: string): string {
+	if (lang && lang !== "plaintext") return highlightLine(code, lang);
+	try { return hljs.highlightAuto(code, ["bash", "python", "typescript", "json", "yaml", "sql"]).value; }
+	catch { return escapeHtml(code); }
+}
+
 /** Extension → highlight.js language alias. Lives here (next to the hljs
  *  registration list it must stay in sync with) rather than in a component,
  *  so the tool-call cards and the file-preview panel share one map. */

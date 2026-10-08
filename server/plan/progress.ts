@@ -1,3 +1,4 @@
+import { isToolTextContinuation } from "../tool-text.js";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { PlanSnapshot, TaskProgress, UiMessage, UiToolCallBlock } from "../protocol.js";
 import type { AgentMessage } from "../serialize.js";
@@ -28,8 +29,8 @@ export function planFromTranscript(messages: UiMessage[]): { plan?: NonNullable<
 	const tools = new Map<string, string[]>();
 	const removed = new Map<string, { id: string; title: string; detail?: string }>();
 	const times = new Map<string, { startedAt?: number; endedAt?: number }>();
-	for (const message of messages) {
-		if (message.role === "user") { confirmed = false; continue; }
+	for (const [index, message] of messages.entries()) {
+		if (message.role === "user") { if (!isToolTextContinuation(messages, index)) confirmed = false; continue; }
 		if (message.role !== "assistant") continue;
 		for (const part of message.content) {
 			if (part.type !== "toolCall") continue;
@@ -63,6 +64,6 @@ export function planFromTranscript(messages: UiMessage[]): { plan?: NonNullable<
 		title: latest.title, completionCriteria: latest.completionCriteria, changeSummary,
 		added: latest.changes.filter(change => change.kind === "added").length, removed: removed.size,
 		changes,
-		items: [...latest.steps.map(step => ({ ...step, status: latest.completedStepIds.includes(step.id) ? "done" as const : step.id === latest.currentStepId ? "running" as const : "pending" as const, toolCallIds: tools.get(step.id) ?? [], ...times.get(step.id) })), ...[...removed.values()].map(step => ({ ...step, status: "removed" as const, toolCallIds: tools.get(step.id) ?? [], ...times.get(step.id) }))],
+		items: [...latest.steps.map(step => ({ ...step, status: latest.completedStepIds.includes(step.id) ? "done" as const : confirmed && step.id === latest.currentStepId ? "running" as const : "pending" as const, toolCallIds: tools.get(step.id) ?? [], ...times.get(step.id) })), ...[...removed.values()].map(step => ({ ...step, status: "removed" as const, toolCallIds: tools.get(step.id) ?? [], ...times.get(step.id) }))],
 	} };
 }

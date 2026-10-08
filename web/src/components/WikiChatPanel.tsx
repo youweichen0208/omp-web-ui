@@ -56,7 +56,7 @@ export function WikiChatPanel({ messages, live, streaming, toolStatuses, model, 
 			if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
 			else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
 		}}>
-		<header><img className="wiki-chat-brand" src="/brand-mark.svg" alt="" /><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null && contextPercent > 0 ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
+		<header><img className="wiki-chat-brand" src="/icon/1a-mark.svg" alt="" /><strong>{t("wikiChatTitle")}</strong><span className="wiki-chat-model" title={model?.id}>{model?.name || model?.id || t("wikiNoModel")}{contextPercent != null && contextPercent > 0 ? ` · ${t("wikiChatContext", { percent: Math.round(contextPercent) })}` : ""}</span><button disabled={disabled} onClick={onNew}>{t("newChat")}</button><button aria-label={t("wikiCloseChat")} onClick={onClose}><FiX /></button></header>
 		{error}
 		<div className={`wiki-chat-messages${!transcript.length ? " empty" : ""}`} ref={scroll} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
 			{transcript.length > limit && <button className="wiki-chat-earlier" onClick={() => { follow.current = false; setLimit(n => n + 60); }}>{t("wikiEarlierMessages")}</button>}

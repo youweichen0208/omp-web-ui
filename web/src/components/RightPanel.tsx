@@ -17,6 +17,7 @@ interface RightPanelProps {
 	messages: UiMessage[];
 	streamingMessage: UiMessage | null;
 	taskProgress?: TaskProgress | null;
+	isStreaming?: boolean;
 	conversationId: string;
 	agentSilence?: Extract<ServerMessage, { type: "agent_silence" }> | null;
 	cwd: string;
@@ -26,7 +27,7 @@ interface RightPanelProps {
 	onNotice: (level: "info" | "warning" | "error", text: string) => void;
 }
 
-export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, isStreaming, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
 	const t = useT();
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
@@ -173,7 +174,7 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 			{compactTree && !onlyChanged && otherDirectories > 0 && <button type="button" className="tree-other-directories" onClick={() => setShowOtherDirectories(true)}>{t("otherDirectories", { n: otherDirectories })}</button>}
 		</div>
-		<div className="panel-lower"><TaskProgressPanel key={conversationId} task={taskProgress} silence={agentSilence ?? null} cwd={cwd} messages={messages} onPreview={onPreview} /></div>
+		<div className="panel-lower"><TaskProgressPanel key={conversationId} task={taskProgress} streaming={isStreaming} live={streamingMessage} silence={agentSilence ?? null} cwd={cwd} messages={messages} onPreview={onPreview} /></div>
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (
 				<div className="panel-widgets">
 					{widgets

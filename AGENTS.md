@@ -151,7 +151,7 @@ pi-web-ui/
 
 ## 原生代理边界
 
-pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash，不自动续跑或发起额外模型调用；唯一例外：回复以“写成文本、未执行的工具调用”结尾时，以可见的用户消息请模型重新调用（再次请求前必须有真实工具执行，每条用户消息最多 5 次，见 `docs/architecture-core.md`「未执行的工具调用」）；原生 plan 扩展默认开启（保留已保存的关闭选择），启用时由扩展提供工具规则与条件性历史背景。修改工具、全局开关、压缩恢复或计划投影时读取 `docs/architecture-plan.md`。设置中的提示词支持原生文件编辑与空闲时 reload，技能支持原生发现、筛选和启停（见 docs/architecture-extensions.md）；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
+pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 SDK 补丁。会话加载 pi 原生配置、上下文文件、技能、扩展与官方 Codemode/tool_search/MCP。WebUI 不覆盖 bash，不自动续跑或发起额外模型调用；唯一例外：回复以“写成文本、未执行的工具调用”结尾时，请模型重新调用，界面显示为自动提醒事件（每条用户请求最多 1 次，见 `docs/architecture-core.md`「未执行的工具调用」）；原生 plan 扩展默认开启（保留已保存的关闭选择），启用时由扩展提供工具规则与条件性历史背景。修改工具、全局开关、压缩恢复或计划投影时读取 `docs/architecture-plan.md`。设置中的提示词支持原生文件编辑与空闲时 reload，技能支持原生发现、筛选和启停（见 docs/architecture-extensions.md）；Extensions 管理原生包声明及资源过滤规则，变更通过新会话或用户重载生效。界面偏好不改变模型上下文。SSH 工作台只提供手动操作。
 
 ## 4. 核心架构（摘要）
 
@@ -176,7 +176,7 @@ pi SDK 和 pi-ai 精确锁定 1.0.4，使用原版 SDK，不应用本项目的 S
 | **后台任务列表** | `docs/architecture-core.md` | bash 前后端口快照 diff；按客户端持久；单停/全部关闭 |
 | **扩展 UI 桥** | `docs/architecture-core.md` | setWidget/setStatus/notify/select/confirm/input → 浏览器消息；dialog_response 回传 |
 
-Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改阅读布局/本页目录、右侧对话面板/建议跳转、文档切换性能/正文独立读取、文档会话隔离/等待状态、索引状态、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。入口为 `WikiWorkbench.tsx` / `WikiReading.tsx` / `WikiChatPanel.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
+Wiki：点击 `.md` / `.markdown` 自动进入文档工作台，顶栏无独立 Wiki 模式入口，点「对话」返回。修改阅读布局/本页目录、右侧对话面板/建议跳转、文档切换性能/正文独立读取、文档会话隔离/等待状态、索引状态、双链/标签索引、全文/PDF 搜索、请求改动记录、撤销重做或桌面默认应用打开时，读取 `docs/architecture-wiki.md`。34a 插入工具栏为 `WikiToolbar.tsx`（表格尺寸、代码语言及宽版）；具体排版见 `docs/wiki-doc-v2-design.md`。入口为 `WikiWorkbench.tsx` / `WikiReading.tsx` / `WikiChatPanel.tsx`、`wiki-routes.ts` 与 `wiki-service.ts`；提问复用原生 pi 会话。
 
 会话树：修改树过滤/搜索、分支切换/摘要/label、编辑重问、派生会话、外部修改检测或返回文本的草稿保护时，读取 `docs/architecture-session-tree.md`。树状态由原生 SDK 管理，协议 v40，默认编辑重问留在同一会话文件。修改附件卡片、原生条目冻结恢复或模板附件时，读取 `docs/architecture-attachments.md`。
 

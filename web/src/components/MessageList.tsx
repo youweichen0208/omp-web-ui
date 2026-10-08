@@ -1,3 +1,4 @@
+import { projectToolTextMessages, toolTextIncidents } from "../tool-text";
 import type { ToolRecoveryActions } from "./ToolRecoveryCard";
 import { ConversationWorkingStatus } from "./WorkingStatus";
 import { groupBashMessages } from "../bash-groups";
@@ -138,6 +139,10 @@ function ReloadEvent({ event }: { event: ReloadStatus }) {
 
 export const MessageList = memo(function MessageList({ recovery, state, connected = true, silenceNotified = false, liveOutputs, toolStatuses, onEdit, onKillBash, onStop, thinkingWrap, toolsWrap, pendingEcho, reloadEvents = [] }: MessageListProps) {
 	const t = useT();
+	const projectedMessages = useMemo(() => projectToolTextMessages(state.messages), [state.messages]);
+	state = { ...state, messages: projectedMessages };
+	const incidentState = useMemo(() => toolTextIncidents(state.streamingMessage ? [...state.messages, state.streamingMessage] : state.messages, state.isStreaming), [state.messages, state.streamingMessage, state.isStreaming]);
+	const incidentFor = new Map(incidentState.incidents.flatMap(incident => [...incident.leaks, incident.last].map(message => [message.id, incident] as const)));
 	const timeline = useMemo(() => {
 		const events = [
 			...reloadEvents.filter((event) => event.conversationId === state.conversationId).map((event) => ({ kind: "reload" as const, event })),
@@ -154,6 +159,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 	}, [state.messages, state.conversationId, state.cwd, state.cwdEvents, reloadEvents]);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const [stickBottom, setStickBottom] = useState(true);
+	const [farFromBottom, setFarFromBottom] = useState(false);
 	const stickRef = useRef(true);
 	/** 上一帧 scrollTop —— 判定滚动方向（向上 = 用户要离开底部）。 */
 	const prevStRef = useRef(0);
@@ -356,7 +362,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 	const questions = useMemo(() => {
 		const qs: { id: string; text: string }[] = [];
 		for (const m of state.messages) {
-			if (m.role !== "user" || goalEventText(m) || goalCompletedText(m)) continue;
+			if (m.role !== "user" || m.origin === "auto-reminder" || goalEventText(m) || goalCompletedText(m)) continue;
 			const joined = m.content
 				.map((b) => asText(b)?.text ?? "")
 				.filter(Boolean)
@@ -576,7 +582,9 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 		if (!el) return;
 		const dSt = el.scrollTop - prevStRef.current;
 		prevStRef.current = el.scrollTop;
-		const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+		const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+		setFarFromBottom(distance > el.clientHeight);
+		const nearBottom = distance < 80;
 		if (dSt < -4 && dSt > -500) {
 			// 明确的向上滚动意图：立即松开贴底——即使仍在 80px 阈值内。
 			// 流式期间每个 delta 都会把视口钉回底部，若只看距离阈值，
@@ -620,6 +628,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 		if (el && stickRef.current) {
 			el.scrollTop = el.scrollHeight;
 		}
+		if (el) setFarFromBottom(el.scrollHeight - el.scrollTop - el.clientHeight > el.clientHeight);
 	}, [messages, state.isStreaming, liveOutputs]);
 
 
@@ -686,7 +695,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 				{timeline.length === 0 && !state.streamingMessage && (
 					<div className="empty-state">
 						<div className="empty-logo-wrap">
-							<img className="empty-logo" src="/favicon.svg" alt="" />
+							<img className="empty-logo" src="/icon/1a-mark.svg" alt="" />
 						</div>
 						<h2 className="empty-title">{t("welcomeTitle")}</h2>
 						<p className="empty-sub">{t("welcomeSub")}</p>
@@ -719,6 +728,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 					if (item.kind === "cwd") return <div key={`cwd-${item.event.timestamp}`} className="goal-event cwd-event" role="status"><span aria-hidden="true">↪</span><span>{t("cwdSwitchEvent", { path: item.event.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~") })}</span></div>;
 					const { message: m, index: i } = item;
 					if (goalEvents.absorbed.has(m.id)) return null;
+					if (m.origin === "auto-reminder") return <Message key={m.id} message={m} toolResults={toolResults} liveOutputs={EMPTY_LIVE} toolStatuses={toolStatuses} streaming={false} isLast={false} />;
 					const withGap = (content: ReactNode) => {
 						const label = timeGaps.get(i);
 						return label ? <Fragment key={m.id}><div className="time-gap" aria-label={t("timeGapAt", { time: label })} title={m.timestamp ? new Date(m.timestamp).toLocaleString() : undefined}><span>{label}</span></div>{content}</Fragment> : content;
@@ -766,7 +776,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 							onMeasured={storeHeight}
 							lazyRef={attachEl}
 						>
-						<Message recovery={recovery}
+						<Message recovery={recovery} incident={incidentFor.get(m.id)}
 							key={m.id}
 							message={bashGroups.projected.get(m.id) ?? m}
 							toolMessageIds={bashGroups.sources}
@@ -794,7 +804,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 					);
 				})}
 				{state.streamingMessage && streamingHasContent && !bashGroups.owners.has(state.streamingMessage.id) && (
-					<Message recovery={recovery}
+					<Message recovery={recovery} incident={incidentFor.get(state.streamingMessage.id)}
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}
 						continuation={!!predecessors.get(state.streamingMessage.id)}
@@ -836,7 +846,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 				)}
 
 			</div>
-			{!stickBottom && (() => {
+			{!stickBottom && farFromBottom && (() => {
 				const button = <button type="button" className="scroll-bottom" onClick={scrollToBottom}><FiArrowDown /> {t("backToBottom")}</button>;
 				const composer = document.querySelector<HTMLElement>(".design-workspace .view-pane:not(.hidden) .main > .inputbar");
 				return composer ? createPortal(button, composer) : button;

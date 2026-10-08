@@ -1,5 +1,5 @@
 import { richCodeText } from "./rich-code-text";
-import { highlightLine } from "./hljs-lite";
+import { highlightLine, highlightWikiCode } from "./hljs-lite";
 
 type Paint = { add: (range: Range) => void; delete: (range: Range) => void; size: number; priority: number };
 const groups = ["plain", "keyword", "string", "number", "title", "comment"] as const;
@@ -13,7 +13,7 @@ const category = (classes: DOMTokenList): Group | undefined => {
 };
 
 /** Paint mutable code using ranges, leaving native selection, IME and undo DOM untouched. */
-export function createRichCodeHighlighter() {
+export function createRichCodeHighlighter(wiki = false) {
 	const registry = (CSS as unknown as { highlights?: Map<string, Paint> }).highlights;
 	const Constructor = (window as unknown as { Highlight?: new (...ranges: Range[]) => Paint }).Highlight;
 	const blocks = new Map<HTMLElement, { group: Group; range: Range }[]>();
@@ -34,7 +34,7 @@ export function createRichCodeHighlighter() {
 			if (!text) return;
 			const language = code.className.match(/language-([^\s]+)/)?.[1] ?? "";
 			const template = document.createElement("template");
-			template.innerHTML = highlightLine(text, language === "toml" ? "ini" : language);
+			template.innerHTML = (wiki ? highlightWikiCode : highlightLine)(text, language === "toml" ? "ini" : language);
 			const nodes: { node: Text; start: number; end: number }[] = [];
 			const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
 			let node: Node | null, offset = 0;

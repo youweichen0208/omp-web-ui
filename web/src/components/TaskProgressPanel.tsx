@@ -1,4 +1,4 @@
-import { latestToolTextFailure } from "../tool-text";
+import { toolTextIncidents } from "../tool-text";
 import { conversationWait } from "../waiting-indicator";
 import { useEffect, useRef, useState } from "react";
 import { FiChevronRight, FiFile } from "react-icons/fi";
@@ -9,9 +9,19 @@ import { taskOutputs } from "../task-outputs";
 
 type Silence = Extract<ServerMessage, { type: "agent_silence" }> | null;
 
-export function TaskProgressPanel({ task, silence, cwd, messages, onPreview }: { task?: TaskProgress | null; silence: Silence; cwd: string; messages: UiMessage[]; onPreview: (path: string, name: string) => void }) {
+export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, streaming, live }: { task?: TaskProgress | null; streaming?: boolean; live?: UiMessage | null; silence: Silence; cwd: string; messages: UiMessage[]; onPreview: (path: string, name: string) => void }) {
 	const t = useT();
-	const interrupted = !!latestToolTextFailure(messages, task?.status === "running");
+	const incident = toolTextIncidents(live ? [...messages, live] : messages, streaming ?? task?.status === "running").current;
+	const interrupted = incident?.state === "stopped";
+	const reminding = incident?.state === "reminding";
+	const [elapsed, setElapsed] = useState(0);
+	useEffect(() => {
+		if (!reminding) return;
+		const start = incident?.reminders.at(-1)?.timestamp ?? Date.now();
+		const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+		update(); const timer = window.setInterval(update, 1000);
+		return () => window.clearInterval(timer);
+	}, [reminding, incident?.incidentId]);
 	const phase = conversationWait(messages, new Map());
 	const [progressOpen, setProgressOpen] = useState(true);
 	const [outputsOpen, setOutputsOpen] = useState(true);
@@ -34,13 +44,13 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview }: {
 	const files = taskOutputs(task, messages, cwd);
 	const planMessage = messages.find(message => message.role === "toolResult" && message.planSnapshot?.planId === task?.plan?.origin);
 	const planSource = planMessage && messages.find(message => message.role === "assistant" && message.content.some(block => block.type === "toolCall" && block.id === planMessage.toolCallId));
-	const status = interrupted ? t("toolRecoveryInterrupted") : task?.status === "failed" ? t("taskFailed") : task?.status === "cancelled" ? t("taskCancelled") : task?.plan?.awaitingConfirmation ? t("planPrevious") : task?.status === "waiting" ? t("taskPaused") : silence && task && silence.conversationId === task.conversationId ? t(phase?.label ?? "working") : "";
-	return <div className={`task-progress task-sections ${interrupted ? "interrupted" : task?.status ?? "empty"}`} tabIndex={-1} aria-label={t("taskProgress")}>
+	const status = interrupted ? t("toolRecoveryInterrupted") : reminding ? `${t("working")} · ${t("waitSeconds", { n: elapsed })}` : task?.status === "failed" ? t("taskFailed") : task?.status === "cancelled" ? t("taskCancelled") : task?.plan?.awaitingConfirmation ? t("planPrevious") : task?.status === "waiting" ? t("taskPaused") : silence && task && silence.conversationId === task.conversationId ? t(phase?.label ?? "working") : "";
+	return <div className={`task-progress task-sections ${interrupted ? "interrupted" : reminding ? "reminding" : task?.status ?? "empty"}`} tabIndex={-1} aria-label={t("taskProgress")}>
 		<div className="task-sections-scroll" ref={scrollRef}>
 			<section className="task-section">
 				<button type="button" className="task-section-heading" aria-expanded={progressOpen} onClick={() => setProgressOpen(value => !value)}><FiChevronRight className={progressOpen ? "open" : ""} />{t("taskProgressHeading")}</button>
 				{progressOpen && <div className="task-section-content">
-					{status && <p className={`task-progress-status task-progress-source ${interrupted ? "interrupted" : task?.status}`} role="status">{status}</p>}
+					{status && (!interrupted || !!task?.plan) && <p className={`task-progress-status task-progress-source ${interrupted ? "interrupted" : reminding ? "reminding" : task?.status}`} role="status">{reminding && <i aria-hidden="true" />}{status}</p>}
 					{task?.plan && items.length ? <>
 						{task.plan.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
 						<div className="task-plan-list">{items.map(item => <div key={item.id} className={`task-plan-step ${interrupted && item.status === "running" ? "interrupted" : item.status}${expanded === item.id ? " expanded" : ""}`}>
@@ -58,7 +68,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview }: {
 								<button type="button" className="task-step-jump" onClick={() => window.dispatchEvent(new CustomEvent("pi:jump-message", { detail: { messageId: planSource?.id ?? task.sourceMessageId } }))}>{t("taskJumpToChat")} →</button>
 							</div>}
 						</div>)}</div>
-					</> : <div className="task-section-empty"><div className="task-empty-circles" aria-hidden="true"><i /><i /><i /></div><p>{t("taskProgressEmpty")}</p></div>}
+					</> : interrupted ? <div className="task-interrupted-hint"><strong>● {t("taskInterruptedTitle")}</strong><p>{t("taskInterruptedHint")}</p></div> : reminding ? null : <div className="task-section-empty"><div className="task-empty-circles" aria-hidden="true"><i /><i /><i /></div><p>{t("taskProgressEmpty")}</p></div>}
 				</div>}
 			</section>
 			<section className="task-section">

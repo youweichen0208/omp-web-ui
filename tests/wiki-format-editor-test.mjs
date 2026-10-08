@@ -24,7 +24,7 @@ try {
 	const failures = [], errors = [];
 	page.on('pageerror', error => errors.push(error.message));
 	const check = (condition, message) => { console.log(condition ? 'PASS' : 'FAIL', message); if (!condition) failures.push(message); };
-	const aliases = [['zw', '正文'], ['zhengwen', '正文'], ['bg', '插入表格'], ['biaoge', '插入表格'], ['dmk', '代码块'], ['daimakuai', '代码块'], ['glk', '高亮块'], ['gaoliangkuai', '高亮块'], ['lb', '列表'], ['liebiao', '列表'], ['bh', '编号'], ['bianhao', '编号'], ['rw', '任务列表'], ['renwuliebiao', '任务列表'], ['yy', '引用'], ['yinyong', '引用'], ['fgx', '分隔线'], ['fengexian', '分隔线']];
+	const aliases = [['zw', '正文'], ['zhengwen', '正文'], ['bg', '插入表格'], ['biaoge', '插入表格'], ['dmk', '代码块'], ['daimakuai', '代码块'], ['lb', '列表'], ['liebiao', '列表'], ['rw', '任务列表'], ['renwuliebiao', '任务列表'], ['yy', '引用'], ['yinyong', '引用']];
 	for (const [alias, label] of aliases) {
 		await editor.locator('p').last().fill('');
 		await page.keyboard.type(`/${alias}`);
@@ -33,7 +33,7 @@ try {
 	}
 	for (let level = 1; level <= 6; level++) {
 		await editor.locator('p').last().fill('');
-		if (level <= 3) { await page.keyboard.type(`/bt${level}`); await page.getByRole('option', { name: `标题 ${level}`, exact: true }).click(); }
+		if (level === 2 || level === 3) { await page.keyboard.type(`/bt${level}`); await page.getByRole('option', { name: `标题 ${level}`, exact: true }).click(); }
 		else await page.keyboard.type('#'.repeat(level) + ' ');
 		await page.keyboard.type(`Heading ${level}`);
 		check(await editor.locator(`h${level}`).last().textContent() === `Heading ${level}`, `H${level} inserts correct heading level`);
@@ -61,12 +61,10 @@ try {
 	await page.keyboard.press('Meta+z');
 	check(await editor.locator('p').last().locator('span[style*="background-color"]').count() === 0, 'highlight supports native undo');
 	await page.keyboard.press('Meta+Shift+z');
-	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
-	let source = await page.locator('.fp-editor').inputValue();
-	check(source.includes('Before <mark style="background-color: #fff3a3">marked words</mark> after'), 'selected background persists as mark HTML');
 	await page.keyboard.press('Meta+s');
-	for (let i = 0; i < 50 && readFileSync(join(base, 'note.md'), 'utf8') !== source; i++) await new Promise(r => setTimeout(r, 100));
-	check(readFileSync(join(base, 'note.md'), 'utf8') === source, 'highlight saved to disk');
+	await page.locator('.wiki-save-status.saved').waitFor();
+	let source = readFileSync(join(base, 'note.md'), 'utf8');
+	check(source.includes('Before <mark style="background-color: #fff3a3">marked words</mark> after'), 'selected background persists to disk as mark HTML');
 	await page.reload();
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.file-name', { hasText: 'note.md' }).click();
@@ -75,8 +73,9 @@ try {
 	await selectWords(); await page.getByRole('button', { name: '绿色背景', exact: true }).click();
 	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.style.backgroundColor === 'rgb(204, 235, 197)')), 'reopened highlight can change color');
 	await selectWords(); await page.getByRole('button', { name: '绿色背景', exact: true }).click();
-	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
-	source = await page.locator('.fp-editor').inputValue();
+	await page.keyboard.press('Meta+s');
+	await page.locator('.wiki-save-status.saved').waitFor();
+	source = readFileSync(join(base, 'note.md'), 'utf8');
 	check(source.includes('Before marked words after') && !source.includes('<mark'), 'clear removes color without losing text');
 	assert.deepEqual(errors, []);
 	assert.deepEqual(failures, []);

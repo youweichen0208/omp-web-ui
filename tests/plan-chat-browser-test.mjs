@@ -10,6 +10,7 @@ import { chromium } from "playwright-core";
 import { CHROME_PATH } from "./lib/chrome.mjs";
 import { serializeMessage } from "../dist/server/serialize.js";
 import { deriveTaskProgress } from "../dist/server/task-progress.js";
+import { TOOL_TEXT_CONTINUE_PROMPT } from "../dist/server/tool-text.js";
 
 const port = 31000 + Math.floor(Math.random() * 10000);
 const probe = createServer();
@@ -92,6 +93,13 @@ try {
 		await page.locator(".header-task-progress").click();
 		await page.locator(".task-progress:visible").waitFor();
 		assert.equal(await page.locator(".task-plan-step").count(), 5);
+		// A persisted tool-text correction belongs to the same confirmed plan.
+		fixture = [...updates, text('leaked-call', '<invoke name="read"><parameter name="path">README.md</parameter></invoke>'), text('auto-recovery', TOOL_TEXT_CONTINUE_PROMPT, 'user')];
+		running = true; send();
+		await page.locator('.task-progress.reminding').waitFor();
+		assert.equal(await page.locator('.task-plan-step.running').count(), 1);
+		assert.doesNotMatch(await page.locator('.task-progress').textContent(), /等待确认|awaiting confirmation/);
+		running = false; fixture = updates; send();
 		const headings = page.locator('.task-section-heading');
 		assert.deepEqual(await headings.allTextContents(), lang === 'en' ? ['Progress', 'Outputs'] : ['进度', '输出']);
 		assert.equal(await page.locator('.task-progress-meta').count(), 0);
@@ -164,6 +172,8 @@ try {
 		await page.locator('.header-task-progress').click();
 		await page.locator('.task-progress:visible').waitFor();
 		assert.match(await page.locator('.task-progress-source').textContent(), lang === 'en' ? /awaiting confirmation/ : /等待确认/);
+		assert.equal(await page.locator('.task-plan-step.running').count(), 0);
+		assert.equal(await page.locator('.task-plan-step.pending').count(), 5);
 		fixture.push({ id: 'outside-call', role: 'assistant', timestamp, content: [{ type: 'toolCall', id: 'outside-read', name: 'read', argumentsText: '{"path":"README.md"}' }] }, { id: 'outside-result', role: 'toolResult', toolName: 'read', toolCallId: 'outside-read', timestamp, isError: false, content: [{ type: 'text', text: 'file contents' }] }); send();
 		running = true; send();
 		await page.locator('.task-progress.running').waitFor();

@@ -176,7 +176,9 @@ Wiki 复用当前工作区，使用原生内存会话，离开后释放，不写
 部分模型（实测 DeepSeek V4 Pro / Volc）偶尔把工具调用写进正文（`<invoke name=…>`、DSML，或只剩 `<parameter …>…</parameter></invoke>` 后半截，开头被泄露的推理吞掉）。SDK 只看到一段普通回答，运行随之结束，任务停在半途。
 
 - 识别：`server/tool-text.ts` 的 `unexecutedToolText` 是唯一实现，服务端与界面共用。严格规则要求完整的 `<invoke name>`…`</invoke>`；兜底规则只看正文**结尾**是否为若干 `<parameter>` 加 `</invoke>`，所以闭合代码块、行内代码和其后还有正文的示例都不算。文本永远不会被当作工具调用执行。
-- 自动继续：`agent_settled` 时若最后一条助手消息没有真实工具调用、正文以上述标记结尾、未中止、无排队消息，则以可见的用户消息 `TOOL_TEXT_CONTINUE_PROMPT` 请模型重新调用，并发出一条 warning 通知。
-- 防循环：上次自动请求之后必须至少执行过一次真实工具才能再次请求；每条用户消息最多 `TOOL_TEXT_MAX_CONTINUES`（5）次；用户发出新消息时计数清零。被拦下时停止运行，消息上的恢复卡片仍提供手动重试或换模型重试。
-- 回归：`tests/tool-text-continue-test.mjs`（单次泄露、执行后再次泄露、持续泄露只续一次、普通回答不续）与 `tests/unit/tool-text.test.ts`。
+- 自动继续：`agent_settled` 时若最后一条助手消息没有真实工具调用、正文以上述标记结尾、未中止、无排队消息，则以可见的用户消息 `TOOL_TEXT_CONTINUE_PROMPT` 请模型重新调用。传输投影添加 `origin: "auto-reminder"` 与 `toolText: { incidentId, attempt }`，界面显示事件行，不改写 SDK 的原始消息。
+- 防循环：每条用户请求最多 `TOOL_TEXT_MAX_CONTINUES`（1）次，即使中间执行过工具也不再自动提醒；用户发出新消息时计数清零。被拦下时停止运行，消息上的恢复卡片仍提供手动重试或换模型重试。
+- 回归：`tests/tool-text-continue-test.mjs`（单次泄露、执行后再次泄露也不再续、持续泄露只续一次、普通回答不续）与 `tests/unit/tool-text.test.ts`。
 
+
+33a 展示由 `tool-text-incidents.ts` 重放原生消息统一推导：同一次用户请求共用 incidentId，工具文本和提醒后无工具的普通回复关联为同一次异常；真实工具调用恢复状态。原问题与附件用于手动重发，提醒不参与问题导航、编辑、折叠摘要。重连及历史会话按同一规则恢复。

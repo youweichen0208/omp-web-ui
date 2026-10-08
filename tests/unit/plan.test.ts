@@ -169,3 +169,41 @@ test("failed completion retains the last saved steps, and corrected completion c
 	expect(corrected?.status).toBe("done");
 	expect(corrected?.plan?.items.every(item => item.status === "done")).toBe(true);
 });
+
+const recoveryPrompt = (): UiMessage => ({ ...user("recovery"), content: [{ type: "text", text: "你上一条回复里的工具调用是以普通文本输出的，没有被执行。请通过工具调用（不要写成文本）重新发起它，然后继续完成任务。" }] });
+const toolTextReply = (): UiMessage => ({ id: "tool-text", role: "assistant", stopReason: "stop", content: [{ type: "text", text: '<invoke name="read"><parameter name="path">README.md</parameter></invoke>' }] });
+
+test("tool-text recovery preserves the task, confirmed plan and tool attribution across transcript replay", () => {
+	const messages = [user("original"), assistant("p1", "read-before"), result("p1", create()), toolTextReply(), recoveryPrompt(), assistant("read-after")];
+	for (const streaming of [true, false]) {
+		const task = deriveTaskProgress("c", JSON.parse(JSON.stringify(messages)), null, streaming)!;
+		expect(task.sourceMessageId).toBe("original");
+		expect(task.plan?.awaitingConfirmation).toBe(false);
+		expect(task.plan?.items[0]).toMatchObject({ status: "running", toolCallIds: ["read-before", "read-after"] });
+		expect(task.steps.flatMap(step => step.artifacts.map(a => a.toolCallId))).toEqual(["read-before", "read-after"]);
+	}
+});
+
+test("new requests demote historical current steps without losing completion or reconfirmation", () => {
+	const first = create(), second = transition(update(first, { currentStepId: "b", completedStepIds: ["a"] }), first);
+	const messages = [user("original"), assistant("p1"), result("p1", second), user("new-request")];
+	const task = deriveTaskProgress("c", messages, null, true)!;
+	expect(task.plan?.awaitingConfirmation).toBe(true);
+	expect(task.plan?.items.map(item => item.status)).toEqual(["done", "pending"]);
+	const resumed = deriveTaskProgress("c", [...messages, assistant("p2"), result("p2", transition(update(second), second))], null, true)!;
+	expect(resumed.plan?.items.map(item => item.status)).toEqual(["done", "running"]);
+});
+
+test("recovery cannot confirm an unrelated historical plan or swallow ordinary user messages", () => {
+	const base = [user("original"), assistant("p1"), result("p1", create())];
+	const unrelated = [...base, user("new-request"), toolTextReply(), recoveryPrompt(), assistant("read-other")];
+	const task = deriveTaskProgress("c", unrelated, null, true)!;
+	expect(task.sourceMessageId).toBe("new-request");
+	expect(task.plan?.awaitingConfirmation).toBe(true);
+	expect(task.plan?.items.flatMap(item => item.toolCallIds ?? [])).not.toContain("read-other");
+	for (const reply of [assistant("read-real"), { ...toolTextReply(), stopReason: "aborted" }, { ...toolTextReply(), stopReason: "error" }, { ...toolTextReply(), content: [{ type: "text", text: "Finished" }] }]) {
+		const ordinary = deriveTaskProgress("c", [...base, reply, recoveryPrompt()], null, true)!;
+		expect(ordinary.sourceMessageId).toBe("recovery");
+		expect(ordinary.plan?.awaitingConfirmation).toBe(true);
+	}
+});

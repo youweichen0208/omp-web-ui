@@ -1,8 +1,12 @@
+import { WikiToolbar, WikiInsertPopover, type WikiInsertPopup } from "./WikiToolbar";
+import { TableSizePicker } from "./TableSizePicker";
+import { CodeLanguagePicker } from "./CodeLanguagePicker";
+import { MermaidDiagram } from "./MermaidDiagram";
 import { createPortal } from "react-dom";
 import { WikiReadingDialog } from "./WikiReading";
 import { TEXT_HIGHLIGHT_COLORS } from "../remark-text-highlight";
 import { Fragment, memo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare, FiLink, FiImage } from "react-icons/fi";
+import { FiCalendar, FiBold, FiItalic, FiRotateCcw, FiRotateCw, FiSquare, FiType, FiCode, FiGrid, FiList, FiCheckSquare, FiMinus, FiMessageSquare, FiLink, FiImage } from "react-icons/fi";
 import { markdownImageUrl } from "../markdown-image";
 import { withToken } from "../auth-token";
 import { getClientId } from "../use-chat";
@@ -13,16 +17,20 @@ import { useT } from "../i18n";
 import { mountRichDocument, prepareRichDocument, readRichDocument } from "../rich-markdown";
 import type { RichDocument } from "../rich-markdown";
 
-const CODE_LANGUAGES = ["javascript", "typescript", "python", "bash", "json", "yaml", "html", "css", "sql", "go", "rust", "java", "c", "cpp", "csharp", "ruby", "php", "swift", "kotlin", "markdown", "xml", "toml", "diff"];
+const CODE_LANGUAGES = ["javascript", "typescript", "python", "bash", "json", "yaml", "html", "css", "sql", "go", "rust", "java", "c", "cpp", "csharp", "ruby", "php", "swift", "kotlin", "markdown", "xml", "toml", "diff", "mermaid"];
 
 export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, readOnly, onChange, file, wiki }: {
 	file: { cwd: string; path: string };
-	wiki?: { paths: string[]; ask: (text: string) => void; followLink: (href: string) => void; resolveCode: (value: string) => string | undefined; added: Set<string> };
+	wiki?: { paths: string[]; ask: (text: string) => void; followLink: (href: string) => void; resolveCode: (value: string) => string | undefined; added: Set<string>; toolbarHost?: HTMLElement | null; focused?: boolean; onWidth?: () => void };
 	value: string;
 	readOnly: boolean;
 	onChange: (value: string) => void;
 }) {
 	const t = useT();
+	const [insertPopup, setInsertPopup] = useState<WikiInsertPopup | null>(null);
+	const savedRange = useRef<Range | null>(null);
+	const [diagrams, setDiagrams] = useState<{ host: HTMLElement; code: string }[]>([]);
+	const didFocus = useRef(false);
 	const [uploading, setUploading] = useState(false);
 	const [imageError, setImageError] = useState("");
 	const upload = useRef<AbortController | null>(null);
@@ -34,7 +42,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	const codeHighlighter = useRef<ReturnType<typeof createRichCodeHighlighter> | null>(null);
 	useEffect(() => () => { codeHighlighter.current?.dispose(); codeHighlighter.current = null; }, []);
 	const paintCode = (code: HTMLElement) => {
-		codeHighlighter.current ??= createRichCodeHighlighter();
+		codeHighlighter.current ??= createRichCodeHighlighter(!!wiki);
 		codeHighlighter.current.update(code);
 	};
 	const selectedCode = () => {
@@ -58,6 +66,12 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	};
 	useEffect(() => {
 		const changed = () => {
+			const selection = window.getSelection();
+			if (selection?.rangeCount && root.current?.contains(selection.anchorNode) && root.current.contains(selection.focusNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
+			root.current?.querySelectorAll("[data-wiki-placeholder]").forEach(el => el.removeAttribute("data-wiki-placeholder"));
+			const anchor = selection?.anchorNode;
+			const paragraph = (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("p, div");
+			if (wiki && paragraph && paragraph !== root.current && root.current?.contains(paragraph) && !paragraph.textContent?.trim() && !paragraph.querySelector("img, code")) paragraph.setAttribute("data-wiki-placeholder", t("wikiEmptyParagraph"));
 			const range = highlightSelection(); setCanHighlight(!!range);
 			if (!range) { setFloating(null); return; }
 			const rect = range.getBoundingClientRect();
@@ -137,7 +151,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			const language = detected === "plaintext" ? "" : detected;
 			control.replaceChildren();
 			for (const lang of ["", ...new Set([...CODE_LANGUAGES, ...(language ? [language] : [])])]) {
-				control.add(new Option(lang || t("richPlainText"), lang));
+				control.add(new Option(lang || t(wiki ? "wikiCodeAutomatic" : "richPlainText"), lang));
 			}
 			control.value = language;
 			control.disabled = readOnly;
@@ -153,6 +167,25 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			img.src = markdownImageUrl(source, file);
 		});
 	}, [value, file.cwd, file.path]);
+	useEffect(() => {
+		if (!wiki || readOnly || didFocus.current || !root.current) return;
+		didFocus.current = true;
+		root.current.focus({ preventScroll: true });
+		const range = document.createRange(); range.selectNodeContents(root.current); range.collapse(false);
+		window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(range); savedRange.current = range.cloneRange();
+	}, [readOnly]);
+	useLayoutEffect(() => {
+		if (!wiki || !root.current) return;
+		const next: { host: HTMLElement; code: string }[] = [];
+		root.current.querySelectorAll<HTMLElement>('pre > code.language-mermaid').forEach(code => {
+			const pre = code.parentElement!;
+			let host = pre.querySelector<HTMLElement>('.wiki-mermaid-preview');
+			if (!host) { host = document.createElement('div'); host.dataset.richUi = ''; host.contentEditable = 'false'; host.className = 'wiki-mermaid-preview'; pre.prepend(host); }
+			next.push({ host, code: richCodeText(code) });
+		});
+		root.current.querySelectorAll<HTMLElement>('.wiki-mermaid-preview').forEach(host => { if (!next.some(item => item.host === host)) host.remove(); });
+		setDiagrams(next);
+	}, [value]);
 	const selectedCell = () => {
 		const node = window.getSelection()?.anchorNode;
 		const element = node instanceof Element ? node : node?.parentElement;
@@ -278,7 +311,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		document.execCommand(name, false, argument);
 		update();
 	};
-	const items = [
+	const allItems = [
 		...((wiki ? [1, 2, 3] : [1, 2, 3, 4, 5, 6]) as (1 | 2 | 3 | 4 | 5 | 6)[]).map(level => ({ label: "richHeading", keywords: `heading header title h${level} bt${level} biaoti${level} 标题${level}`, alias: `bt${level}`, action: "formatBlock", argument: `h${level}` } as const)),
 		{ label: "richParagraph", alias: "zw", keywords: "paragraph text zw zhengwen 正文", action: "formatBlock", argument: "p" },
 		{ label: "richCodeBlock", alias: "dmk", keywords: "code fence dmk daimakuai 代码 代码块", action: "insertHTML", argument: "<pre><code data-slash-insert><br></code></pre><p><br></p>" },
@@ -291,14 +324,54 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: "richDivider", alias: "fgx", keywords: "divider horizontal rule fgx fengexian 分隔线", action: "insertHTML", argument: "<hr><p><br></p>" },
 			{ label: "richImage", alias: "tp", keywords: "image photo upload tp tupian 图片", action: "image" },
 		{ label: "richWikiLink", alias: "sl", keywords: "wiki link document sl shuanglian 链接 双链 文档", action: "wikiLink" },
+			{ label: "wikiMentionDate", alias: "date", keywords: "date mention riqi 日期", action: "insertText", argument: new Date().toLocaleDateString("sv-SE") },
 	] as const;
-	const icons = { richImage: <FiImage />, richWikiLink: <FiLink />, richHighlightBlock: <FiSquare />, richHeading: <span>H₂</span>, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <span>1.</span>, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
+	const wikiOrder = ["zw", "bt2", "bt3", "lb", "bg", "tp", "rw", "yy", "dmk", "sl", "date"];
+	const items = wiki ? allItems.filter(item => wikiOrder.includes(item.alias)).sort((a, b) => wikiOrder.indexOf(a.alias) - wikiOrder.indexOf(b.alias)) : allItems.filter(item => item.alias !== "date");
+	const icons = { wikiMentionDate: <FiCalendar />, richImage: <FiImage />, richWikiLink: <FiLink />, richHighlightBlock: <FiSquare />, richHeading: <FiType />, richParagraph: <FiType />, richCodeBlock: <FiCode />, richTable: <FiGrid />, richList: <FiList />, richOrderedList: <FiList />, richTaskList: <FiCheckSquare />, richQuote: <FiMessageSquare />, richDivider: <FiMinus /> };
 	const itemLabel = (item: typeof items[number]) => item.label === "richHeading" ? `${t(item.label)} ${"argument" in item ? item.argument.slice(1) : ""}` : t(item.label);
 	const isBlock = (item: typeof items[number]) => item.action === "insertHTML";
-	const order = ["zw", "bt1", "bt2", "bt3", "lb", "bh", "rw", "yy", "dmk", "glk", "bg", "fgx", "tp", "sl"];
-	const hints: Record<string, string> = { zw: "", bt1: "#", bt2: "##", bt3: "###", lb: "-", bh: "1.", rw: "[]", yy: ">", dmk: "```", glk: ":::", bg: "3 × 3", fgx: "---", tp: "![]", sl: "[[" };
-	const help: Record<string, Parameters<typeof t>[0]> = { zw: "wikiInsertParagraph", bt1: "wikiInsertH1", bt2: "wikiInsertH2", bt3: "wikiInsertH3", lb: "wikiInsertList", bh: "wikiInsertOrdered", rw: "wikiInsertTask", yy: "wikiInsertQuote", dmk: "wikiInsertCode", glk: "wikiInsertCallout", bg: "wikiInsertTable", fgx: "wikiInsertDivider", tp: "wikiInsertImage", sl: "wikiInsertLink" };
-	const matches = items.filter(item => wiki || !["image", "wikiLink"].includes(item.action)).filter((item) => `${itemLabel(item)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => wiki ? order.indexOf(a.alias) - order.indexOf(b.alias) : Number(isBlock(a)) - Number(isBlock(b)));
+	const hints: Record<string, string> = { date: "@", zw: "", bt1: "#", bt2: "##", bt3: "###", lb: "-", bh: "1.", rw: "[]", yy: ">", dmk: "```", glk: ":::", bg: "3 × 3", fgx: "---", tp: "![]", sl: "[[" };
+	const help: Record<string, Parameters<typeof t>[0]> = { date: "wikiInsertDate", zw: "wikiInsertParagraph", bt1: "wikiInsertH1", bt2: "wikiInsertH2", bt3: "wikiInsertH3", lb: "wikiInsertList", bh: "wikiInsertOrdered", rw: "wikiInsertTask", yy: "wikiInsertQuote", dmk: "wikiInsertCode", glk: "wikiInsertCallout", bg: "wikiInsertTable", fgx: "wikiInsertDivider", tp: "wikiInsertImage", sl: "wikiInsertLink" };
+	const matches = items.filter(item => wiki || !["image", "wikiLink"].includes(item.action)).filter((item) => `${itemLabel(item)} ${item.keywords}`.toLowerCase().includes(menu?.query.toLowerCase() ?? "")).sort((a, b) => wiki ? wikiOrder.indexOf(a.alias) - wikiOrder.indexOf(b.alias) : Number(isBlock(a)) - Number(isBlock(b)));
+	const prepareInsert = () => {
+		const selection = window.getSelection();
+		if (selection?.rangeCount && root.current?.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
+	};
+	const restoreInsert = () => {
+		if (!root.current || readOnly) return false;
+		root.current.focus({ preventScroll: true });
+		const range = savedRange.current && root.current.contains(savedRange.current.startContainer) ? savedRange.current : document.createRange();
+		if (!savedRange.current || !root.current.contains(range.startContainer)) { range.selectNodeContents(root.current); range.collapse(false); }
+		const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return true;
+	};
+	const insertToolbar = (id: string, dimensions?: { columns: number; rows: number }, language?: string) => {
+		if (!restoreInsert()) return;
+		const anchor = window.getSelection()?.anchorNode;
+		const originalBlock = (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("p,h1,h2,h3,h4,h5,h6");
+		const blockParent = originalBlock?.parentElement;
+		const emptyBlock = !originalBlock?.textContent?.trim();
+		let formattedTag: string | undefined;
+		if ((id === "bg" && !dimensions) || (id === "dmk" && language === undefined)) {
+			const rect = savedRange.current?.getBoundingClientRect();
+			setInsertPopup({ kind: id === "bg" ? "table" : "code", x: insertPopup?.x ?? rect?.left ?? 16, y: insertPopup?.y ?? (rect?.bottom ?? 80) + 6 }); return;
+		}
+		setInsertPopup(null);
+		if (id === "heading") { const node = window.getSelection()?.anchorNode; const current = node?.parentElement?.closest("h2,h3,p")?.tagName; formattedTag = current === "H2" ? "h3" : current === "H3" ? "p" : "h2"; command("formatBlock", formattedTag); }
+		else if (id === "bg" && dimensions) {
+			command("insertHTML", `<table><thead><tr>${Array.from({ length: dimensions.columns }, (_, i) => `<th ${i === 0 ? 'data-slash-insert' : ''}>${t("richColumn")} ${i + 1}</th>`).join('')}</tr></thead><tbody>${Array.from({ length: dimensions.rows - 1 }, () => `<tr>${'<td><br></td>'.repeat(dimensions.columns)}</tr>`).join('')}</tbody></table><p><br></p>`);
+		} else if (id === "dmk") command("insertHTML", `<pre><code data-slash-insert class="language-${language || 'plaintext'}">${language === 'mermaid' ? 'flowchart LR\n  A --> B' : '<br>'}</code></pre><p><br></p>`);
+		else {
+			const item = items.find(item => item.alias === id); if (!item) return;
+			if (item.action === "image") { imageRange.current = window.getSelection()?.getRangeAt(0).cloneRange() ?? null; imageInput.current?.click(); return; }
+			if (item.action === "wikiLink") { command("insertText", "[["); const range = window.getSelection()?.getRangeAt(0).cloneRange(); if (range && range.startOffset >= 2) range.setStart(range.startContainer, range.startOffset - 2); linkRange.current = range ?? null; setLinkInput("[["); return; }
+			if (item.action === "formatBlock") formattedTag = item.argument;
+			command(item.action, "argument" in item ? item.argument : undefined);
+		}
+		const target = root.current?.querySelector("[data-slash-insert]") ?? (emptyBlock && formattedTag ? blockParent?.querySelector(formattedTag) : null);
+		if (target) { target.removeAttribute("data-slash-insert"); const range = document.createRange(); range.selectNodeContents(target); range.collapse(true); window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(range); update(); }
+		prepareInsert();
+	};
 	const inspectSlash = () => {
 		if (readOnly) return closeMenu();
 		const selection = window.getSelection();
@@ -354,6 +427,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		selection?.addRange(range);
 		closeMenu();
 		document.execCommand("delete");
+		if (wiki) { prepareInsert(); insertToolbar(item.alias); return; }
 		if (item.action === "image") { imageRange.current = selection?.getRangeAt(0).cloneRange() ?? null; imageInput.current?.click(); update(); return; }
 		if (item.action === "wikiLink") { linkRange.current = selection?.getRangeAt(0).cloneRange() ?? null; setLinkInput("[["); update(); return; }
 		if (wiki && item.alias === "bg") command("insertHTML", `<table><thead><tr>${[1, 2, 3].map(n => `<th ${n === 1 ? "data-slash-insert" : ""}>${t("richColumn")} ${n}</th>`).join("")}</tr></thead><tbody>${[1, 2].map(() => "<tr><td>…</td><td>…</td><td>…</td></tr>").join("")}</tbody></table><p><br></p>`);
@@ -405,10 +479,15 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		if (!block || block === root.current) return false;
 		const range = selection.getRangeAt(0).cloneRange(); range.setStart(block, 0);
 		const text = range.toString(), heading = /^(#{1,6})$/.exec(text);
-		const item = items.find(item => item.alias === ({ "-": "lb", "*": "lb", "1.": "bh", "[]": "rw", "[ ]": "rw", ">": "yy", "```": "dmk", "---": "fgx", ":::": "glk" } as Record<string, string>)[text]);
+		const item = allItems.find(item => item.alias === ({ "-": "lb", "*": "lb", "1.": "bh", "[]": "rw", "[ ]": "rw", ">": "yy", "```": "dmk", "---": "fgx", ":::": "glk" } as Record<string, string>)[text]);
 		if (!heading && !item) return false;
 		selection.removeAllRanges(); selection.addRange(range); document.execCommand("delete");
-		if (heading) command("formatBlock", `h${heading[1].length}`);
+		if (heading) {
+			const parent = block.parentElement, tag = `h${heading[1].length}`;
+			command("formatBlock", tag);
+			const headingNode = parent?.querySelector(tag);
+			if (headingNode && !headingNode.textContent) { range.selectNodeContents(headingNode); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); }
+		}
 		else if (item) command(item.action, "argument" in item ? item.argument : undefined);
 		const target = root.current.querySelector("[data-slash-insert]");
 		if (target) { target.removeAttribute("data-slash-insert"); range.selectNodeContents(target); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); }
@@ -426,6 +505,11 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: t("richOrderedList"), icon: <span>1.</span>, action: "insertOrderedList" },
 	];
 	return <div className="fp-rich-editor" onScrollCapture={(event) => { if (!(event.target as HTMLElement).closest(".fp-slash-menu")) { if (menu) inspectSlash(); } }}>
+		{wiki?.toolbarHost && createPortal(<WikiToolbar readOnly={readOnly} focused={!!wiki.focused} onWidth={wiki.onWidth ?? (() => {})} items={items.map(item => ({ id: item.alias, label: itemLabel(item), hint: hints[item.alias] ?? "", help: t(help[item.alias]), icon: icons[item.label] }))} popup={insertPopup} onPrepare={prepareInsert} onSelect={id => insertToolbar(id)} onPopup={setInsertPopup} />, wiki.toolbarHost)}
+		{diagrams.map(({ host, code }, index) => createPortal(<MermaidDiagram code={code} />, host, String(index)))}
+		{insertPopup && !readOnly && <WikiInsertPopover popup={insertPopup} onClose={() => { setInsertPopup(null); restoreInsert(); }}>
+			{insertPopup.kind === "table" ? <TableSizePicker onInsert={(columns, rows) => insertToolbar("bg", { columns, rows })} /> : insertPopup.kind === "code" ? <CodeLanguagePicker onInsert={language => insertToolbar("dmk", undefined, language)} /> : <div className="wiki-more-items" role="menu" onKeyDown={e => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")], index = buttons.indexOf(document.activeElement as HTMLButtonElement); buttons[(index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus(); } }}>{items.map(item => <button type="button" role="menuitem" key={item.alias} onClick={() => insertToolbar(item.alias)}><span className="wiki-insert-icon">{icons[item.label]}</span><span>{itemLabel(item)}<small>{t(help[item.alias])}</small></span><kbd>{hints[item.alias]}</kbd></button>)}</div>}
+		</WikiInsertPopover>}
 		{!wiki && <div className="fp-rich-toolbar" role="toolbar" aria-label={t("richFormatToolbar")}>
 			{formatTools.map((tool) => <Fragment key={tool.label}>
 				{tool.separator && <span className="fp-rich-toolbar-separator" aria-hidden="true" />}
@@ -451,7 +535,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{uploading && <div className="fp-notice" role="status">{t("richImageUploading")}</div>}
 		{imageError && <div className="fp-notice" role="alert">{imageError}</div>}
 		{wiki && floating && linkInput === null && createPortal(<div ref={floatingToolbar} className="wiki-format-popover" role="toolbar" aria-label={t("richFormatToolbar")} style={{ left: floating.x, top: floating.y }} onMouseDown={e => e.preventDefault()}>
-			{[{ label: t("richBold"), action: "bold", icon: <FiBold /> }, { label: t("richItalic"), action: "italic", icon: <FiItalic /> }, { label: `${t("richHeading")} 2`, action: "formatBlock", argument: "h2", icon: "H₂" }, { label: `${t("richHeading")} 3`, action: "formatBlock", argument: "h3", icon: "H₃" }].map(tool => <button key={tool.label} aria-label={tool.label} title={tool.label} disabled={readOnly} onClick={() => command(tool.action, tool.argument)}>{tool.icon}</button>)}
+			{[{ label: t("richBold"), action: "bold", icon: <FiBold /> }, { label: t("richItalic"), action: "italic", icon: <FiItalic /> }, { label: `${t("richHeading")} 2`, action: "formatBlock", argument: "h2", icon: <FiType /> }, { label: `${t("richHeading")} 3`, action: "formatBlock", argument: "h3", icon: <FiType /> }].map(tool => <button key={tool.label} aria-label={tool.label} title={tool.label} disabled={readOnly} onClick={() => command(tool.action, tool.argument)}>{tool.icon}</button>)}
 			<button aria-label={t("wikiAddLink")} title={t("wikiAddLink")} disabled={readOnly} onClick={() => { linkRange.current = highlightSelection()?.cloneRange() ?? null; setLinkInput(""); }}><FiLink /></button><i />
 			{TEXT_HIGHLIGHT_COLORS.slice(0, 2).map(color => <button className={`fp-highlight-swatch fp-highlight-${color.name}`} key={color.name} aria-label={t(`richHighlight_${color.name}`)} title={t(`richHighlight_${color.name}`)} disabled={readOnly} onClick={() => toggleHighlight(color)}><span /></button>)}<i />
 			<button className="wiki-ask-selection" onClick={() => { wiki.ask(window.getSelection()?.toString() ?? ""); setFloating(null); }}>{t("wikiAskPi")}</button>
@@ -463,7 +547,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			{matches.length ? matches.map((item, index) => <Fragment key={item.alias}>
 				{!wiki && (index === 0 || isBlock(item) !== isBlock(matches[index - 1])) && <div className="fp-slash-group" role="presentation">{t(isBlock(item) ? "richBlocksGroup" : "richTextGroup")}</div>}
 				<button type="button" role="option" aria-label={itemLabel(item)} aria-selected={index === active} id={`fp-slash-option-${index}`} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => insert(index)}>
-					<span className="fp-slash-icon" aria-hidden="true">{item.label === "richHeading" ? ("argument" in item ? item.argument.toUpperCase() : "H") : icons[item.label]}</span><span className="fp-slash-label">{itemLabel(item)}{wiki && <small>{t(help[item.alias])}</small>}</span><kbd aria-hidden="true">{wiki ? hints[item.alias] : `/${item.alias}`}</kbd>
+					<span className="fp-slash-icon" aria-hidden="true">{icons[item.label]}</span><span className="fp-slash-label">{itemLabel(item)}{wiki && <small>{t(help[item.alias])}</small>}</span><kbd aria-hidden="true">{wiki ? hints[item.alias] : `/${item.alias}`}</kbd>
 				</button></Fragment>) : <span className="wiki-slash-empty">{t(wiki ? "wikiNoInsertResults" : "richNoElements")}</span>}
 			</div>{wiki && <footer>{t("wikiInsertKeys")}</footer>}
 		</div>, document.body)}

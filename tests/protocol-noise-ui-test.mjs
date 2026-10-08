@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
+import { TOOL_TEXT_CONTINUE_PROMPT } from '../dist/server/tool-text.js';
 import { CHROME_PATH } from './lib/chrome.mjs';
 
 const port = 31000 + Math.floor(Math.random() * 10000);
@@ -41,8 +42,9 @@ try {
 		text(`empty-${i}`, '</think>\n</think>'),
 	]).flat(), text('suffix', suffix), text('answer', `检查完成。\n${suffix}`)];
 	let streaming = null;
+	let hasPlan = true;
 	const task = { id: 'task', sourceMessageId: 'question', title: '扩展配置', status: 'waiting', startedAt: Date.now(), completed: 0, steps: [], plan: { revision: 1, added: 0, removed: 0, items: [{ id: 'step', title: '扩展多 profile', status: 'running' }] } };
-	const send = () => socket.send(JSON.stringify({ type: 'snapshot', state: { ...baseState, piConfigured: true, messages, streamingMessage: streaming, isStreaming: !!streaming, taskProgress: { ...task, conversationId: baseState.conversationId } } }));
+	const send = () => socket.send(JSON.stringify({ type: 'snapshot', state: { ...baseState, piConfigured: true, messages, streamingMessage: streaming, isStreaming: !!streaming, taskProgress: hasPlan ? { ...task, status: streaming ? "running" : "waiting", conversationId: baseState.conversationId } : null } }));
 	await page.routeWebSocket('**/ws', route => {
 		socket = route;
 		const upstream = route.connectToServer();
@@ -85,20 +87,39 @@ try {
 	assert.equal(await page.locator('.msg-text', { hasText: '流式结果' }).textContent(), '流式结果');
 	const instruction = '<invoke name="edit"> <parameter name="path">fixture.py</parameter> <parameter name="edits">[{"oldText":"default","newText":"multi"}]</parameter> </invoke>';
 	streaming = null;
-	messages = [...messages, { ...text('unexecuted', `让我写扩展。\n${instruction}`), model: 'DeepSeek V4 Pro' }]; send();
+	messages = [...messages, { ...text('unexecuted', `让我写扩展。</think>\n${instruction}`), model: 'DeepSeek V4 Pro' }, { ...text('auto-reminder', TOOL_TEXT_CONTINUE_PROMPT, 'user'), timestamp: Date.now() }, text('empty-system', '  ', 'system')];
+	streaming = text('retry-live', ''); send();
+	await page.locator('.tool-reminder-event').waitFor();
+	await page.locator('.waiting-indicator').waitFor();
+	assert.equal(await page.locator('.unexecuted-tool').count(), 0);
+	assert.equal(await page.locator('.tool-unexecuted-inline').count(), 1);
+	assert.equal(await page.locator('.msg[data-msg-id="auto-reminder"]').count(), 0);
+	assert.equal(await page.locator('.msg[data-msg-id="empty-system"]').count(), 0);
+	assert.equal(await page.locator('.qn-tag[title*="你上一条回复"]').count(), 0);
+	assert.equal(await page.locator('.msg[data-msg-id="unexecuted"] .thinking.leaked').count(), 0);
+	await page.locator('.header-task-progress.reminding').waitFor();
+	await page.locator('.task-progress-status.reminding').waitFor();
+	await page.locator('.session-item.active .session-dot.streaming').waitFor();
+	assert.equal(await page.locator('.composer-action.stop').count(), 1);
+	streaming = null;
+	messages.push({ ...text('still-no-tool', '我会继续处理。'), model: 'DeepSeek V4 Pro' }); send();
 	await page.locator('.unexecuted-tool').waitFor();
-	assert.match(await page.locator('.unexecuted-tool').innerText(), /工具调用解析失败/);
-	assert.equal(await page.locator('.msg[data-msg-id="unexecuted"] .change-card').count(), 0);
-	await page.locator('.unexecuted-tool summary').click();
-	assert.equal(await page.locator('.unexecuted-tool pre').textContent(), instruction);
-	// Manual recovery resends the original question and its frozen attachments only.
+	assert.equal(await page.locator('.unexecuted-tool').count(), 1);
+	assert.match(await page.locator('.unexecuted-tool').innerText(), /工具调用未执行/);
+	assert.match(await page.locator('.unexecuted-tool header').innerText(), /自动提醒 1 次后停止/);
+	assert.equal(await page.locator('.tool-reminder-event').count(), 1);
+	assert.equal(await page.locator('.tool-recovery-actions select').count(), 0);
+	await page.locator('.tool-recovery-raw').click();
+	assert.equal(await page.locator('.unexecuted-tool pre').first().textContent(), instruction);
+	assert.equal(await page.locator('.unexecuted-tool pre').last().textContent(), '我会继续处理。');
+	// Recovery restores the ORIGINAL question and frozen attachments, not the reminder.
 	const question = messages.find(message => message.id === 'user-code');
 	question.questionText = '扩展多 profile';
 	question.userAttachments = [{ path: 'config.yaml', mode: 'inline', nativeRef: { entryId: 'user-code', index: 0 } }];
 	send();
 	await page.locator('.header-task-progress.interrupted').waitFor();
+	await page.locator('.session-item.active .session-dot.interrupted').waitFor();
 	await page.locator('.task-progress-status.interrupted').waitFor();
-	assert.equal(await page.locator('.task-progress-status.interrupted').innerText(), '中断');
 	assert.equal(await page.locator('.task-plan-step.interrupted .task-plan-mark').innerText(), '×');
 	const draft = page.locator('.inputbar textarea');
 	await draft.fill('保留我的草稿');
@@ -109,9 +130,10 @@ try {
 	assert.deepEqual(submitted[0].attachments, question.userAttachments);
 	assert.equal(await draft.inputValue(), '保留我的草稿');
 	assert.equal(await page.locator('.bash-row').count(), 6);
-	await page.locator('.tool-recovery-actions select').focus();
-	await page.locator('.tool-recovery-actions select option[value="fixture/other"]').waitFor({ state: 'attached' });
-	await page.locator('.tool-recovery-actions select').selectOption('fixture/other');
+	await page.getByRole('button', { name: '换个模型', exact: true }).click();
+	await page.getByRole('menuitemradio').waitFor();
+	await page.keyboard.press('ArrowDown');
+	await page.keyboard.press('Enter');
 	await sleep(100);
 	assert.equal(selectedModel, 'fixture/other');
 	assert.equal(submitted.length, 1, 'must await model confirmation before prompting');
@@ -120,28 +142,45 @@ try {
 	assert.equal(submitted.length, 2);
 	assert.equal(submitted[1].text, '扩展多 profile');
 	assert.notEqual(submitted[0].requestId, submitted[1].requestId);
-	assert.match(await page.locator('.unexecuted-tool p').innerText(), /DeepSeek V4 Pro/);
+	assert.match(await page.locator('.tool-recovery-body > p').innerText(), /DeepSeek V4 Pro/);
 	baseState.tree = { ...baseState.tree, externallyModified: true }; send();
 	await page.waitForFunction(() => document.querySelector('.tool-recovery-primary')?.disabled);
 	baseState.tree.externallyModified = false; send();
 	await page.waitForFunction(() => !document.querySelector('.tool-recovery-primary')?.disabled);
+	hasPlan = false; send();
+	await page.locator('.task-interrupted-hint').waitFor();
+	assert.equal(await page.locator('.task-empty-circles').count(), 0);
+	assert.match(await page.locator('.task-interrupted-hint').textContent(), /已中断/);
 	mkdirSync('tests/scratch', { recursive: true });
-	await page.locator('.unexecuted-tool pre').scrollIntoViewIfNeeded();
-	await page.screenshot({ path: 'tests/scratch/design19-recovery-light.png' });
-	// The complete original payload remains readable in a short, narrow window.
-	await page.setViewportSize({ width: 820, height: 500 });
-	assert.equal(await page.locator('.unexecuted-tool pre').evaluate(el => getComputedStyle(el).whiteSpace), 'pre-wrap');
+	for (const width of [390, 900, 1440]) {
+		await page.setViewportSize({ width, height: 900 });
+		await sleep(350);
+		assert(await page.locator(".header-task-progress.interrupted").isVisible());
+		await page.locator('.unexecuted-tool').scrollIntoViewIfNeeded();
+		assert(await page.locator('.unexecuted-tool').evaluate(el => { const r = el.getBoundingClientRect(); return el.scrollWidth <= el.clientWidth + 1 && r.left >= 0 && r.right <= innerWidth; }), `card exceeds viewport at ${width}`);
+		await page.getByRole('button', { name: '换个模型', exact: true }).click();
+		await page.getByRole('menu').waitFor();
+		assert(await page.getByRole('menu').evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }));
+		await page.keyboard.press('Escape');
+		assert.equal(await page.getByRole('menu').count(), 0);
+		await page.screenshot({ path: `tests/scratch/design33a-${width}.png` });
+	}
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'dark');
-	assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim().toLowerCase()), '#5ba3d6');
-	assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent-fg').trim()), '#fff');
-	await page.screenshot({ path: 'tests/scratch/design19-recovery-dark-narrow.png' });
+	await page.screenshot({ path: 'tests/scratch/design33a-dark.png' });
+	// A successful retry leaves only the inline event, without a final card.
+	const failedMessages = [...messages];
+	messages.push({ id: 'actual-call', role: 'assistant', content: [{ type: 'toolCall', id: 'actual-tool', name: 'read', argumentsText: '{"path":"README.md"}' }] }, text('recovered', '完成。')); send();
+	await page.waitForFunction(() => !document.querySelector('.unexecuted-tool'));
+	assert.equal(await page.locator('.header-task-progress.interrupted').count(), 0);
+	messages = failedMessages;
 	baseState.model = { ...baseState.model, id: 'original' }; send();
-	await page.locator('.tool-recovery-actions select').selectOption('fixture/other');
+	await page.getByRole('button', { name: '换个模型', exact: true }).click();
+	await page.getByRole('menuitemradio').click();
 	assert.equal(submitted.length, 2);
 	messages.push(text('user-instruction', instruction, 'user'), text('example-instruction', `\`\`\`xml\n${instruction}\n\`\`\``)); send();
 	await page.locator('.msg[data-msg-id="example-instruction"] pre').waitFor();
 	assert.equal(await page.locator('.unexecuted-tool').count(), 1);
-	assert.equal(await page.locator('.tool-recovery-actions').count(), 0);
+	assert.equal(await page.locator('.tool-recovery-primary').count(), 0);
 	assert.equal(await page.locator('.header-task-progress.interrupted').count(), 0);
 	baseState.model = { ...baseState.model, id: 'other' }; send();
 	await sleep(100);
@@ -152,6 +191,13 @@ try {
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
 	await page.waitForFunction(previous => document.querySelector('.mermaid-svg')?.innerHTML !== previous && !!document.querySelector('.mermaid-svg svg'), darkDiagram);
 	assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim().toLowerCase()), '#2f7aae');
+	// Short conversations and zero usage must not display empty controls.
+	messages = [text('tiny', '你好', 'user'), text('tiny-answer', '你好。')];
+	baseState.stats = { ...baseState.stats, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }, contextUsage: { percent: 0, tokens: 0, contextWindow: 64000 } }; send();
+	await page.locator('.msg[data-msg-id="tiny-answer"]').waitFor();
+	await page.locator('.messages').evaluate(el => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
+	assert.equal(await page.locator('.scroll-bottom').count(), 0);
+	assert.equal(await page.locator('.usage-trigger').count(), 0);
 	assert.deepEqual(errors, []);
 	console.log('PASS: six empty reasoning fragments, DSML suffix, answer preservation, inspectable reasoning, code/user text, streaming, manual recovery with attachments, model confirmation, interrupted plan, theme and Mermaid');
 } finally {

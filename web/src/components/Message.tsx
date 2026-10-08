@@ -30,7 +30,7 @@ import { GrepSummary, liveNestedCalls, ReadGroup, ToolCallBlock, type ToolView }
 import { EditWriteCard, EditWriteGroup } from "./EditWriteCard";
 import { useT, type Translate } from "../i18n";
 import { splitLeakedThinking } from "../leaked-thinking";
-import { unexecutedToolText } from "../tool-text";
+import { type ToolTextIncident, unexecutedToolText } from "../tool-text";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
 import { isRasterImage, fileToProcessedImage } from "../image-paste";
 import { splitFrontmatter } from "../read-presentation";
@@ -113,6 +113,7 @@ function editAttLabel(att: PromptAttachment, t: Translate): string {
 }
 
 interface MessageProps {
+	incident?: ToolTextIncident;
 	recovery?: ToolRecoveryActions;
 	toolsRunning?: boolean;
 	toolMessageIds?: ReadonlyMap<string, string>;
@@ -160,6 +161,7 @@ interface MessageProps {
 }
 
 export const Message = memo(function Message({
+	incident,
 	recovery,
 	toolsRunning,
 	toolMessageIds,
@@ -229,6 +231,8 @@ export const Message = memo(function Message({
 	// toolResult content is rendered inside its toolCall card — never standalone
 	// (otherwise the same output shows twice: formatted card + plain text).
 	if (message.role === "toolResult") return null;
+	if (message.origin === "auto-reminder") return <div className="tool-reminder-event" data-msg-id={message.id} title={message.content.map(b => b.type === "text" ? b.text : "").join("\n")}><span>↻ {t("toolReminderEvent")}{message.timestamp ? ` · ${formatTime(message.timestamp)}` : ""}</span></div>;
+	if (message.role === "system" && !message.content.some(b => b.type === "text" ? typeof b.text === "string" && b.text.trim() : b.type !== "thinking")) return null;
 	// Attached files are rendered as their own collapsible card, separate from
 	// the user message text.
 	const isFileAttachment =
@@ -393,7 +397,7 @@ export const Message = memo(function Message({
 				elements.push(<GrepSummary key={`${message.id}-${first.id}`} block={first} view={viewFor(first)} wrap={toolsWrap} />);
 				continue;
 			}
-			elements.push(<Block key={`${message.id}-${i}`} block={block} modelName={message.model ?? ""} recovery={recovery?.messageId === message.id ? recovery : undefined} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
+			elements.push(<Block key={`${message.id}-${i}`} suppressLeak={!!incident} block={block} user={message.role === "user"} toolResults={toolResults} liveOutputs={liveOutputs} toolStatuses={toolStatuses} streaming={streaming} isLast={isLast && i === message.content.length - 1} onKillBash={onKillBash} toolsWrap={toolsWrap} thinkingWrap={thinkingWrap} />);
 		}
 		return elements;
 	};
@@ -588,6 +592,7 @@ export const Message = memo(function Message({
 						) : (
 							renderContentBlocks(false)
 						)}
+						{incident && incident.last.id === message.id && incident.state === "stopped" ? <ToolRecoveryCard incident={incident} model={message.model || incident.first.model || t("unknown")} recovery={recovery?.messageId === message.id ? recovery : undefined} /> : incident?.leaks.some(m => m.id === message.id) && <div className="tool-unexecuted-inline"><span>✗</span> {t("toolUnexecutedInline")}{incident.reminders.length > 0 && <small> · {t("toolAutoReminded")}</small>}</div>}
 						{message.role === "user" && message.userAttachments?.map((a, i) => <details className="user-attachment-card" key={i}><summary>{a.path}</summary><pre>{a.preview}</pre></details>)}
 						{foldableUser && userOverflow && !editing && !skillBlock && <button type="button" className="user-message-expand" onClick={() => setUserExpanded(value => !value)}>{userExpanded ? t("collapseCode") : t("expandAllLines", { n: userLineCount })}</button>}
 
@@ -760,7 +765,7 @@ function SkillCard({ block }: { block: SkillBlock }) {
 }
 
 function Block({
-	recovery, modelName,
+	suppressLeak,
 	block,
 	user,
 	toolResults,
@@ -773,8 +778,7 @@ function Block({
 	toolsWrap,
 }: {
 	block: UiContentBlock;
-	modelName?: string;
-	recovery?: ToolRecoveryActions;
+	suppressLeak?: boolean;
 	user?: boolean;
 	toolResults: ReadonlyMap<string, UiMessage>;
 	liveOutputs: ReadonlyMap<string, { toolName: string; text: string; codemode?: UiMessage["codemode"] }>;
@@ -796,21 +800,20 @@ function Block({
 		// it folds away the moment the tag completes. Skipping this during
 		// streaming meant the leak sat in plain view for the whole turn,
 		// which is precisely when the user is watching.
-		const failedCall = !user && !streaming ? unexecutedToolText(text.text) : null;
+		const failedCall = !user && (!streaming || suppressLeak) ? unexecutedToolText(text.text) : null;
 		const displayText = failedCall ? failedCall.before : text.text;
 		const leak = user ? null : splitLeakedThinking(displayText);
 		const body = leak ? leak.visible : displayText;
 		if (!body.trim() && !leak?.leaked.trim() && !failedCall && !text.truncated) return null;
 		return (
 			<div className={`msg-text${!user && !isLast && isProcessNarration(body) ? " process-narration" : ""}`}>
-				{leak?.leaked && <LeakedThinkingBlock text={leak.leaked} />}
+				{leak?.leaked && !suppressLeak && <LeakedThinkingBlock text={leak.leaked} />}
 				{body &&
 					(live ? (
 						<StreamMarkdown text={user ? preserveUserTree(body) : body} />
 					) : (
 						<Markdown text={user ? preserveUserTree(body) : body} fileLinks={user} />
 					))}
-				{failedCall && <ToolRecoveryCard raw={failedCall.raw} model={modelName || t("unknown")} recovery={recovery} />}
 				{text.truncated && <div className="trunc-note">{t("truncated")}</div>}
 			</div>
 		);

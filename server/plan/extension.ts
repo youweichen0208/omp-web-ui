@@ -52,7 +52,7 @@ export const createPlanExtension = (): ExtensionFactory => pi => {
 		exposure: "model-only", executionMode: "sequential", defaultActive: false,
 		annotations: { readOnlyHint: true, openWorldHint: false },
 		promptSnippet: "Record and update a multi-step implementation plan.",
-		promptGuidelines: ["For multi-step implementation, create or update a relevant plan before execution and update the current step before starting it. Submit the full state each time. Wait for create to return its identity before updating. Follow user and skill instructions, including waiting; a plan does not grant authorization. Ordinary questions need no plan. Mark completion explicitly; never infer it from a stopped run."],
+		promptGuidelines: ["For multi-step implementation, create or update a relevant plan before execution and update the current step before starting it. Submit the full state each time. Wait for create to return its identity before updating. Follow user and skill instructions, including waiting; a plan does not grant authorization. Ordinary questions need no plan. When work is merged into another step or becomes unnecessary, update or remove the superseded step and explain the change instead of leaving a stale pending item. Never mark unfinished work completed. Mark completion explicitly; never infer it from a stopped run."],
 		parameters: planParameters,
 		async execute(_id, args, _signal, _update, ctx) {
 			const snapshot = transition(args, latestPlan(ctx.sessionManager.getBranch())?.snapshot);

@@ -1,3 +1,4 @@
+import { isToolTextContinuation } from "./tool-text.js";
 import { planFromTranscript as nativePlanFromTranscript } from "./plan/progress.js";
 import type { TaskProgress, TaskStep, UiMessage, UiToolCallBlock } from "./protocol.js";
 
@@ -17,7 +18,7 @@ function taskTitle(messages: UiMessage[], userIndex: number, steps: TaskStep[]):
 	const current = textOf(messages[userIndex]);
 	if (vagueRequest(current)) {
 		for (let index = userIndex - 1; index >= 0; index--) {
-			if (messages[index].role !== "user") continue;
+			if (messages[index].role !== "user" || isToolTextContinuation(messages, index)) continue;
 			const previous = textOf(messages[index]);
 			if (!vagueRequest(previous) && !greeting.test(previous.trim()) && previous.trim()) return short(previous, 56);
 		}
@@ -126,7 +127,7 @@ function planFromTranscript(tail: UiMessage[], results: Map<string, UiMessage>, 
  * transcript remains authoritative; no browser heuristic decides completion. */
 export function deriveTaskProgress(conversationId: string, messages: UiMessage[], streamingMessage: UiMessage | null, isStreaming: boolean, turnEndedAt?: number): TaskProgress | null {
 	const recorded = nativePlanFromTranscript([...messages, ...(streamingMessage ? [streamingMessage] : [])]);
-	const latestUserIndex = messages.findLastIndex((message) => message.role === "user" && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
+	const latestUserIndex = messages.findLastIndex((message, index) => message.role === "user" && !isToolTextContinuation(messages, index) && message.content.some((part) => part.type === "text" && typeof (part as { text?: unknown }).text === "string"));
 	if (latestUserIndex < 0) return null;
 	const userIndex = latestUserIndex;
 	const user = messages[userIndex];
