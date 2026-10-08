@@ -215,7 +215,7 @@ npm publish --access public
 
 注意事项：版本号必须高于 npm registry；提交信息不要带 `Co-authored-by`；升级后需手动重启服务 `pi-web-ui server restart`；发布前检查示例文件不泄密。
 
-桌面版发布是独立的一条线（跟 npm 发布不绑在一起）：打一个 `v*` tag push 上去，`.github/workflows/release-desktop.yml` 先创建草稿，在 mac/win/linux 真机 runner 上构建、执行打包产物回归，再上传附件；三个平台全部成功且附件齐全后才公开。使用 GitHub 自带的 `GITHUB_TOKEN`，带 `-` 的 beta tag 标记 prerelease。mac 使用 ad-hoc 签名，首次打开可能需要右键「打开」。手动单平台重建只更新附件，不单独公开草稿。
+桌面版发布是独立的一条线（跟 npm 发布不绑在一起）：打一个 `v*` tag push 上去，`.github/workflows/release-desktop.yml` 先创建草稿，在 mac/win/linux 真机 runner 上构建、执行打包产物回归，再上传附件；三个平台全部成功且附件齐全后才公开。使用 GitHub 自带的 `GITHUB_TOKEN`，带 `-` 的 beta tag 标记 prerelease。mac 只有 ad-hoc 签名、未公证：macOS 14 及更早右键「打开」，macOS 15 及以后需在「系统设置 → 隐私与安全性」点「仍要打开」；Windows 未签名，SmartScreen 点「更多信息 → 仍要运行」。正式签名需要修改 `electron-builder.yml`，仅加 Secrets 不会生效。手动单平台重建只更新附件，不单独公开草稿。
 Windows job 的终端冒烟测试必须通过才能上传安装包；`AttachConsole failed` 清理竞态由 `server/patch-node-pty.ts` 处理，不能以 `continue-on-error` 跳过终端读写失败。
 
 ## 7. 环境变量
