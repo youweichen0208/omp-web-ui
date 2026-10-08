@@ -4,18 +4,18 @@
   pi-web-ui launchd agent — macOS auto-start at login.
 
   Install:
-    npm i -g pi-web-ui
-    cp deploy/com.xingshuyin.pi-web-ui.plist ~/Library/LaunchAgents/
+    npm i -g @youweichen/pi-web-ui
+    cp deploy/com.youweichen.pi-web-ui.plist ~/Library/LaunchAgents/
     # edit ProgramArguments / WorkingDirectory / PI_WEB_CWD for your setup
-    launchctl load ~/Library/LaunchAgents/com.xingshuyin.pi-web-ui.plist
-    # (or: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.xingshuyin.pi-web-ui.plist)
+    launchctl load ~/Library/LaunchAgents/com.youweichen.pi-web-ui.plist
+    # (or: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.youweichen.pi-web-ui.plist)
 
   Find the pi-web-ui binary path with: which pi-web-ui
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.xingshuyin.pi-web-ui</string>
+  <string>com.youweichen.pi-web-ui</string>
 
   <key>ProgramArguments</key>
   <array>
