@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-web-ui`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 1.0.0 首个正式版
+
+从 origin/develop 发布，功能与 0.99.14 一致，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、SSH `TCP_NODELAY`、生产依赖漏洞清零、标题改为 pi-harness、macOS 服务标识迁移，并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v40 不变。npm 上一版为 0.9.0，本次同时发布 npm；说明见 `.github/release-notes/v1.0.0.md`。
+
 ## 0.99.14 Wiki 文档页 v2 与工具恢复状态
 
 实现 34a Wiki 工具栏、表格/代码插入、Mermaid、本地衬线标题和宽版；实现 33a 工具异常统一状态、单次提醒与恢复卡片，修复自动提醒误确认历史计划。合入 develop 的 PR #22，保留 #21。SDK 1.0.4、协议 v40 不变。GitHub 桌面发布由三平台构建及产物回归完成后公开；说明见 `.github/release-notes/v0.99.14.md`。
@@ -242,7 +246,7 @@ curl -s https://registry.npmjs.org/@youweichen/pi-web-ui/latest | jq .version
 
 ## 注意事项
 
-- 版本号必须在当前发布线递增且尚未占用；发布前用 `npm view @youweichen/pi-web-ui dist-tags --json` 核对。当前从 `0.6.x` 升至 `0.7.x`，不要为超过历史 `0.51.x` 擅自跳号。
+- 版本号必须递增且尚未占用；发布前用 `npm view @youweichen/pi-web-ui dist-tags --json` 核对。`1.0.0` 起高于历史上所有版本（包括旧的 `0.51.x`），`npm publish` 会把 `latest` 指向新版本；此前 `latest` 停在 `0.9.0`，0.10–0.99.x 未发布到 npm。
 - 提交信息不要带 `Co-authored-by`（P1 规则，仓库 hook 会拦）。
 - `.pi/commands.json` 是**每个项目各自**的个人命令（当前 cwd 的 `.pi/ 下），已被 gitignore，永远不会进公开仓库；切换 cwd 时命令列表自动刷新为该项目的命令。
 - 大改动发布前先问用户是否要 `npm publish`（会真实消耗账号权限、触发构建）。
