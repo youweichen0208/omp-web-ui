@@ -595,7 +595,7 @@ export class ClientSession {
 	 * (the model choice is client-wide), so later conversations reuse the
 	 * instance created with the first one.
 	 */
-	private makeRuntimeFactory(): CreateAgentSessionRuntimeFactory {
+	private makeRuntimeFactory(refreshResources = false, state?: Pick<AgentSession, "model" | "thinkingLevel">): CreateAgentSessionRuntimeFactory {
 		return async ({ cwd, sessionManager }) => {
 			const services = await createAgentSessionServices({
 				cwd,
@@ -604,7 +604,9 @@ export class ClientSession {
 				settingsManager: conversationSettings(cwd, this.agentDir),
 				resourceLoaderOptions: { extensionFactories: nativeToolExtensions() },
 			});
-			const created = await createAgentSessionFromServices({ services, sessionManager });
+			// A second native reload invalidates the process-wide extension factory cache.
+			if (refreshResources) { await services.resourceLoader.reload(); refreshResources = false; }
+			const created = await createAgentSessionFromServices({ services, sessionManager, model: state?.model, thinkingLevel: state?.thinkingLevel });
 			return { ...created, services, diagnostics: services.diagnostics };
 		};
 	}
@@ -1437,6 +1439,7 @@ export class ClientSession {
 		cwd: () => this.cwd,
 		getSession: () => this.session,
 		startNewSession: () => this.startNewSession(),
+		restartSession: (conversationId) => this.restartSession(conversationId),
 		treeCommand: async (name, args, context) => {
 				const conv = this.conv;
 				if (conv.id !== context.conversationId) return;
@@ -1611,11 +1614,14 @@ export class ClientSession {
 			onAccepted?.(ok);
 		};
 		try {
+			if (this.restartingSession) throw new Error("当前会话正在重启，请稍后重试。");
 			if (!["tree", "fork"].includes(parseSlash(text)?.name ?? "")) await conv.tree?.waitForVerification();
 			const s = conv.session;
-			await flushPromptReload(s);
-			const promptReloadError=promptReloadStatus(s).reloadError;
-			if(promptReloadError)throw new Error(`Native prompt reload failed: ${promptReloadError}`);
+			if (parseSlash(text)?.name !== "restart") {
+				await flushPromptReload(s);
+				const promptReloadError = promptReloadStatus(s).reloadError;
+				if (promptReloadError) throw new Error(`Native prompt reload failed: ${promptReloadError}`);
+			}
 			if (this.conv !== conv || conv.session !== s) throw new Error("Conversation changed");
 			const extensionCommand = text.startsWith("/") && s.extensionRunner.getCommand(text.slice(1).split(" ", 1)[0]);
 			if (!extensionCommand) { attachments = resolveNativeAttachments(s, attachments); validateEditorSnapshots(this.cwd, attachments); }
@@ -1892,8 +1898,41 @@ export class ClientSession {
 		}
 	}
 
+	private restartingSession = false;
+	/** Recreate only this conversation's native runtime; retain its exact branch and PTYs. */
+	async restartSession(conversationId: string): Promise<void> {
+		const conv = this.conv;
+		if (conv.id !== conversationId || this.switchingWorkspace || this.creatingConversation) throw new Error("对话正在切换或重启，请稍后重试。");
+		if (this.quiesceBlocked()) throw new Error("服务暂停接收新操作。");
+		conv.tree?.assertWritable();
+		if (!conv.session.isIdle || isRecovering(conv.recovery)) throw new Error("请先停止当前任务，再重启会话。");
+		this.restartingSession = true;
+		let replacement: AgentSessionRuntime | undefined;
+		try {
+			const previous = conv.runtime, model = conv.session.model, thinking = conv.session.thinkingLevel;
+			replacement = await createAgentSessionRuntime(this.makeRuntimeFactory(true, { model, thinkingLevel: thinking }), {
+				cwd: conv.cwd, agentDir: this.agentDir, sessionManager: conv.session.sessionManager,
+			});
+			if (this.disposed || this.conv !== conv) throw new Error("对话已切换。");
+			await previous.dispose();
+			conv.unsubscribe?.(); conv.unsubscribe = undefined;
+			conv.tree?.dispose(); conv.tree = undefined;
+			conv.runtime = replacement; replacement = undefined;
+			conv.recovery = {}; conv.treeProjectionRevision = undefined;
+			conv.uiMessageCache.clear(); conv.lastMessagesSig = "";
+			await this.bindSession(conv);
+			await this.pushSlashCommands();
+			this.pushSettings(); this.emitConversations(); this.flushSnapshot(true);
+			this.emit({ type: "notice", conversationId: conv.id, level: "info", text: "当前会话已重启，历史记录已保留。" });
+		} finally {
+			try { await replacement?.dispose(); }
+			finally { this.restartingSession = false; }
+		}
+	}
+
 	/** /new delegates session creation and history persistence to the SDK; the Web slot is reused. */
 	async startNewSession(): Promise<void> {
+		if (this.restartingSession) { this.emitNotice("warning", "当前会话正在重启，请稍后重试。"); return; }
 		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (this.quiesceBlocked()) return;
 		const previous = this.conv;
@@ -1925,6 +1964,7 @@ export class ClientSession {
 	}
 
 	async newChat(fresh = false, wiki = false): Promise<boolean> {
+		if (this.restartingSession) { this.emitNotice("warning", "当前会话正在重启，请稍后重试。"); return false; }
 		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return false; }
 		if (this.creatingConversation) return false;
 		this.creatingConversation = true;
@@ -2103,6 +2143,7 @@ export class ClientSession {
 
 	/** Switch the ACTIVE conversation without interrupting any other chat. */
 	async switchConversation(id: string): Promise<void> {
+		if (this.restartingSession) { this.emitNotice("warning", "当前会话正在重启，请稍后重试。"); return; }
 		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (!this.convs.has(id) || id === this.activeId) return;
 		const displaced = this.displaceActive();
@@ -2331,6 +2372,7 @@ export class ClientSession {
 	 * user opened history while it was streaming.
 	 */
 	async switchSession(path: string): Promise<void> {
+		if (this.restartingSession) { this.emitNotice("warning", "当前会话正在重启，请稍后重试。"); return; }
 		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		if (this.quiesceBlocked()) return;
 		let openedRuntime: AgentSessionRuntime | null = null;
@@ -2618,9 +2660,14 @@ export class ClientSession {
 
 	private cwdQueue: { path: string; id?: string; source?: "ui"; done: () => void } | null = null;
 	private cwdSwitchRunning = false;
-	get switchingWorkspace(): boolean { return this.cwdSwitchRunning; }
+	get switchingWorkspace(): boolean { return this.cwdSwitchRunning || this.restartingSession; }
 
 	async setCwd(path: string, id?: string, source?: "ui"): Promise<void> {
+		if (this.restartingSession) {
+			if (id) this.emit({ type: "cwd_result", requestId: id, cwd: this.cwd, ok: false, error: "当前会话正在重启，请稍后重试。" });
+			else this.emitNotice("warning", "当前会话正在重启，请稍后重试。");
+			return;
+		}
 		if (this.conv.tree?.busy) { this.emitNotice("warning", "等待当前切换完成。"); return; }
 		return new Promise<void>((done) => {
 			if (this.cwdQueue) {

@@ -17,6 +17,7 @@ Pi 1.0 工具结果的 `nestedCalls` 投影为独立子调用记录（参数、�
 - **服务端是唯一事实源**：每次 SDK 事件后节流 60ms 推快照（`UiState`），浏览器只按快照渲染。重连只需重发 `get_state`。
 - **增量快照（协议 v2）**：持久化消息内容不可变 + 对象引用稳定，`emitSnapshotNow` 用 O(n) 指针等同性遍历检测追加式增长——能追加则发 `snapshot_delta`（轻字段 + `appended` 尾部，baseRev 链），中途变更/截断/切会话/强制 resync 回落全量 `snapshot`。前端 reducer 按 rev 链合并，缺口触发防抖 `get_state`；背压下 delta 与 snapshot 同样可丢弃，丢包靠 rev 链断裂自愈。`get_state` 恒返全量。回归：`snapshot-delta-test`。**测试适配**：等「动作后快照」的测试必须同时接受 snapshot_delta（参照 conv-cwd/vision-bridge 的 rev 链合并写法）；连接后的首个快照恒为全量。
 - **WS permessage-deflate**：WebSocketServer 开启压缩（threshold 16KB），大会话多 MB snapshot 线上传输降数倍；小消息（notice/心跳）不压省 CPU。
+- `/restart` 仅重建当前对话的原生运行环境，重新加载扩展代码并清除扩展内存状态；复用原 SessionManager，保留当前历史分支、模型、思考档位和手动终端，其他对话继续运行。任务或恢复操作进行中时拒绝重启；准备新运行环境失败时保留旧会话。重启期间拒绝项目/会话切换，新环境就绪后重新绑定扩展 UI 并推送快照。它不会重启服务端进程，也不会发起模型请求。
 - `/reload` 使用带 `conversationId`、`requestId` 的 `reload_status` 事件发送运行中及完成状态，包含资源数量、名称、耗时和加载诊断；前端按请求更新同一条对话事件，不通过通用 notice 浮层。事件保存在当前标签页的 sessionStorage，刷新后仍可查看，不写入 Agent 上下文。
 - **多标签页序列化共享**：emit 把同一消息对象发给客户端的所有 socket，index.ts 用 WeakMap 按对象身份缓存 stringify 结果——N 个标签页共享一次序列化，新 snapshot 即新对象自动失效。
 - 序列化时**对象引用稳定**：`uiMessageCache` + 消息数组签名比对，消息没变就不重建数组，前端 `React.memo` 因此能跳过整条消息——**不要**破坏这个缓存（stable id、引用复用）。

@@ -42,6 +42,7 @@ const ALL = [
 	"session-tree-test",
 	"tool-output-test",
 	"recovery-service-test",
+	"restart-session-test",
 	"system-prompt-test",
 	"conv-cwd-test",
 	"db-client-test",

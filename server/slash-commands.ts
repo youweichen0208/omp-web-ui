@@ -25,6 +25,7 @@ export interface SlashHost {
 	/** 活动对话的 session。 */
 	getSession: () => AgentSession;
 	startNewSession: () => Promise<void>;
+	restartSession?: (conversationId: string) => Promise<void>;
 	setModel: (modelId: string) => Promise<void>;
 	setCwd: (path: string) => Promise<void>;
 	setThinking: (level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") => void;
@@ -56,6 +57,7 @@ export const NATIVE_COMMANDS: {
 	{ name: "fork", description: "选择用户消息派生新会话", descriptionEn: "Choose a user message to fork" },
 	{ name: "name", description: "重命名当前会话", descriptionEn: "Rename this session", argumentHint: "<名称>", argumentHintEn: "<name>" },
 	{ name: "new", description: "新建会话，保留当前会话历史", descriptionEn: "Start a new session, keeping previous history" },
+	{ name: "restart", description: "重启当前会话运行环境，保留历史", descriptionEn: "Restart this session runtime, keeping history" },
 	{ name: "model", description: "切换模型", descriptionEn: "Switch model", argumentHint: "[名称]", argumentHintEn: "[name]" },
 	{ name: "compact", description: "压缩上下文", descriptionEn: "Compact context", argumentHint: "[说明]", argumentHintEn: "[instructions]" },
 	{ name: "cwd", description: "切换工作目录", descriptionEn: "Switch workspace", argumentHint: "<路径>", argumentHintEn: "<path>" },
@@ -150,6 +152,10 @@ export class SlashCommandsService {
 				return true;
 			case "new":
 				await this.host.startNewSession();
+				return true;
+			case "restart":
+				if (!this.host.restartSession) throw new Error("Session restart unavailable");
+				await this.host.restartSession(context.conversationId);
 				return true;
 			case "model": {
 				if (!args) {
