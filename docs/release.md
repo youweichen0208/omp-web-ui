@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 1.1.0 节点 Agent 与工作区修复
+
+合入最新 develop，交付 #31–#45：SSH 原生远端 Agent、文件创建、Wiki 面板与大文档性能、会话重启、Plan／扩展／拖放修复及工具卡片优化。SDK 1.0.4、协议 v41 不变。发布 npm latest 和三平台桌面 Release；说明见 `.github/release-notes/v1.1.0.md`。
+
 ## 1.0.0 首个正式版
 
 从 origin/develop 发布，功能在 0.99.16 的基础上，补齐发布前审查：DNS rebinding、路径与符号链接、桌面口令与子进程口令隔离、口令 cookie 只发给已认证请求、防嵌入响应头、`clientId` 校验、`auth.json` 加锁与私有文件权限、WebSocket 异常消息容错、空闲会话回收、强制恢复打开原会话、长会话缓存与消息 ID 稳定、改动面板未跟踪文件与大差异、Wiki 段间距与大文档输入、Docker 数据持久化与默认只绑本机、SSH `TCP_NODELAY`、生产依赖漏洞清零、npm 包、命令、服务与应用标识统一改名为 pi-harness（不兼容旧包），并更正 macOS 15 与 Windows 首次打开说明。SDK 1.0.4、协议 v41。旧包 `@youweichen/pi-web-ui` 停在 0.9.0，新包从 1.0.0 开始；说明见 `.github/release-notes/v1.0.0.md`。
