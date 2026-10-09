@@ -2,6 +2,10 @@
 
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
+## 1.2.0 文档转换与 OKF 知识整理
+
+新增默认开启的原生 PDF 转 Markdown 与 OKF Wiki 扩展，支持本地解析、来源归档、Agent 候选核对、冲突草稿、增量恢复与人工编辑保护。合入最新 develop，SDK 1.0.4、协议 v41 不变。发布 npm latest 与三平台桌面 Release；说明见 `.github/release-notes/v1.2.0.md`。本地解析环境和模型单独 setup，macOS arm64 已完成真实离线资格验证。
+
 ## 1.1.0 节点 Agent 与工作区修复
 
 合入最新 develop，交付 #31–#45：SSH 原生远端 Agent、文件创建、Wiki 面板与大文档性能、会话重启、Plan／扩展／拖放修复及工具卡片优化。SDK 1.0.4、协议 v41 不变。发布 npm latest 和三平台桌面 Release；说明见 `.github/release-notes/v1.1.0.md`。
