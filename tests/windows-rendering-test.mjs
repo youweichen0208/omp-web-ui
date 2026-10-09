@@ -61,14 +61,38 @@ try {
 		const { root } = await cdp.send('DOM.getDocument'); const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '.msg-text h2' });
 		const rendered = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
 		assert(rendered.fonts.some(font => font.familyName === 'UI SC' && font.isCustomFont && font.glyphCount > 0), JSON.stringify(rendered));
-		const metrics = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio, platform: document.documentElement.dataset.platform, appearance: document.documentElement.dataset.appearance, bodySize: getComputedStyle(document.body).fontSize }));
+		const { nodeId: monoNode } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-tree-node=".ruff_cache"] .file-name' });
+		const monoFonts = await cdp.send('CSS.getPlatformFontsForNode', { nodeId: monoNode });
+		assert(monoFonts.fonts.some(font => font.familyName === 'JetBrains Mono' && font.isCustomFont), JSON.stringify(monoFonts));
+		const metrics = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio, platform: document.documentElement.dataset.platform, appearance: document.documentElement.dataset.appearance, bodySize: getComputedStyle(document.body).fontSize, fontSmoothing: getComputedStyle(document.body).webkitFontSmoothing, monoWidth: (() => { const range = document.createRange(); range.selectNodeContents(document.querySelector('[data-tree-node=".ruff_cache"] .file-name')); return range.getBoundingClientRect().width; })() }));
+		if (process.platform === 'win32') assert.equal(metrics.fontSmoothing, 'auto');
 		assert.equal(metrics.bodySize, process.platform === 'win32' ? '14.5px' : '14px');
 		assert.equal(metrics.width, 1440); assert.equal(metrics.height, 900); assert.equal(metrics.dpr, scale);
 		for (const selector of ['.panel-right > .panel-title > span:first-child', '.bash-group-head > span']) for (const item of await page.locator(selector).all()) assert.equal(await item.evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap');
 		await page.mouse.move(720, 880); await page.screenshot({ path: join(output, `${prefix}-conversation.png`) });
-		const scroll = page.locator('.file-tree');
-		if (await scroll.count()) { await scroll.hover(); await page.screenshot({ path: join(output, `${prefix}-scrollbar.png`) }); }
-		writeFileSync(join(output, `${prefix}-metrics.json`), JSON.stringify({ ...metrics, nativeWindow, fonts, renderedFonts: rendered.fonts }, null, 2));
+		const scroll = page.locator('.panel-right > .panel-body');
+		await scroll.waitFor();
+		assert(await scroll.evaluate(el => el.scrollHeight > el.clientHeight), 'fixture must exercise a real scroll container');
+		const scrollbarState = () => scroll.evaluate(el => { const track = getComputedStyle(el, '::-webkit-scrollbar'), thumb = getComputedStyle(el, '::-webkit-scrollbar-thumb'); return { width: track.width, border: thumb.borderLeftWidth, radius: thumb.borderRadius, background: thumb.backgroundColor, scrollTop: el.scrollTop }; });
+		// Chromium's computed custom-scrollbar pseudo style can remain transparent
+		// while the hover thumb is painted. Sample the rendered track instead.
+		const thumbPixel = async y => {
+			const png = (await scroll.screenshot()).toString('base64');
+			return page.evaluate(async ({ png, y, scale }) => { const img = new Image(); img.src = `data:image/png;base64,${png}`; await img.decode(); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return [...ctx.getImageData(img.width - Math.round(4 * scale), Math.round(y * scale), 1, 1).data]; }, { png, y, scale });
+		};
+		const resting = { ...await scrollbarState(), pixel: await thumbPixel(12) };
+		assert.equal(resting.width, '8px'); assert.equal(resting.border, '2px'); assert.equal(resting.radius, '4px'); assert.equal(resting.background, 'rgba(0, 0, 0, 0)');
+		await scroll.hover(); const hovered = { ...await scrollbarState(), pixel: await thumbPixel(12) };
+		assert.notDeepEqual(hovered.pixel, resting.pixel, 'hover paints the previously transparent thumb');
+		await page.screenshot({ path: join(output, `${prefix}-scrollbar.png`) });
+		const bounds = await scroll.boundingBox();
+		await app.evaluate(({app, BrowserWindow})=>{app.focus({steal:true});BrowserWindow.getAllWindows()[0].focus();}); await page.mouse.move(bounds.x + bounds.width - 4, bounds.y + 12); await page.mouse.down();
+		await page.mouse.move(bounds.x + bounds.width - 4, bounds.y + 80, { steps: 8 });
+		const dragged = { ...await scrollbarState(), pixel: await thumbPixel(80) };
+		await page.screenshot({ path: join(output, `${prefix}-scrollbar-drag.png`) });
+		await page.mouse.up(); assert(dragged.scrollTop > 0, 'scrollbar thumb can be dragged');
+		assert(dragged.pixel[0] < hovered.pixel[0], `dragging darkens the thumb: ${JSON.stringify({ hovered, dragged })}`);
+		writeFileSync(join(output, `${prefix}-metrics.json`), JSON.stringify({ ...metrics, nativeWindow, fonts, renderedFonts: rendered.fonts, monoFonts: monoFonts.fonts, scrollbar: { resting, hovered, dragged } }, null, 2));
 		await app.close(); app = undefined;
 		console.log(`PASS actual ${prefix} Electron: platform, fonts, SVG icons, labels, 1440x900 screenshots`);
 	}
