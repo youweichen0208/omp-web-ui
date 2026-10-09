@@ -150,7 +150,7 @@ export function prepareRichDocument(source: string, wiki = false): RichDocument 
 		if (node.type === "heading" && node.depth === 1) firstHeading = false;
 		blocks.push({
 			raw, prefix: source.slice(end, start), protected: protectedBlock, hidden,
-			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, remarkTextHighlight, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={[rehypeHighlight]}>{(wiki ? renderWikiLinks(raw) : raw) + "\n\n" + definitions}</ReactMarkdown>),
+			html: protectedBlock ? "" : renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm, remarkTextHighlight, preserveInlineHtml, remarkHighlightBlock]} rehypePlugins={wiki ? [] : [rehypeHighlight]}>{(wiki ? renderWikiLinks(raw) : raw) + "\n\n" + definitions}</ReactMarkdown>),
 		});
 		end = stop;
 	}
@@ -160,10 +160,10 @@ export function prepareRichDocument(source: string, wiki = false): RichDocument 
 /** Initialize only on open or an external source replacement, never on a keystroke. */
 export function mountRichDocument(root: HTMLElement, document: RichDocument, sourceLabel: string): void {
 	root.replaceChildren();
-	let sourceOffset = 0;
+	let sourceLine = 1;
 	document.blocks.forEach((block, index) => {
-		sourceOffset += block.prefix.length;
-		const startLine = document.source.slice(0, sourceOffset).split("\n").length;
+		sourceLine += block.prefix.split("\n").length - 1;
+		const startLine = sourceLine;
 		const wrapper = root.ownerDocument.createElement("div");
 		wrapper.dataset.richBlock = String(index);
 		wrapper.dataset.sourceStart = String(startLine);
@@ -185,7 +185,7 @@ export function mountRichDocument(root: HTMLElement, document: RichDocument, sou
 		}
 		wrapper.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((input) => { input.disabled = false; });
 		root.append(wrapper);
-		sourceOffset += block.raw.length;
+		sourceLine += block.raw.split("\n").length - 1;
 		block.html = wrapper.innerHTML;
 	});
 	if (!document.blocks.length) root.innerHTML = "<p><br></p>";

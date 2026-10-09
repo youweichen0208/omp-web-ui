@@ -42,9 +42,10 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 	const root = useRef<HTMLDivElement>(null);
 	const codeHighlighter = useRef<ReturnType<typeof createRichCodeHighlighter> | null>(null);
 	useEffect(() => () => { codeHighlighter.current?.dispose(); codeHighlighter.current = null; }, []);
-	const paintCode = (code: HTMLElement) => {
+	const paintCode = (code: HTMLElement, lazy = false) => {
 		codeHighlighter.current ??= createRichCodeHighlighter(!!wiki);
-		codeHighlighter.current.update(code);
+		if (lazy) codeHighlighter.current.observe(code);
+		else codeHighlighter.current.update(code);
 	};
 	const selectedCode = () => {
 		const selection = window.getSelection(), node = selection?.anchorNode;
@@ -157,7 +158,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 			control.value = language;
 			control.disabled = readOnly;
 			control.setAttribute("aria-label", t("richCodeLanguage"));
-			paintCode(code);
+			paintCode(code, true);
 		});
 	}, [value, readOnly, t]);
 	useLayoutEffect(() => {

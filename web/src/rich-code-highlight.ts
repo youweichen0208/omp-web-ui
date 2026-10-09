@@ -17,6 +17,7 @@ export function createRichCodeHighlighter(wiki = false) {
 	const registry = (CSS as unknown as { highlights?: Map<string, Paint> }).highlights;
 	const Constructor = (window as unknown as { Highlight?: new (...ranges: Range[]) => Paint }).Highlight;
 	const blocks = new Map<HTMLElement, { group: Group; range: Range }[]>();
+	const baselines = new Map<HTMLElement, { html: string; language: string; nodes: Text[] }>();
 	const clear = (code: HTMLElement) => {
 		for (const { group, range } of blocks.get(code) ?? []) {
 			const name = `rich-code-${group}`, paint = registry?.get(name);
@@ -24,15 +25,32 @@ export function createRichCodeHighlighter(wiki = false) {
 			if (paint?.size === 0) registry?.delete(name);
 		}
 		blocks.delete(code);
+		baselines.delete(code);
 	};
-	return {
+	const observed = new Set<HTMLElement>(), visible = new Set<HTMLElement>();
+	const observer = wiki && typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(entries => {
+		for (const entry of entries) {
+			const code = entry.target as HTMLElement;
+			if (entry.isIntersecting) { visible.add(code); api.update(code); }
+			else visible.delete(code);
+		}
+	}, { rootMargin: "400px" }) : null;
+	const api = {
+		observe(code: HTMLElement) {
+			if (!observer) { api.update(code); return; }
+			for (const block of observed) if (!block.isConnected) { observer.unobserve(block); observed.delete(block); visible.delete(block); clear(block); }
+			if (!observed.has(code)) { observed.add(code); observer.observe(code); }
+			else if (visible.has(code)) api.update(code);
+		},
 		update(code: HTMLElement) {
 			if (!registry || !Constructor) return;
 			for (const block of blocks.keys()) if (!block.isConnected) clear(block);
+			const language = code.className.match(/language-([^\s]+)/)?.[1] ?? "";
+			const html = code.innerHTML, baseline = baselines.get(code);
+			if (baseline?.html === html && baseline.language === language && baseline.nodes.every(node => code.contains(node))) return;
 			clear(code);
 			const text = richCodeText(code);
 			if (!text) return;
-			const language = code.className.match(/language-([^\s]+)/)?.[1] ?? "";
 			const template = document.createElement("template");
 			template.innerHTML = (wiki ? highlightWikiCode : highlightLine)(text, language === "toml" ? "ini" : language);
 			const nodes: { node: Text; start: number; end: number }[] = [];
@@ -47,7 +65,14 @@ export function createRichCodeHighlighter(wiki = false) {
 			const ranges: { group: Group; range: Range }[] = [];
 			const add = (group: Group, start: number, end: number) => {
 				if (start === end) return;
-				const first = nodes.find(item => item.end > start), last = [...nodes].reverse().find(item => item.start < end);
+				// Token offsets are ordered, but nested syntax groups can overlap.
+				// Binary lookup keeps each range bounded without copying the node array.
+				let low = 0, high = nodes.length;
+				while (low < high) { const mid = (low + high) >>> 1; if (nodes[mid].end <= start) low = mid + 1; else high = mid; }
+				const first = nodes[low];
+				low = 0; high = nodes.length;
+				while (low < high) { const mid = (low + high) >>> 1; if (nodes[mid].start < end) low = mid + 1; else high = mid; }
+				const last = nodes[low - 1];
 				if (!first || !last) return;
 				const range = document.createRange();
 				range.setStart(first.node, Math.max(0, start - first.start));
@@ -70,7 +95,9 @@ export function createRichCodeHighlighter(wiki = false) {
 			};
 			visit(template.content);
 			blocks.set(code, ranges);
+			baselines.set(code, { html, language, nodes: nodes.map(item => item.node) });
 		},
-		dispose() { for (const code of blocks.keys()) clear(code); },
+		dispose() { observer?.disconnect(); observed.clear(); visible.clear(); for (const code of blocks.keys()) clear(code); },
 	};
+	return api;
 }

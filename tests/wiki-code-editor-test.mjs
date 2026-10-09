@@ -20,7 +20,7 @@ try {
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.file-name', { hasText: 'note.md' }).click();
 	const editor = page.locator('.wiki-prose .fp-rich-document');
-	await editor.locator('code .hljs-keyword').first().waitFor();
+	await page.waitForFunction(() => [...(CSS.highlights.get('rich-code-keyword') ?? [])].some(range => range.toString() === 'public'));
 	const failures = [], errors = [];
 	page.on('pageerror', error => errors.push(error.message));
 	const check = (condition, message) => { console.log(condition ? 'PASS' : 'FAIL', message); if (!condition) failures.push(message); };
