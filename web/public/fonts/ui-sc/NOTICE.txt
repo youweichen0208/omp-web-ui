@@ -1,0 +1,8 @@
+UI SC is a subset of Noto Sans SC, renamed after modification.
+Real weights included: 400 (Regular), 500 (Medium), 600 (SemiBold).
+The font files are served from /assets/ as referenced by the app stylesheet.
+Licensed under SIL Open Font License 1.1; see OFL.txt in this directory.
+Upstream: https://github.com/notofonts/noto-cjk
+Source commit: f8d157532fbfaeda587e826d4cd5b21a49186f7c
+Source font: Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf
+Subset builder: https://github.com/youweichen0208/pi-harness/blob/develop/scripts/build-ui-fonts.py

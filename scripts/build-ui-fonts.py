@@ -46,5 +46,8 @@ for weight, style in [(400, "Regular"), (500, "Medium"), (600, "SemiBold")]:
 	assert path.stat().st_size <= 650 * 1024, "Subset exceeds the font byte budget"
 	manifest["files"][path.name] = {"weight": weight, "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 (out / "OFL.txt").write_bytes(license_path.read_bytes())
+public = root / "web/public/fonts/ui-sc"
+public.mkdir(parents=True, exist_ok=True)
+(public / "OFL.txt").write_bytes(license_path.read_bytes())
 (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf8")
 print(json.dumps(manifest["files"], indent=2))
