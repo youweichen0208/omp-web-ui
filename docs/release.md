@@ -1,5 +1,9 @@
 # 发布流程
 
+## 1.2.1 文档转换与桌面修复
+
+从 develop 的 1.2.0 合入未发布改动，拆分文档转换和 OKF 知识蒸馏，增加 CHM、证据包与本地上下文评测。修复扩展 worker 生命周期及重复刷新、Windows 字体与布局、SSH/Agent 双栏、Wiki 模型选择（#46–#50）。SDK 1.0.4、协议 v41 不变。`verify-rendering.yml` 验证实际 Windows 100%/125% 和 macOS 打包版字体及截图；本机 macOS 补充原生 1440×900 窗口。npm 使用网页登录验证发布。
+
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
 ## 1.2.0 文档转换与 OKF 知识整理

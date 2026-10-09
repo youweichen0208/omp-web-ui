@@ -39,6 +39,11 @@ try {
 		await page.evaluate(() => { localStorage.setItem('pi-appearance', 'light'); localStorage.setItem('pi-left-collapsed', 'false'); });
 		await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http://127.0.0.1:')); w.setContentSize(1440, 900); });
 		const cdp = await page.context().newCDPSession(page);
+		const nativeWindow = await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http://127.0.0.1:')); return { size: w.getContentSize(), background: w.getBackgroundColor() }; });
+		assert.equal(nativeWindow.background.toUpperCase(), '#FBF9F6');
+		// Hosted macOS can clamp native windows to its small virtual display. Keep
+		// the comparison canvas identical; still use this OS/Electron font renderer.
+		if (nativeWindow.size[0] !== 1440 || nativeWindow.size[1] !== 900) await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: scale, mobile: false });
 		await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
 		const fonts = [], failures = [];
 		page.on('response', response => { if (/\.woff2(?:\?|$)/.test(response.url())) { fonts.push({ url: new URL(response.url()).pathname, status: response.status() }); if (!response.ok()) failures.push(response.url()); } });
@@ -57,12 +62,13 @@ try {
 		const rendered = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
 		assert(rendered.fonts.some(font => font.familyName === 'UI SC' && font.isCustomFont && font.glyphCount > 0), JSON.stringify(rendered));
 		const metrics = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio, platform: document.documentElement.dataset.platform, appearance: document.documentElement.dataset.appearance, bodySize: getComputedStyle(document.body).fontSize }));
+		assert.equal(metrics.bodySize, process.platform === 'win32' ? '14.5px' : '14px');
 		assert.equal(metrics.width, 1440); assert.equal(metrics.height, 900); assert.equal(metrics.dpr, scale);
 		for (const selector of ['.panel-right > .panel-title > span:first-child', '.bash-group-head > span']) for (const item of await page.locator(selector).all()) assert.equal(await item.evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap');
 		await page.mouse.move(720, 880); await page.screenshot({ path: join(output, `${prefix}-conversation.png`) });
 		const scroll = page.locator('.file-tree');
 		if (await scroll.count()) { await scroll.hover(); await page.screenshot({ path: join(output, `${prefix}-scrollbar.png`) }); }
-		writeFileSync(join(output, `${prefix}-metrics.json`), JSON.stringify({ ...metrics, fonts, renderedFonts: rendered.fonts }, null, 2));
+		writeFileSync(join(output, `${prefix}-metrics.json`), JSON.stringify({ ...metrics, nativeWindow, fonts, renderedFonts: rendered.fonts }, null, 2));
 		await app.close(); app = undefined;
 		console.log(`PASS actual ${prefix} Electron: platform, fonts, SVG icons, labels, 1440x900 screenshots`);
 	}

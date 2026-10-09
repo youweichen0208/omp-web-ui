@@ -18,6 +18,7 @@ const tickets = new Map<string, { cwd: string; clientId: string; until: number; 
 const states = new Map<string, ExtensionsState>();
 let mutation: string | undefined;
 let readers = 0;
+const pendingReads = new Map<string, Promise<ExtensionsState>>();
 let canBackgroundRun = () => false;
 const background = new Map<string, { agentDir:string; next:number }>();
 function autoCheckEnabled(agentDir:string): boolean { try { return readJson(join(agentDir,"webui-extensions.json")).autoCheck !== false; } catch { return false; } }
@@ -40,9 +41,21 @@ function runWorker(input: WorkerRequest, log: (line: string) => void = () => {})
 		process.once("exit", stop);
 		const timer = setTimeout(() => { failure = Error("Package operation timed out"); stop(); }, input.action === "mutate" ? 20*60*1000 : 120000);
 		child.once("error", error => { clearTimeout(timer); process.removeListener("exit",stop); reject(error); });
-		child.once("exit", () => { clearTimeout(timer); process.removeListener("exit",stop); result && !failure ? resolve(result) : reject(failure ?? Error("Package worker stopped")); });
-		child.send(input);
+		child.once("close", (code, signal) => { clearTimeout(timer); process.removeListener("exit",stop); result && !failure && code === 0 ? resolve(result) : reject(failure ?? Error(`Package worker stopped (exit ${code ?? "none"}, signal ${signal ?? "none"})`)); });
+		child.send(input, error => { if (error) { failure = error; stop(); } });
 	});
+}
+async function readWorker(cwd: string, agentDir: string, action: "list" | "check"): Promise<ExtensionsState> {
+	const key = JSON.stringify([cwd, agentDir, action]);
+	let pending = pendingReads.get(key);
+	if (!pending) {
+		if (readers >= 4) throw Error("Package manager busy");
+		readers++;
+		pending = runWorker({ cwd, agentDir, action }).finally(() => { readers--; pendingReads.delete(key); });
+		pendingReads.set(key, pending);
+	}
+	// Each response decorates update/preferences metadata independently.
+	return structuredClone(await pending);
 }
 async function previewSource(source: string): Promise<Omit<ExtensionPreview,"ticket">> {
 	const info = sourceInfo(source);
@@ -107,16 +120,14 @@ export function installExtensionsRoutes(app: Express, service: () => AgentServic
 				}
 				const id = randomUUID(), job = { id,phase: "running" as const,log: "",cwd,clientId } as ExtensionJob & { cwd:string;clientId:string };
 				if (jobs.size >= 32) jobs.delete(jobs.keys().next().value!); jobs.set(id,job); mutation=id;
-				void runWorker({ cwd,agentDir,action:"mutate",operation:op,source,version:req.body.version }, line => { job.log = (job.log + line + "\n").slice(-128000); }).then(() => { states.delete(cwd); job.phase="done"; }, error => { job.phase="error";job.error=error.message;job.log += `\n${error.message}`; }).finally(() => { mutation=undefined; });
+				void Promise.allSettled([...pendingReads.values()]).then(() => runWorker({ cwd,agentDir,action:"mutate",operation:op,source,version:req.body.version }, line => { job.log = (job.log + line + "\n").slice(-128000); })).then(() => { states.delete(cwd); job.phase="done"; }, error => { job.phase="error";job.error=error.message;job.log += `\n${error.message}`; }).finally(() => { mutation=undefined; });
 				res.json(job); return;
 			}
 			if (action !== "list" && action !== "check" && !["open-info","file","save-file","notes"].includes(action)) throw Error("Unknown action");
 			if (mutation) throw Error("Package operation running");
-			if (readers >= 4) throw Error("Package manager busy");
-			readers++;
-			try {
+			{
 				const cached = states.get(cwd);
-				const state = await runWorker({ cwd,agentDir,action:action === "check" ? "check" : "list" });
+				const state = await readWorker(cwd, agentDir, action === "check" ? "check" : "list");
 				if (cs.cwd !== cwd || cs.switchingWorkspace) throw Error("Workspace changed");
 				if (["file","save-file","notes"].includes(action)) {
 					const item = state.packages.find(p => p.id === req.body.id); if (!item) throw Error("Package unavailable");
@@ -139,7 +150,7 @@ export function installExtensionsRoutes(app: Express, service: () => AgentServic
 				if (background.size>32) background.delete(background.keys().next().value!);
 				background.set(cwd,{agentDir,next:Math.max(Date.now()+60000,(state.checkedAt??0)+6*60*60*1000)});
 				res.json(state);
-			} finally { readers--; }
+			}
 		} catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
 	});
 }

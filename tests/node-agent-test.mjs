@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import ssh2 from "ssh2";
@@ -28,6 +28,10 @@ const model = createServer(async (req, res) => {
 	res.writeHead(200, { "content-type": "text/event-stream" });
 	const send = (delta, reason = null) => res.write(`data: ${JSON.stringify({ id: "remote", object: "chat.completion.chunk", model: payload.model, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`);
 	const last = payload.messages.at(-1);
+	if (last.role === "user" && JSON.stringify(last.content).includes("remote diagnostics")) {
+		send({ tool_calls: [{ index: 0, id: "remote-bash", type: "function", function: { name: "bash", arguments: JSON.stringify({ command: "pwd; printf 'remote diagnostics executed' > remote-bash-proof.txt" }) } }] });
+		send({}, "tool_calls"); res.end("data: [DONE]\n\n"); return;
+	}
 	if (last.role === "user" && JSON.stringify(last.content).includes("remote write")) {
 		send({ tool_calls: [{ index: 0, id: "remote-write", type: "function", function: { name: "write", arguments: JSON.stringify({ path: "remote-proof.txt", content: "written on remote node" }) } }] });
 		send({}, "tool_calls"); res.end("data: [DONE]\n\n"); return;
@@ -134,9 +138,11 @@ try {
 		assert.equal(requests, 4, "connecting must not start model work");
 		await page.getByRole("button", { name: "启动远端 Agent", exact: true }).click();
 		const input = page.getByRole("textbox", { name: "让 Agent 在此节点执行任务…", exact: true });
-		await input.fill("browser remote task"); await input.press("Enter");
+		await input.fill("remote diagnostics"); await input.press("Enter");
 		await page.locator(".node-agent-message.assistant", { hasText: "agent reply" }).waitFor();
 		assert.equal(await input.inputValue(), "");
+		assert.equal(readFileSync(join(root, "remote-bash-proof.txt"), "utf8"), "remote diagnostics executed");
+		assert(!existsSync(resolve("remote-bash-proof.txt")), "remote bash must not execute in the local project");
 		await input.fill("/ask"); await input.press("Enter");
 		await page.locator(".node-agent-dialog", { hasText: "Remote permission" }).waitFor();
 		await page.locator(".node-agent-dialog").getByRole("button", { name: "确认", exact: true }).click();

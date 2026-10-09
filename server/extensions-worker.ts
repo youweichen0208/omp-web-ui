@@ -123,6 +123,23 @@ export async function extensionWork(input: WorkerRequest, progress: (message: st
 	}
 	return state;
 }
-if (process.send && process.argv.includes("--extensions-worker")) process.once("message", (input: WorkerRequest) => {
-	void extensionWork(input, message => process.send?.({ progress: message })).then(state => process.send?.({ state }, () => process.disconnect()), error => process.send?.({ error: error instanceof Error ? error.message : String(error) }, () => process.disconnect()));
-});
+if (process.send && process.argv.includes("--extensions-worker")) {
+	let started = false;
+	// Keep IPC referenced until the async operation and its final send finish.
+	// once("message") releases that reference as soon as the request arrives.
+	process.on("message", (input: WorkerRequest) => {
+		if (started) return;
+		started = true;
+		const finish = (message: { state: ExtensionsState } | { error: string }) => {
+			if (!process.connected) return;
+			process.send?.(message, error => {
+				if (error) process.exitCode = 1;
+				if (process.connected) process.disconnect();
+			});
+		};
+		void extensionWork(input, message => process.send?.({ progress: message })).then(
+			state => finish({ state }),
+			error => finish({ error: error instanceof Error ? error.message : String(error) }),
+		);
+	});
+}

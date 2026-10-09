@@ -50,6 +50,7 @@ const ALL = [
 	"clear-provider-key-test",
 	"component-updates-test",
 	"extensions-test",
+	"extensions-worker-test",
 	"extension-ui-test",
 	"session-tree-test",
 	"tool-output-test",

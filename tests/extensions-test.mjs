@@ -34,6 +34,7 @@ try{
  assert.equal((await req('open-info',{id:'skills:user'})).absolute,join(agent,'skills'));
  assert.equal((await req('skills-list',{}, {Origin:'https://evil.invalid'})).status,403);
  assert.equal((await req('skills-list',{cwd:root})).status,409);
+ const parallelLists=await Promise.all(Array.from({length:8},()=>req('list')));assert(parallelLists.every(result=>result.status===200),JSON.stringify(parallelLists.map(result=>({status:result.status,error:result.error}))));
  let state=await req('list');assert.equal(state.status,200,JSON.stringify(state));const item=state.packages.find(p=>p.name==='local-tools');assert(item);assert(state.packages.some(p=>p.kind==='file'));
  state=await mutation(state,{action:'toggle',id:item.id,enabled:false});assert.equal(state.packages.find(p=>p.id===item.id).enabled,false);
  state=await mutation(state,{action:'toggle',id:item.id,enabled:true});assert.equal(state.packages.find(p=>p.id===item.id).enabled,true);

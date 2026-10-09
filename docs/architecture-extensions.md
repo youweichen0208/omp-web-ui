@@ -8,7 +8,7 @@
 
 `/api/extensions` 位于公共鉴权中间件之后，校验同源、已连接 clientId、活动 cwd、工作区切换和 quiesce。HTTP 类型集中在 protocol.ts；独立于聊天 WebSocket 消息。来源预览返回绑定 clientId/cwd、20 分钟有效的 ticket；确认安装必须提交 ticket。列表与预览是只读操作，写任务全服务串行；日志有界 128 KB，关闭面板后可按任务 ID 恢复轮询。
 
-worker 保留原生 npmCommand，项目和个人作用域使用相同原生安装路径。读任务最多 4 个，超时 2 分钟；写任务超时 20 分钟。worker 是独立进程组，超时和服务退出仅终止其所属进程树。Electron 通过 ELECTRON_RUN_AS_NODE 加载相同 worker。
+worker 保留原生 npmCommand，项目和个人作用域使用相同原生安装路径。同一工作区和动作的并发读取共享 worker，响应各自复制；读 worker 最多 4 个，超时 2 分钟；写任务超时 20 分钟。worker 是独立进程组，超时和服务退出仅终止其所属进程树。写任务先等待已经开始的包读取结束，再执行原生操作。worker 在异步操作和最终 IPC 回传完成前保持 message 监听，父进程等待 close 确保管道排空；异常退出显示退出码与信号。Electron 通过 ELECTRON_RUN_AS_NODE 加载相同 worker。
 
 Desktop 不打包应用自己的 `extensions/` 或声明其扩展入口。会话使用 Pi 原生用户目录与受信任项目资源发现，保留原生 Codemode/tool_search/MCP 工厂。CLI 的可选 `/webui` 入口只属于 npm 包；用户已配置的扩展不被 Desktop 删除或迁移。打包钩子拒绝夹带应用扩展，`wiki-electron-test.mjs` 验证用户扩展在启动和新会话中执行，并遵循原生禁用规则。
 
@@ -54,3 +54,5 @@ pi.dev 当前通过服务端 HTML 提供目录，没有依赖未公开 JSON API�
 包安装状态按原生 npm 声明匹配，同名多作用域时优先选择可更新的受信任、未固定且非保护条目，按钮将其 ID 传给原生更新流程。其他已安装项只显示已安装，不从目录 latest 推断更新资格。安装确认保持 480px 弹窗，展示资源声明、个人/项目设置路径及命令预览；未信任项目不可选择。任务运行时保留弹窗并锁定操作，失败保留日志末尾，重试重新预览获取 ticket，成功后返回已安装列表并标注新包。
 
 已安装页签数量仅统计包，不包括单文件；文件保留路径、打开/复制、重载、开关和展开编辑。键盘支持页签方向键、弹窗焦点循环及关闭后焦点恢复。更新页继续隐藏 pi-harness 和单文件。扩展回归同时覆盖失败重试、详情只读权限、中英文、深色与 390px 窄屏。
+
+#46 回归：`tests/extensions-worker-test.mjs` 在真实 npm 卸载后的 SettingsManager.reload 注入无活跃句柄的异步等待，证明 IPC 不会提前退出；这用于生命周期故障注入，不表示已还原用户原始机器的具体触发条件。另有普通 Node / Electron 原生卸载和并发 HTTP 列表测试。

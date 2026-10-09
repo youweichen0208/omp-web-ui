@@ -1,12 +1,11 @@
 name: Verify desktop rendering
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/release-1.2.1]
   pull_request:
     paths:
       - 'web/**'
       - 'electron/**'
+      - 'server/extensions-*.ts'
       - 'tests/windows-rendering-test.mjs'
       - 'tests/extensions-worker-test.mjs'
       - '.github/workflows/verify-rendering.yml'
@@ -21,9 +20,11 @@ jobs:
           - os: macos-latest
             target: mac
             executable: release/mac-arm64/pi.app/Contents/MacOS/pi
+            root: release/mac-arm64/pi.app/Contents/Resources/app
           - os: windows-2022
             target: win
             executable: release/win-unpacked/pi.exe
+            root: release/win-unpacked/resources/app
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -39,6 +40,9 @@ jobs:
         run: node tests/extensions-worker-test.mjs
       - name: Package actual desktop application
         run: npx electron-builder --${{ matrix.target }} --dir --publish never
+      - name: Packaged native npm removal worker
+        shell: bash
+        run: ELECTRON_RUN_AS_NODE=1 "${{ matrix.executable }}" tests/extensions-worker-test.mjs "${{ matrix.root }}"
       - name: Actual platform fonts, layout and screenshots
         run: node tests/windows-rendering-test.mjs "${{ matrix.executable }}"
         env:

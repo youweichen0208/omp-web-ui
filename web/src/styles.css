@@ -8879,7 +8879,7 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { position: fix
 @media (min-width: 769px) and (max-width: 1200px) {
 	.design-workspace.document-open > .drawer-left:not(.open) { display: none; }
 }
-body { -webkit-font-smoothing: antialiased; }
+:root:not([data-platform="win32"]) body, :root[data-appearance="dark"] body { -webkit-font-smoothing: antialiased; }
 .design-workspace { line-height: normal; }
 .design-workspace .msg-text :not(pre) > code { font-size: 12.5px; padding: 1px 5px; border: 0; border-radius: var(--r-sm); }
 .design-workspace .bash-output-label > span:first-child { flex: none; }
