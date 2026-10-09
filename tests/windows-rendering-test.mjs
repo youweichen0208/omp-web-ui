@@ -78,8 +78,9 @@ try {
 		// Chromium's computed custom-scrollbar pseudo style can remain transparent
 		// while the hover thumb is painted. Sample the rendered track instead.
 		const thumbRaster = async () => {
-			const png = (await scroll.screenshot()).toString('base64');
-			return page.evaluate(async ({ png, scale }) => { const img = new Image(); img.src = `data:image/png;base64,${png}`; await img.decode(); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const bytes = ctx.getImageData(img.width - Math.round(4 * scale), 0, 1, img.height).data; return Array.from({ length: img.height }, (_, y) => [...bytes.slice(y * 4, y * 4 + 4)]); }, { png, scale });
+			const bounds = await scroll.boundingBox();
+			const png = (await page.screenshot()).toString('base64');
+			return page.evaluate(async ({ png, scale, bounds }) => { const img = new Image(); img.src = `data:image/png;base64,${png}`; await img.decode(); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const bytes = ctx.getImageData(Math.round((bounds.x + bounds.width - 4) * scale), Math.round(bounds.y * scale), 1, Math.floor(bounds.height * scale)).data; return Array.from({ length: Math.floor(bounds.height * scale) }, (_, y) => [...bytes.slice(y * 4, y * 4 + 4)]); }, { png, scale, bounds });
 		};
 		await page.mouse.move(720, 880);
 		await page.waitForFunction(() => !document.querySelector('.panel-right > .panel-body').matches(':hover'));
@@ -92,7 +93,8 @@ try {
 				const key = pixels[y].join(','); const match = colors.get(key) ?? { pixel: pixels[y], rows: [] }; match.rows.push(y); colors.set(key, match);
 			}
 			const paint = [...colors.values()].sort((a, b) => b.rows.length - a.rows.length)[0];
-			assert(paint && paint.rows.length > 4, 'the rendered scrollbar thumb must be visible');
+			const counts = rows => [...rows.reduce((map, pixel) => { const key = pixel.join(','); map.set(key, (map.get(key) ?? 0) + 1); return map; }, new Map())].sort((a,b)=>b[1]-a[1]).slice(0,4);
+			assert(paint && paint.rows.length > 4, `the rendered scrollbar thumb must be visible: ${JSON.stringify({baseline:counts(baseline),current:counts(pixels)})}`);
 			return { pixel: paint.pixel, first: paint.rows[0] / scale, last: paint.rows.at(-1) / scale };
 		};
 		const resting = { ...await scrollbarState(), pixel: baseline[Math.round(12 * scale)] };
