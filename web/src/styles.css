@@ -11548,3 +11548,33 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 @media (max-width: 760px) {
 	.wiki-resize-chat { display: none; }
 }
+
+/* Generic tool inspection: identity, parameters, then result actions. */
+.toolcall-generic .toolcall-head { gap: 8px; }
+.toolcall-generic .toolcall-name-toggle {
+	min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	border: 0; padding: 2px 0; background: transparent; text-align: left; cursor: pointer;
+}
+.toolcall-generic .toolcall-status { flex-shrink: 0; white-space: nowrap; }
+.design-workspace .toolcall-generic > .toolcall-head > button { opacity: 1; pointer-events: auto; }
+.design-workspace .toolcall-generic > .toolcall-head > button:not(.toolcall-name-toggle) {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 28px; height: 28px; padding: 5px; flex-shrink: 0; border-radius: var(--r-sm);
+}
+.toolcall-generic .toolcall-head svg { width: 14px; height: 14px; }
+.toolcall-parameters { padding: 4px 0 6px; }
+.toolcall-section-label { display: block; color: var(--text-dim); font-size: 11px; margin-bottom: 8px; }
+.toolcall-parameters dl { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+.toolcall-parameters dl > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
+.toolcall-parameters dt { color: var(--text-dim); font-size: 11px; font-family: var(--mono); }
+.toolcall-parameters dd { margin: 0; color: var(--text); font-size: 12px; font-family: var(--mono); overflow-wrap: anywhere; min-width: 0; }
+.toolcall-result-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 12px; color: var(--text-dim); font-size: 11px; }
+.toolcall-result-actions .tool-output-download-link { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: var(--r-sm); padding: 4px 0; color: var(--accent); background: transparent; font: inherit; cursor: pointer; }
+.toolcall-result-actions .tool-output-download-link:hover { text-decoration: underline; }
+.toolcall-result-actions .tool-output-download-link:disabled { opacity: .5; cursor: wait; }
+.toolcall-generic button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 600px) {
+	.toolcall-generic .toolcall-head { gap: 4px; }
+	.toolcall-generic .toolcall-icon { display: none; }
+	.toolcall-parameters dl { gap: 6px 16px; }
+}

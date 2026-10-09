@@ -7,6 +7,10 @@ import { commandPresentation, gitStatusLine, gitStatusSummary, numberedOutputLin
 import { WorkspacePathContext } from "../workspace-context";
 import { Fragment, memo, useContext, useEffect, useRef, useState } from "react";
 import {
+	FiTool,
+	FiCopy,
+	FiCheck,
+	FiMaximize2,
 	FiChevronDown,
 	FiChevronRight,
 	FiSquare,
@@ -117,6 +121,19 @@ const TOOL_ICONS: Record<string, string> = {
 
 function toolIcon(name: string): string {
 	return TOOL_ICONS[name] ?? "🛠";
+}
+
+function ToolArguments({ text }: { text: string }) {
+	const t = useT();
+	let entries: [string, unknown][] | undefined;
+	try {
+		const value: unknown = JSON.parse(text);
+		if (value && typeof value === "object" && !Array.isArray(value)) {
+			const fields = Object.entries(value);
+			if (fields.length > 0 && fields.length <= 8 && fields.every(([, v]) => v === null || typeof v === "number" || typeof v === "boolean" || (typeof v === "string" && v.length <= 160))) entries = fields;
+		}
+	} catch { /* Streaming/incomplete arguments remain available verbatim. */ }
+	return <div className="toolcall-parameters"><span className="toolcall-section-label">{t("toolParameters")}</span>{entries ? <dl>{entries.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value === null ? "null" : String(value)}</dd></div>)}</dl> : <pre>{text}</pre>}</div>;
 }
 
 /** True when this is a `read` tool call whose target path is a Markdown
@@ -364,6 +381,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 		try { editPath = JSON.parse(block.argumentsText ?? "").path ?? ""; } catch { /* keep the diff visible for malformed arguments */ }
 	}
 
+	const generic = !Object.hasOwn(TOOL_ICONS, block.name);
 	const output = view.result
 		? view.result.content.map((b) => (b.type === "text" ? b.text : "")).join("")
 		: (view.liveOutput ?? "");
@@ -421,7 +439,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 		<>
 			{block.argumentsText && (!compactBash || fullCommand || zoomed) && (
 				<div className="toolcall-args">
-					{targetPath ? (
+					{generic ? <ToolArguments text={block.argumentsText} /> : targetPath ? (
 						<button type="button" className="toolcall-read-path" title={targetPath} onClick={() => setZoomed(true)}>{displayReadPath(targetPath)}</button>
 					) : block.name === "bash" && block.argumentsText.startsWith("{") ? (
 						<div className="bash-command-preview"><TerminalCommand args={block.argumentsText} cwd={cwd} /></div>
@@ -447,7 +465,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				</details>)}
 				{view.result && !nestedCalls.complete && <p>{t("nestedToolCallsIncomplete")}</p>}
 			</details>}
-			{view.result?.toolOutputUrl && <ToolOutputDownload url={view.result.toolOutputUrl} />}
+			{!generic && view.result?.toolOutputUrl && <ToolOutputDownload url={view.result.toolOutputUrl} />}
 			{view.result?.content.flatMap(block => block.type === "image" && "dataUrl" in block && typeof block.dataUrl === "string" ? [block.dataUrl] : []).map((url, index) => <div key={index}><a href={url} target="_blank" rel="noreferrer" className="tool-result-image"><img src={url} alt={t("toolResultImage")} loading="lazy" /></a><a href={url} download={`generated-${index}.png`}>{t("downloadImage")}</a></div>)}
 			{output.length > 0 && (block.name === "bash" ? bashRun && bashView === "steps" ? <BashSteps run={bashRun} wrap={lineWrap} /> : bashDiagnostics.length > 0 ? <BashFailure diagnostics={bashDiagnostics} output={output} wrap={lineWrap} /> : <BashOutput output={output} wrap={lineWrap} cwd={differentCommandDirectory(block.argumentsText, cwd) ?? ""} searchOutput={searchOutputKind(block.argumentsText)} command={commandDisplay?.command ?? ""} /> : (
 				<div className="toolcall-output">
@@ -489,12 +507,12 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					{block.name !== "bash" && outputLines.length > 10 && <button type="button" className="toolcall-output-more" onClick={() => setExpanded((value) => !value)}>{expanded || zoomed ? t("collapseCode") : t("expandAllLines", { n: outputLines.length })}</button>}
 				</div>
 			))}
-
+			{generic && view.result?.toolOutputUrl && <div className="toolcall-result-actions">{!output && <span>{t("toolOutputFileOnly")}</span>}<ToolOutputDownload url={view.result.toolOutputUrl} compact /></div>}
 		</>
 	);
 
 	return (
-		<div className={`toolcall ${statusClass} ${block.name === "bash" ? "toolcall-bash" : ""} ${bashRun ? "toolcall-steps" : ""} ${bashDiagnostics.length ? "toolcall-diagnostics" : ""}`} onMouseEnter={() => notifyToolHover(block.id)} onMouseLeave={() => notifyToolHover(null)}>
+		<div className={`toolcall ${generic ? "toolcall-generic" : ""} ${statusClass} ${block.name === "bash" ? "toolcall-bash" : ""} ${bashRun ? "toolcall-steps" : ""} ${bashDiagnostics.length ? "toolcall-diagnostics" : ""}`} onMouseEnter={() => notifyToolHover(block.id)} onMouseLeave={() => notifyToolHover(null)}>
 			{commandDisplay ? <BashCommandHeader command={commandDisplay.command} original={command!} directory={commandDisplay.directory ?? differentCommandDirectory(block.argumentsText, cwd)} running={isBashRunning} elapsed={elapsed} status={statusLabel} full={fullCommand} onFull={() => { setFullCommand((value) => !value); setOpen(true); }} onKill={onKillBash}>
 				{bashRun && <span className="bash-view-switch"><button type="button" className={bashView === "steps" ? "active" : ""} onClick={() => setBashView("steps")}>{t("bashSteps")}</button><button type="button" className={bashView === "raw" ? "active" : ""} onClick={() => setBashView("raw")}>{t("bashRaw")}</button></span>}
 				<button type="button" className="toolcall-wrap" aria-pressed={lineWrap} onClick={() => setLineWrap((value) => !value)}>{t("toolWrap")}</button>
@@ -504,8 +522,8 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 				<button type="button" className="toolcall-toggle" onClick={() => setOpen((value) => !value)}>{t(open ? "collapseCode" : "expandCode")}</button>
 			</BashCommandHeader> : (
 			<div className="toolcall-head">
-				<span className="toolcall-icon">{toolIcon(block.name)}</span>
-				{compactBash ? <code className="bash-head-command" title={command ?? ""}>$ {displayBashCommand(command!, cwd)}</code> : <span className="toolcall-name">{block.name}</span>}
+				<span className="toolcall-icon">{generic ? <FiTool aria-hidden="true" /> : toolIcon(block.name)}</span>
+				{compactBash ? <code className="bash-head-command" title={command ?? ""}>$ {displayBashCommand(command!, cwd)}</code> : generic ? <button type="button" className="toolcall-name toolcall-name-toggle" title={block.name} aria-expanded={open} onClick={() => setOpen(v => !v)}>{block.name}</button> : <span className="toolcall-name">{block.name}</span>}
 				{compactBash && output && <span className="bash-head-count">{t("toolLineCount", { n: outputLines.length })}</span>}
 				<span className="toolcall-status">
 					{statusLabel}
@@ -526,7 +544,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 						<span>{t("stopBash")}</span>
 					</button>
 				)}
-				{block.name !== "read" && !bashRun && !bashDiagnostics.length && (
+				{!generic && block.name !== "read" && !bashRun && !bashDiagnostics.length && (
 					<button
 						type="button"
 						disabled={!open}
@@ -541,17 +559,19 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 					type="button"
 					className="toolcall-expand"
 					title={t("zoomCode")}
+					aria-label={t("zoomCode")}
 					onClick={() => setZoomed(true)}
 				>
-				{t("zoomCode")}
+				{generic ? <FiMaximize2 /> : t("zoomCode")}
 				</button>}
 				<button
 					type="button"
 					className="toolcall-copy"
 					title={t("copyArgs")}
+					aria-label={t(copied ? "copied" : "copyArgs")}
 					onClick={copyArgs}
 				>
-					{t(copied ? "copied" : "copy")}
+					{generic ? copied ? <FiCheck /> : <FiCopy /> : t(copied ? "copied" : "copy")}
 				</button>
 				{(bashRun || bashDiagnostics.length > 0) && <details className="bash-card-more"><summary aria-label={t("more")}>⋯</summary><div><button type="button" onClick={() => setLineWrap((value) => !value)}>{t("toolWrap")}</button><button type="button" onClick={() => setZoomed(true)}>{t("zoomCode")}</button><button type="button" onClick={() => setOpen((value) => !value)}>{open ? t("collapseCode") : t("expandCode")}</button></div></details>}
 				{!bashRun && !bashDiagnostics.length && <button
@@ -580,7 +600,7 @@ function RegularToolCallBlock({ block, view, onKillBash, wrap = true }: ToolCall
 						onClick={(e) => e.stopPropagation()}
 					>
 						<div className="toolcall-zoom-head">
-							<span className="toolcall-icon">{toolIcon(block.name)}</span>
+							<span className="toolcall-icon">{generic ? <FiTool aria-hidden="true" /> : toolIcon(block.name)}</span>
 							<span className="toolcall-name">{block.name}</span>
 							<span className="toolcall-spacer" />
 							<button

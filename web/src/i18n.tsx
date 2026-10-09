@@ -17,6 +17,8 @@ const STORAGE_KEY = "pi-harness:lang";
 /* ------------------------------------------------------------------ */
 
 const zh = {
+	toolParameters: "参数",
+	toolOutputFileOnly: "完整结果可下载",
 	mcpAdapterNoticeTitle: "旧 MCP 扩展需要选择配置方式",
 	mcpAdapterNoticeNative: "pi 已内置 MCP，使用 mcp.json。如果你使用内置 MCP，请在 Extensions 中关闭 pi-mcp-adapter，再点击重载；保留 mcp.json。",
 	mcpAdapterNoticeSeparate: "如果需要继续使用该扩展，请按扩展文档配置独立的 mcp-adapter.json，确认哪些服务交由扩展管理。不要直接移动正在供内置 MCP 使用的 mcp.json。",
@@ -1673,6 +1675,8 @@ const zh = {
 /* ------------------------------------------------------------------ */
 
 const en: Record<keyof typeof zh, string> = {
+	toolParameters: "Parameters",
+	toolOutputFileOnly: "Full result available to download",
 	mcpAdapterNoticeTitle: "Choose how to configure the legacy MCP extension",
 	mcpAdapterNoticeNative: "Pi includes native MCP using mcp.json. If you use native MCP, disable pi-mcp-adapter in Extensions and reload. Keep mcp.json in place.",
 	mcpAdapterNoticeSeparate: "To keep using the adapter, follow its documentation to configure a separate mcp-adapter.json and choose which servers it manages. Do not move mcp.json while native MCP uses it.",

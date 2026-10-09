@@ -1,8 +1,9 @@
+import { FiDownload } from "react-icons/fi";
 import { useEffect, useState } from "react";
 import { withToken } from "../auth-token";
 import { useT } from "../i18n";
 
-export function ToolOutputDownload({ url }: { url: string }) {
+export function ToolOutputDownload({ url, compact = false }: { url: string; compact?: boolean }) {
 	const t = useT();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<number>();
@@ -34,5 +35,5 @@ export function ToolOutputDownload({ url }: { url: string }) {
 			else setOutputs(files);
 		} catch { fail(500); } finally { setBusy(false); }
 	};
-	return <><button className="btn" disabled={busy} onClick={() => void select()}>{t("toolOutputDownload")}</button>{outputs && <span className="tool-output-files"><button disabled={busy} onClick={() => void download()}>{t("toolOutputText")}</button>{outputs.map(file => <button disabled={busy} key={file.id} onClick={() => void download(file.id, file.name)}>{file.name}</button>)}</span>}{error && <span role="alert">{t(error === 404 ? "toolOutputUnavailable" : error === 401 ? "toolOutputAuth" : error === 403 ? "toolOutputDenied" : "toolOutputError")}</span>}</>;
+	return <><button type="button" className={compact ? "tool-output-download-link" : "btn"} disabled={busy} onClick={() => void select()}>{compact && <FiDownload aria-hidden="true" />}{t("toolOutputDownload")}</button>{outputs && <span className="tool-output-files"><button disabled={busy} onClick={() => void download()}>{t("toolOutputText")}</button>{outputs.map(file => <button disabled={busy} key={file.id} onClick={() => void download(file.id, file.name)}>{file.name}</button>)}</span>}{error && <span role="alert">{t(error === 404 ? "toolOutputUnavailable" : error === 401 ? "toolOutputAuth" : error === 403 ? "toolOutputDenied" : "toolOutputError")}</span>}</>;
 }
