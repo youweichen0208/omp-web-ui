@@ -4,6 +4,8 @@
 
 从 develop 的 1.2.0 合入未发布改动，拆分文档转换和 OKF 知识蒸馏，增加 CHM、证据包与本地上下文评测。修复扩展 worker 生命周期及重复刷新、Windows 字体与布局、SSH/Agent 双栏、Wiki 模型选择（#46–#50）。SDK 1.0.4、协议 v41 不变。`verify-rendering.yml` 验证实际 Windows 100%/125% 和 macOS 打包版字体及截图；本机 macOS 补充原生 1440×900 窗口。npm 使用网页登录验证发布。
 
+Windows 的 PowerShell 步骤通过 `| Out-Host` 等待 Electron GUI 可执行文件退出，再读取 `$LASTEXITCODE`；否则可能在测试仍运行时读取空值或旧退出码。1.2.1 首次发布的 worker 已输出 PASS，但宿主脚本提前判失败，修正发布脚本后单独重建 Windows；应用源码与 v1.2.1 标签保持一致。单平台重建通过后仍需核对三平台产物及 CI，再公开草稿。
+
 > npm 发布者账号是 `youweichen`（`npm whoami` 验证），包名 `@youweichen/pi-harness`。当前项目独立维护，仓库为 `youweichen0208/pi-harness`。`dist/`、`web/dist/` 被 gitignore 不进 git，但 `package.json` 的 `files` 白名单会把它们打进 npm 包；`prepublishOnly` 会在发布前自动 `npm run build`。
 
 ## 1.2.0 文档转换与 OKF 知识整理

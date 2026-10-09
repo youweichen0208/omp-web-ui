@@ -204,7 +204,8 @@ jobs:
           node tests/native-tools-desktop-test.mjs release/win-unpacked/pi.exe release/win-unpacked/resources/app
           if ($LASTEXITCODE -ne 0) { throw "Packaged native tools failed" }
           $env:ELECTRON_RUN_AS_NODE = "1"
-          & ./release/win-unpacked/pi.exe tests/provider-auth-test.mjs "$PWD/release/win-unpacked/resources/app"
+          # Electron is a GUI executable: a pipeline makes PowerShell wait and set LASTEXITCODE.
+          & ./release/win-unpacked/pi.exe tests/provider-auth-test.mjs "$PWD/release/win-unpacked/resources/app" | Out-Host
           if ($LASTEXITCODE -ne 0) { throw "Packaged OAuth failed" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
@@ -214,7 +215,7 @@ jobs:
         shell: pwsh
         run: |
           $env:ELECTRON_RUN_AS_NODE = "1"
-          & ./release/win-unpacked/pi.exe tests/extensions-worker-test.mjs release/win-unpacked/resources/app
+          & ./release/win-unpacked/pi.exe tests/extensions-worker-test.mjs release/win-unpacked/resources/app | Out-Host
           if ($LASTEXITCODE -ne 0) { throw "Packaged extension worker failed" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           node tests/windows-rendering-test.mjs release/win-unpacked/pi.exe
