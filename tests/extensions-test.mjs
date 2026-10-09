@@ -16,6 +16,7 @@ writeFileSync(join(pkg,'package.json'),JSON.stringify({name:'local-tools',versio
 writeFileSync(join(pkg,'extensions/main.js'),'export default () => {};');
 mkdirSync(join(agent,'skills/design-fixture'),{recursive:true});writeFileSync(join(agent,'skills/design-fixture/SKILL.md'),'---\nname: design-fixture\ndescription: Settings v2 native skill fixture\n---\nUse native behavior.');
 writeFileSync(join(agent,'extensions/footer.js'),'export default () => {};');
+for (const name of ['weather', 'deploy']) { mkdirSync(join(agent, 'extensions', name)); writeFileSync(join(agent, 'extensions', name, 'index.ts'), 'export default () => {};'); }
 writeFileSync(join(agent,'settings.json'),JSON.stringify({packages:[pkg],defaultProvider:'fixture',defaultModel:'fixture'}));
 writeFileSync(join(agent,'models.json'),JSON.stringify({providers:{fixture:{api:'openai-completions',baseUrl:'http://127.0.0.1:1',apiKey:'fixture',models:[{id:'fixture',name:'Fixture',input:['text'],contextWindow:32000,maxTokens:4000,cost:{input:0,output:0,cacheRead:0,cacheWrite:0}}]}}}));
 writeFileSync(join(agent,'webui-extensions.json'),JSON.stringify({autoCheck:false}));
@@ -44,7 +45,7 @@ try{
  state=await mutation(state,{action:'install',scope:'user',ticket:preview.ticket});assert(state.packages.some(p=>p.name==='another-package'));
  state=await mutation(state,{action:'remove',id:state.packages.find(p=>p.name==='another-package').id});assert(existsSync(join(another,'package.json')));
 
- const file=state.packages.find(p=>p.kind==='file');const opened=await req('file',{id:file.id});assert.equal(opened.status,200);
+ const file=state.packages.find(p=>p.path===join(agent,'extensions/footer.js'));const opened=await req('file',{id:file.id});assert.equal(opened.status,200);
  assert.equal((await req('save-file',{id:file.id,version:'stale',content:'no'})).status,400);
  const edited='export default () => {}; // editor fixture';assert.equal((await req('save-file',{id:file.id,version:opened.version,content:edited})).status,200);assert.equal(readFileSync(file.path,'utf8'),edited);
  assert.equal((await req('file',{id:item.id})).status,400);
@@ -54,6 +55,8 @@ try{
   await page.addInitScript(id=>{sessionStorage.setItem('pi-web-client-id',id);localStorage.setItem('pi-extensions-autocheck','false');},clientId);
   await page.goto(`http://127.0.0.1:${port}/?token=${token}`);await page.getByRole('button',{name:'设置',exact:true}).first().click();await page.getByText('所有设置',{exact:true}).click();await page.getByRole('button',{name:'Extensions',exact:true}).click();
   const panel=page.locator('.extensions-panel');await panel.getByText('local-tools',{exact:true}).waitFor();
+  for (const name of ['weather', 'deploy']) await panel.getByRole('switch', {name: `启用 ${name}`, exact: true}).waitFor();
+  assert.equal(await panel.getByText('index.ts', {exact: true}).count(), 0);
   await panel.getByRole('button',{name:'查看详情 local-tools',exact:true}).click();await panel.getByRole('button',{name:'移除引用',exact:true}).waitFor();
   await page.screenshot({path:'tests/scratch/extensions-installed.png',fullPage:true});
   await panel.getByRole('switch',{name:'启用 local-tools',exact:true}).click();await wait(async()=>Array.isArray(JSON.parse(readFileSync(join(agent,'settings.json'),'utf8')).packages[0].extensions)&&!JSON.parse(readFileSync(join(agent,'settings.json'),'utf8')).packages[0].extensions.length);
@@ -64,7 +67,7 @@ try{
   await page.route('**/api/extensions**',failInstall);await dialog.getByRole('button',{name:'安装',exact:true}).click();await dialog.getByRole('alert').filter({hasText:'Fixture install failure'}).waitFor();assert(await dialog.isVisible());
   await dialog.getByRole('button',{name:'重试',exact:true}).click();await dialog.waitFor({state:'hidden'});await page.unroute('**/api/extensions**',failInstall);
   await panel.getByRole('tab',{name:'已安装 · 2',exact:true}).waitFor();await panel.locator('.ext-new').waitFor();assert((await req('list')).packages.some(p=>p.name==='another-package'&&p.scope==='user'));
-  await panel.getByRole('button',{name:'查看详情 footer.js',exact:true}).click();await panel.getByRole('button',{name:'编辑文件',exact:true}).click();await panel.getByRole('textbox',{name:'编辑文件',exact:true}).fill('export default () => {}; // browser editor');await panel.getByRole('button',{name:'保存文件',exact:true}).click();await panel.locator('.ext-editor').waitFor({state:'hidden'});assert(readFileSync(file.path,'utf8').includes('browser editor'));
+  await panel.getByRole('button',{name:'查看详情 footer',exact:true}).click();await panel.getByRole('button',{name:'编辑文件',exact:true}).click();await panel.getByRole('textbox',{name:'编辑文件',exact:true}).fill('export default () => {}; // browser editor');await panel.getByRole('button',{name:'保存文件',exact:true}).click();await panel.locator('.ext-editor').waitFor({state:'hidden'});assert(readFileSync(file.path,'utf8').includes('browser editor'));
   await page.route('**/api/extensions**',async route=>{const body=route.request().postDataJSON();if(body.action==='details')return route.fulfill({json:{source:body.source,name:'fixture-catalog',description:'Native extension catalog fixture.',license:'MIT',repository:'https://example.com/source',resources:{extensions:['main.ts'],skills:['skills/one','skills/two']},canPin:true}});
   if(body.action!=='search')return route.continue();return route.fulfill({json:{page:1,pages:1,items:[{name:'fixture-catalog',description:'Native extension catalog fixture.',version:'1.2.3',author:'Pi community',downloads:12500,date:Date.now(),types:['extension','skill'],url:'https://pi.dev/packages/fixture-catalog'}]}});});
   await panel.getByRole('tab',{name:/浏览 pi.dev/}).click();await panel.getByText('fixture-catalog',{exact:true}).waitFor();await panel.getByRole('button',{name:'查看详情 fixture-catalog',exact:true}).click();await panel.getByText('MIT',{exact:true}).waitFor();assert.equal(await panel.locator('.ext-catalog-detail .ext-resource-counts').innerText(),'扩展 1\n技能 2');
@@ -81,7 +84,7 @@ try{
   await skills.getByRole('button',{name:'重载当前会话',exact:true}).click();
   await page.screenshot({path:'tests/scratch/settings-v2-skills.png',fullPage:true});
   await page.getByRole('button',{name:'更新',exact:true}).click();await panel.getByText('local-tools',{exact:true}).waitFor();
-  assert(!await panel.getByText('pi-harness',{exact:true}).count());assert(!await panel.getByText('footer.js',{exact:true}).count());
+  assert(!await panel.getByText('pi-harness',{exact:true}).count());assert(!await panel.getByText('footer',{exact:true}).count());
   await panel.getByRole('switch').waitFor();assert(!await panel.getByRole('switch').isChecked());
   await panel.getByRole('switch').check();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===true);
   await panel.getByRole('switch').uncheck();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===false);

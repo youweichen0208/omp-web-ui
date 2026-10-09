@@ -288,6 +288,17 @@ export class WikiService {
 		try { this.record(cwd, before, await this.snapshot(cwd), "pi", title, attribution); } finally { this.active.delete(this.key(cwd)); }
 	}
 	cancel(cwd: string) { this.active.delete(this.key(cwd)); }
+	createFile(cwd: string, path: string) {
+		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
+		// Accept portable relative paths; parent directories must already exist.
+		path = path.replaceAll("\\", "/");
+		if (!path || path.split("/").some(part => !part || part === "." || part === ".." || /[<>:"|?*\x00-\x1f]/.test(part) || /[. ]$/.test(part) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) throw new Error("Invalid file name");
+		const absolute = wikiPath(cwd, path);
+		// Exclusive creation also rejects existing files and symlinks without truncating them.
+		writeFileSync(absolute, "", { flag: "wx" });
+		this.record(cwd, { files: new Map(), skipped: [] }, { files: new Map([[path, Buffer.alloc(0)]]), skipped: [] }, "user", path);
+		return { path };
+	}
 	write(cwd: string, path: string, text: string, version: string) {
 		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
 		const abs = wikiPath(cwd, path), data = readFileSync(abs), next = Buffer.from(text);

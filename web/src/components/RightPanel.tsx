@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiX } from "react-icons/fi";
+import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, TaskProgress, UiMessage } from "../types";
 import { useT } from "../i18n";
 import { downloadFile } from "../download";
 import { mentionedHiddenDirs } from "../conversation-files";
+import { CreateFileForm } from "./CreateFileForm";
 import { TaskProgressPanel } from "./TaskProgressPanel";
 
 type AttachMode = "inline" | "reference";
@@ -29,6 +30,8 @@ interface RightPanelProps {
 
 export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, isStreaming, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
 	const t = useT();
+	const [creating, setCreating] = useState(false);
+	useEffect(() => setCreating(false), [cwd, conversationId, active]);
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
 	const [directories, setDirectories] = useState<Record<string, FileListing>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -98,6 +101,11 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		if (active && fileChanged) request(fileChanged.path);
 	}, [active, fileChanged, request]);
 	useEffect(() => { if (notRepo || !changed.length) setOnlyChanged(false); }, [notRepo, changed]);
+	const refreshFiles = () => {
+		pending.current = null;
+		request("");
+		for (const path of expandedRef.current) request(path);
+	};
 	const toggle = (path: string) => {
 		setExpanded((previous) => {
 			const next = new Set(previous);
@@ -145,12 +153,17 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		</div>;
 	};
 	const renderDirectory = (path: string, depth: number): React.ReactNode => <>
-		{directoryEntries(path).map(({ entry, virtual }) => renderEntry(entry, depth, virtual))}
+		{directories[path]?.error ? <div className="tree-directory-error" role="status" title={directories[path].error?.message}>
+			<span>{t(directories[path].error?.code === "missing" ? "directoryMissing" : directories[path].error?.code === "denied" ? "directoryDenied" : directories[path].error?.code === "not_directory" ? "directoryNotFolder" : "directoryUnavailable")}</span>
+			{!path && <span>{t("directoryChooseProject")}</span>}
+			<button type="button" onClick={() => request(path)}>{t("refreshWorkspaceFiles")}</button>
+		</div> : directoryEntries(path).map(({ entry, virtual }) => renderEntry(entry, depth, virtual))}
 		{directories[path]?.truncated && <div className="panel-empty files-truncated">{t("filesTruncated")}</div>}
 	</>;
 	const otherDirectories = directoryEntries("").filter(({ entry }) => entry.type === "dir" && !changed.some((change) => change.path === entry.path || change.path.startsWith(`${entry.path}/`)) && (showHidden || !entry.name.startsWith("."))).length;
 	return <aside className="panel panel-right has-task-progress">
-		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
+		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<button type="button" className="tree-menu-trigger" aria-label={t("newWorkspaceFile")} title={t("newWorkspaceFile")} disabled={isStreaming || !cwd} onClick={() => setCreating(value => !value)}><FiPlus /></button><button type="button" className="tree-menu-trigger" aria-label={t("refreshWorkspaceFiles")} title={t("refreshWorkspaceFiles")} onClick={refreshFiles}><FiRefreshCw /></button><div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
+		{creating && <CreateFileForm key={`${cwd}:${conversationId}`} cwd={cwd} conversationId={conversationId} disabled={isStreaming} onCancel={() => setCreating(false)} onCreated={path => { setCreating(false); refreshFiles(); onPreview(path, path.split("/").at(-1)!); }} />}
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
 			if (!button) return;

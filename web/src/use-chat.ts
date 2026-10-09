@@ -36,16 +36,12 @@ import type {
 
 import { applyMessageDelta, type MessageDeltaMsg } from "./message-delta";
 import { emitPluginData } from "./plugin-loader";
+import { appendNotice, type Notice } from "./notices";
 import { PROTOCOL_VERSION } from "./protocol-version";
 
 export type ConnStatus = "connecting" | "open" | "closed";
 
-export interface Notice {
-	conversationId?: string;
-	id: number;
-	level: "info" | "warning" | "error";
-	text: string;
-}
+export type { Notice } from "./notices";
 
 export type ReloadStatus = Extract<ServerMessage, { type: "reload_status" }>;
 
@@ -522,7 +518,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 				),
 			};
 		case "notice":
-			return { ...state, notices: [...state.notices, action.notice].slice(-6) };
+			return { ...state, notices: appendNotice(state.notices, action.notice) };
 		case "agent_silence": {
 			const byConversation = { ...state.agentSilenceByConversation };
 			if (action.event.phase === "active") delete byConversation[action.event.conversationId];

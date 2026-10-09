@@ -16,6 +16,34 @@ function fixture() {
 	return { root, cwd, service };
 }
 describe("Wiki workspace", () => {
+	it("creates empty files exclusively and records undo/redo without overwriting", async () => {
+		const { cwd, service } = fixture();
+		mkdirSync(join(cwd, "docs"));
+		expect(service.createFile(cwd, "docs\\中文.md")).toEqual({ path: "docs/中文.md" });
+		expect(readFileSync(join(cwd, "docs/中文.md"), "utf8")).toBe("");
+		expect(() => service.createFile(cwd, "docs/中文.md")).toThrow();
+		expect(() => service.createFile(cwd, "notes.md")).toThrow();
+		expect(readFileSync(join(cwd, "notes.md"), "utf8")).toContain("# Notes");
+		const state = await service.state(cwd);
+		expect(state.entries.some(entry => entry.path === "docs/中文.md")).toBe(true);
+		const revision = state.revisions[0];
+		expect(revision.changes[0]).toMatchObject({ path: "docs/中文.md", before: null, after: "" });
+		service.restore(cwd, revision.id, true);
+		expect(existsSync(join(cwd, "docs/中文.md"))).toBe(false);
+		service.restore(cwd, revision.id, false);
+		expect(readFileSync(join(cwd, "docs/中文.md"), "utf8")).toBe("");
+	});
+	it("rejects unsafe creation paths, absent parents and external symlinks", async () => {
+		const { cwd, root, service } = fixture();
+		for (const path of ["", "../outside.md", "/absolute.md", "C:\\outside.md", "missing/note.md", "con.txt", "note.", "a\0b", "a//b"]) expect(() => service.createFile(cwd, path)).toThrow();
+		mkdirSync(join(root, "outside"));
+		symlinkSync(join(root, "outside"), join(cwd, "linked"), process.platform === "win32" ? "junction" : "dir");
+		expect(() => service.createFile(cwd, "linked/new.md")).toThrow(/outside/);
+		expect(existsSync(join(root, "outside/new.md"))).toBe(false);
+		await service.begin(cwd);
+		expect(() => service.createFile(cwd, "busy.md")).toThrow(/finish/);
+		service.cancel(cwd);
+	});
 	it("persists request/reply attribution only for actual Pi changes", async () => {
 		const { cwd, root, service } = fixture();
 		const before = await service.begin(cwd);

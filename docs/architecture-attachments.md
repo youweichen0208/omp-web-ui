@@ -22,7 +22,17 @@
 
 ## 文件对话（无工作区路径）
 
+窗口拖放遮罩在捕获阶段监听 drop/dragend 清理，即使子输入框阻止冒泡也不会残留；Escape 与窗口失焦同样取消遮罩。浏览器回归：`tests/notice-drop-browser-test.mjs`。
+
 拖入输入框 / 📎 上传的任意文件带 `attachments[].fileData`（base64）发送——服务端写入全局目录 `~/.pi-web/uploads/<clientId>/`（**不放项目内**，`MAX_UPLOAD_BYTES` 20MB 上限），小文本（≤ `PI_WEB_INLINE_FILE_MAX` 且嗅探为文本）直接内联，其余以**绝对路径** reference 附加（read 工具支持绝对路径）。前端分流（`isRasterImage`）：**只有栅格图片**（png/jpeg/gif/webp/bmp/avif…）走 imageData 管线；**SVG 等矢量格式排除**——createImageBitmap 解码 SVG 会失败，SVG 作为普通文件附加让模型读源码更有用，其余文件走 fileData。
+
+## 手动新建文件
+
+文件树与 Wiki 共用 `CreateFileForm`，通过已有鉴权 `/api/wiki` 的 `create-file` 操作创建空文件（请求携带 cwd、conversationId、path）。父目录必须存在；相对路径校验兼容 Windows 分隔符并拒绝越界、保留设备名和无效字符，真实父路径不能越出工作区。`wx` 独占创建保证重名或符号链接不会覆盖已有文件，工作区/会话切换、quiesce 与正在执行的任务阻止创建。成功返回 `WorkspaceFileCreated` 后刷新并沿原导航保护打开文件；失败保留输入。创建记录进入 Wiki 手动改动历史，可撤销/重做。
+
+## 文件树错误恢复
+
+`files` 响应以可选 error 字段报告 missing/not_directory/denied/unavailable，所有平台一致；失败仍返回空列表供请求队列结算，不注册不存在目录的 watcher，也不重复发送 notice。错误在所属节点下展示，可手动刷新；目录恢复后成功响应自动清除错误。失效的项目根提示用户重新选择目录，不擅自创建或切换工作区。
 
 ## 文件预览协议
 

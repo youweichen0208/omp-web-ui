@@ -116,7 +116,7 @@ function NoticeToast({
 			3000,
 		);
 		return () => clearTimeout(t);
-	}, [paused, notice.id, notice.level, onDismiss]);
+	}, [paused, notice.id, notice.level, notice.count, onDismiss]);
 	const Icon =
 		notice.level === "error"
 			? FiAlertCircle
@@ -132,6 +132,7 @@ function NoticeToast({
 		>
 			<Icon className="notice-icon" />
 			<span className="notice-text">{<LinkedText text={notice.text} />}</span>
+			{(notice.count ?? 1) > 1 && <span className="notice-count">×{notice.count}</span>}
 			<button
 				type="button"
 				className="notice-close"
@@ -287,6 +288,21 @@ export function App() {
 	 *  drop overlay; drop anywhere attaches, the input bar keeps priority via
 	 *  its own stopPropagation handlers. */
 	const [appDragOver, setAppDragOver] = useState(false);
+	useEffect(() => {
+		const clear = () => setAppDragOver(false);
+		const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") clear(); };
+		// Capture also sees drops consumed by child upload/editor handlers.
+		window.addEventListener("drop", clear, true);
+		window.addEventListener("dragend", clear, true);
+		window.addEventListener("blur", clear);
+		window.addEventListener("keydown", onKey, true);
+		return () => {
+			window.removeEventListener("drop", clear, true);
+			window.removeEventListener("dragend", clear, true);
+			window.removeEventListener("blur", clear);
+			window.removeEventListener("keydown", onKey, true);
+		};
+	}, []);
 	useEffect(() => {
 		const configure = () => { if (chat.state?.cwd) send({ type: "native_mcp_request", action: "radius", scope: "global", cwd: chat.state.cwd, requestId: randomUuid() }); };
 		window.addEventListener("pi-configure-radius", configure);

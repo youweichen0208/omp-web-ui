@@ -1,9 +1,10 @@
 import { DefaultPackageManager, SettingsManager, ProjectTrustStore, type PackageSource } from "@earendil-works/pi-coding-agent";
 import { writeFileSync, mkdirSync, renameSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { createHash } from "node:crypto";
 import type { ExtensionOperation, ExtensionPackage, ExtensionsState, ExtensionScope } from "./protocol.js";
 import { readJson, textField, resourceTypes, sourceOf, sourceInfo, packageDisabled, settingsVersion } from "./extensions-model.js";
+import { extensionDisplay } from "./extension-display.js";
 import { gitOutput, latestNpmVersion } from "./component-updates.js";
 export interface WorkerRequest { cwd: string; agentDir: string; action: "list" | "check" | "mutate"; operation?: ExtensionOperation; source?: string; version?: string; }
 const blankResources = () => ({ extensions: [] as string[], skills: [] as string[], prompts: [] as string[], themes: [] as string[] });
@@ -44,7 +45,7 @@ export async function extensionWork(input: WorkerRequest, progress: (message: st
 		}
 		for (const resource of resources.extensions) {
 			if (resource.metadata.origin !== "top-level" || resource.path.startsWith("builtin:") || resource.metadata.scope === "temporary") continue;
-			result.push({ id: `file:${resource.metadata.scope}:${resource.path}`, source: resource.path, name: basename(resource.path), scope: resource.metadata.scope, kind: "file", path: resource.path, enabled: resource.enabled, pinned: false, trusted: resource.metadata.scope === "user" || trusted, resources: blankResources() });
+			result.push({ id: `file:${resource.metadata.scope}:${resource.path}`, source: resource.path, ...extensionDisplay(resource.path), scope: resource.metadata.scope, kind: "file", path: resource.path, enabled: resource.enabled, pinned: false, trusted: resource.metadata.scope === "user" || trusted, resources: blankResources() });
 		}
 		return { packages: result, version: settingsVersion(cwd,agentDir), trusted };
 	}

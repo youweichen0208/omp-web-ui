@@ -22,6 +22,8 @@
 
 ## 文件与索引
 
+文件栏提供新建文件，默认填入当前文档的父目录；与普通文件树共用创建表单和独占创建接口，详见 [附件与文件处理](architecture-attachments.md#手动新建文件)。创建成功后经过自动保存导航保护打开新文件。
+
 `wiki-service.ts` 负责工作区索引、文档读取、搜索和文件历史；`wiki-links.ts` 定义标签与链接解析。HTTP 类型只在 `server/protocol.ts` 声明，经现有 type-only shim 供浏览器使用。
 
 正文使用 `document-content`：仅校验目标真实路径，读取文件和元数据、SHA-256 版本，返回 `WikiDocumentContent`，不等待索引。引用使用独立 `document-references`（`WikiDocumentReferences`）；索引缓存各文件已解析链接及反向引用表，后台引用只更新链接，不覆盖编辑草稿。引用尚未返回时显示加载状态，不显示 0 篇。原 `document` 完整接口保持兼容。只读 HTTP 查询允许同项目原生会话切换；项目变化拒绝旧结果，写入/发送仍校验原会话。正文响应由组件存活状态和读取序号丢弃迟到结果。

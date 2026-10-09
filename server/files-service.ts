@@ -132,7 +132,7 @@ export function isRealPathInWorkspace(root: string, abs: string): boolean {
  * win32: stability and completeness first, preview second. ACL-protected
  * system dirs (C:\$Recycle.Bin, Program Files internals, OneDrive placeholders)
  * throw EPERM/EACCES on open — that must not kill the panel, so it degrades
- * to an empty listing plus a warning. Directory symlinks/junctions are
+ * to an empty listing with a node-local error. Directory symlinks/junctions are
  * followed so mklink /D folders stay navigable; broken links still show as
  * files instead of vanishing. The cap is 4x posix and truncation is reported
  * via `truncated` instead of happening silently.
@@ -140,7 +140,7 @@ export function isRealPathInWorkspace(root: string, abs: string): boolean {
 async function readDirForUI(
 	abs: string,
 	rel: string,
-): Promise<{ entries: FileEntry[]; truncated: boolean; error?: string }> {
+): Promise<{ entries: FileEntry[]; truncated: boolean; error?: Extract<ServerMessage, { type: "files" }>["error"] }> {
 	const { join } = await import("node:path");
 	const fs = await import("node:fs/promises");
 	const ignored = ignoredEntries();
@@ -150,10 +150,11 @@ async function readDirForUI(
 	try {
 		dirents = await fs.readdir(abs, { withFileTypes: true });
 	} catch (err) {
-		if (!IS_WIN32) throw err;
-		// Windows ACL-protected/system dirs throw EPERM/EACCES on open —
-		// degrade to an empty listing; listFiles turns this into a warning.
-		return { entries: [], truncated: false, error: (err as Error).message };
+		const code = (err as NodeJS.ErrnoException).code;
+		return { entries: [], truncated: false, error: {
+			code: code === "ENOENT" ? "missing" : code === "ENOTDIR" ? "not_directory" : code === "EACCES" || code === "EPERM" ? "denied" : "unavailable",
+			message: (err as Error).message,
+		} };
 	}
 
 	const out: FileEntry[] = [];
@@ -251,15 +252,6 @@ export class FilesService {
 		// always use "/", but relative() returns "\\" on Windows.
 		const rel = rawRel.split(sep).join("/");
 		const { entries, truncated, error } = await readDirForUI(target, rel);
-		if (error) {
-			// Windows-only: unreadable system dirs degrade to an empty list
-			// with a warning instead of a hard error — the panel stays usable.
-			this.host.emit({
-				type: "notice",
-				level: "warning",
-				text: `目录不可读：${error}`,
-			});
-		}
 		this.host.emit({
 			type: "files",
 			cwd,
@@ -272,6 +264,7 @@ export class FilesService {
 						: "",
 			entries,
 			truncated,
+			...(error ? { error } : {}),
 		});
 		// Watch the listed directory — deferred until AFTER the response is on
 		// the wire. On win32, fs.watch(root, {recursive:true}) registering over
@@ -280,7 +273,7 @@ export class FilesService {
 		// macOS's FSEvents); doing it inline before the emit made every
 		// project switch wait on that registration instead of just seeing the
 		// file list immediately and having the watcher arm a beat later.
-		if (cwd === this.host.getCwd()) this.watchDir(target, rel);
+		if (!error && cwd === this.host.getCwd()) this.watchDir(target, rel);
 	}
 
 	/**

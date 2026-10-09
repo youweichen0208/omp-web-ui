@@ -100,8 +100,19 @@ try {
 			assert(serialized.includes(first.planId));
 			assert(serialized.includes('expectedRevision'));
 			assert(serialized.includes('not authorization to continue'));
+			assert(serialized.includes('without requesting separate plan approval'));
 		});
 		assert(!readFileSync(compactedFile, 'utf8').includes('pi-harness:plan-background'));
+
+		// #37/#39: resume an authorized task and finish in one native model/tool loop.
+		round = 0;
+		const completing = latest();
+		await prompt('Continue the authorized implementation and finish it without waiting for plan approval', () => round++ === 0 ? [['finish-current', update(completing, { status: 'completed' })]] : []);
+		assert.equal(latest().status, 'completed');
+		assert.equal(latest().currentStepId, null);
+		assert.deepEqual(latest().completedStepIds, ['a', 'b']);
+		assert(session.messages.some(message => message.role === 'toolResult' && message.toolCallId === 'finish-current' && !message.isError));
+		assert.equal(round, 2, 'one tool call and final reply; no human approval round');
 
 		preference.set(false); preference.coordinate(session, true);
 		await session.navigateTree(firstLeaf, { summarize: false });

@@ -3,11 +3,12 @@ import ReactMarkdown from "react-markdown";
 import { useExtensionEditor } from "../extension-editor";
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import { FiCalendar, FiArrowUp, FiBookOpen, FiChevronDown, FiChevronRight, FiCode, FiFile, FiMenu, FiRefreshCw, FiSearch, FiX, FiClock, FiCornerUpLeft, FiCornerUpRight, FiLink, FiSquare } from "react-icons/fi";
+import { FiPlus, FiCalendar, FiArrowUp, FiBookOpen, FiChevronDown, FiChevronRight, FiCode, FiFile, FiMenu, FiRefreshCw, FiSearch, FiX, FiClock, FiCornerUpLeft, FiCornerUpRight, FiLink, FiSquare } from "react-icons/fi";
 import { useI18n, useT } from "../i18n";
 import type { WikiState, WikiDirectory, WikiDocument, WikiDocumentContent, WikiDocumentReferences, WikiRevision, WikiChange, WikiSearchResult, UiMessage, ClientMessage, UiModelInfo, ToolStatus } from "../types";
 import { wikiRequest, wikiMedia } from "../wiki-api";
 import { wikiMetadata, resolveWikiLink, wikiPrompt } from "../wiki-document";
+import { CreateFileForm } from "./CreateFileForm";
 import { WikiChatPanel } from "./WikiChatPanel";
 import { wikiSectionIndex, wikiHeadingTexts, wikiHasEmptySections } from "../wiki-chat";
 import { RichMarkdownEditor } from "./RichMarkdownEditor";
@@ -53,6 +54,8 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const expandComposer = () => { setComposerOpen(true); };
 	useEffect(() => { if (composerOpen || chatOpen) inputRef.current?.focus(); }, [composerOpen, chatOpen]);
 	useEffect(() => { const root = composerRef.current; if (!root) return; const observer = new ResizeObserver(() => setComposerHeight(root.getBoundingClientRect().height)); observer.observe(root); return () => observer.disconnect(); }, [chatOpen]);
+	const [creating, setCreating] = useState(false);
+	useEffect(() => setCreating(false), [active, conversationId]);
 	const [sidebar, setSidebar] = useState(false);
 	const [drawer, setDrawer] = useState<"recent" | string | null>(null);
 	const [search, setSearch] = useState(false), [query, setQuery] = useState(""), [results, setResults] = useState<WikiSearchResult[]>([]);
@@ -327,7 +330,8 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 		{active && statusHost && state.index && createPortal(<WikiIndexIndicator status={state.index} />, statusHost)}
 		<aside className={`wiki-sidebar ${sidebar ? "open" : ""}`}>
 			<button className="wiki-search-trigger" onClick={() => setSearch(true)}><FiSearch /><span>{t("wikiSearchAll")}</span><kbd>⌘K</kbd></button>
-			<div className="wiki-tree-label"><span>{t("wikiFiles")}</span><button aria-label={t("wikiRefresh")} onClick={() => void refresh(true)}><FiRefreshCw /></button></div>
+			<div className="wiki-tree-label"><span>{t("wikiFiles")}</span><button aria-label={t("newWorkspaceFile")} title={t("newWorkspaceFile")} disabled={writingBlocked || !connected || state.running} onClick={() => setCreating(value => !value)}><FiPlus /></button><button aria-label={t("wikiRefresh")} onClick={() => void refresh(true)}><FiRefreshCw /></button></div>
+			{creating && <CreateFileForm key={`${cwd}:${conversationId}`} cwd={cwd} conversationId={conversationId} initialPath={path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : ""} disabled={writingBlocked || !connected || state.running} onCancel={() => setCreating(false)} onCreated={target => { setCreating(false); void refresh(true); open(target); }} />}
 			<div className="wiki-tree" role="tree" aria-label={t("wikiFiles")} onScroll={e => setTreeScroll(e.currentTarget.scrollTop)}>
 				{hiddenRoots.size > 0 && <button className="wiki-tree-row wiki-hidden-folders" role="treeitem" aria-expanded={showHidden} onClick={() => { const value = !showHidden; setShowHidden(value); localStorage.setItem(`pi-wiki-hidden:${cwd}`, String(value)); setTreeScroll(0); }}>
 					{showHidden ? <FiChevronDown /> : <FiChevronRight />}<span>{t("wikiHiddenFolders", { count: hiddenRoots.size })}</span>

@@ -43,13 +43,22 @@ export function changesBetween(before: PlanSnapshot | undefined, after: PlanStat
 	return changes;
 }
 
+/** Terminal command intent is atomic; persisted snapshots remain strictly validated. */
+function commandState(value: Record<string, unknown>): PlanState {
+	if (!["completed", "cancelled", "failed"].includes(String(value.status))) return editableState(value);
+	const state = editableState({ ...value, status: "active", currentStepId: null });
+	if (value.currentStepId !== null && (typeof value.currentStepId !== "string" || !state.steps.some(step => step.id === value.currentStepId))) throw new Error("currentStepId must be null or an existing step ID");
+	return { ...state, status: value.status as PlanState["status"],
+		completedStepIds: value.status === "completed" ? state.steps.map(step => step.id) : state.completedStepIds };
+}
+
 export function transition(value: unknown, current?: PlanSnapshot, newId: () => string = randomUUID): PlanSnapshot {
 	if (!object(value) || !["create", "update"].includes(String(value.action))) throw new Error("action must be create or update");
 	if (value.action === "update") {
 		const reason = !current ? "No plan exists on this branch" : current.status !== "active" ? "The latest plan has ended" : value.planId !== current.planId ? "planId does not match this branch's latest plan" : value.expectedRevision !== current.revision ? "expectedRevision is stale" : undefined;
 		if (reason) throw new Error(`${reason}. ${!current || current.status !== "active" ? "Use create for a new plan." : "Use update with the current planId and expectedRevision and submit the full corrected plan."}\nCurrent editable state: ${current ? JSON.stringify({ action: current.status === "active" ? "update" : "create", planId: current.planId, expectedRevision: current.revision, ...editableState(current) }) : "none; use create"}`);
 	}
-	const state = editableState(value);
+	const state = commandState(value);
 	const changes = changesBetween(value.action === "update" ? current : undefined, state);
 	if (value.action === "create" && current?.status === "active") changes.unshift({ kind: "replaced", planId: current.planId, revision: current.revision, reason: "Replaced by a newly created plan" });
 	return { schemaVersion: 3, planId: value.action === "create" ? newId() : current!.planId, revision: value.action === "create" ? 1 : current!.revision + 1, ...state, changes };

@@ -1123,6 +1123,7 @@ export type ServerMessage =
 	| {
 			type: "files";
 			cwd: string;
+			error?: { code: "missing" | "not_directory" | "denied" | "unavailable"; message: string };
 			path: string;
 			parent: string | null;
 			entries: FileEntry[];
@@ -1307,6 +1308,7 @@ export interface NodeSource {
 
 /** Wiki HTTP API. Workspace and request identity are checked at the boundary. */
 export interface WikiConversationResult { conversationId: string }
+export interface WorkspaceFileCreated { path: string }
 export interface WikiEntry {
 	path: string;
 	name: string;

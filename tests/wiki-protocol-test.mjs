@@ -60,6 +60,14 @@ try {
 	assert.equal(history.revisions.length, 1);
 	assert.equal((await request('restore', { id: history.revisions[0].id, undo: true })).status, 200);
 	assert.equal(readFileSync(join(workspace, 'note.md'), 'utf8'), '# Notes\n\nsearch phrase');
+	assert.equal((await request('create-file', { path: 'created.md', conversationId: 'stale' })).status, 400);
+	assert.equal((await request('create-file', { path: '../escape.md', conversationId: state.conversationId })).status, 400);
+	assert.equal((await request('create-file', { path: 'created.md', conversationId: state.conversationId }, { Origin: 'https://evil.invalid' })).status, 403);
+	const created = await request('create-file', { path: 'created.md', conversationId: state.conversationId });
+	assert.equal(created.status, 200); assert.deepEqual(await created.json(), { path: 'created.md' });
+	assert.equal(readFileSync(join(workspace, 'created.md'), 'utf8'), '');
+	assert.equal((await request('create-file', { path: 'note.md', conversationId: state.conversationId })).status, 400);
+	assert.equal(readFileSync(join(workspace, 'note.md'), 'utf8'), '# Notes\n\nsearch phrase');
 	const openInfo = await (await request('open-info', { path: 'note.md' })).json(); assert(openInfo.absolute.endsWith('note.md'));
 	assert.equal((await request('new-conversation', { path: '../outside.txt', conversationId: state.conversationId })).status, 400);
 	assert.equal((await request('new-conversation', { path: 'missing.md', conversationId: state.conversationId })).status, 400);

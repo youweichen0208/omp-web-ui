@@ -22,6 +22,8 @@ Desktop 不打包应用自己的 `extensions/` 或声明其扩展入口。会话
 
 ## 目录和展示
 
+独立文件的名称统一由 `extensionDisplay` 派生：index/main/extension/plugin 入口使用所属目录名，跳过 src/dist 等中间目录，兼容 Windows 路径。完整路径保留供区分，开关与编辑继续使用原生文件身份。
+
 pi.dev 当前通过服务端 HTML 提供目录，没有依赖未公开 JSON API。extensions-catalog.ts 从 data-package-* 和文本中提取名称、类型、下载量、日期与版本，支持原站搜索、排序和分页。只渲染文本及校验后的 HTTP(S) 链接，不注入远程 HTML。目录格式变化时展示错误及原站入口。联网请求 15 秒超时、5 分钟缓存，缓存有界。安装预览从 npm registry 读取显式资源清单；Git 来源确认前不克隆，因此清单未知时明确提示审查源码。版本说明从仓库的 GitHub latest release 提取至多三条，并显示实际 release tag，不伪造包 changelog。
 
 用户进入管理页后注册该工作区的后台更新检查，服务运行期间每 6 小时检查；最多记忆 32 个工作区。自动检查开关存放 agentDir/webui-extensions.json，关闭后停止后台检查。关闭设置不会自动安装或更新任何包。

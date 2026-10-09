@@ -43,6 +43,10 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
 					if (![path, text, version].every(v => typeof v === "string")) throw new Error("Invalid save request");
 					wiki.write(cwd, path, text, version); result = await wiki.documentContent(cwd, path); break;
+				case "create-file":
+					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
+					if (typeof path !== "string" || conversationId !== cs.conversationId) throw new Error("Invalid create request");
+					result = wiki.createFile(cwd, path); break;
 				case "restore":
 					if (service().quiesceInfo().quiesced || session.isStreaming) throw new Error("Wait for the current request to finish");
 					if (typeof id !== "string" || typeof undo !== "boolean" || (path !== undefined && typeof path !== "string")) throw new Error("Invalid undo request");
@@ -63,7 +67,7 @@ export function installWikiRoutes(app: Express, service: () => AgentService, dat
 				}
 				default: throw new Error("Unknown Wiki action");
 			}
-			if (cs.switchingWorkspace || cs.cwd !== cwd || (["prompt", "write", "restore"].includes(action) && !valid())) { res.status(409).json({ error: "Workspace changed" }); return; }
+			if (cs.switchingWorkspace || cs.cwd !== cwd || (["prompt", "write", "restore", "create-file"].includes(action) && !valid())) { res.status(409).json({ error: "Workspace changed" }); return; }
 			res.json(result);
 		} catch (error) { res.status(error instanceof WikiConflictError ? 409 : 400).json({ error: (error as Error).message, ...(error instanceof WikiConflictError ? { code: "version_conflict" } : {}) }); }
 	});

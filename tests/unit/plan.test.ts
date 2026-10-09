@@ -19,9 +19,24 @@ const call = (id: string, name = "plan") => ({ type: "toolCall" as const, id, na
 const assistant = (...ids: string[]): UiMessage => ({ id: `a-${ids.join()}`, role: "assistant", content: ids.map(id => call(id, id.startsWith("p") ? "plan" : "read")), timestamp: 2 });
 const result = (id: string, plan: PlanSnapshot, isError = false): UiMessage => ({ id: `r-${id}`, role: "toolResult", toolName: "plan", toolCallId: id, content: [], planSnapshot: plan, isError, timestamp: 3 });
 
+test("explicit completion closes the current step and completes the checklist (#37)", () => {
+	const before = transition(update(create(), { currentStepId: "b", completedStepIds: ["a"] }), create());
+	const command = update(before, { status: "completed" });
+	const done = transition(command, before);
+	expect(done).toMatchObject({ status: "completed", currentStepId: null, completedStepIds: ["a", "b"], revision: 3 });
+	expect(done.changes).toContainEqual({ kind: "completed", stepId: "b", title: "Implement", position: 2 });
+	expect(planSnapshot(done)).toEqual(done);
+	expect(command.currentStepId).toBe("b");
+	for (const patch of [{ currentStepId: "unknown" }, { completedStepIds: ["unknown"] }, { expectedRevision: 1 }, { planId: "other" }]) expect(() => transition({ ...command, ...patch }, before)).toThrow();
+	expect(planSnapshot({ ...done, currentStepId: "b" })).toBeUndefined();
+	expect(planSnapshot({ ...done, completedStepIds: ["a"] })).toBeUndefined();
+	expect(before.status).toBe("active");
+	for (const status of ["cancelled", "failed"]) expect(transition(update(before, { status }), before)).toMatchObject({ status, currentStepId: null, completedStepIds: ["a"] });
+});
+
 test("validation rejects invalid full states without changing previous state", () => {
 	const before = create(), unchanged = structuredClone(before);
-	for (const patch of [ { title: " " }, { title: "x".repeat(81) }, { completionCriteria: "x".repeat(241) }, { steps: [] }, { steps: Array(17).fill(input.steps[0]) }, { steps: [input.steps[0], input.steps[0]] }, { steps: [{ id: "x".repeat(65), title: "x" }] }, { steps: [{ id: "a", title: "x", detail: "x".repeat(501) }] }, { completedStepIds: ["missing"] }, { completedStepIds: ["b", "b"] }, { completedStepIds: ["a"] }, { currentStepId: "missing" }, { currentStepId: undefined }, { status: "cancelled" }, { status: "completed", currentStepId: null, completedStepIds: ["a"] }, { changeSummary: "x".repeat(241) } ]) expect(() => transition(update(before, patch), before)).toThrow();
+	for (const patch of [ { title: " " }, { title: "x".repeat(81) }, { completionCriteria: "x".repeat(241) }, { steps: [] }, { steps: Array(17).fill(input.steps[0]) }, { steps: [input.steps[0], input.steps[0]] }, { steps: [{ id: "x".repeat(65), title: "x" }] }, { steps: [{ id: "a", title: "x", detail: "x".repeat(501) }] }, { completedStepIds: ["missing"] }, { completedStepIds: ["b", "b"] }, { completedStepIds: ["a"] }, { currentStepId: "missing" }, { currentStepId: undefined }, { changeSummary: "x".repeat(241) } ]) expect(() => transition(update(before, patch), before)).toThrow();
 	expect(before).toEqual(unchanged);
 	for (const status of ["cancelled", "failed"]) expect(transition(update(before, { status, currentStepId: null }), before).status).toBe(status);
 });

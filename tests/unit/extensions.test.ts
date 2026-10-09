@@ -8,6 +8,27 @@ import { sourceInfo, validateSource } from "../../server/extensions-model.js";
 import { parseCatalog } from "../../server/extensions-catalog.js";
 
 describe("native extension management",()=>{
+	it("distinguishes index entry points while keeping native file identities", async () => {
+		const root = mkdtempSync(join(tmpdir(), "pi-extension-names-"));
+		const cwd = join(root, "project"), agentDir = join(root, "agent");
+		mkdirSync(cwd); mkdirSync(agentDir);
+		const paths = ["weather", "deploy"].map(name => join(agentDir, "extensions", name, "index.ts"));
+		for (const path of paths) {
+			mkdirSync(join(path, ".."), { recursive: true });
+			writeFileSync(path, 'throw Error("listing must not execute extensions");');
+		}
+		try {
+			let state = await extensionWork({ cwd, agentDir, action: "list" });
+			for (const [index, name] of ["weather", "deploy"].entries()) {
+				const file = state.packages.find(item => item.path === paths[index]);
+				expect(file).toMatchObject({ name, id: `file:user:${paths[index]}`, source: paths[index], kind: "file" });
+			}
+			const id = `file:user:${paths[0]}`;
+			state = await extensionWork({ cwd, agentDir, action: "mutate", version: state.version, operation: { action: "toggle", id, enabled: false } });
+			expect(state.packages.find(item => item.id === id)).toMatchObject({ name: "weather", enabled: false });
+			expect(state.packages.find(item => item.path === paths[1])?.enabled).toBe(true);
+		} finally { rmSync(root, { recursive: true, force: true }); }
+	});
 	it("preserves filters and unrelated settings, persists native switches, moves scope and removes only local references",async()=>{
 		const root=mkdtempSync(join(tmpdir(),"pi-extension-test-")),cwd=join(root,"project"),agentDir=join(root,"agent"),pkg=join(root,"package");
 		mkdirSync(cwd);mkdirSync(agentDir);mkdirSync(pkg);mkdirSync(join(pkg,"extensions"));mkdirSync(join(agentDir,"extensions"));
