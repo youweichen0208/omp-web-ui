@@ -20,7 +20,8 @@ try {
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.file-name', { hasText: 'note.md' }).click();
 	const editor = page.locator('.wiki-prose .fp-rich-document');
-	await editor.locator('code .hljs-keyword').first().waitFor();
+	await editor.locator('pre > code').first().waitFor();
+	await page.waitForFunction(() => [...(CSS.highlights.get('rich-code-keyword') ?? [])].some(range => range.toString() === 'public'));
 	const toolbar = page.locator('.wiki-insert-toolbar');
 	assert.deepEqual(await toolbar.locator('button').evaluateAll(buttons => buttons.slice(0, -1).map(button => button.getAttribute('aria-label'))), ['正文', '标题 2', '标题 3', '列表', '插入表格', '图片', '任务列表', '引用', '代码块', '文档链接', '提及日期']);
 	await editor.locator('p').last().fill('Insert here.');
