@@ -1,3 +1,4 @@
+import { isLegacyMcpNotice } from "./notices";
 import { ChangesProvider } from "./changes-context";
 import { taskChanges } from "./changes";
 import { ChangesPanel } from "./components/ChangesPanel";
@@ -103,9 +104,11 @@ export interface PendingAttachment {
 function NoticeToast({
 	notice,
 	onDismiss,
+	onOpenExtensions,
 }: {
 	notice: Notice;
 	onDismiss: (id: number) => void;
+	onOpenExtensions: () => void;
 }) {
 	const t = useT();
 	const [paused, setPaused] = useState(false);
@@ -131,7 +134,11 @@ function NoticeToast({
 			onMouseLeave={() => setPaused(false)}
 		>
 			<Icon className="notice-icon" />
-			<span className="notice-text">{<LinkedText text={notice.text} />}</span>
+			<span className="notice-text">{isLegacyMcpNotice(notice.text) ? <>
+				<strong>{t("mcpAdapterNoticeTitle")}</strong><p>{t("mcpAdapterNoticeNative")}</p><p>{t("mcpAdapterNoticeSeparate")}</p>
+				<button onClick={onOpenExtensions}>{t("settingsExtensions")}</button>
+				<details><summary>{t("mcpAdapterNoticeOriginal")}</summary><LinkedText text={notice.text} /></details>
+			</> : <LinkedText text={notice.text} />}</span>
 			{(notice.count ?? 1) > 1 && <span className="notice-count">×{notice.count}</span>}
 			<button
 				type="button"
@@ -524,6 +531,8 @@ export function App() {
 	const [manageModelsOpen, setManageModelsOpen] = useState(false);
 	// Settings panel (system prompt / skills / extensions / presets).
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [settingsInitialTab, setSettingsInitialTab] = useState<"prompt" | "extensions">("prompt");
+	const openExtensionSettings = () => { setSettingsInitialTab("extensions"); setSettingsOpen(true); };
 	// Background-task panel (AI-started servers — stop individually or all).
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
 	// Global search panel (sessions / projects / workspace files).
@@ -922,7 +931,7 @@ export function App() {
 			>
 				<LeftPanel
 					incidentState={conversationState ? toolTextIncidents(conversationState.streamingMessage ? [...conversationState.messages, conversationState.streamingMessage] : conversationState.messages, conversationState.isStreaming).current?.state : undefined}
-					onOpenSettings={() => setSettingsOpen(true)}
+					onOpenSettings={() => { setSettingsInitialTab("prompt"); setSettingsOpen(true); }}
 					onNewChat={() => { setView("chat"); panelSend({ type: "new_chat" }); }}
 					send={panelSend}
 					active={!isMobile || drawer === "left"}
@@ -976,7 +985,7 @@ export function App() {
 						}
 					}}
 					onManageModels={() => setManageModelsOpen(true)}
-					onOpenSettings={() => setSettingsOpen(true)}
+					onOpenSettings={() => { setSettingsInitialTab("prompt"); setSettingsOpen(true); }}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
 					onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 					sound={sound}
@@ -1000,7 +1009,7 @@ export function App() {
 					</div>
 				)}
 				{view !== "chat" && chat.notices.length > 0 && <div className="notices notices-overlay">
-					{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} />)}
+					{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} onOpenExtensions={openExtensionSettings} />)}
 				</div>}
 				<div
 					className="layout"
@@ -1037,7 +1046,7 @@ export function App() {
 							{/* 扩展问卷：非模态内联面板，插在输入框上方，对话内容保持可见 */}
 							{chat.dialog && <Dialog dialog={chat.dialog} send={send} />}
 							{chat.notices.length > 0 && <div className="notices">
-								{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} />)}
+								{chat.notices.map((n) => <NoticeToast key={n.id} notice={n} onDismiss={dismissNotice} onOpenExtensions={openExtensionSettings} />)}
 							</div>}
 							<ChatInput
 								active={view === "chat" && !wikiConversationMatches}
@@ -1183,6 +1192,7 @@ export function App() {
 			<SessionTreeWorkbench state={conversationState} connected={chat.ready} send={send} />
 			{settingsOpen && (
 				<SettingsModal
+					initialTab={settingsInitialTab}
 					chat={chat}
 					send={send}
 					onClose={() => setSettingsOpen(false)}

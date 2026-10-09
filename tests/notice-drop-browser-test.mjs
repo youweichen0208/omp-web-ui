@@ -53,6 +53,17 @@ try {
 	await page.locator(".notice-close").click();
 	assert.equal(await page.locator(".notice").count(), 0);
 	console.log("PASS: identical notices collapse and dismiss together");
+	const migration = String.raw`pi-mcp-adapter no longer reads C:\Users\user\.pi\agent\mcp.json. Move it with: mv "source" "target"`;
+	socket.send(JSON.stringify({ type: "notice", level: "warning", text: migration }));
+	await page.getByText("旧 MCP 扩展需要选择配置方式", { exact: true }).waitFor();
+	assert((await page.locator(".notice-text").innerText()).includes("保留 mcp.json"));
+	await page.locator(".notice summary").click();
+	assert((await page.locator(".notice-text").innerText()).includes(migration));
+	await page.locator(".notice").getByRole("button", { name: "Extensions", exact: true }).click();
+	await page.locator('.settings-tab.active').filter({ hasText: 'Extensions' }).waitFor();
+	await page.locator('.settings-modal .modal-head button').click();
+	await page.locator('.notice-close').click();
+	console.log("PASS: adapter migration offers native-safe guidance and opens Extensions without running a shell command");
 	const transfer = await page.evaluateHandle(() => {
 		const transfer = new DataTransfer();
 		transfer.items.add(new File(["hello"], "drop-regression.txt", { type: "text/plain" }));

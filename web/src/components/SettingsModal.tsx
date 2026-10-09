@@ -11,6 +11,7 @@ import { randomUuid } from "../uuid";
 
 type Tab = "prompt" | "skills" | "extensions" | "native-mcp" | "updates";
 interface SettingsModalProps {
+	initialTab?: Tab;
 	chat: {
 		ready: boolean;
 		settings: UiSettingsState | null;
@@ -23,13 +24,13 @@ interface SettingsModalProps {
 	onClose: () => void;
 }
 
-export function SettingsModal({ chat, send, onClose }: SettingsModalProps) {
+export function SettingsModal({ chat, send, onClose, initialTab = "prompt" }: SettingsModalProps) {
 	const t = useT();
 	const [extensionUpdates,setExtensionUpdates]=useState(0);
 	const canLeave=()=>!document.querySelector('.ext-editor[data-dirty="true"], .prompt-editor[data-dirty="true"], .mcp-workbench[data-dirty="true"]')||window.confirm(t("extDiscard"));
 	const close=()=>{if(canLeave())onClose();};
 	useEffect(() => { const handle = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) close(); }; window.addEventListener("keydown", handle); return () => window.removeEventListener("keydown", handle); }, [onClose]);
-	const [tab, setTab] = useState<Tab>("prompt");
+	const [tab, setTab] = useState<Tab>(initialTab);
 	const settings = chat.settings;
 	useEffect(() => { if (tab === "updates" && chat.ready) send({ type: "check_component_updates", requestId: randomUuid() }); }, [tab, chat.ready, chat.state?.cwd, send]);
 	const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [

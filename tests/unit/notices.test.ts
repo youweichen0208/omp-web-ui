@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendNotice } from "../../web/src/notices.js";
+import { appendNotice, isLegacyMcpNotice } from "../../web/src/notices.js";
 import type { Notice } from "../../web/src/notices.js";
 
 const warning: Notice = { id: 1, level: "error", text: "目录不可读：ENOENT: scandir 'D:\\knowledge-base\\raw'", conversationId: "a" };
@@ -30,5 +30,15 @@ describe("notice aggregation", () => {
 		for (let id = 0; id < 8; id++) notices = appendNotice(notices, { ...warning, id, text: String(id) });
 		expect(notices.map(n => n.id)).toEqual([2, 3, 4, 5, 6, 7]);
 		expect(appendNotice([], warning)[0].count ?? 1).toBe(1);
+	});
+});
+
+
+describe("legacy MCP adapter notice", () => {
+	it("recognizes Windows and POSIX migration messages without treating other errors as migration", () => {
+		expect(isLegacyMcpNotice(String.raw`pi-mcp-adapter no longer reads C:\Users\user\.pi\agent\mcp.json. Move it with: mv ...`)).toBe(true);
+		expect(isLegacyMcpNotice("pi-mcp-adapter no longer reads /home/user/.pi/agent/mcp.json. Merge source into target.")).toBe(true);
+		expect(isLegacyMcpNotice("MCP connection failed")).toBe(false);
+		expect(isLegacyMcpNotice("pi-mcp-adapter no longer reads /home/user/another.json. Move it with: mv ...")).toBe(false);
 	});
 });

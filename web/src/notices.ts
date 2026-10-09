@@ -14,3 +14,8 @@ export function appendNotice(notices: Notice[], incoming: Notice): Notice[] {
 		: notice);
 	return [...notices, incoming].slice(-6);
 }
+
+/** Only the adapter migration notice: native MCP still owns mcp.json. */
+export function isLegacyMcpNotice(text: string): boolean {
+	return /^pi-mcp-adapter no longer reads [^\r\n]+[\\/]mcp\.json\. (?:Move it with:|Merge )/.test(text);
+}
