@@ -17,7 +17,7 @@ import { WebSocket } from "ws";
 // fileURLToPath: URL.pathname 在 Windows 下是 /E:/... 形式，直接当 cwd 会失败
 const REPO_ROOT = fileURLToPath(new globalThis.URL("../", import.meta.url));
 
-const PORT = 8793;
+const PORT = 18993;
 const WS_URL = `ws://localhost:${PORT}/ws`;
 // Unique per run — a persisted lastCwd from a previous run would restore /tmp
 // on attach and change the /cwd assertions.
@@ -95,11 +95,7 @@ async function main() {
 		console.error("build failed");
 		process.exit(1);
 	}
-	try {
-		await freePort(PORT);
-	} catch {
-		/* port free */
-	}
+	await freePort(PORT);
 	await sleep(500);
 	const server = spawn("node", ["dist/server/index.js"], {
 		cwd: PROJ,
@@ -241,10 +237,6 @@ async function main() {
 
 main().catch(async (e) => {
 	console.error("❌", e.message);
-	try {
-		await freePort(PORT);
-	} catch {
-		/* */
-	}
+	await freePort(PORT);
 	process.exit(1);
 });

@@ -7,7 +7,7 @@
  * just renders it.
  */
 import { execFile } from "node:child_process";
-import { open, realpath, stat } from "node:fs/promises";
+import { lstat, open, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { decodeText, looksLikeText } from "./text-sniff.js";
@@ -18,6 +18,9 @@ const exec = promisify(execFile);
 const GIT_TIMEOUT_MS = 15_000;
 const MAX_GIT_OUTPUT = 16 * 1024 * 1024;
 const MAX_UNTRACKED_PREVIEW_BYTES = 512 * 1024;
+/** Untracked files shown in the whole-scope diff; the rest are only counted. */
+const MAX_DIFF_UNTRACKED_FILES = 500;
+class GitOutputTooLarge extends Error {}
 
 export interface ScmFileEntry {
 	path: string;
@@ -74,6 +77,7 @@ async function git(cwd: string, args: string[]): Promise<string> {
 	} catch (err) {
 		const e = err as { message?: string; stderr?: string; killed?: boolean; code?: string };
 		if (e.code === "ENOENT") throw new Error("未找到 git 命令——请确认已安装 Git 并在 PATH 中");
+		if (e.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") throw new GitOutputTooLarge("git 输出超过 16 MiB");
 		if (e.killed) throw new Error("git 命令超时");
 		const detail = (e.stderr ?? e.message ?? "").trim().split("\n")[0];
 		throw new Error(detail || "git 命令失败");
@@ -408,11 +412,52 @@ export async function scmCurrentBranch(cwd: string): Promise<{ branch: string | 
 	}
 }
 
+/** Untracked file as a unified "new file" patch. Each file is read directly: the
+ * listing already proved it untracked, so no git process is needed per file.
+ * Symlinks are not followed and unreadable files become binary entries, so one
+ * odd file never fails the whole view. */
+async function untrackedPatch(root: string, path: string): Promise<string> {
+	const a = JSON.stringify(`a/${path}`), b = JSON.stringify(`b/${path}`);
+	const header = `diff --git ${a} ${b}\nnew file mode 100644\n--- /dev/null\n+++ ${b}\n`;
+	const binary = `${header}Binary files /dev/null and ${b} differ\n`;
+	try {
+		const absolute = resolve(root, path);
+		const rel = relative(root, absolute);
+		if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) return binary;
+		const info = await lstat(absolute);
+		if (!info.isFile()) return binary;
+		const handle = await open(absolute, "r");
+		try {
+			const buf = Buffer.alloc(Math.min(info.size, MAX_UNTRACKED_PREVIEW_BYTES));
+			const { bytesRead } = await handle.read(buf, 0, buf.length, 0);
+			const data = buf.subarray(0, bytesRead);
+			if (!looksLikeText(data)) return binary;
+			const lines = decodeText(data).replace(/\n$/, "").split("\n");
+			let text = header;
+			if (bytesRead > 0) text += `@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+			if (bytesRead < info.size) text += "\\ Preview truncated\n";
+			return text;
+		} finally {
+			await handle.close();
+		}
+	} catch {
+		return binary;
+	}
+}
+
 /** Whole-scope patches for the changes panel. Resolve refs before constructing
  * revision expressions: user input can never become an option or pathspec. */
-export async function scmDiff(cwd: string, options: { scope: "branch" | "work"; base?: string }): Promise<{ text: string; base?: string }> {
+export async function scmDiff(cwd: string, options: { scope: "branch" | "work"; base?: string }): Promise<{ text: string; base?: string; omittedUntracked?: number; reducedContext?: boolean }> {
 	const commit = async (ref: string) => (await git(cwd, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`])).trim();
-	const args = ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--find-renames", "--relative", "--unified=100000"];
+	// Full-file context lets the panel unfold unchanged lines. Large files can
+	// exceed the output cap that way; fall back to normal context instead of failing.
+	const diff = async (range: string[]) => {
+		const args = (context: string) => ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--find-renames", "--relative", `--unified=${context}`, ...range, "--", "."];
+		try { return { text: await git(cwd, args("100000")), reducedContext: false }; }
+		catch (error) { if (!(error instanceof GitOutputTooLarge)) throw error; }
+		try { return { text: await git(cwd, args("3")), reducedContext: true }; }
+		catch (error) { if (error instanceof GitOutputTooLarge) throw new Error("Diff exceeds 16 MiB; narrow the changes before retrying"); throw error; }
+	};
 	if (options.scope === "branch") {
 		let base = options.base;
 		if (!base) {
@@ -423,24 +468,23 @@ export async function scmDiff(cwd: string, options: { scope: "branch" | "work"; 
 		}
 		if (!base || base.length > 1024 || base.includes("\0")) throw new Error("Invalid base branch");
 		const [baseHash, head] = await Promise.all([commit(base), commit("HEAD")]);
-		return { text: await git(cwd, [...args, `${baseHash}...${head}`, "--", "."]), base };
+		const result = await diff([`${baseHash}...${head}`]);
+		return { text: result.text, base, ...(result.reducedContext ? { reducedContext: true } : {}) };
 	}
 	if (options.scope !== "work") throw new Error("Invalid diff scope");
 	const head = await commit("HEAD").catch(async () => (await git(cwd, ["hash-object", "-t", "tree", "--stdin"])).trim());
 	// Git recognizes the empty tree without writing an object, including SHA-256 repos.
-	let text = await git(cwd, [...args, head, "--", "."]);
+	const result = await diff([head]);
+	const parts = [result.text];
+	let bytes = Buffer.byteLength(result.text, "utf8");
 	const paths = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z", "--", "."])).split("\0").filter(Boolean);
-	for (const path of paths) {
-		const preview = await scmFileDiff(cwd, path);
-		const a = JSON.stringify(`a/${path}`), b = JSON.stringify(`b/${path}`);
-		text += `diff --git ${a} ${b}\nnew file mode 100644\n--- /dev/null\n+++ ${b}\n`;
-		if (preview.untrackedKind !== "text") text += `Binary files /dev/null and ${b} differ\n`;
-		else {
-			const lines = preview.untrackedText ? preview.untrackedText.replace(/\n$/, "").split("\n") : [];
-			if (lines.length) text += `@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
-			if (preview.untrackedTruncated) text += "\\ Preview truncated\n";
-		}
-		if (Buffer.byteLength(text, "utf8") > MAX_GIT_OUTPUT) throw new Error("Diff exceeds 16 MiB; narrow the changes before retrying");
+	const root = await realpath(cwd);
+	const shown = paths.slice(0, MAX_DIFF_UNTRACKED_FILES);
+	for (const path of shown) {
+		const patch = await untrackedPatch(root, path);
+		bytes += Buffer.byteLength(patch, "utf8");
+		if (bytes > MAX_GIT_OUTPUT) throw new Error("Diff exceeds 16 MiB; narrow the changes before retrying");
+		parts.push(patch);
 	}
-	return { text };
+	return { text: parts.join(""), ...(paths.length > shown.length ? { omittedUntracked: paths.length - shown.length } : {}), ...(result.reducedContext ? { reducedContext: true } : {}) };
 }

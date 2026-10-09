@@ -39,9 +39,7 @@ try {
 chmodSync(HELPER, 0o644);
 check("helper broken (0644) before test", (statSync(HELPER).mode & 0o111) === 0);
 
-try {
-	await freePort(PORT);
-} catch {}
+await freePort(PORT);
 await sleep(400);
 const server = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,

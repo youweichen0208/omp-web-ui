@@ -14,7 +14,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 // fileURLToPath: URL.pathname 在 Windows 下是 /E:/... 形式，直接当 cwd 会失败
 const REPO_ROOT = fileURLToPath(new globalThis.URL("../", import.meta.url));
 
-const PORT = 8898;
+const PORT = 18998;
 const PROJ = REPO_ROOT;
 const WS = mkdtempSync(join(tmpdir(), "pi-prev-"));
 writeFileSync(join(WS, "notes.weird"), "hello from an unknown extension\nline2\n");
@@ -39,9 +39,7 @@ try {
 	console.error("build failed");
 	process.exit(1);
 }
-try {
-	await freePort(PORT);
-} catch {}
+await freePort(PORT);
 await sleep(400);
 const server = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,

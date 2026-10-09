@@ -58,9 +58,9 @@ try {
 	const yellow = page.getByRole('button', { name: '黄色背景', exact: true });
 	await selectWords(); await yellow.click();
 	check(await editor.locator('p').last().locator('span').evaluateAll(spans => spans.some(span => span.textContent === 'marked words' && span.style.backgroundColor === 'rgb(255, 243, 163)')), 'selection receives yellow background');
-	await page.keyboard.press('Meta+z');
+	await page.keyboard.press('ControlOrMeta+z');
 	check(await editor.locator('p').last().locator('span[style*="background-color"]').count() === 0, 'highlight supports native undo');
-	await page.keyboard.press('Meta+Shift+z');
+	await page.keyboard.press('ControlOrMeta+Shift+z');
 	await page.keyboard.press('Meta+s');
 	await page.locator('.wiki-save-status.saved').waitFor();
 	let source = readFileSync(join(base, 'note.md'), 'utf8');

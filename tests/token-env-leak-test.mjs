@@ -37,7 +37,14 @@ try {
 	assert(output.includes('[[]]'), `terminal did not run the probe: ${JSON.stringify(output.slice(-300))}`);
 	assert(!output.includes(TOKEN), 'PI_WEB_TOKEN must not be visible inside terminals');
 	ws.close();
-	console.log('PASS PI_WEB_TOKEN is not inherited by terminals');
+	// Anonymous health checks stay open but must never receive the token cookie.
+	const anonymous = await fetch(`http://127.0.0.1:${PORT}/api/health`);
+	assert.equal(anonymous.status, 200);
+	assert.equal(anonymous.headers.get('set-cookie'), null, 'anonymous /api/health must not set the token cookie');
+	assert.equal((await fetch(`http://127.0.0.1:${PORT}/`)).status, 401);
+	const withToken = await fetch(`http://127.0.0.1:${PORT}/api/health?token=${TOKEN}`);
+	assert.match(withToken.headers.get('set-cookie') ?? '', /pi_web_token=/, 'an authenticated request still gets the cookie');
+	console.log('PASS PI_WEB_TOKEN is not inherited by terminals, and only authenticated requests get the token cookie');
 } finally {
 	server.kill();
 	await sleep(300);

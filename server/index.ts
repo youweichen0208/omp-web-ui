@@ -132,9 +132,11 @@ function tokenOk(req: Parameters<typeof requestTokens>[0]): boolean {
 if (AUTH_TOKEN) {
 	// /api/health 保持开放：无敏感信息，容器/监控探针需要它
 	app.use((req, res, next) => {
-		if (req.path === "/api/health" || tokenOk(req)) {
-			// 浏览器经 ?token= 首次进入后下发 HttpOnly cookie，后续导航/资源请求免带参数
-			if (needsTokenCookie(req.headers.cookie, AUTH_TOKEN)) {
+		const authenticated = tokenOk(req);
+		if (authenticated || req.path === "/api/health") {
+			// 浏览器经 ?token= 首次进入后下发 HttpOnly cookie，后续导航/资源请求免带参数。
+			// 只发给已认证的请求：匿名健康检查拿到 cookie 就等于拿到口令。
+			if (authenticated && needsTokenCookie(req.headers.cookie, AUTH_TOKEN)) {
 				const https = (req.socket as { encrypted?: boolean }).encrypted === true || req.headers["x-forwarded-proto"] === "https";
 				res.setHeader("Set-Cookie", tokenCookie(AUTH_TOKEN, https));
 			}

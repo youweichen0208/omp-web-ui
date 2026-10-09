@@ -37,7 +37,8 @@ export async function checkWikiV2(page, cwd) {
 	await page.locator('.wiki-chat-toggle').click();
 	await end();
 	await editor.locator('[data-wiki-placeholder]').waitFor();
-	await page.locator('.wiki-insert-toolbar button').nth(3).click();
+	// Table and code blocks are the two toolbar actions that open a picker.
+	await page.locator('.wiki-insert-toolbar button[aria-expanded]').nth(0).click();
 	assert.equal(await page.locator('.wiki-table-grid button').count(), 48);
 	for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
 	for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
@@ -46,7 +47,7 @@ export async function checkWikiV2(page, cwd) {
 	assert.equal(await editor.locator('table th').count(), 8);
 	await page.keyboard.type('Header marker');
 	await end();
-	await page.locator('.wiki-insert-toolbar button').nth(4).click();
+	await page.locator('.wiki-insert-toolbar button[aria-expanded]').nth(1).click();
 	await page.locator('.wiki-language-picker input').fill('merm');
 	await page.locator('.wiki-language-picker button').click();
 	await editor.locator('.wiki-mermaid-preview svg.flowchart').waitFor();
@@ -59,12 +60,17 @@ export async function checkWikiV2(page, cwd) {
 	assert(markdown.includes('```mermaid\nflowchart LR'));
 	assert(!markdown.includes('<svg') && !markdown.includes('wiki-mermaid-preview'));
 	await end();
-	await page.locator('.wiki-more-insert').click();
-	const more = await page.locator('.wiki-more-items button > span:nth-child(2)').allTextContents();
-	await page.keyboard.press('Escape');
+	// The toolbar and the / menu are one list: all eleven actions, no overflow menu.
+	const toolbarActions = await page.locator('.wiki-insert-toolbar .wiki-tool-group button').count();
+	assert.equal(toolbarActions, 11);
 	await page.keyboard.type('/');
 	await page.locator('.wiki-slash-menu').waitFor();
-	assert.equal(await page.locator('.wiki-slash-menu [role="option"]').count(), more.length);
+	// Browser caret scrolling after input must keep the menu open.
+	await page.keyboard.press('ArrowDown');
+	await page.locator('.wiki-scroll').evaluate(el => el.dispatchEvent(new Event('scroll')));
+	await page.locator('.wiki-slash-menu').waitFor();
+	assert.equal(await page.locator('.wiki-slash-menu [role="option"]').nth(1).getAttribute('aria-selected'), 'true');
+	assert.equal(await page.locator('.wiki-slash-menu [role="option"]').count(), toolbarActions);
 	await page.keyboard.press('Escape');
 	await page.keyboard.press('Backspace');
 	await page.keyboard.press('Meta+s');

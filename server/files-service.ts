@@ -363,6 +363,7 @@ export class FilesService {
 	 * git-dir watcher so external repo changes push scm_changed.
 	 */
 	private branchRequests = new Map<string, Promise<void>>();
+	private diffRequests = new Map<string, ReturnType<typeof scmDiff>>();
 	async gitBranch(): Promise<void> {
 		const cwd = this.host.getActiveCwd();
 		const pending = this.branchRequests.get(cwd);
@@ -390,7 +391,15 @@ export class FilesService {
 				return;
 			}
 			if (kind === "diff" && (arg?.scope === "branch" || arg?.scope === "work")) {
-				const data = await scmDiff(cwd, { scope: arg.scope, base: arg.base });
+				// The panel refreshes on a timer and on every file change; join a
+				// request that is still running instead of starting another git diff.
+				const key = `${cwd}\0${arg.scope}\0${arg.base ?? ""}`;
+				let pending = this.diffRequests.get(key);
+				if (!pending) {
+					pending = scmDiff(cwd, { scope: arg.scope, base: arg.base }).finally(() => this.diffRequests.delete(key));
+					this.diffRequests.set(key, pending);
+				}
+				const data = await pending;
 				this.host.emit({ type: "scm_data", cwd, reqId, kind, ok: true, ...data });
 				return;
 			}

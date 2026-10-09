@@ -11404,7 +11404,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .wiki-document-heading { margin-bottom: 28px; }
 .wiki-document-meta { margin-bottom: 0; }
 /* Native formatBlock requires a box for each editable block to preserve its text. */
-.wiki-prose .fp-rich-document .rich-block { display: flow-root; }
+.wiki-prose .fp-rich-document .rich-block { display: block; }
 .wiki-prose .fp-rich-document .rich-block[hidden] { display: none; }
 .wiki-prose.md p, .wiki-prose .fp-markdown .md p { margin: .75em 0; }
 .wiki-prose .fp-rich-document > .rich-block:not([hidden]):not(.rich-block:not([hidden]) ~ .rich-block) > :first-child { margin-top: 0; }
@@ -11462,6 +11462,7 @@ html.pi-desktop .wiki-breadcrumb { -webkit-app-region: drag; app-region: drag; }
 .changes-line.search-match { outline: 1px solid var(--yellow); outline-offset: -1px; }
 .changes-gap { display: block; width: 100%; min-height: 30px; text-align: left; padding: 4px 18px !important; background: var(--diff-header) !important; color: var(--text-dim) !important; font-size: 12px !important; }
 .changes-empty, .changes-meta { padding: 14px; color: var(--text-dim); font-size: 12px; }
+.changes-note { margin: 0; padding: 8px 14px; color: var(--text-dim); font-size: 12px; border-bottom: 1px solid var(--border); }
 .changes-recent { color: var(--yellow); }
 .changes-search { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
 .changes-search input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); color: var(--text); background: var(--bg); }

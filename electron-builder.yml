@@ -152,6 +152,7 @@ nsis:
 
 # Linux
 linux:
+  executableName: pi-harness
   target:
     - target: AppImage
       arch:
@@ -161,6 +162,9 @@ linux:
         - x64
   category: Development
   artifactName: "${productName}-${version}-linux-${arch}.${ext}"
+
+deb:
+  packageName: pi-harness
 
 # 发布：push v* tag 时由 .github/workflows/release-desktop.yml 触发，
 # 三平台构建并验证后上传草稿，全部成功后由工作流公开 GitHub Release

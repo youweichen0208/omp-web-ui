@@ -1,4 +1,5 @@
 import { planSettings } from "./plan/settings.js";
+import { reloadSession } from "./session-reload.js";
 import { resolveNativeAttachments } from "./user-attachments.js";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import { SessionTreeController } from "./session-tree-controller.js";
@@ -153,9 +154,9 @@ const STALL_NOTIFY_MS = (() => {
 	const v = Number(process.env.PI_WEB_STALL_NOTIFY_MS);
 	return Number.isFinite(v) && v >= 0 ? v : 180_000;
 })();
-/** Serialization-cache cap per conversation (see serializeCached): cached
- *  UiMessage objects are pure-function results, so eviction only costs a
- *  recompute on next access. Bounds memory for marathon sessions. */
+/** Serialization-cache headroom per conversation (see serializeCached): the
+ *  cache holds the current transcript plus this many stale entries (old
+ *  tool-result revisions, abandoned branches) before evicting the oldest. */
 const UI_MESSAGE_CACHE_CAP = 4096;
 /** Preview panel cap: only the first 512KB of a file is ever read/sent. */
 
@@ -371,7 +372,7 @@ export class ClientSession {
 	private async reloadMcpConversation(conv: Conversation): Promise<void> {
 		const trust = new NativeMcpConfigService().isTrusted(conv.cwd);
 		conv.session.settingsManager.setProjectTrusted(trust);
-		await conv.session.reload();
+		await reloadSession(conv.session);
 		if (conv.id === this.activeId) await this.pushSlashCommands();
 	}
 	async nativeMcpRequest(msg: Extract<ClientMessage, { type: "native_mcp_request" }>): Promise<void> {
@@ -527,10 +528,11 @@ export class ClientSession {
 			agentDir: () => this.agentDir,
 			isStreaming: () => this.session.isStreaming,
 			reloadSession: async () => {
-				await this.session.reload();
+				const session = this.session;
+				await reloadSession(session);
 				// reload() 会把 custom 工具重新加回活跃集——重放终端开关。
 
-				await this.pushSlashCommands();
+				if (this.session === session) await this.pushSlashCommands();
 			},
 
 			effectiveSystemPrompt: () => this.effectiveSystemPrompt(),
@@ -651,6 +653,7 @@ export class ClientSession {
 			msgIds: new Map(),
 			nextMsgId: 1,
 			userSeqByTs: new Map(),
+			userSeqByKey: new Map(),
 			uiMessageCache: new Map(),
 			lastMessagesSig: "",
 			lastMessagesArray: [],
@@ -762,6 +765,7 @@ export class ClientSession {
 	/** (Re)attach event plumbing to the ACTIVE conversation's session. */
 	private boundUiSessions = new WeakSet<AgentSession>();
 	private async bindSession(conv = this.conv): Promise<void> {
+		if (this.disposed || this.convs.get(conv.id) !== conv) return;
 		conv.unsubscribe?.();
 		if (conv.session !== conv.runtime.session) {
 			conv.webUi.dispose();
@@ -795,13 +799,21 @@ export class ClientSession {
 			};
 		}
 
-		await conv.session.bindExtensions({
+		const runtime = conv.runtime;
+		const session = conv.session;
+		await session.bindExtensions({
 			mode: "rpc",
 			uiContext: conv.webUi,
 			onError: (err) => {
 				this.emit({ type: "notice", conversationId: conv.id, level: "error", text: err.error });
 			},
 		});
+		if (this.disposed || this.convs.get(conv.id) !== conv || conv.session !== session) {
+			// An async session_start may finish after the first shutdown.
+			// Dispose the captured runtime again to release those late resources.
+			await runtime.dispose();
+			return;
+		}
 
 		this.coordinatePlan(conv);
 		const unsubscribe = conv.session.subscribe((event) =>
@@ -809,7 +821,7 @@ export class ClientSession {
 		);
 		conv.unsubscribe = unsubscribe;
 		this.scheduleSnapshot();
-		this.webUi.refresh();
+		conv.webUi.refresh();
 		this.startWidgetsTimer();
 		this.startStallTimer();
 
@@ -817,7 +829,7 @@ export class ClientSession {
 
 	/** Poll extension widgets so TUI-only overlays (e.g. rpiv-todo) stay live. */
 	private startWidgetsTimer(): void {
-		if (this.widgetsTimer) return;
+		if (this.disposed || this.widgetsTimer) return;
 		this.widgetsTimer = setInterval(() => {
 			if (!this.disposed) for (const conv of this.convs.values()) conv.webUi.refresh();
 		}, WIDGET_REFRESH_MS);
@@ -826,7 +838,7 @@ export class ClientSession {
 	/** Report a quiet model or tool as conversation-scoped state. The WebSocket
 	 * heartbeat is separate: a live socket does not imply a live model request. */
 	private startStallTimer(): void {
-		if (this.stallTimer || STALL_NOTIFY_MS === 0) return;
+		if (this.disposed || this.stallTimer || STALL_NOTIFY_MS === 0) return;
 		this.stallTimer = setInterval(() => {
 			if (this.disposed) return;
 			const now = Date.now();
@@ -1046,18 +1058,19 @@ export class ClientSession {
 	private toolContentIds = new WeakMap<object, number>();
 	private toolContentSeq = 0;
 	/** Serialize a persisted message with a STABLE id + cached object reference. */
-	private serializeCached(m: AgentMessage): UiMessage | null {
+	private serializeCached(m: AgentMessage, entryId?: string, occurrence = 0): UiMessage | null {
 		const conv = this.conv;
 		// toolResult messages are keyed by toolCallId; everything else by
 		// role+timestamp. A single prompt can emit several same-role messages
 		// within the SAME millisecond (multiple attachment asides), so the
 		// timestamp alone collides in the cache and only the first one renders
-		// — append a cheap content fingerprint to keep them distinct while
+		// — append a full-content fingerprint to keep them distinct while
 		// staying stable across snapshots (content never changes once persisted).
-		const key =
+		const contentKey =
 			m.role === "toolResult"
 				? `t:${m.toolCallId}`
 				: `${m.role}:${m.timestamp}:${contentFingerprint(m)}`;
+		const key = entryId ? `entry:${entryId}:${contentKey}` : occurrence ? `${contentKey}:occurrence:${occurrence}` : contentKey;
 		let n = conv.msgIds.get(key);
 		if (n === undefined) {
 			n = conv.nextMsgId++;
@@ -1082,9 +1095,16 @@ export class ClientSession {
 		// fails to resolve ("找不到要编辑的消息").
 		let seq = n;
 		if (m.role === "user") {
-			const ts = m.timestamp ?? 0;
-			seq = (conv.userSeqByTs.get(ts) ?? 0) + 1;
-			conv.userSeqByTs.set(ts, seq);
+			// Assigned once per message: re-serializing after cache eviction must
+			// keep the same id, or edits resolve the wrong message.
+			const known = conv.userSeqByKey.get(key);
+			if (known !== undefined) seq = known;
+			else {
+				const ts = m.timestamp ?? 0;
+				seq = (conv.userSeqByTs.get(ts) ?? 0) + 1;
+				conv.userSeqByTs.set(ts, seq);
+				conv.userSeqByKey.set(key, seq);
+			}
 		}
 		const measured = conv.thinkingTimings.annotate(serializeMessage(m, seq), m.timestamp ?? 0);
 		const msg = this.thinkingDurationStore.annotate(measured, conv.session.sessionFile, m.timestamp ?? 0);
@@ -1096,7 +1116,10 @@ export class ClientSession {
 			// insertion order, so dropping from the front evicts the oldest —
 			// recent messages (the ones every snapshot touches) always survive.
 			// Safe: a miss just recomputes an identical object on next access.
-			let excess = conv.uiMessageCache.size - UI_MESSAGE_CACHE_CAP;
+			// Every snapshot walks the whole transcript, so the cap must cover it:
+			// a cap below the message count evicts entries just before they are
+			// needed again and every snapshot re-serializes everything.
+			let excess = conv.uiMessageCache.size - (conv.session.agent.state.messages.length + UI_MESSAGE_CACHE_CAP);
 			while (excess-- > 0) {
 				const oldest = conv.uiMessageCache.keys().next().value;
 				if (oldest === undefined) break;
@@ -1124,9 +1147,10 @@ export class ClientSession {
 		const occurrences = new Map<string, number>();
 		const rawMessages = projectToolTextMessages(conv.session.agent.state.messages
 			.map((m) => {
-				const value = this.serializeCached(m);
 				const key = messageKey(m), index = occurrences.get(key) ?? 0; occurrences.set(key, index + 1);
-				return value ? conv.tree?.decorate(value, conv.treeEntryIds?.get(key)?.[index]) ?? value : null;
+				const entryId = conv.treeEntryIds?.get(key)?.[index];
+				const value = this.serializeCached(m, entryId, index);
+				return value ? conv.tree?.decorate(value, entryId) ?? value : null;
 			})
 			.filter((m): m is NonNullable<typeof m> => m !== null));
 		// Reuse the previous array when nothing changed: the element objects are
@@ -1194,7 +1218,7 @@ export class ClientSession {
 			// it here is what makes thinking + text stream into the browser at
 			// ~60ms granularity instead of appearing only when the turn finishes.
 			streamingMessage,
-			taskProgress: deriveTaskProgress(conv.id, taskHistoryFromSession(conv.session.sessionManager, (message) => this.serializeCached(message)) ?? messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
+			taskProgress: deriveTaskProgress(conv.id, taskHistoryFromSession(conv.session.sessionManager, (message, entryId) => this.serializeCached(message, entryId)) ?? messages, streamingMessage, conv.session.isStreaming, conv.lastTaskEndedAt),
 			isStreaming: this.session.isStreaming,
 			recovery: recoverySnapshot(conv.recovery),
 			runSettings: { autoCompaction: conv.session.autoCompactionEnabled, autoRetry: conv.session.autoRetryEnabled },
@@ -1810,6 +1834,9 @@ export class ClientSession {
 
 	/** Interrupt a run: abort, with a force-reset fallback on timeout. */
 	private async interruptRun(conv: Conversation, reason: string): Promise<void> {
+		const runtime = conv.runtime;
+		const current = () => !this.disposed && this.convs.get(conv.id) === conv && conv.runtime === runtime;
+		if (!current()) return;
 
 		// The run is only truly stopped when its agent_settled event arrives:
 		// session.abort() can return without stopping anything when the run is
@@ -1817,16 +1844,16 @@ export class ClientSession {
 		// begins), so we watch for agent_settled and force-reset when it never
 		// comes — abort 卡住（超时）或空转（结算窗口）两条路都覆盖。
 		let ended = false;
-		let forced = false;
+		let forced: Promise<void> | undefined;
 		const off = conv.session.subscribe((e) => {
 			if (e.type === "agent_settled") {
 				ended = true;
 			}
 		});
 		const force = () => {
-			if (forced) return;
-			forced = true;
-			void this.forceResetConversation(
+			if (forced) return forced;
+			if (!current()) return Promise.resolve();
+			return forced = this.forceResetConversation(
 				conv,
 				`${reason}：运行未终止，已强制重置当前对话`,
 			);
@@ -1854,14 +1881,26 @@ export class ClientSession {
 		}
 		clearTimeout(abortTimer);
 		off();
-		if (!ended) force();
+		if (!ended) await force();
 	}
 
 	/** Force-reset a conversation: dispose the stuck runtime (kills the hung
 	 *  model stream / child processes) and rebuild it from the most recent
 	 *  persisted session. The conversation record itself is kept (same id,
 	 *  same cwd, same serialization caches), so the UI stays attached. */
-	private async forceResetConversation(conv: Conversation, reason: string): Promise<void> {
+	private readonly forcedResets = new WeakMap<Conversation, Promise<void>>();
+	private forceResetConversation(conv: Conversation, reason: string): Promise<void> {
+		const pending = this.forcedResets.get(conv);
+		if (pending) return pending;
+		const operation = this.rebuildConversation(conv, reason).finally(() => this.forcedResets.delete(conv));
+		this.forcedResets.set(conv, operation);
+		return operation;
+	}
+
+	private async rebuildConversation(conv: Conversation, reason: string): Promise<void> {
+		const previous = conv.runtime;
+		const current = () => !this.disposed && this.convs.get(conv.id) === conv && conv.runtime === previous;
+		if (!current()) return;
 
 		try {
 			conv.unsubscribe?.();
@@ -1870,23 +1909,33 @@ export class ClientSession {
 			const manager = conv.session.sessionManager;
 			const header = manager.getHeader();
 			const wikiManager = conv.wiki ? SessionManager.inMemory(conv.cwd, undefined, [...(header ? [header] : []), ...manager.getEntries()]) : null;
+			// Reopen THIS conversation's file. continueRecent() would pick the most
+			// recently written session of the project, which may be another open chat.
+			const sessionFile = conv.session.sessionFile;
 			conv.toolStartTimes.clear();
-			await conv.runtime.dispose();
+			await previous.dispose();
+			if (!current()) return;
 			const runtime = await createAgentSessionRuntime(
 				this.makeRuntimeFactory(),
 				{
 					cwd: conv.cwd,
 					agentDir: this.agentDir,
-					sessionManager: wikiManager ?? SessionManager.continueRecent(conv.cwd),
+					sessionManager: wikiManager ?? (sessionFile ? SessionManager.open(sessionFile) : SessionManager.create(conv.cwd)),
 				},
 			);
+			if (!current()) {
+				await runtime.dispose();
+				return;
+			}
 			conv.runtime = runtime;
 			conv.webUi.dispose();
 			conv.webUi = new WebUIContext(msg => this.emit(msg), conv.id, () => `${conv.cwd} · ${conv.title}`);
 			conv.recovery = {};
 			conv.session = runtime.session;
 			this.emit({ type: "notice", level: "warning", text: reason });
-			await this.bindSession();
+			// Rebind the recovered conversation itself, which may be in the background.
+			await this.bindSession(conv);
+			if (this.disposed || this.convs.get(conv.id) !== conv || conv.runtime !== runtime) return;
 			this.emitConversations();
 			void this.pushSlashCommands();
 		} catch (err) {
@@ -2941,6 +2990,7 @@ export class ClientSession {
 		for (const conv of this.convs.values()) {
 
 			conv.unsubscribe?.();
+			conv.unsubscribe = undefined;
 			try {
 				await conv.runtime.dispose();
 			} catch {

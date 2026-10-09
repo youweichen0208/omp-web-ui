@@ -35,11 +35,7 @@ try {
 	console.error("build failed");
 	process.exit(1);
 }
-try {
-	await freePort(PORT);
-} catch {
-	/* port free */
-}
+await freePort(PORT);
 await sleep(500);
 const server = spawn("node", ["dist/server/index.js"], {
 	cwd: PROJ,

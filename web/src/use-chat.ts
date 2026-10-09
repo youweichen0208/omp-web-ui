@@ -175,6 +175,8 @@ export interface ChatState {
 	/** Last source-control query result (scm_status / scm_filediff /
 	 *  scm_commit), matched by reqId in the SCM panel. */
 	scmData: ServerMessage | null;
+	/** Latest whole-scope diff reply, kept apart from status replies that can arrive in the same tick. */
+	scmDiffData: ServerMessage | null;
 	/** Last global-search file query result, matched by reqId in the
 	 *  global search panel (stale results with older reqIds are ignored). */
 	fileSearch: {
@@ -447,7 +449,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 				...state,
 				ready: true,
 				state: action.state,
-				...(state.state?.cwd !== action.state.cwd ? { sessions: [], files: null, conversationFilesChecked: null, fileContent: null, scmData: null } : {}),
+				...(state.state?.cwd !== action.state.cwd ? { sessions: [], files: null, conversationFilesChecked: null, fileContent: null, scmData: null, scmDiffData: null } : {}),
 				activeConversationId: action.state.conversationId,
 				agentSilence: action.state.isStreaming ? state.agentSilenceByConversation[action.state.conversationId] ?? null : null,
 				liveOutputs: pruneLiveOutputs(state.liveOutputs, action.state),
@@ -584,7 +586,7 @@ function reducer(state: ChatState, action: Action): ChatState {
 		case "install_result":
 			return { ...state, installResult: action.result };
 		case "scm_data":
-			return { ...state, scmData: action.data };
+			return { ...state, scmData: action.data, ...(action.data.type === "scm_data" && action.data.kind === "diff" ? { scmDiffData: action.data } : {}) };
 		case "file_search_result":
 			return { ...state, fileSearch: action.result };
 		case "scm_changed":
@@ -757,6 +759,7 @@ export function useChat() {
 		refreshProviderResult: null,
 		cloneProviderResult: null,
 		scmData: null,
+		scmDiffData: null,
 		fileSearch: null,
 		scmDirty: 0,
 		plugins: [],

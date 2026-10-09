@@ -38,6 +38,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   prepare-release:
@@ -108,6 +109,25 @@ jobs:
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$PWD/$root"
           codesign --verify --deep --strict "$app"
 
+      - name: Verify DMG installation and previous-version data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous="$RUNNER_TEMP/pi-previous"
+          installed="$RUNNER_TEMP/pi-installed"
+          mount="$RUNNER_TEMP/pi-dmg"
+          mkdir -p "$previous" "$installed" "$mount"
+          gh release download v0.99.16 --pattern '*mac-arm64.zip' --dir "$previous"
+          ditto -x -k "$previous/"*mac-arm64.zip "$previous"
+          ditto "$previous/pi.app" "$installed/pi.app"
+          node tests/packaged-upgrade-test.mjs seed "$installed/pi.app/Contents/MacOS/pi" "$installed/pi.app/Contents/Resources/app" "$RUNNER_TEMP/pi-upgrade-state"
+          rm -rf "$installed/pi.app"
+          hdiutil attach release/*mac-arm64.dmg -mountpoint "$mount" -nobrowse -readonly
+          ditto "$mount/pi.app" "$installed/pi.app"
+          hdiutil detach "$mount"
+          node tests/packaged-server-start-test.mjs "$installed/pi.app/Contents/MacOS/pi" "$installed/pi.app/Contents/Resources/app"
+          node tests/packaged-upgrade-test.mjs verify "$installed/pi.app/Contents/MacOS/pi" "$installed/pi.app/Contents/Resources/app" "$RUNNER_TEMP/pi-upgrade-state"
+
       - name: Upload verified macOS packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -177,6 +197,29 @@ jobs:
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
 
+      - name: Verify NSIS installation and previous-version data
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $previous = Join-Path $env:RUNNER_TEMP 'pi-previous'
+          $dest = Join-Path $env:LOCALAPPDATA 'Programs\pi-release-test'
+          gh release download v0.99.16 --pattern '*win-x64.zip' --dir $previous
+          if ($LASTEXITCODE -ne 0) { throw 'Previous release download failed' }
+          $zip = Get-ChildItem "$previous/*win-x64.zip" | Select-Object -First 1
+          Expand-Archive $zip.FullName "$previous/app"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "$previous/app/*" $dest -Recurse
+          node tests/packaged-upgrade-test.mjs seed "$dest/pi.exe" "$dest/resources/app" "$env:RUNNER_TEMP/pi-upgrade-state"
+          if ($LASTEXITCODE -ne 0) { throw 'Previous runtime seed failed' }
+          $installer = Get-ChildItem release/*setup-x64.exe | Select-Object -First 1
+          $proc = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', '/currentuser', "/D=$dest") -PassThru
+          if (-not $proc.WaitForExit(180000) -or $proc.ExitCode -ne 0) { throw 'NSIS installation failed' }
+          node tests/packaged-server-start-test.mjs "$dest/pi.exe" "$dest/resources/app"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed server failed' }
+          node tests/packaged-upgrade-test.mjs verify "$dest/pi.exe" "$dest/resources/app" "$env:RUNNER_TEMP/pi-upgrade-state"
+          if ($LASTEXITCODE -ne 0) { throw 'Previous-version data failed' }
+
       - name: Publish verified Windows packages
         shell: pwsh
         env:
@@ -231,10 +274,29 @@ jobs:
       - name: Verify packaged server, native worker and OAuth
         run: |
           root="$PWD/release/linux-unpacked/resources/app"
-          executable="$PWD/release/linux-unpacked/pi"
+          executable="$PWD/release/linux-unpacked/pi-harness"
           node tests/packaged-server-start-test.mjs "$executable" "$root"
           node tests/native-tools-desktop-test.mjs "$executable" "$root"
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$root"
+
+      - name: Verify deb installation and previous-version data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous="$RUNNER_TEMP/pi-previous"
+          mkdir -p "$previous"
+          gh release download v0.99.16 --pattern '*.deb' --dir "$previous"
+          dpkg-deb -x "$previous/"*.deb "$previous/app"
+          oldroot=$(dirname "$(find "$previous/app" -path '*/resources/app/package.json' -print -quit)")
+          node tests/packaged-upgrade-test.mjs seed "$oldroot/../../pi" "$oldroot" "$RUNNER_TEMP/pi-upgrade-state"
+          sudo apt-get update
+          sudo apt-get install -y ./release/*.deb
+          package=$(dpkg-deb -f release/*.deb Package)
+          test "$package" = pi-harness
+          test "$(dpkg-query -W -f='${Version}' "$package")" = "$(node -p "require('./package.json').version")"
+          root=$(dirname "$(dpkg -L "$package" | sed -n '\|/resources/app/package.json$|p')")
+          node tests/packaged-server-start-test.mjs "$root/../../pi-harness" "$root"
+          node tests/packaged-upgrade-test.mjs verify "$root/../../pi-harness" "$root" "$RUNNER_TEMP/pi-upgrade-state"
 
       - name: Upload verified Linux packages
         env:
@@ -249,6 +311,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Require successful CI for the exact release commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test "$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --limit 50 --json conclusion --jq 'any(.[]; .conclusion == "success")')" = true
       - name: Verify attachments and publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,7 +9,7 @@ import { ChangeCounts } from "./ChangeSummaryCard";
 let diffRequestId = -1000000;
 export function ChangesPanel({ cwd, data, send, notRepo, branch, branches, defaultBase, dirty, ready }: { cwd: string; data: ServerMessage | null; send: (message: ClientMessage) => boolean; notRepo: boolean; branch: string; defaultBase: string; branches: ScmBranchEntry[]; dirty: number; ready: boolean }) {
 	const changes = useChanges()!, t = useT();
-	const [result, setResult] = useState<{ key: string; files: ChangedFile[]; error?: string; base?: string }>();
+	const [result, setResult] = useState<{ key: string; files: ChangedFile[]; error?: string; base?: string; omittedUntracked?: number; reducedContext?: boolean }>();
 	const [search, setSearch] = useState(false), [query, setQuery] = useState("");
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 	const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
@@ -24,7 +24,7 @@ export function ChangesPanel({ cwd, data, send, notRepo, branch, branches, defau
 	}, [changes.open, scope, changes.base, cwd, dirty, ready, send]);
 	useEffect(() => {
 		if (data?.type !== "scm_data" || data.kind !== "diff" || data.reqId !== request.current || data.cwd !== cwd) return;
-		setResult({ key, files: data.ok ? parseUnifiedDiff(data.text ?? "") : [], error: data.error, base: data.base });
+		setResult({ key, files: data.ok ? parseUnifiedDiff(data.text ?? "") : [], error: data.error, base: data.base, omittedUntracked: data.omittedUntracked, reducedContext: data.reducedContext });
 	}, [data, key, cwd]);
 	const files = scope === "turn" ? changes.files : result?.key === key ? result.files : [];
 	const loading = scope !== "turn" && result?.key !== key;
@@ -73,6 +73,7 @@ export function ChangesPanel({ cwd, data, send, notRepo, branch, branches, defau
 				const selected = elements.find(element => element.getBoundingClientRect().bottom > top + 40)?.dataset.changeFile;
 				if (selected && selected !== changes.selected) changes.set({ selected });
 			}}>
+				{!loading && result?.key === key && scope !== "turn" && (result.reducedContext || result.omittedUntracked) ? <p className="changes-note" role="status">{[result.reducedContext ? t("changesReducedContext") : "", result.omittedUntracked ? t("changesOmittedUntracked", { n: result.omittedUntracked }) : ""].filter(Boolean).join(" ")}</p> : null}
 				{loading ? <p className="changes-empty">{t("changesLoading")}</p> : result?.key === key && result.error && scope !== "turn" ? <p className="changes-empty" role="alert">{result.error}</p> : !filtered.length && <p className="changes-empty">{t("changesEmpty")}</p>}
 				{filtered.map(file => <DiffFile key={file.path} file={file} selected={changes.selected === file.path} collapsed={isCollapsed(file)} toggle={() => { changes.set({ selected: file.path }); setCollapsed(previous => ({ ...previous, [file.path]: !isCollapsed(file) })); }} gaps={expandedGaps} expandGap={id => setExpandedGaps(previous => new Set([...previous, id]))} query={query} />)}
 			</div>

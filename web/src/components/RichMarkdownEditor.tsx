@@ -326,7 +326,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: "richDivider", alias: "fgx", keywords: "divider horizontal rule fgx fengexian 分隔线", action: "insertHTML", argument: "<hr><p><br></p>" },
 			{ label: "richImage", alias: "tp", keywords: "image photo upload tp tupian 图片", action: "image" },
 		{ label: "richWikiLink", alias: "sl", keywords: "wiki link document sl shuanglian 链接 双链 文档", action: "wikiLink" },
-			{ label: "wikiMentionDate", alias: "date", keywords: "date mention riqi 日期", action: "insertText", argument: new Date().toLocaleDateString("sv-SE") },
+			{ label: "wikiMentionDate", alias: "date", keywords: "date mention riqi 日期", action: "insertText", get argument() { return new Date().toLocaleDateString("sv-SE"); } }, // read at insert time, not render time
 	] as const;
 	const wikiOrder = ["zw", "bt2", "bt3", "lb", "bg", "tp", "rw", "yy", "dmk", "sl", "date"];
 	const items = wiki ? allItems.filter(item => wikiOrder.includes(item.alias)).sort((a, b) => wikiOrder.indexOf(a.alias) - wikiOrder.indexOf(b.alias)) : allItems.filter(item => item.alias !== "date");
@@ -373,7 +373,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		if (target) { target.removeAttribute("data-slash-insert"); const range = document.createRange(); range.selectNodeContents(target); range.collapse(true); window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(range); update(); }
 		prepareInsert();
 	};
-	const inspectSlash = () => {
+	const inspectSlash = (resetActive = true) => {
 		if (readOnly) return closeMenu();
 		const selection = window.getSelection();
 		if (!selection?.isCollapsed || !selection.anchorNode || !root.current?.contains(selection.anchorNode)) return closeMenu();
@@ -396,13 +396,20 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		slashRange.current = range;
 		const rect = range.getBoundingClientRect();
 		setMenu({ query: match[1], x: Math.max(8, Math.min(rect.left, window.innerWidth - (wiki ? 308 : 328))), y: rect.bottom + 6 });
-		setActive(0);
+		if (resetActive) setActive(0);
 	};
 	useEffect(() => {
 		if (!menu) return;
-		const close = (event: Event) => { if (!(event.target instanceof Element && event.target.closest(".fp-slash-menu"))) closeMenu(); };
-		window.addEventListener("scroll", close, true); window.addEventListener("resize", close);
-		return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+		const scroll = (event: Event) => {
+			if (event.target instanceof Element && event.target.closest(".fp-slash-menu")) return;
+			const rect = slashRange.current?.getBoundingClientRect();
+			// Typing at the bottom can scroll the caret into view after input.
+			// Keep the Wiki menu attached to that caret instead of closing it.
+			if (wiki && rect && rect.bottom >= 0 && rect.top <= window.innerHeight) inspectSlash(false);
+			else closeMenu();
+		};
+		window.addEventListener("scroll", scroll, true); window.addEventListener("resize", closeMenu);
+		return () => { window.removeEventListener("scroll", scroll, true); window.removeEventListener("resize", closeMenu); };
 	}, [!!menu]);
 	useLayoutEffect(() => {
 		if (!menu || !popup.current || !slashRange.current) return;
@@ -507,7 +514,7 @@ export const RichMarkdownEditor = memo(function RichMarkdownEditor({ value, read
 		{ label: t("richList"), icon: <FiList />, action: "insertUnorderedList", separator: true },
 		{ label: t("richOrderedList"), icon: <span>1.</span>, action: "insertOrderedList" },
 	];
-	return <div className="fp-rich-editor" onScrollCapture={(event) => { if (!(event.target as HTMLElement).closest(".fp-slash-menu")) { if (menu) inspectSlash(); } }}>
+	return <div className="fp-rich-editor" onScrollCapture={(event) => { if (!(event.target as HTMLElement).closest(".fp-slash-menu")) { if (menu) inspectSlash(false); } }}>
 		{wiki?.toolbarHost && createPortal(<WikiToolbar readOnly={readOnly} focused={!!wiki.focused} onWidth={wiki.onWidth ?? (() => {})} items={items.map(item => ({ id: item.alias, label: itemLabel(item), hint: hints[item.alias] ?? "", help: t(help[item.alias]), icon: icons[item.label] }))} popup={insertPopup} onPrepare={prepareInsert} onSelect={id => insertToolbar(id)} onPopup={setInsertPopup} />, wiki.toolbarHost)}
 		{diagrams.map(({ host, code }, index) => createPortal(<MermaidDiagram code={code} />, host, String(index)))}
 		{insertPopup && !readOnly && <WikiInsertPopover popup={insertPopup} onClose={() => { setInsertPopup(null); restoreInsert(); }}>

@@ -68,6 +68,8 @@ const zh = {
 	changesRecent: "刚刚改动",
 	changesTruncated: "差异已截断",
 	changesLoading: "正在读取改动…",
+	changesReducedContext: "改动较大，只显示改动附近的上下文。",
+	changesOmittedUntracked: "另有 {n} 个未跟踪文件未显示，可将它们加入 .gitignore。",
 	changesCommands: "{n} 条命令",
 
 	bashDurationUnknown: "耗时未记录",
@@ -1747,6 +1749,8 @@ const en: Record<keyof typeof zh, string> = {
 	changesRecent: "Just changed",
 	changesTruncated: "Diff truncated",
 	changesLoading: "Loading changes\u2026",
+	changesReducedContext: "Large diff: showing only the lines around each change.",
+	changesOmittedUntracked: "{n} more untracked files are not shown; consider adding them to .gitignore.",
 	changesCommands: "{n} commands",
 
 	bashDurationUnknown: "Time unavailable",

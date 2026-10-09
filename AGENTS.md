@@ -50,6 +50,7 @@ pi-harness/
 │   ├── bg-servers.ts           # 后台任务跟踪（bash 前后端口快照 diff + 存活刷新）
 │   ├── component-updates.ts    # pi Agent / 扩展版本检查、来源校验与包更新
 │   ├── system-prompt-view.ts / system-prompt-files.ts / system-prompt-routes.ts # 原生提示词分段、文件编辑与 reload
+│   ├── session-reload.ts         # 提示词、设置、MCP 与斜杠命令共用的按会话重载队列
 │   ├── settings-service.ts     # 界面偏好与原生资源只读视图（扩展命名见 extension-display.ts）
 │   ├── task-progress.ts        # 从当前轮次工具记录推断任务进度与显式计划
 │   ├── plan/                   # 可选原生 plan 扩展、全局开关与分支快照投影；见 docs/architecture-plan.md
