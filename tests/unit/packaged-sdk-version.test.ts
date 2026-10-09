@@ -11,8 +11,8 @@ test("desktop packaging follows the exact SDK pin and rejects mismatches or rang
 		const app = join(out, "resources/app"), sdk = join(app, "node_modules/@earendil-works/pi-coding-agent");
 		mkdirSync(join(sdk, "docs"), { recursive: true });
 		mkdirSync(join(sdk, "examples/extensions"), { recursive: true });
-		const documentAssets = ["bridge.py", "fixtures.py", "native_code.py"].map(name => join(app, "dist/server/document-conversion/python", name));
-		mkdirSync(join(app, "dist/server/document-conversion/python"), { recursive: true });
+		const documentAssets = ["bridge.py", "fixtures.py", "native_code.py", "chm/bridge.py", "chm/fixture.py", "chm/requirements.txt"].map(name => join(app, "dist/server/document-conversion/python", name));
+		mkdirSync(join(app, "dist/server/document-conversion/python/chm"), { recursive: true });
 		for (const file of documentAssets) writeFileSync(file, "# packaged worker fixture");
 		const references = ["README.md", "docs/extensions.md", "examples/extensions/README.md", "examples/extensions/hello.ts"];
 		for (const reference of references) writeFileSync(join(sdk, reference), "fixture reference");

@@ -94,7 +94,7 @@ try {
 		writeFileSync(join(cwd, 'fixture.pdf'), '%PDF-1.7\nfixture');
 		updateDocumentSettings({ pdfEnabled: true, okfEnabled: true });
 		session = await create(cwd, mode);
-		const names = ['pdf_to_markdown', 'okf_ingest', 'okf_candidates', 'okf_publish'];
+		const names = ['document_to_markdown', 'pdf_to_markdown', 'chm_to_markdown', 'okf_ingest', 'okf_candidates', 'okf_publish'];
 		for (const name of names) {
 			assert.equal(session.getAllTools().find(tool => tool.name === name)?.exposure, 'deferred');
 			assert(!session.getActiveToolNames().includes(name), `${name} is not globally injected`);
@@ -102,6 +102,7 @@ try {
 		}
 		assert(!session.systemPrompt.includes('This is an explicitly requested ingestion workflow'));
 		assert(session.extensionRunner.getCommand('pdf-md'));
+		assert(session.extensionRunner.getCommand('documents'));
 		assert(session.extensionRunner.getCommand('okf'));
 		if (mode === 'on' && process.platform !== 'win32') {
 			// Exercise the native command and owned child process without installing packages.
@@ -128,9 +129,17 @@ try {
 			} finally { await session.prompt('/pdf-md cancel'); await setup; updateDocumentSettings({ runtimePath: undefined }); }
 		} else if (mode === 'on' && process.platform === 'win32') console.log('SKIP setup child fixture on Windows: fixture uses a POSIX executable script; command ownership/abort behavior is covered by the portable unit test.');
 		const beforeDirect = requests.length;
+		await session.getToolDefinition('tool_search').execute('find-converter', { query: 'document_to_markdown' });
+		const converted = await call('document_to_markdown', { inputPath: 'raw/policy.md', outputDir: 'converted/policy' });
+		assert.equal(converted.status, 'complete');
+		assert(existsSync(join(cwd, converted.bundlePath)), 'generic conversion returns a portable evidence bundle');
+		assert.match(readFileSync(join(cwd, converted.markdownPath), 'utf8'), /support desk operates on weekdays/);
 		await session.getToolDefinition('tool_search').execute('find-documents', { query: 'okf_ingest' });
 		assert(session.getActiveToolNames().includes('okf_ingest'));
 		await assert.rejects(call('pdf_to_markdown', { inputPath: 'raw/policy.md' }), /accepts PDF/);
+		await session.getToolDefinition('tool_search').execute('find-chm', { query: 'chm_to_markdown' });
+		assert(session.getActiveToolNames().includes('chm_to_markdown'));
+		await assert.rejects(call('chm_to_markdown', { inputPath: 'raw/policy.md' }), /accepts CHM/);
 		await assert.rejects(call('pdf_to_markdown', { inputPath: 'fixture.pdf', outputDir: '../escape' }), /inside the current workspace/);
 		if (process.platform !== 'win32') {
 			symlinkSync(join(root, 'missing-target'), join(cwd, 'dangling'));
@@ -149,14 +158,14 @@ try {
 		assert(block, JSON.stringify(source));
 		assert.equal(source.state, 'complete', JSON.stringify(source));
 		assert.match(readFileSync(source.markdownPath, 'utf8'), /assets\//, 'archived Markdown keeps its local images');
-		const candidate = { conceptId: 'support-hours', title: 'Support hours', type: 'Policy', statement: 'The support desk operates on weekdays.', evidence: [{ sourceId: source.sourceId, sourceHash: source.hash, blockId: block.id, quote: 'The support desk operates on weekdays.' }], review: { support: 'supported', rationale: 'The full single-source fixture states this directly and no existing concept contradicts it.', comparedConceptIds: [], conflicts: [] } };
+		const candidate = { basis: 'fact', conceptId: 'support-hours', title: 'Support hours', type: 'Policy', statement: 'The support desk operates on weekdays.', evidence: [{ sourceId: source.sourceId, sourceHash: source.hash, blockId: block.id, quote: 'The support desk operates on weekdays.' }], review: { support: 'supported', rationale: 'The full single-source fixture states this directly and no existing concept contradicts it.', comparedConceptIds: [], conflicts: [] } };
 		await assert.rejects(call('okf_publish', { jobId }), /submit|review/i, 'publication requires explicit Agent review');
 		await call('okf_candidates', { action: 'submit', jobId, sourceId: source.sourceId, candidates: [candidate] });
 		const published = await call('okf_publish', { jobId });
-		assert(published.stable.includes('support-hours'), JSON.stringify(published));
+		assert(published.draft.includes('support-hours'), JSON.stringify(published));
 		assert(existsSync(published.indexPath));
 		const page = readFileSync(join(cwd, 'knowledge', 'wiki', 'concepts', 'support-hours.md'), 'utf8');
-		assert.match(page, /status: stable/);
+		assert.match(page, /status: draft/);
 		assert.match(page, /\[\^s-/);
 		assert(!/^verified:/m.test(page), 'automatic publication never claims human verification');
 		// This uses the real text converter, whose manifest rejects untracked files.

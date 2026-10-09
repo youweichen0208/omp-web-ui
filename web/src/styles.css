@@ -1,3 +1,8 @@
+/* Locally bundled Noto Sans SC subsets; license and reproduction notes beside fonts. */
+@font-face { font-family: "UI SC"; font-style: normal; font-weight: 400; font-display: swap; src: url("./assets/fonts/ui-sc-400.woff2") format("woff2"); }
+@font-face { font-family: "UI SC"; font-style: normal; font-weight: 500; font-display: swap; src: url("./assets/fonts/ui-sc-500.woff2") format("woff2"); }
+@font-face { font-family: "UI SC"; font-style: normal; font-weight: 600; font-display: swap; src: url("./assets/fonts/ui-sc-600.woff2") format("woff2"); }
+
 /* Local, Unicode-subset Wiki heading faces; OFL licenses in public/fonts. */
 @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/source-serif-4/source-serif-4-500-0.woff2") format("woff2"); unicode-range: U+20,U+41,U+42,U+A0; }
 @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/source-serif-4/source-serif-4-500-1.woff2") format("woff2"); unicode-range: U+20,U+41,U+42,U+A0; }
@@ -202,6 +207,12 @@
 	--r-sm: 6px;
 	--r-md: 8px;
 	--r-lg: 12px;
+	--r-scrollbar: 4px;
+	--fs-base: 14px;
+	--windows-muted: oklch(0.45 0.01 80);
+	--windows-hairline: oklch(0.9 0.005 80);
+	--scrollbar-thumb: oklch(0.82 0.005 80);
+	--scrollbar-active: oklch(0.7 0.005 80);
 	--input-border: oklch(0.88 0.005 80);
 	--send-disabled-bg: oklch(0.9 0.004 80);
 	--stop-bg: oklch(0.24 0.01 80);
@@ -254,8 +265,8 @@
 	--term-bright-magenta: #c084fc;
 	--term-bright-cyan: #22d3ee;
 	--term-bright-white: #ffffff;
-	--mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-	--sans: "IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+	--mono: "JetBrains Mono", "Cascadia Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+	--sans: "IBM Plex Sans", "UI SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
 	--accent-fg: #fff;
 	--yellow: #f2bc4e;
 	--yellow-fg: #8a5a00;
@@ -280,7 +291,7 @@ body {
 	background: var(--bg);
 	color: var(--text);
 	font-family: var(--sans);
-	font-size: 14px;
+	font-size: var(--fs-base);
 	line-height: 1.6;
 }
 
@@ -4015,7 +4026,7 @@ body.panel-resizing {
 	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .msg-editor.drag-over::after {
-	content: "📎";
+	content: "";
 	position: absolute;
 	inset: 0;
 	display: flex;
@@ -9412,7 +9423,7 @@ body { -webkit-font-smoothing: antialiased; }
 .node-item > button:first-child { flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .node-item > button:last-child:not(:first-child) { border:0; background:transparent; padding:4px; }
 .node-item small { display:block; margin:3px 0 0 14px; font:10.5px var(--mono); color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; }
-.node-badge { font-size:10px; color:var(--yellow-fg); max-width:65px; padding:3px 5px; }
+.node-badge { flex: none; white-space: nowrap; font-size:10px; color:var(--yellow-fg); padding:3px 5px; }
 .node-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:8px; background:var(--text-dim); }
 .node-dot.connected { background:var(--green); }.node-dot.connecting { background:var(--yellow-fg); }
 .node-source-status { display:flex; align-items:center; text-align:left; font-size:12px!important; }
@@ -11580,10 +11591,7 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 	.toolcall-parameters dl { gap: 6px 16px; }
 }
 
-/* Remote native agent workspace; manual SSH terminals remain a separate view. */
-.node-workbench-modes { display: flex; gap: 16px; padding: 0 18px; border-bottom: 1px solid var(--border); }
-.node-workbench-modes button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 10px 0; color: var(--text-dim); cursor: pointer; }
-.node-workbench-modes button.active { border-bottom-color: var(--accent); color: var(--text); }
+/* Remote native agent and manual SSH share a connected workspace. */
 .node-manual-workbench:not([hidden]) { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .node-agent { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .node-agent > header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 18px; font-size: 12px; }
@@ -11624,3 +11632,55 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 }
 
 .node-agent-container:not([hidden]) { display: flex; flex: 1; min-height: 0; }
+
+/* Windows rendering: keep dark appearance and terminal scrollbars unchanged. */
+:root[data-platform="win32"]:not([data-appearance="dark"]) { --text-dim: var(--windows-muted); --text-faint: var(--windows-muted); }
+:root[data-platform="win32"]:not([data-appearance="dark"]) body { font-size: calc(var(--fs-base) + 0.5px); }
+:root[data-platform="win32"]:not([data-appearance="dark"]) .border-hairline { border-color: var(--windows-hairline); }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *)) { scrollbar-width: auto; scrollbar-color: auto; }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *))::-webkit-scrollbar { width: 8px; height: 8px; }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *))::-webkit-scrollbar-track { background: transparent; }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *))::-webkit-scrollbar-thumb { background: transparent; border: 2px solid transparent; border-radius: var(--r-scrollbar); background-clip: padding-box; }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *)):hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb); }
+:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *))::-webkit-scrollbar-thumb:is(:hover, :active) { background-color: var(--scrollbar-active); }
+@supports not selector(::-webkit-scrollbar) {
+	:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *)) { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+	:root:not([data-appearance="dark"]) :where(*:not(.xterm, .xterm *)):hover { scrollbar-color: var(--scrollbar-thumb) transparent; }
+}
+.ui-icon { width: 16px; height: 16px; flex: 0 0 16px; vertical-align: -3px; }
+
+/* Reported Windows narrow-label regressions (#47), shared with browser layouts. */
+.bash-group-head > span { flex: none; white-space: nowrap; }
+.bash-group.historical-step .bash-group-head strong { flex: 1; min-width: 0; }
+.msg-meta { min-height: 22px; flex-wrap: wrap; row-gap: 4px; }
+.msg-role { display: inline-flex; align-items: center; flex: none; white-space: nowrap; }
+.msg-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+.panel-right > .panel-title > span:first-child { flex: none; white-space: nowrap; }
+.ext-row-main > button { flex: none; white-space: nowrap; }
+.ext-row-main { column-gap: 12px; }
+@media (min-width: 1101px) {
+	html.pi-desktop-win32 .design-workspace .panel-right > .panel-title,
+	html.pi-desktop-linux .design-workspace .panel-right > .panel-title { padding-left: 8px; padding-right: 140px; gap: 3px; }
+	html.pi-desktop-win32 .panel-right > .panel-title .tree-menu-trigger,
+	html.pi-desktop-linux .panel-right > .panel-title .tree-menu-trigger { width: 22px; min-width: 22px; padding: 2px; }
+	html.pi-desktop-win32 .panel-right > .panel-title .tree-filter,
+	html.pi-desktop-linux .panel-right > .panel-title .tree-filter { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Wiki shares the native model controls with the chat composer. */
+.wiki-model-controls { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 8px 0 0; padding: 0; border: 0; }
+.wiki-model-controls:disabled { opacity: .5; }
+.wiki-model-controls > .dropdown { min-width: 0; flex: 1; }
+.wiki-model-controls .chip { max-width: 100%; }
+.wiki-model-controls .chip-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wiki-model-controls .dd-menu { top: auto; bottom: calc(100% + 8px); right: 0; max-width: calc(100vw - 32px); max-height: min(360px, 60vh); }
+.wiki-model-controls > .dropdown > .dd-menu { left: 0; right: auto; }
+
+.node-workspace-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, .8fr); flex: 1; min-height: 0; min-width: 0; }
+.node-workspace-split > .node-manual-workbench { min-width: 0; overflow: hidden; }
+.node-workspace-split > .node-agent-container { min-width: 0; border-left: 1px solid var(--border); }
+.node-workspace-split .node-agent-setup { overflow: auto; margin: 12px 0; }
+@media (max-width: 850px) {
+	.node-workspace-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, .7fr) minmax(300px, 1fr); overflow: auto; }
+	.node-workspace-split > .node-agent-container { border-left: 0; border-top: 1px solid var(--border); }
+}

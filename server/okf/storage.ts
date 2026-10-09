@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:p
 import { setTimeout as delay } from "node:timers/promises";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import lockfile from "proper-lockfile";
-import { documentDataDir } from "../document-conversion/settings.js";
+import { documentDataDir } from "../document-extension-settings.js";
 
 const queues = new Map<string, Promise<unknown>>();
 export const digest = (content: string | Buffer): string => createHash("sha256").update(content).digest("hex");

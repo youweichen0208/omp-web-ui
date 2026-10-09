@@ -1,0 +1,51 @@
+name: Verify desktop rendering
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/release-1.2.1]
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'electron/**'
+      - 'tests/windows-rendering-test.mjs'
+      - 'tests/extensions-worker-test.mjs'
+      - '.github/workflows/verify-rendering.yml'
+permissions:
+  contents: read
+jobs:
+  rendering:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: mac
+            executable: release/mac-arm64/pi.app/Contents/MacOS/pi
+          - os: windows-2022
+            target: win
+            executable: release/win-unpacked/pi.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm run check:lockfile
+      - run: npm ci
+      - run: npm run build
+      - name: Native npm removal worker
+        run: node tests/extensions-worker-test.mjs
+      - name: Package actual desktop application
+        run: npx electron-builder --${{ matrix.target }} --dir --publish never
+      - name: Actual platform fonts, layout and screenshots
+        run: node tests/windows-rendering-test.mjs "${{ matrix.executable }}"
+        env:
+          PI_RENDER_OUTPUT: tests/scratch/rendering
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendering-${{ matrix.os }}
+          path: tests/scratch/rendering
+          if-no-files-found: warn

@@ -30,7 +30,8 @@ SDK 与 pi-ai 精确锁定 1.0.4，不应用本项目的 SDK 补丁。Codemode �
 系统提示词：修改分段来源、原生文件编辑或重载时，读取 `docs/architecture-system-prompt.md`。
 Extensions：修改包安装、启停、更新、作用域迁移、目录浏览或单文件编辑时，读取 `docs/architecture-extensions.md`。
 Codemode 卡片与 MCP/Codemode 设置遵循 15a/15b 设计；状态、项目覆盖、费用及输出限制读取 `docs/architecture-plugins.md`。
-文档知识：修改内置 PDF 转换、Docling 环境、raw 导入、候选核对、OKF 发布或证据存储时，读取 `docs/architecture-document-knowledge.md`。
+工程上下文：修改跨仓来源、OpenViking 接入或本地评测时，读取 `docs/engineering-context.md`；先验证检索收益，再增加产品界面。
+文档知识：修改内置多格式 Markdown 转换、解析环境、证据包交接、Markdown 知识蒸馏、候选核对、人工复核或 OKF 发布时，读取 `docs/architecture-document-knowledge.md`。
 
 SDK 生命周期：以 `agent_settled` 判定整个任务结束，`agent_end` 只表示一次循环结束。修改队列、纠正、压缩/重试状态、扩展 UI 对话隔离或工具完整输出下载前读 `docs/architecture-core.md`；修改桌面扩展子进程或打包前读 `docs/deployment.md`。
 

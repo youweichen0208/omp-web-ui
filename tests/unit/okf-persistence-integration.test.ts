@@ -11,11 +11,11 @@ beforeEach(() => {
 	folder = realpathSync(mkdtempSync(join(tmpdir(), "okf-persistence-")));
 	cwd = join(folder, "workspace"); mkdirSync(cwd);
 	vi.stubEnv("PI_WEB_DATA_DIR", join(folder, "data"));
-	writeFileSync(join(cwd, "policy.txt"), "Support operates on weekdays.\n\nSupport is closed on Saturday.\n");
+	writeFileSync(join(cwd, "policy.md"), "Support operates on weekdays.\n\nSupport is closed on Saturday.\n");
 });
 afterEach(() => { vi.unstubAllEnvs(); rmSync(folder, { recursive: true, force: true }); });
 async function ingest() {
-	const job = await startIngestion({ cwd, inputPaths: ["policy.txt"] });
+	const job = await startIngestion({ cwd, inputPaths: ["policy.md"] });
 	await nextIngestion({ cwd, jobId: job.jobId });
 	return job.jobId;
 }
@@ -25,7 +25,7 @@ async function submit(jobId: string, statement: string) {
 	await submitCandidates({ cwd, jobId, sourceId: source.sourceId, producer, candidates: [{ conceptId: "support", title: "Support policy", type: "Policy", statement, evidence: [{ sourceId: source.sourceId, sourceHash: source.hash, blockId: block.id, quote: statement }], review: { support: "supported", rationale: "The complete fixture states this directly; the existing support concept was compared.", comparedConceptIds: evidence.existingConcepts.map(concept => concept.id), conflicts: [] } }] });
 }
 
-describe("OKF transaction integration with the real text converter", () => {
+describe("OKF transaction integration with the Markdown-only intake", () => {
 	it("uses the committed receipt after interruption before the published job checkpoint", async () => {
 		const jobId = await ingest();
 		await submit(jobId, "Support operates on weekdays.");
@@ -102,12 +102,12 @@ describe("OKF transaction integration with the real text converter", () => {
 	it("refreshes an explicitly selected deleted registered file while unknown missing paths abort the whole scan", async () => {
 		const first = await ingest(); await submit(first, "Support operates on weekdays."); await publishKnowledge({ cwd, jobId: first, producer });
 		const manifestPath = join(cwd, "knowledge/manifest.json"), before = readFileSync(manifestPath, "utf8");
-		rmSync(join(cwd, "policy.txt"));
-		await expect(startIngestion({ cwd, inputPaths: ["policy.txt", "unknown.txt"] })).rejects.toThrow(/ENOENT/);
+		rmSync(join(cwd, "policy.md"));
+		await expect(startIngestion({ cwd, inputPaths: ["policy.md", "unknown.md"] })).rejects.toThrow(/ENOENT/);
 		expect(readFileSync(manifestPath, "utf8")).toBe(before);
-		const refreshed = await startIngestion({ cwd, inputPaths: ["policy.txt"] });
+		const refreshed = await startIngestion({ cwd, inputPaths: ["policy.md"] });
 		expect(refreshed.sourceCount).toBe(0);
-		expect(refreshed.warnings).toContain(`Registered source is missing: ${join(cwd, "policy.txt")}`);
+		expect(refreshed.warnings).toContain(`Registered source is missing: ${join(cwd, "policy.md")}`);
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 		const source = manifest.sources[Object.keys(manifest.sources)[0]];
 		expect(source.state).toBe("missing");

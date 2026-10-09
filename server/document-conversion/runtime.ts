@@ -57,7 +57,7 @@ export async function runDocumentProcess(command: string, args: string[], option
 	return new Promise((resolve, reject) => {
 		const child = spawn(command, args, {
 			stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32", windowsHide: true,
-			env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", ...(options.offline ? { HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_DATASETS_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1" } : {}) },
+			env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1", ...(options.offline ? { HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_DATASETS_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1" } : {}) },
 		});
 		trackChild(child);
 		let stdout = "", stderr = "", pending = "", failure: Error | undefined, lastProgress = 0;
@@ -196,7 +196,7 @@ function parserWorker(): ParserWorker {
 	const root = runtimeDirectory();
 	if (worker?.root === root) { if (worker.idle) clearTimeout(worker.idle); return worker; }
 	if (worker) closeWorker(worker);
-	const child = spawn(runtimePython(), [bridgePath(), "serve", root], { stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32", windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1" } });
+	const child = spawn(runtimePython(), [bridgePath(), "serve", root], { stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32", windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1", HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1" } });
 	trackChild(child);
 	const active: ParserWorker = { child, root, stdout: "" }; worker = active;
 	child.stdout.on("data", (chunk: Buffer) => {

@@ -55,6 +55,7 @@
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "node --test tests/check-design-tokens-test.mjs && npm run check:design && vitest run",
     "test:unit": "vitest run",
+    "test:context-eval": "node --test tests/context-corpus-test.mjs tests/context-eval-test.mjs tests/context-session-test.mjs tests/context-pi-model-test.mjs",
     "test:smoke": "node tests/run-smoke.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
     "check:protocol": "node scripts/check-protocol-sync.mjs",

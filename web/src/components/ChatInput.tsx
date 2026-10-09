@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { Dropdown, DropdownItem } from "./Dropdown";
 import { queuedMessagePreview } from "../skill-block";
 import { TreeDraftRestore } from "./TreeDraftRestore";
@@ -477,7 +478,7 @@ export const ChatInput = memo(function ChatInput({
 		>
 			{dragOver && (
 				<div className="drop-overlay">
-					<span>📎 {t("dropHereToAttach")}</span>
+					<span><UiIcon name="paperclip" /> {t("dropHereToAttach")}</span>
 				</div>
 			)}
 			{completions && completions.length > 0 && (
@@ -595,14 +596,14 @@ export const ChatInput = memo(function ChatInput({
 							}
 						>
 							{a.imageData
-								? "🖼"
+								? <UiIcon name="image" />
 								: a.fileData
-									? "📄"
+									? <UiIcon name="file" />
 									: a.isDir
-										? "📁"
+										? <UiIcon name="folder" />
 										: a.mode === "reference"
-											? "🔗"
-											: "📎"}{" "}
+											? <UiIcon name="link" />
+											: <UiIcon name="paperclip" />}{" "}
 							{a.name}
 							{a.mode === "lines" && a.lines && (
 								<span className="attach-range">

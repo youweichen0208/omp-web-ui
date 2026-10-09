@@ -8,9 +8,9 @@ import type { KnowledgeManifest } from "../../server/okf/types.js";
 import { saveUpload } from "../../server/uploads.js";
 
 const converter = vi.hoisted(() => ({ fail: false, calls: 0 }));
-vi.mock("../../server/document-conversion/service.js", () => ({
-	DOCUMENT_EXTENSIONS: new Set([".txt", ".md", ".pdf", ".docx", ".xlsx", ".pptx"]),
-	convertDocument: async ({ inputPath, outputDir, signal }: { inputPath: string; outputDir: string; signal?: AbortSignal }) => {
+vi.mock("../../server/okf/markdown-evidence.js", async importOriginal => ({
+	...await importOriginal<typeof import("../../server/okf/markdown-evidence.js")>(),
+	normalizeMarkdownEvidence: async ({ inputPath, outputDir, signal }: { inputPath: string; outputDir: string; signal?: AbortSignal }) => {
 		converter.calls++;
 		signal?.throwIfAborted();
 		const text = readFileSync(inputPath, "utf8");
@@ -55,7 +55,7 @@ async function ingest(outputDir?: string) {
 async function candidate(jobId: string, sourceId?: string, conceptId = "policies/refunds"): Promise<{ sourceId: string; candidate: CandidateInput }> {
 	const read = await readCandidates({ cwd, jobId, sourceId });
 	const source = read.sources[0];
-	return { sourceId: source.sourceId, candidate: { conceptId, title: "Refund policy", type: "Policy", statement: source.blocks[0].text, evidence: [{ sourceId: source.sourceId, sourceHash: source.hash, blockId: source.blocks[0].id, quote: source.blocks[0].text }], review: { support: "supported", rationale: "Read the full policy and compared its scope with existing concepts.", comparedConceptIds: read.existingConcepts.map(concept => concept.id), conflicts: [] } } };
+	return { sourceId: source.sourceId, candidate: { basis: "fact", conceptId, title: "Refund policy", type: "Policy", statement: source.blocks[0].text, evidence: [{ sourceId: source.sourceId, sourceHash: source.hash, blockId: source.blocks[0].id, quote: source.blocks[0].text }], review: { support: "supported", rationale: "Read the full policy and compared its scope with existing concepts.", comparedConceptIds: read.existingConcepts.map(concept => concept.id), conflicts: [] } } };
 }
 async function submit(jobId: string, sourceId?: string, conceptId?: string) {
 	const result = await candidate(jobId, sourceId, conceptId);
@@ -77,10 +77,10 @@ describe("persistent OKF ingestion", () => {
 		expect(source.inputPath).toBe(upload.abs);
 		expect(readFileSync(join(cwd, "knowledge", source.versions[source.latestHash].originalPath), "utf8")).toContain("The support team responds within one day.");
 
-		writeSource("public.txt", "A separate explicitly scanned source.");
+		writeSource("public.md", "A separate explicitly scanned source.");
 		const broad = await startIngestion({ cwd, inputPaths: [folder] });
 		expect(broad.sourceCount).toBe(1);
-		expect(broad.sources[0].path).toBe(join(raw, "public.txt"));
+		expect(broad.sources[0].path).toBe(join(raw, "public.md"));
 		expect(broad.warnings.some(warning => warning.includes("Skipped document runtime data"))).toBe(true);
 		expect(manifest().sources[source.id].state).toBe("current");
 		const privateSelection = await startIngestion({ cwd, inputPaths: [runtimeOnly, join(folder, "runtime", "uploads")] });
@@ -89,21 +89,22 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("archives every source, emits standard frontmatter and relative evidence, and resumes idempotently", async () => {
-		writeSource("policy.txt", "Refunds are available within 30 days.");
+		writeSource("policy.md", "Refunds are available within 30 days.");
 		writeSource("empty-of-knowledge.md", "A cover page.");
 		const job = await ingest();
-		const policy = job.sources.find(source => source.path?.endsWith("policy.txt"))!;
+		const policy = job.sources.find(source => source.path?.endsWith("policy.md"))!;
 		await submit(job.jobId, policy.sourceId);
 		for (const source of job.sources.filter(source => source !== policy)) await submitCandidates({ cwd, jobId: job.jobId, sourceId: source.sourceId, candidates: [], producer });
 		const published = await publishKnowledge({ cwd, jobId: job.jobId, producer });
-		expect(published?.stable).toEqual(["policies/refunds"]);
+		expect(published?.stable).toEqual([]);
+		expect(published?.draft).toContain("policies/refunds");
 		expect(await publishKnowledge({ cwd, jobId: job.jobId, producer })).toEqual(published);
 		const state = manifest();
 		expect(state).toMatchObject({ kind: "pi-harness-knowledge", version: 1, evidenceDirectory: "evidence" });
 		expect(Object.values(state.sources)).toHaveLength(2);
 		for (const source of Object.values(state.sources)) expect(readFileSync(join(cwd, "knowledge", source.versions[source.latestHash].originalPath), "utf8")).toBe(readFileSync(source.inputPath, "utf8"));
 		const page = readFileSync(join(cwd, "knowledge/wiki/concepts/policies/refunds.md"), "utf8");
-		expect(page).toContain("status: stable");
+		expect(page).toContain("status: draft");
 		expect(page).toContain("description:");
 		expect(page).toContain("../../references/");
 		expect(page).not.toContain("verified:");
@@ -122,8 +123,8 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("requires the complete batch to normalize and every readable source to be reviewed", async () => {
-		writeSource("a.txt", "A fact");
-		writeSource("b.txt", "Another fact");
+		writeSource("a.md", "A fact");
+		writeSource("b.md", "Another fact");
 		const started = await startIngestion({ cwd, inputPaths: ["raw"] });
 		await nextIngestion({ cwd, jobId: started.jobId });
 		const item = await candidate(started.jobId);
@@ -134,7 +135,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("does not equate quotes with truth; uncertain support stays draft and unknown verification is discarded", async () => {
-		writeSource("policy.txt", "The trial does not promise 99.9% availability.");
+		writeSource("policy.md", "The trial does not promise 99.9% availability.");
 		const job = await ingest();
 		const item = await candidate(job.jobId);
 		item.candidate.statement = "The trial promises 99.9% availability.";
@@ -148,7 +149,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("rejects forged evidence, unsafe paths, and human producer identities", async () => {
-		writeSource("policy.txt", "Source evidence.");
+		writeSource("policy.md", "Source evidence.");
 		const job = await ingest();
 		const item = await candidate(job.jobId);
 		const call = (candidate: CandidateInput, author = producer) => submitCandidates({ cwd, jobId: job.jobId, sourceId: item.sourceId, candidates: [candidate], producer: author });
@@ -158,7 +159,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("source changes invalidate stable knowledge while retaining immutable previous evidence", async () => {
-		const original = writeSource("policy.txt", "Refunds within 30 days.");
+		const original = writeSource("policy.md", "Refunds within 30 days.");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
@@ -171,7 +172,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("detects a raw file changed after review, before stable publication", async () => {
-		const path = writeSource("policy.txt", "Original fact");
+		const path = writeSource("policy.md", "Original fact");
 		const job = await ingest();
 		await submit(job.jobId);
 		writeFileSync(path, "Changed fact");
@@ -180,7 +181,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("deleted sources are retained as evidence and invalidate dependent concepts", async () => {
-		const path = writeSource("policy.txt", "Original fact");
+		const path = writeSource("policy.md", "Original fact");
 		const job = await ingest();
 		await submit(job.jobId);
 		await publishKnowledge({ cwd, jobId: job.jobId, producer });
@@ -193,7 +194,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("protects manual changes and writes the complete generated proposal separately", async () => {
-		writeSource("policy.txt", "Original fact");
+		writeSource("policy.md", "Original fact");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
@@ -209,13 +210,13 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("partial or failed files prevent stable publication, but an explicit failed retry can recover", async () => {
-		writeSource("a.txt", "Good fact");
-		writeSource("b.txt", "FAIL document");
+		writeSource("a.md", "Good fact");
+		writeSource("b.md", "FAIL document");
 		const job = await ingest();
 		await submit(job.jobId, job.sources.find(source => source.state === "complete")!.sourceId);
 		expect((await publishKnowledge({ cwd, jobId: job.jobId, producer }))?.draft).toEqual(["policies/refunds"]);
-		writeSource("b.txt", "Now readable");
-		const retry = await startIngestion({ cwd, inputPaths: ["raw/b.txt"], outputDir: "retry-knowledge" });
+		writeSource("b.md", "Now readable");
+		const retry = await startIngestion({ cwd, inputPaths: ["raw/b.md"], outputDir: "retry-knowledge" });
 		converter.fail = true;
 		expect((await nextIngestion({ cwd, jobId: retry.jobId })).sources[0].state).toBe("failed");
 		converter.fail = false;
@@ -223,19 +224,19 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("informational parser warnings allow supported publication while partial parsing stays draft", async () => {
-		writeSource("advisory.pdf", "ADVISORY Code retains its documented indentation.");
+		writeSource("advisory.md", "ADVISORY Code retains its documented indentation.");
 		const job = await ingest();
 		await submit(job.jobId);
-		expect((await publishKnowledge({ cwd, jobId: job.jobId, producer }))?.stable).toContain("policies/refunds");
-		writeSource("advisory.pdf", "PARTIAL Some page text could not be parsed.");
+		expect((await publishKnowledge({ cwd, jobId: job.jobId, producer }))?.draft).toContain("policies/refunds");
+		writeSource("advisory.md", "PARTIAL Some page text could not be parsed.");
 		const partial = await ingest();
 		await submit(partial.jobId);
 		expect((await publishKnowledge({ cwd, jobId: partial.jobId, producer }))?.draft).toContain("policies/refunds");
 	});
 
 	test("exact duplicates merge into one statement without inventing verification", async () => {
-		writeSource("a.txt", "Refunds within 30 days.");
-		writeSource("b.txt", "Refunds within 30 days.");
+		writeSource("a.md", "Refunds within 30 days.");
+		writeSource("b.md", "Refunds within 30 days.");
 		const job = await ingest();
 		for (const source of job.sources) await submit(job.jobId, source.sourceId);
 		await publishKnowledge({ cwd, jobId: job.jobId, producer });
@@ -246,12 +247,12 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("a new contradiction downgrades both its own concept and previously stable target", async () => {
-		writeSource("policy.txt", "Refunds within 30 days.");
+		writeSource("policy.md", "Refunds within 30 days.");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
-		writeSource("competing.txt", "Refunds are never allowed.");
-		const second = await startIngestion({ cwd, inputPaths: ["raw/competing.txt"] });
+		writeSource("competing.md", "Refunds are never allowed.");
+		const second = await startIngestion({ cwd, inputPaths: ["raw/competing.md"] });
 		await nextIngestion({ cwd, jobId: second.jobId });
 		const item = await candidate(second.jobId, undefined, "policies/new-refunds");
 		item.candidate.review.conflicts = ["policies/refunds"];
@@ -261,7 +262,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("stop prevents candidate writes and publication, and archival yields to abort signals", async () => {
-		writeSource("policy.txt", "Original fact");
+		writeSource("policy.md", "Original fact");
 		const controller = new AbortController();
 		await expect(startIngestion({ cwd, inputPaths: ["raw"], signal: controller.signal, onProgress: () => controller.abort() })).rejects.toThrow();
 		const job = await ingest();
@@ -271,8 +272,8 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("cancelling after one archive rolls back only new unregistered evidence before a retry", async () => {
-		writeSource("a.txt", "First raw document");
-		writeSource("b.txt", "Second raw document");
+		writeSource("a.md", "First raw document");
+		writeSource("b.md", "Second raw document");
 		let progress = 0;
 		const controller = new AbortController();
 		await expect(startIngestion({ cwd, inputPaths: ["raw"], signal: controller.signal, onProgress: () => { if (++progress === 2) controller.abort(); } })).rejects.toThrow();
@@ -284,7 +285,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("reuses an archive copied before its source registration reached the manifest", async () => {
-		writeSource("policy.txt", "Original source");
+		writeSource("policy.md", "Original source");
 		const first = await startIngestion({ cwd, inputPaths: ["raw"] });
 		const interrupted = manifest();
 		interrupted.sources = {};
@@ -296,7 +297,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("tampered normalization cannot be used as proof for new claims", async () => {
-		writeSource("policy.txt", "Original fact");
+		writeSource("policy.md", "Original fact");
 		const job = await ingest();
 		const item = await candidate(job.jobId);
 		const source = (await readCandidates({ cwd, jobId: job.jobId })).sources[0];
@@ -335,13 +336,13 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("rechecks retained source evidence when only a different source is being ingested", async () => {
-		const a = writeSource("a.txt", "Existing policy.");
+		const a = writeSource("a.md", "Existing policy.");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
 		writeFileSync(a, "Changed existing policy.");
-		writeSource("b.txt", "Additional policy.");
-		const second = await startIngestion({ cwd, inputPaths: ["raw/b.txt"] });
+		writeSource("b.md", "Additional policy.");
+		const second = await startIngestion({ cwd, inputPaths: ["raw/b.md"] });
 		await nextIngestion({ cwd, jobId: second.jobId });
 		await submit(second.jobId);
 		await expect(publishKnowledge({ cwd, jobId: second.jobId, producer })).rejects.toThrow("changed after");
@@ -349,14 +350,14 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("a manually edited Reference for retained evidence prevents stable republishing from another source", async () => {
-		writeSource("a.txt", "Existing policy.");
+		writeSource("a.md", "Existing policy.");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
 		const reference = Object.keys(manifest().managedFiles).find(path => path.startsWith("wiki/references/"))!;
 		writeFileSync(join(cwd, "knowledge", reference), "Human-edited evidence reference");
-		writeSource("b.txt", "Additional policy.");
-		const second = await startIngestion({ cwd, inputPaths: ["raw/b.txt"] });
+		writeSource("b.md", "Additional policy.");
+		const second = await startIngestion({ cwd, inputPaths: ["raw/b.md"] });
 		await nextIngestion({ cwd, jobId: second.jobId });
 		await submit(second.jobId);
 		const published = await publishKnowledge({ cwd, jobId: second.jobId, producer });
@@ -367,18 +368,18 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("a second output root does not re-ingest the first root as raw knowledge", async () => {
-		writeSource("policy.txt", "Existing policy.");
+		writeSource("policy.md", "Existing policy.");
 		const first = await ingest();
 		await submit(first.jobId);
 		await publishKnowledge({ cwd, jobId: first.jobId, producer });
 		const second = await startIngestion({ cwd, inputPaths: ["."], outputDir: "second-export" });
 		expect(second.sources).toHaveLength(1);
-		expect(second.sources[0].path).toBe(join(raw, "policy.txt"));
+		expect(second.sources[0].path).toBe(join(raw, "policy.md"));
 		expect(second.warnings.some(warning => warning.includes("existing knowledge"))).toBe(true);
 	});
 
 	test("cancels a queued operation immediately without running it after the current holder exits", async () => {
-		writeSource("policy.txt", "Fact");
+		writeSource("policy.md", "Fact");
 		let release!: () => void;
 		let entered!: () => void;
 		const running = new Promise<void>(resolve => { entered = resolve; });
@@ -395,7 +396,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("refuses oversized manifests before replacing the previous readable state", async () => {
-		writeSource("policy.txt", "Original policy.");
+		writeSource("policy.md", "Original policy.");
 		await ingest();
 		const prior = readFileSync(join(cwd, "knowledge/manifest.json"), "utf8");
 		const byteLength = Buffer.byteLength.bind(Buffer);
@@ -406,7 +407,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("custom output stays confined, read operations page sources and expose full evidence paths", async () => {
-		for (let index = 0; index < 3; index++) writeSource(`${index}.txt`, "x".repeat(3000));
+		for (let index = 0; index < 3; index++) writeSource(`${index}.md`, "x".repeat(3000));
 		const job = await ingest("generated/company");
 		const first = await readCandidates({ cwd, jobId: job.jobId });
 		expect(first.sources).toHaveLength(1);
@@ -419,7 +420,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("status and next stay bounded while reporting pending sources beyond the displayed page", async () => {
-		for (let index = 0; index < 25; index++) writeSource(`${index.toString().padStart(2, "0")}.txt`, `Fact ${index}`);
+		for (let index = 0; index < 25; index++) writeSource(`${index.toString().padStart(2, "0")}.md`, `Fact ${index}`);
 		let status = await startIngestion({ cwd, inputPaths: ["raw"] });
 		expect(status).toMatchObject({ sourceCount: 25, sourcesTruncated: true, sourceCounts: { pending: 25 } });
 		expect(status.sources).toHaveLength(20);
@@ -430,7 +431,7 @@ describe("persistent OKF ingestion", () => {
 	});
 
 	test("refuses symbolic-link outputs and skips links encountered inside source directories", async () => {
-		writeSource("a.txt", "Fact");
+		writeSource("a.md", "Fact");
 		const outside = join(folder, "outside");
 		mkdirSync(outside);
 		symlinkSync(outside, join(raw, "linked"), process.platform === "win32" ? "junction" : "dir");
@@ -444,14 +445,14 @@ describe("persistent OKF ingestion", () => {
 	test("replays interrupted transactions without overwriting intervening manual changes", async () => {
 		const root = join(cwd, "knowledge");
 		mkdirSync(root);
-		writeFileSync(join(root, "a.txt"), "already committed");
+		writeFileSync(join(root, "a.md"), "already committed");
 		const journal = join(privateDirectory(cwd), "transaction.json");
-		writeFileSync(journal, JSON.stringify({ version: 1, cwd, outputDirectory: root, writes: [{ path: "a.txt", expectedHash: null, contents: "already committed" }, { path: "b.txt", expectedHash: null, contents: "pending" }] }));
+		writeFileSync(journal, JSON.stringify({ version: 1, cwd, outputDirectory: root, writes: [{ path: "a.md", expectedHash: null, contents: "already committed" }, { path: "b.md", expectedHash: null, contents: "pending" }] }));
 		await recoverTransaction(cwd);
-		expect(readFileSync(join(root, "b.txt"), "utf8")).toBe("pending");
-		writeFileSync(journal, JSON.stringify({ version: 1, cwd, outputDirectory: root, writes: [{ path: "b.txt", expectedHash: digest("pending"), contents: "new version" }] }));
-		writeFileSync(join(root, "b.txt"), "human edit");
+		expect(readFileSync(join(root, "b.md"), "utf8")).toBe("pending");
+		writeFileSync(journal, JSON.stringify({ version: 1, cwd, outputDirectory: root, writes: [{ path: "b.md", expectedHash: digest("pending"), contents: "new version" }] }));
+		writeFileSync(join(root, "b.md"), "human edit");
 		await expect(recoverTransaction(cwd)).rejects.toThrow("externally modified");
-		expect(readFileSync(join(root, "b.txt"), "utf8")).toBe("human edit");
+		expect(readFileSync(join(root, "b.md"), "utf8")).toBe("human edit");
 	});
 });

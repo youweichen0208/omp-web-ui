@@ -283,7 +283,8 @@ try {
 	hold = false;
 	if (page) {
 		for (const wire of held) downstream.send(wire);
-		await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");
+		// Settings v2 hides zero/unknown usage instead of rendering 0% or —.
+		await page.waitForFunction(() => !document.querySelector(".usage-control"));
 		if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("/new retained old messages in UI");
 		await page.waitForFunction(() => document.querySelectorAll(".session-item").length === 2);
 	}
@@ -353,14 +354,14 @@ try {
 	await client.waitForState((state) => state.conversationId !== resumedId);
 	if (client.messages.length || client.state.stats.tokens.total !== 0) throw new Error("new_chat did not open an empty conversation");
 	if (page) {
-		await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "—");
+		await page.waitForFunction(() => !document.querySelector(".usage-control"));
 		if (await page.locator(".main").getByText("OLD_CONTEXT_SENTINEL", { exact: true }).isVisible()) throw new Error("UI retained old messages while new_chat snapshot was delayed");
 		for (let i = 0; i < 20 && !resyncs; i++) await sleep(50);
 		if (!resyncs) throw new Error("Missing snapshot recovery request");
-		if ((await page.locator(".usage-cache-short strong").innerText()) !== "—") throw new Error("Input toolbar retained old cache usage");
+		if (await page.locator(".usage-cache-short").count()) throw new Error("Input toolbar retained old cache usage");
 		hold = false;
 		for (const wire of held) downstream.send(wire);
-		await page.waitForFunction(() => document.querySelector(".usage-percent")?.textContent === "0%");
+		await page.waitForFunction(() => !document.querySelector(".usage-control"));
 	}
 	console.log("✓ new_chat opens a separate conversation without stale UI during delayed snapshots");
 	console.log("✓ native /new starts empty; old history remains restorable; next request contains no old context");

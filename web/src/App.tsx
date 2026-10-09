@@ -1,3 +1,4 @@
+import { UiIcon } from "./components/UiIcon";
 import { isLegacyMcpNotice } from "./notices";
 import { ChangesProvider } from "./changes-context";
 import { taskChanges } from "./changes";
@@ -10,6 +11,7 @@ import { RecoveryStatus } from "./components/RecoveryStatus";
 import { LinkedText } from "./components/LinkedText";
 import type { WikiConversationResult } from "./types";
 import { wikiRequest } from "./wiki-api";
+import { ModelThinking } from "./components/ModelThinking";
 import { WikiWorkbench } from "./components/WikiWorkbench";
 
 import { ProviderAuthModal } from "./components/ProviderAuthModal";
@@ -923,7 +925,7 @@ export function App() {
 		>
 			{appDragOver && (
 				<div className="app-drop-overlay" aria-hidden>
-					<span>📎 {t("dropHereToAttach")}</span>
+					<span><UiIcon name="paperclip" /> {t("dropHereToAttach")}</span>
 				</div>
 			)}
 			{view !== "nodes" && view !== "wiki" && <div
@@ -1132,7 +1134,7 @@ export function App() {
 							)}
 						</div>
 					</div>
-					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench recovery={conversationState?.recovery} key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
+					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench modelControls={<ModelThinking key={chat.activeConversationId} state={wikiSessionReady ? modelState : null} models={chat.models} modelsLoading={chat.modelsLoading} send={message => wikiSessionReady && chat.ready && view === "wiki" && !switching ? send(message) : false} onManageModels={openManageModels} compact segmented />} recovery={conversationState?.recovery} key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>
 							{visited.current.has("terminal") && <TerminalPanel active={view === "terminal" && !switching} chat={chat} send={send} terminal={terminal} />}

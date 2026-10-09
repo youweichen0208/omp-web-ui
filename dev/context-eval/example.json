@@ -1,0 +1,67 @@
+{
+	"version": 1,
+	"model": {
+		"baseUrl": "http://127.0.0.1:11434/v1",
+		"id": "REPLACE_WITH_INSTALLED_LOCAL_MODEL",
+		"contextWindow": 32768,
+		"maxTokens": 4096
+	},
+	"openviking": {
+		"url": "http://127.0.0.1:1933/mcp",
+		"version": "REPLACE_WITH_INSTALLED_OPENVIKING_VERSION",
+		"apiKeyEnv": "OPENVIKING_API_KEY"
+	},
+	"timeoutMs": 120000,
+	"sources": [
+		{
+			"id": "harness",
+			"kind": "code",
+			"root": "../..",
+			"vikingUri": "viking://resources/context-eval/harness",
+			"files": ["server/agent-service.ts", "server/wiki-service.ts", "server/wiki-routes.ts", "server/wiki-links.ts", "server/native-mcp-config.ts", "server/prompt-delivery.ts", "server/serialize.ts"]
+		},
+		{
+			"id": "pi-sdk",
+			"kind": "code",
+			"root": "../../node_modules/@earendil-works/pi-coding-agent",
+			"vikingUri": "viking://resources/context-eval/pi-sdk",
+			"files": ["dist/core/agent-session.js", "dist/core/mcp-servers.js", "dist/extensions/mcp/runtime.js", "dist/extensions/mcp/index.js", "dist/core/session-manager.js"]
+		},
+		{
+			"id": "docs",
+			"kind": "reference",
+			"root": "../../docs",
+			"vikingUri": "viking://resources/context-eval/docs",
+			"files": ["architecture-core.md", "architecture-wiki.md", "architecture-plugins.md", "architecture-attachments.md", "development.md"]
+		},
+		{
+			"id": "notes",
+			"kind": "personal",
+			"root": "examples",
+			"vikingUri": "viking://resources/context-eval/notes",
+			"files": ["personal.md"]
+		}
+	],
+	"questions": [
+		{"id": "lifecycle", "prompt": "结合 harness 和 Pi SDK 的实现，任务结束应监听 agent_end 还是 agent_settled？解释区别并各引用一处代码。", "expectedEvidence": [{"sourceId": "harness", "path": "server/agent-service.ts"}, {"sourceId": "pi-sdk", "path": "dist/core/agent-session.js"}]},
+		{"id": "parallel_projects", "prompt": "切换当前项目时，另一个项目正在执行的会话如何保持归属？结合实现与架构文档查证。", "expectedEvidence": [{"sourceId": "harness", "path": "server/agent-service.ts"}, {"sourceId": "docs", "path": "architecture-core.md"}]},
+		{"id": "mcp_transport", "prompt": "当前 Pi 支持哪些 MCP 传输？传统 SSE 能否直接用于 harness？核对 SDK 与宿主校验。", "expectedEvidence": [{"sourceId": "pi-sdk", "path": "dist/core/mcp-servers.js"}, {"sourceId": "harness", "path": "server/native-mcp-config.ts"}]},
+		{"id": "mcp_override", "prompt": "项目可否只覆盖全局 MCP 的 headers/env 而继承其他字段？核对宿主规则和 SDK。", "expectedEvidence": [{"sourceId": "harness", "path": "server/native-mcp-config.ts"}, {"sourceId": "pi-sdk", "path": "dist/core/mcp-servers.js"}]},
+		{"id": "mcp_roots", "prompt": "Pi 创建 stdio MCP 子进程时工作目录是什么，向 MCP 暴露的 roots 又是什么？", "expectedEvidence": [{"sourceId": "pi-sdk", "path": "dist/extensions/mcp/runtime.js"}]},
+		{"id": "mcp_exposure", "prompt": "如何让模型只能看到 MCP 的特定只读工具？区分 exposure 配置与服务端权限。", "expectedEvidence": [{"sourceId": "pi-sdk", "path": "dist/core/mcp-servers.js"}, {"sourceId": "docs", "path": "architecture-plugins.md"}]},
+		{"id": "wiki_symlink", "prompt": "Wiki 能否通过指向工作区外的符号链接打开另一仓库文档？引用路径检查实现。", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-service.ts"}]},
+		{"id": "wiki_cwd", "prompt": "Wiki HTTP 请求携带的 cwd 与当前会话不一致时会如何处理？", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-routes.ts"}]},
+		{"id": "wiki_search_limits", "prompt": "Wiki 搜索在索引规模、读取量和返回条数上有哪些限制？是否适合作为多个大型仓库的统一索引？", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-service.ts"}, {"sourceId": "docs", "path": "architecture-wiki.md"}]},
+		{"id": "current_file_snapshot", "prompt": "编辑器有未保存改动时，附加当前文件会发送什么？结合附件设计与 prompt 投递实现说明。", "expectedEvidence": [{"sourceId": "docs", "path": "architecture-attachments.md"}, {"sourceId": "harness", "path": "server/prompt-delivery.ts"}]},
+		{"id": "frontmatter", "prompt": "Wiki 索引会提取哪些 frontmatter 字段？可以把 authority: official 当作已经实现的权威来源过滤吗？", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-links.ts"}]},
+		{"id": "wiki_links", "prompt": "Wiki 双链能否直接使用任意远程 URL 或绝对文件路径？说明支持范围。", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-links.ts"}]},
+		{"id": "pdf_limits", "prompt": "Wiki PDF 搜索有怎样的文件数、大小和页数限制？不要将其描述为无限量全文索引。", "expectedEvidence": [{"sourceId": "harness", "path": "server/wiki-service.ts"}]},
+		{"id": "wiki_memory", "prompt": "Wiki 对话是否能直接充当持久任务记忆？结合临时会话实现和文档分析。", "expectedEvidence": [{"sourceId": "harness", "path": "server/agent-service.ts"}, {"sourceId": "docs", "path": "architecture-wiki.md"}]},
+		{"id": "experience_conflict", "prompt": "个人示例笔记建议在 agent_end 时保存最终经验。与当前架构是否一致？指出笔记的适用性和冲突依据。", "expectedEvidence": [{"sourceId": "notes", "path": "personal.md"}, {"sourceId": "docs", "path": "architecture-core.md"}]},
+		{"id": "reload_timing", "prompt": "MCP 配置保存时，空闲和运行中的会话分别何时 reload？个人笔记的立即生效假设是否准确？", "expectedEvidence": [{"sourceId": "harness", "path": "server/agent-service.ts"}, {"sourceId": "notes", "path": "personal.md"}]},
+		{"id": "source_of_truth", "prompt": "界面插件可以直接替换原生代理工具和系统提示词吗？说明界面插件与原生扩展的职责。", "expectedEvidence": [{"sourceId": "docs", "path": "architecture-plugins.md"}]},
+		{"id": "sdk_version", "prompt": "当前工程对 SDK 升级要求做哪些契约回归，为什么不能只测试页面能打开？", "expectedEvidence": [{"sourceId": "docs", "path": "development.md"}]},
+		{"id": "unknown_incident", "prompt": "根据所给资料，2026-09-01 生产数据库事故的根因和事故负责人是什么？资料不包含时明确说明。", "expectedEvidence": [], "expectInsufficient": true},
+		{"id": "unknown_benchmark", "prompt": "这些资料是否证明 OpenViking 在本机能让跨仓问答准确率提高 30%？给出实测数据；缺少实测则明确说明。", "expectedEvidence": [], "expectInsufficient": true}
+	]
+}

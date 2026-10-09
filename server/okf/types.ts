@@ -1,3 +1,4 @@
+import type { DocumentOrigin, DocumentBlock } from "../document-bundle.js";
 import type { SourceDependency } from "./markdown-sources.js";
 
 export interface EvidenceInput {
@@ -14,6 +15,9 @@ export interface CandidateInput {
 	type: string;
 	statement: string;
 	scope?: string;
+	basis?: "fact" | "inference" | "hypothesis" | "outdated";
+	section?: "symptom" | "conditions" | "cause" | "validation" | "solution" | "workaround" | "limitations" | "unconfirmed" | "knowledge";
+	staleAfter?: string;
 	evidence: EvidenceInput[];
 	review: {
 		support: "supported" | "uncertain" | "unsupported";
@@ -23,11 +27,7 @@ export interface CandidateInput {
 	};
 }
 
-export interface EvidenceBlock {
-	id: string;
-	text: string;
-	locator: { page?: number; heading?: string; sheet?: string; cell?: string; slide?: number; lineStart?: number; lineEnd?: number };
-}
+export type EvidenceBlock = DocumentBlock;
 
 export interface SourceVersion {
 	hash: string;
@@ -35,10 +35,13 @@ export interface SourceVersion {
 	dependencies: SourceDependency[];
 	originalPath: string;
 	originalName: string;
+	bundlePath?: string;
+	provenance?: DocumentOrigin;
 	bytes: number;
 	createdAt: string;
 	state: "pending" | "complete" | "partial" | "failed";
 	markdownPath?: string;
+	normalizedFiles?: Record<string, string>;
 	blocksPath?: string;
 	blocksHash?: string;
 	parserVersion?: string;
@@ -71,6 +74,7 @@ export interface KnowledgeConcept {
 	updatedAt: string;
 	producer: string;
 	reasons: string[];
+	verified?: Array<{ by: string; at: string; notes: string }>;
 }
 
 export interface KnowledgeManifest {

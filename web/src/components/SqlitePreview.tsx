@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { memo, useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { withToken } from "../auth-token";
@@ -62,7 +63,7 @@ export const SqlitePreview = memo(function SqlitePreview({ file, disabled }: {
 				<div className="sqlite-grid-wrap" tabIndex={0} aria-label={t("dbRows")}>
 					<table className="sqlite-grid">
 						<thead><tr><th scope="col">#</th>{data.columns.map((column) => <th scope="col" key={column.name}>
-							<span>{column.name}{column.primaryKey ? " 🔑" : ""}</span><small>{column.type || "—"}</small>
+							<span>{column.name}{column.primaryKey ? <UiIcon name="key" /> : ""}</span><small>{column.type || "—"}</small>
 						</th>)}</tr></thead>
 						<tbody>{data.rows.map((row, index) => <tr key={data.offset + index}>
 							<th scope="row">{data.offset + index + 1}</th>

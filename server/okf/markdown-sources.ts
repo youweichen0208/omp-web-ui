@@ -11,6 +11,7 @@ export interface SourceDependency {
 	hash: string | null;
 	bytes: number;
 	archivePath?: string;
+	bundlePath?: string;
 	warning?: string;
 }
 

@@ -1,3 +1,4 @@
+import { UiIcon, type UiIconName } from "./UiIcon";
 import { ToolOutputDownload } from "./ToolOutputDownload";
 import { withToken } from "../auth-token";
 import { CodemodeCard } from "./CodemodeCard";
@@ -65,7 +66,7 @@ export function ReadGroup({ items, wrap }: { items: { block: UiToolCallBlock; vi
 	const duration = items.reduce((sum, { view }) => sum + (view.status?.durationMs ?? 0), 0);
 	return <div className={`read-group ${failed ? "err" : pending ? "run" : completed ? "ok" : "idle"}`}>
 		<button type="button" className="read-group-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-			<span aria-hidden="true">{open ? "⌄" : "›"}</span><span aria-hidden="true">📄</span>
+			<span aria-hidden="true">{open ? "⌄" : "›"}</span><UiIcon name="file" />
 			<strong>{t("readFiles", { n: items.length })}</strong>
 			<span className="read-group-paths" title={paths.join("\n")}>{paths.map((path) => path.split("/").slice(-2).join("/")).join(", ")}</span>
 			<span className="read-group-status">{failed ? t("error") : pending ? t("running") : completed ? `${t("done")}${duration ? ` · ${formatDuration(duration)}` : ""}` : t("toolQueued")}</span>
@@ -109,18 +110,18 @@ export function GrepSummary({ block, view, wrap }: { block: UiToolCallBlock; vie
 	</div>;
 }
 
-const TOOL_ICONS: Record<string, string> = {
-	bash: "$",
-	read: "📄",
-	write: "W",
-	edit: "✏️",
-	grep: "🔍",
-	find: "🧭",
-	ls: "📂",
+const TOOL_ICONS: Record<string, UiIconName> = {
+	bash: "terminal",
+	read: "file",
+	write: "file",
+	edit: "edit",
+	grep: "search",
+	find: "compass",
+	ls: "folder",
 };
 
-function toolIcon(name: string): string {
-	return TOOL_ICONS[name] ?? "🛠";
+function toolIcon(name: string) {
+	return <UiIcon name={TOOL_ICONS[name] ?? "tool"} />;
 }
 
 function ToolArguments({ text }: { text: string }) {

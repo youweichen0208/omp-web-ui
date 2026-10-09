@@ -1,5 +1,5 @@
 import { createPlanExtension } from "./plan/extension.js";
-import { createPdfMarkdownExtension } from "./document-conversion/extension.js";
+import { createDocumentMarkdownExtension } from "./document-conversion/extension.js";
 import { createOkfExtension } from "./okf/extension.js";
 import { SettingsManager, createCodemodeExtension, createMcpExtension, createToolSearchExtension, type InlineExtension } from "@earendil-works/pi-coding-agent";
 
@@ -26,7 +26,7 @@ export function conversationSettings(cwd: string, agentDir: string): SettingsMan
 export function nativeToolExtensions(): InlineExtension[] {
 	return [
 		{ name: "pi-harness-plan", replaceable: true, factory: createPlanExtension() },
-		{ name: "pi-harness-pdf-markdown", replaceable: true, factory: createPdfMarkdownExtension() },
+		{ name: "pi-harness-pdf-markdown", replaceable: true, factory: createDocumentMarkdownExtension() },
 		{ name: "pi-harness-okf", replaceable: true, factory: createOkfExtension() },
 		{ name: "codemode", builtin: true, replaceable: true, factory: createCodemodeExtension() },
 		{ name: "tool-search", builtin: true, replaceable: true, factory: createToolSearchExtension() },

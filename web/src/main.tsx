@@ -8,6 +8,8 @@ import "highlight.js/styles/github-dark.css";
 import { initAuthToken } from "./auth-token";
 import { desktopAPI } from "./desktop";
 
+document.documentElement.dataset.platform = desktopAPI?.platform ?? (/Windows/i.test(navigator.userAgent) ? "win32" : /Mac/i.test(navigator.userAgent) ? "darwin" : "linux");
+
 if (desktopAPI) {
 	document.documentElement.classList.add("pi-desktop", `pi-desktop-${desktopAPI.platform}`);
 }

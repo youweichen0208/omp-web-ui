@@ -1,3 +1,4 @@
+import { UiIcon, type UiIconName } from "./UiIcon";
 import { ReplyActions } from "./ReplyActions";
 import { turnChangeSummaries } from "../changes";
 import { ChangeSummaryCard } from "./ChangeSummaryCard";
@@ -66,17 +67,17 @@ function hasToolCall(m: UiMessage): boolean {
 /** Suggested prompts shown on the empty-state welcome page. */
 const EXAMPLE_DEFS: {
 	key: "ex.understand" | "ex.debug" | "ex.test" | "ex.review";
-	icon: string;
+	icon: UiIconName;
 }[] = [
-	{ key: "ex.understand", icon: "🔍" },
-	{ key: "ex.debug", icon: "🐛" },
-	{ key: "ex.test", icon: "🧪" },
-	{ key: "ex.review", icon: "🧹" },
+	{ key: "ex.understand", icon: "search" },
+	{ key: "ex.debug", icon: "bug" },
+	{ key: "ex.test", icon: "flask" },
+	{ key: "ex.review", icon: "brush" },
 ];
 
 function examples(
 	t: Translate,
-): { icon: string; text: string; prompt: string }[] {
+): { icon: UiIconName; text: string; prompt: string }[] {
 	return EXAMPLE_DEFS.map(({ key, icon }) => ({
 		icon,
 		text: t(key),
@@ -732,7 +733,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 										)
 									}
 								>
-									<span className="empty-example-icon">{ex.icon}</span>
+									<span className="empty-example-icon"><UiIcon name={ex.icon} /></span>
 									<span className="empty-example-text">{ex.text}</span>
 								</button>
 							))}

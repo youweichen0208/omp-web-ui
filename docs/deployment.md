@@ -121,7 +121,7 @@ npm run publish:electron       # 同 build，但 --publish always——本地跑
   ≤1100px 时右侧文件树变为抽屉。Web 和桌面共用工作区布局，模型设置位于输入框底部；
   顶栏高 44px，项目栏全高显示；macOS 品牌区为原生窗口按钮留空，项目栏开关固定在红绿灯右侧，收起项目栏时标题仍避让这些控件。Windows/Linux 顶栏为右上角 132px 窗口按钮预留空间；宽屏文件栏可见时由文件栏承担这段空间。设置和文件按钮不压缩，视图标签在空间不足时横向滚动。`tests/desktop-toolbar-test.mjs` 在 Chromium 中模拟两平台外壳，验证顶栏边界、状态数字与任务定位（不替代真机窗口验证）。详见 [界面布局](ui-design.md)。
 - SDK 原生提示词引用的 README、docs 与 examples 通过 extraResources 原样保留，防止 electron-builder 的生产依赖剪枝删除扩展示例。afterPack 检查文档和示例入口；native-tools-desktop-test 使用包内 SDK 的真实路径读取资源，缺失时阻断打包回归。
-- 文档转换的 Python 桥由 build:server 复制到 dist，afterPack 检查入口；Python 环境和模型由 `/pdf-md setup` 单独安装，不放进 npm/Electron 包。运行时、离线处理与平台验证见 [文档转换与 OKF](architecture-document-knowledge.md)。
+- 文档转换的 Python 桥由 build:server 复制到 dist，afterPack 检查入口；PDF/Office 环境和模型由 `/pdf-md setup` 单独安装，CHM 轻量环境由 `/pdf-md setup chm` 单独安装，不放进 npm/Electron 包。运行时、离线处理与平台验证见 [文档转换与 OKF](architecture-document-knowledge.md)。
 - 原生模块（`node-pty`）：`electron-builder.yml` 里 `npmRebuild: true`，打包时自动
   rebuild 成 Electron 的 Node ABI，不需要手动 `electron-rebuild`；本机需要装好
   Xcode Command Line Tools（mac）/ Visual Studio Build Tools（win）。

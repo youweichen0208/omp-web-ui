@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { useEffect, useState } from "react";
 import { FiLayers, FiRefreshCw, FiSquare, FiTerminal, FiX } from "react-icons/fi";
 import type { BgServer, ClientMessage } from "../types";
@@ -84,7 +85,7 @@ export function BgTasksModal({ servers, send, onClose }: BgTasksModalProps) {
 										<div className="bg-task-line1">
 											{isPlugin ? (
 													<span className="bg-task-port" title={s.taskId}>
-														🧩 {s.plugin}
+														<UiIcon name="puzzle" /> {s.plugin}
 													</span>
 												) : (
 													<span className="bg-task-port">:{s.port}</span>

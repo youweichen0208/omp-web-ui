@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { memo, useEffect, useMemo, useState } from "react";
 import { FiCpu, FiSearch, FiZap } from "react-icons/fi";
 import type { ClientMessage, ModelInfo, UiState } from "../types";
@@ -120,7 +121,7 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 						</span>
 						{!compact && model?.vision && (
 							<span className="chip-vision" title={t("vision")}>
-								🖼
+								<UiIcon name="image" />
 							</span>
 						)}
 						{!compact && model && (

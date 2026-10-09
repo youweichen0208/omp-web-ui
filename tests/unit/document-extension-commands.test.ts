@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { createPdfMarkdownExtension } from "../../server/document-conversion/extension.js";
 import { doctorRuntime, setupRuntime } from "../../server/document-conversion/runtime.js";
+import { doctorChmRuntime, setupChmRuntime } from "../../server/document-conversion/chm-runtime.js";
 
 vi.mock("../../server/document-conversion/runtime.js", () => ({ setupRuntime: vi.fn(), doctorRuntime: vi.fn() }));
+vi.mock("../../server/document-conversion/chm-runtime.js", () => ({ setupChmRuntime: vi.fn(), doctorChmRuntime: vi.fn() }));
 vi.mock("../../server/document-conversion/service.js", () => ({ convertDocument: vi.fn() }));
 vi.mock("../../server/document-conversion/settings.js", () => ({ getDocumentSettings: () => ({ pdfEnabled: true, okfEnabled: true }), updateDocumentSettings: vi.fn() }));
 
@@ -18,6 +20,18 @@ function context(id: string) {
 }
 
 describe("document setup commands", () => {
+	it("routes explicit CHM setup and doctor to the lightweight runtime", async () => {
+		const handler = (await command()).handler, owner = context("chm-owner");
+		vi.mocked(setupChmRuntime).mockResolvedValueOnce({ ready: true, missing: [], warnings: [] });
+		await handler("setup chm", owner.ctx);
+		await vi.waitFor(() => expect(owner.setStatus).toHaveBeenLastCalledWith("document-runtime", undefined));
+		expect(setupChmRuntime).toHaveBeenCalledTimes(1);
+		vi.mocked(doctorChmRuntime).mockResolvedValueOnce({ ready: true, missing: [], warnings: [] });
+		await handler("doctor chm", owner.ctx);
+		expect(doctorChmRuntime).toHaveBeenCalledTimes(1);
+		expect(setupRuntime).not.toHaveBeenCalled();
+		expect(doctorRuntime).not.toHaveBeenCalled();
+	});
 	it("cancels only the initiating session's setup and releases ownership for retry", async () => {
 		const handler = (await command()).handler;
 		const owner = context("setup-owner"), other = context("other-session");

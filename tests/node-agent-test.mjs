@@ -142,9 +142,11 @@ try {
 		await page.locator(".node-agent-dialog").getByRole("button", { name: "确认", exact: true }).click();
 		await page.locator(".node-agent").getByText("accepted remotely", { exact: true }).waitFor();
 		await input.fill("draft for this node");
-		await page.getByRole("button", { name: "终端与文件", exact: true }).click();
+		assert(await input.isVisible(), "Agent remains visible alongside manual terminal");
 		await page.locator(".node-xterm:visible").waitFor();
-		await page.getByRole("button", { name: "Agent 工作台", exact: true }).click();
+		const terminalBox = await page.locator('.node-manual-workbench').boundingBox();
+		const agentBox = await page.locator('.node-agent-container').boundingBox();
+		assert(terminalBox.x + terminalBox.width <= agentBox.x + 1, 'SSH terminal is on the left, Agent on the right');
 		await page.locator(".node-agent-message.assistant", { hasText: "agent reply" }).waitFor();
 		assert.equal(await input.inputValue(), "draft for this node");
 		mkdirSync("tests/scratch", { recursive: true });
@@ -152,7 +154,7 @@ try {
 		await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300);
 		await page.locator(".node-connected").screenshot({ path: "tests/scratch/node-agent-mobile.png" });
 		assert.deepEqual(errors, []);
-		console.log("PASS remote agent browser start, streaming, prompt acknowledgement, confirmation and manual terminal switch");
+		console.log("PASS remote agent browser start, streaming, prompt acknowledgement, confirmation and simultaneous terminal/Agent panes");
 	}
 
 	console.log("PASS real SSH/native RPC streaming, remote credentials, dialog round-trip, fresh session, identity isolation and scoped shutdown");

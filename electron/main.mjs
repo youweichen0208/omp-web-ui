@@ -223,7 +223,7 @@ function createWindow() {
 		minWidth: 800,
 		minHeight: 600,
 		title: "pi-harness",
-		backgroundColor: "#ffffff",
+		backgroundColor: "#FBF9F6",
 		show: false,
 		...(process.platform === "darwin"
 			? { titleBarStyle: "hidden", trafficLightPosition: { x: 18, y: 17 } }

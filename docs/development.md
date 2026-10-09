@@ -20,6 +20,8 @@ npm run test:freeze  # 冻结/重连回归测试（Playwright，需要本机 chr
 
 ## CI
 
+跨仓代码与文档检索的本地评测见 [工程上下文：设计与验证](engineering-context.md)。开发工具位于 `dev/context-eval/`，确定性回归执行 `npm run test:context-eval`（也纳入零 token 冒烟）；真实模型和 OpenViking 对比在本机单独运行，开发夹具结果不作为检索收益结论。
+
 GitHub Actions ubuntu-latest（`.github/workflows/ci.yml`，push/PR → main 或 develop 触发）：`check:lockfile → npm ci → check:protocol → typecheck → build → npm test（设计检查 + vitest）→ test:smoke`。
 
 SSH 节点另有 macOS/Windows CI job：两平台分别构建服务端并运行 `node-workbench-test.mjs` 的 mock SSH 测试。浏览器工作台交互可在 macOS 本地运行 `node tests/node-workbench-browser-test.mjs`（先 `npm run build`）。
@@ -103,3 +105,5 @@ Pi 1.0.4 专项：`pi-104-prompt-contract-test.mjs` 核对 Codemode on/only 的�
 原生计划回归：`plan-sdk-test.mjs` 与 `plan-settings-test.mjs` 纳入零 token 冒烟；浏览器单独执行 `node tests/plan-chat-browser-test.mjs`。均使用隔离目录与本地模拟模型，不调用真实服务。
 
 文档扩展回归：`document-extensions-sdk-test.mjs` 纳入零 token 冒烟，配合 document/okf 单测验证流程；真实 Docling/PDF 质量与平台资格单独验证，参见 [文档转换与 OKF](architecture-document-knowledge.md)。原生上下文基线同时关闭 plan、PDF 和 OKF 内置工具。
+
+CHM 离线解析测试：`python tests/document-chm-test.py`（Python 3.12，依赖见 `server/document-conversion/python/chm/requirements.txt`），CI 在三平台独立运行；设置好隔离环境后，`PI_CHM_TEST_RUNTIME=<包含 chm-html-v1 的目录> node tests/document-chm-integration-test.mjs` 验证实际转换至 OKF 发布，不调用模型。

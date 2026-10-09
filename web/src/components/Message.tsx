@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { useChangesAvailable } from "../changes-context";
 import { ToolRecoveryCard, type ToolRecoveryActions } from "./ToolRecoveryCard";
 import { isProcessNarration } from "../command-reading";
@@ -499,7 +500,7 @@ export const Message = memo(function Message({
 											) : (
 												<span className="msg-editor-file">
 													<span className="msg-editor-file-icon">
-														{kind === "path" ? (att.mode === "reference" ? "🔗" : "📎") : "📄"}
+														{kind === "path" ? (att.mode === "reference" ? <UiIcon name="link" /> : <UiIcon name="paperclip" />) : <UiIcon name="file" />}
 													</span>
 													<span className="msg-editor-file-name">
 														{att.name ?? att.path?.split("/").pop()}
@@ -659,7 +660,7 @@ function AttachmentCard({ message }: { message: UiMessage }) {
 				className="attachcard-head"
 				onClick={() => setOpen((v) => !v)}
 			>
-				<span className="attachcard-icon">{isFolder ? "📁" : "📎"}</span>
+				<span className="attachcard-icon">{isFolder ? <UiIcon name="folder" /> : <UiIcon name="paperclip" />}</span>
 				<span className="attachcard-name">{name}</span>
 				{details.editorSnapshot && <span className="attachcard-mode">{t(details.editorSnapshot.dirty ? "currentFileDraft" : "currentFileLabel")}</span>}
 				{details.path && (

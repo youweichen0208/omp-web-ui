@@ -29,7 +29,7 @@ module.exports = async function afterPack(context) {
 	if (fs.existsSync(path.join(packagedRoot, "extensions")) || manifest.pi?.extensions?.length) {
 		throw new Error("Desktop must not bundle application extensions; load user Pi extensions instead");
 	}
-	for (const asset of ["bridge.py", "fixtures.py", "native_code.py"]) {
+	for (const asset of ["bridge.py", "fixtures.py", "native_code.py", "chm/bridge.py", "chm/fixture.py", "chm/requirements.txt"]) {
 		const file = path.join(packagedRoot, "dist/server/document-conversion/python", asset);
 		if (!fs.existsSync(file) || !fs.statSync(file).isFile() || !fs.statSync(file).size) {
 			throw new Error(`Packaged document conversion worker is missing: ${asset}; run build:server before packaging`);

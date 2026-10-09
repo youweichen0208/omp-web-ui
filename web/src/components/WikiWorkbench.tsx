@@ -1,7 +1,7 @@
 import { wikiProperties } from "../wiki-properties";
 import ReactMarkdown from "react-markdown";
 import { useExtensionEditor } from "../extension-editor";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import { FiPlus, FiCalendar, FiArrowUp, FiBookOpen, FiChevronDown, FiChevronRight, FiCode, FiFile, FiMenu, FiRefreshCw, FiSearch, FiX, FiClock, FiCornerUpLeft, FiCornerUpRight, FiLink, FiSquare } from "react-icons/fi";
 import { useI18n, useT } from "../i18n";
@@ -22,7 +22,8 @@ import { randomUuid } from "../uuid";
 
 type Guard = (next: () => void) => void;
 const EMPTY: WikiState = { entries: [], tags: [], revisions: [], running: false, limited: false };
-export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, model, contextPercent, toolStatuses, active, ready, send, guard, fileRequest, openDocument, thinkingWrap, connected, silenceNotified, sessionError, writingBlocked, onContentRequested, recovery }: {
+export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, model, contextPercent, toolStatuses, active, ready, send, guard, fileRequest, openDocument, thinkingWrap, connected, silenceNotified, sessionError, writingBlocked, onContentRequested, recovery, modelControls }: {
+	modelControls: ReactNode;
 	recovery?: import("../types").UiRecovery;
 	sessionError: string; writingBlocked: boolean; onContentRequested: (token: string) => void;
 	cwd: string; conversationId: string; messages: UiMessage[]; streaming: boolean; active: boolean; ready: boolean;
@@ -316,6 +317,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 						<span className="wiki-mention-hints"><button onClick={() => { setInput(v => v + " @"); inputRef.current?.focus(); }}>{t("wikiReferenceHint")}</button></span>
 						{!chatOpen && <button className="wiki-collapse-composer" onClick={() => { setComposerOpen(false); setScopeOpen(false); }}>{t("wikiCollapseComposer")}</button>}
 						{streaming ? <button className="wiki-send stopping" aria-label={t("wikiStop")} onClick={() => send({ type: "abort" })}><FiSquare /></button> : <button className="wiki-send" aria-label={t(!ready ? "wikiSessionPreparing" : sending ? "sending" : "wikiSend")} title={t(!ready ? "wikiSessionPreparing" : sending ? "sending" : "wikiSend")} disabled={busy || !input.trim() || (!path && !whole && !refs.length)} onClick={() => void submit()}>{(!ready || sending) && <span>{t(!ready ? "wikiSessionPreparing" : "sending")}</span>}<FiArrowUp /></button>}</div>
+					<fieldset className="wiki-model-controls" disabled={!ready || !connected || !active}>{modelControls}</fieldset>
 					{previewPrompt && <pre className="wiki-prompt-preview">{promptText}</pre>}
 				</div>
 			</div>;

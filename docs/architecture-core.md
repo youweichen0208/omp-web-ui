@@ -2,7 +2,7 @@
 
 ## 原生上下文边界
 
-PDF 转 Markdown 与 OKF 整理以具名原生 inline extension 提供按需工具，工作流由用户命令或工具结果说明。解析使用独立本机环境，知识整理沿用当前原生会话，不另建后台模型任务；细节见 [文档转换与 OKF](architecture-document-knowledge.md)。
+多格式转 Markdown 与 Markdown → OKF 知识蒸馏以两个独立原生 inline extension 提供按需工具，通过标准化证据包交接，工作流由用户命令或工具结果说明。转换使用本机解析环境，知识扩展不依赖该环境，沿用当前原生会话生成草稿，经实际人工复核再发布 stable；细节见 [文档转换与 OKF](architecture-document-knowledge.md)。
 
 会话由 pi 1.0.4 原版 SDK 创建。WebUI 只桥接用户输入、原生事件和界面交互；不覆盖原生 bash，不注入终端状态消息。原生 plan 扩展默认开启（保留已保存的关闭选择），启用时由扩展注册工具、提供规则与压缩背景（见 [计划扩展](architecture-plan.md)）。原生配置文件、技能、用户扩展和官方 MCP/Codemode/tool_search 由 pi 加载。WebUI 设置支持显示偏好、界面插件可见性及原生配置管理；Extensions 管理用户明确选择的包；plan 的服务全局开关独立协调激活状态。系统提示词页编辑用户选择的原生 SYSTEM/APPEND/上下文文件，空闲时原生 reload，下一次请求由 SDK 应用变化；来源、文件校验与运行中保存见 [系统提示词架构](architecture-system-prompt.md)。新会话、切换、恢复和重载共用同一个原生运行时工厂。历史 transcript 不会改写。
 

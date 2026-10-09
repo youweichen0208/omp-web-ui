@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Build artifacts
 dist/
@@ -45,6 +45,11 @@ tests/scratch/
 dev/*.png
 dev/*-preview.html
 .cache/
+.context-eval/
+dev/context-eval/local/
 
 # Cowork 在仓库根建的输出目录
 Claude outputs/
+
+# Isolated development worktrees
+.claude/
