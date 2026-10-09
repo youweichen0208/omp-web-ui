@@ -10,12 +10,20 @@ test("desktop packaging follows the exact SDK pin and rejects mismatches or rang
 	try {
 		const app = join(out, "resources/app"), sdk = join(app, "node_modules/@earendil-works/pi-coding-agent");
 		mkdirSync(join(sdk, "docs"), { recursive: true });
+		mkdirSync(join(sdk, "examples/extensions"), { recursive: true });
+		const references = ["README.md", "docs/extensions.md", "examples/extensions/README.md", "examples/extensions/hello.ts"];
+		for (const reference of references) writeFileSync(join(sdk, reference), "fixture reference");
 		writeFileSync(join(sdk, "docs/codemode.md"), "models.generateImages");
 		const context = { appOutDir: out, electronPlatformName: "linux", packager: { appInfo: { productFilename: "pi" } } };
 		for (const version of ["1.0.1", "2.0.0"]) {
 			writeFileSync(join(app, "package.json"), JSON.stringify({ dependencies: { "@earendil-works/pi-coding-agent": version } }));
 			writeFileSync(join(sdk, "package.json"), JSON.stringify({ version }));
 			await expect(afterPack(context)).resolves.toBeUndefined();
+		}
+		for (const reference of references) {
+			rmSync(join(sdk, reference));
+			await expect(afterPack(context)).rejects.toThrow(`Packaged Pi reference is missing: ${reference}`);
+			writeFileSync(join(sdk, reference), "fixture reference");
 		}
 		mkdirSync(join(app, "extensions"));
 		writeFileSync(join(app, "extensions/webui.ts"), "export default () => {};");

@@ -42,6 +42,16 @@ directories:
 # 额外的路径拼接。代价是文件数量多一些、源码没打包，对这个项目无所谓。
 asar: false
 
+# The native SDK prompt references these assets. Dependency pruning removes
+# examples and README files, so copy the original resources explicitly.
+extraResources:
+  - from: node_modules/@earendil-works/pi-coding-agent/README.md
+    to: app/node_modules/@earendil-works/pi-coding-agent/README.md
+  - from: node_modules/@earendil-works/pi-coding-agent/docs
+    to: app/node_modules/@earendil-works/pi-coding-agent/docs
+  - from: node_modules/@earendil-works/pi-coding-agent/examples
+    to: app/node_modules/@earendil-works/pi-coding-agent/examples
+
 # 默认会把整个项目目录带上，这里去掉运行时用不到的部分（源码、测试、CI 配置）。
 # 生产依赖 node_modules 由 electron-builder 自己剪枝并始终包含，不用在这里列。
 files:
@@ -60,6 +70,7 @@ files:
   - "!.env*"
   - "!deploy/**"
   - "!dev/**"
+  - "!.context-eval/**"
   - "!Dockerfile"
   - "!docker-compose.yml"
   - "!.dockerignore"

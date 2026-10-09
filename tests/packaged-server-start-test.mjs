@@ -16,6 +16,7 @@ import { relative, isAbsolute } from "node:path";
 const [executable, appRoot] = process.argv.slice(2).map((p) => resolve(p));
 assert(executable && appRoot, "Usage: node tests/packaged-server-start-test.mjs <executable> <resources/app>");
 assert(!existsSync(join(appRoot, "extensions")), "Desktop must not ship application extensions");
+assert(!existsSync(join(appRoot, ".context-eval")), "Desktop must not ship local evaluation data");
 assert(!JSON.parse(readFileSync(join(appRoot, "package.json"), "utf8")).pi?.extensions?.length, "Desktop must not declare application extensions");
 // A checkout-local package can otherwise hide missing runtime dependencies by
 // resolving them from the repository's parent node_modules directory.

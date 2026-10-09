@@ -53,6 +53,12 @@ if (!process.env.PI_NATIVE_TOOLS_WORKER) {
 	for (const separator of [' ', '\n', '\t', '\r\n']) assert.equal(await expandNativeTemplate(`/fixture${separator}"one two" three`, [{ name: 'fixture', content: '$1 / $2', description: '', filePath: '', sourceInfo: {} }]), 'one two / three');
 	const { nativeToolExtensions } = await import(pathToFileURL(join(root, 'dist/server/native-tools.js')));
 	assert.match(readFileSync(join(root, 'node_modules/@earendil-works/pi-coding-agent/docs/codemode.md'), 'utf8'), /generateImages/);
+	const sdkRoot = join(root, 'node_modules/@earendil-works/pi-coding-agent');
+	const { getExamplesPath, getDocsPath, getReadmePath } = await import(pathToFileURL(join(sdkRoot, 'dist/config.js')));
+	assert(readFileSync(getReadmePath(), 'utf8').length > 100, 'native README reference is readable');
+	assert(readFileSync(join(getDocsPath(), 'extensions.md'), 'utf8').length > 100, 'native extension documentation is readable');
+	assert(readFileSync(join(getExamplesPath(), 'extensions/README.md'), 'utf8').length > 100, 'native extension examples index is readable');
+	assert.match(readFileSync(join(getExamplesPath(), 'extensions/hello.ts'), 'utf8'), /registerTool/);
 	const cwd = process.env.PI_NATIVE_TOOLS_WORKER, agentDir = process.env.PI_CODING_AGENT_DIR;
 	const settingsManager = SettingsManager.create(cwd, agentDir);
 	const resourceLoader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, extensionFactories: nativeToolExtensions() });

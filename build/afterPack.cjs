@@ -35,6 +35,10 @@ module.exports = async function afterPack(context) {
 		throw new Error(`Unexpected packaged Pi SDK version: expected ${expectedSdk}, got ${actualSdk}`);
 	}
 	if (!fs.readFileSync(path.join(sdkRoot, "docs/codemode.md"), "utf8").includes("generateImages")) throw new Error("Packaged codemode reference is missing");
+	for (const reference of ["README.md", "docs/extensions.md", "examples/extensions/README.md", "examples/extensions/hello.ts"]) {
+		const file = path.join(sdkRoot, reference);
+		if (!fs.existsSync(file) || !fs.statSync(file).isFile() || !fs.statSync(file).size) throw new Error(`Packaged Pi reference is missing: ${reference}`);
+	}
 	if (context.electronPlatformName !== "darwin") return;
 
 	const appName = context.packager.appInfo.productFilename;
