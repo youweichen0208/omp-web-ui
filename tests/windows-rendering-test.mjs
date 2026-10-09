@@ -98,7 +98,7 @@ try {
 			return { pixel: paint.pixel, first: paint.rows[0] / scale, last: paint.rows.at(-1) / scale };
 		};
 		const resting = { ...await scrollbarState(), pixel: baseline[Math.round(12 * scale)] };
-		assert.equal(resting.width, '8px'); assert.equal(resting.border, '2px'); assert.equal(resting.radius, '4px'); assert.equal(resting.background, 'rgba(0, 0, 0, 0)');
+		assert.equal(resting.width, '8px'); assert.equal(parseFloat(resting.border), Math.floor(2 * scale) / scale, '2 CSS px borders are snapped to whole device pixels'); assert.equal(resting.radius, '4px'); assert.equal(resting.background, 'rgba(0, 0, 0, 0)');
 		await scroll.hover();
 		await page.waitForFunction(() => document.querySelector('.panel-right > .panel-body').matches(':hover'));
 		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
