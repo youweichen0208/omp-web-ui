@@ -24,6 +24,8 @@
 
 ## 文件与索引
 
+内置 OKF 扩展生成的普通 Markdown 直接通过现有 Wiki 阅读。带有效知识 manifest 的 evidence 副本排除后台索引与撤销快照，显式打开保留；明确相对文件链接不依赖索引命中。来源、发布和迁移约定见 [文档转换与 OKF](architecture-document-knowledge.md)。
+
 文件栏提供新建文件，默认填入当前文档的父目录；与普通文件树共用创建表单和独占创建接口，详见 [附件与文件处理](architecture-attachments.md#手动新建文件)。创建成功后经过自动保存导航保护打开新文件。
 
 `wiki-service.ts` 负责工作区索引、文档读取、搜索和文件历史；`wiki-links.ts` 定义标签与链接解析。HTTP 类型只在 `server/protocol.ts` 声明，经现有 type-only shim 供浏览器使用。

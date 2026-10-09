@@ -1,8 +1,9 @@
-// Minimal typings for the part of proper-lockfile that auth-file.ts uses
+// Minimal typings for the proper-lockfile API used by auth and document jobs
 // (the SDK ships the library but not its types).
 declare module "proper-lockfile" {
 	export interface LockOptions {
 		realpath?: boolean;
+		lockfilePath?: string;
 		stale?: number;
 		retries?: number | { retries: number; minTimeout?: number; maxTimeout?: number };
 	}

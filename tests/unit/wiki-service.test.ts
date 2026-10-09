@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WikiService, WikiConflictError, wikiPath } from "../../server/wiki-service.js";
-import { wikiMetadata, resolveWikiLink, wikiReferences, wikiLinkIndex } from "../../server/wiki-links.js";
+import { wikiMetadata, resolveWikiLink, explicitWikiFilePath, wikiReferences, wikiLinkIndex } from "../../server/wiki-links.js";
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function fixture() {
@@ -16,6 +16,52 @@ function fixture() {
 	return { root, cwd, service };
 }
 describe("Wiki workspace", () => {
+	it("does not undo only the manifest of an ingestion while retaining its archived evidence", async () => {
+		const { cwd, service } = fixture();
+		const before = await service.begin(cwd);
+		mkdirSync(join(cwd, "knowledge/evidence"), { recursive: true });
+		mkdirSync(join(cwd, "knowledge/wiki"), { recursive: true });
+		const manifest = JSON.stringify({ kind: "pi-harness-knowledge", version: 1, evidenceDirectory: "evidence" });
+		writeFileSync(join(cwd, "knowledge/manifest.json"), manifest);
+		writeFileSync(join(cwd, "knowledge/evidence/original.md"), "source bytes");
+		writeFileSync(join(cwd, "knowledge/wiki/concept.md"), "generated knowledge");
+		await service.finish(cwd, before, "Import knowledge");
+		const revision = (await service.state(cwd)).revisions[0];
+		expect(() => service.restore(cwd, revision.id, true)).toThrow(/versioned evidence/);
+		expect(readFileSync(join(cwd, "knowledge/manifest.json"), "utf8")).toBe(manifest);
+		expect(readFileSync(join(cwd, "knowledge/wiki/concept.md"), "utf8")).toBe("generated knowledge");
+		expect(readFileSync(join(cwd, "knowledge/evidence/original.md"), "utf8")).toBe("source bytes");
+	});
+	it("resolves explicit evidence links without requiring index membership", () => {
+		expect(explicitWikiFilePath("knowledge/wiki/references/source.md", "../../evidence/source/original.pdf#page=2")).toBe("knowledge/evidence/source/original.pdf");
+		expect(explicitWikiFilePath("knowledge/wiki/index.md", "./references/%E4%B8%AD%E6%96%87.md")).toBe("knowledge/wiki/references/中文.md");
+		for (const target of ["../../outside.md", "../%00bad.pdf", "https://example.com/file.pdf", "//host/file.pdf", "../C:/outside.pdf", "unknown.md", "./folder", "%xx"]) expect(explicitWikiFilePath("index.md", target)).toBeUndefined();
+	});
+	it("keeps portable knowledge evidence browsable without indexing or snapshotting duplicate sources", async () => {
+		const { cwd, service } = fixture();
+		mkdirSync(join(cwd, "knowledge/evidence/source"), { recursive: true });
+		mkdirSync(join(cwd, "knowledge/wiki"), { recursive: true });
+		mkdirSync(join(cwd, "research/evidence"), { recursive: true });
+		writeFileSync(join(cwd, "knowledge/manifest.json"), JSON.stringify({ kind: "pi-harness-knowledge", version: 1, evidenceDirectory: "evidence" }));
+		writeFileSync(join(cwd, "knowledge/evidence/source/original.md"), "# Archived raw evidence");
+		writeFileSync(join(cwd, "knowledge/wiki/concept.md"), "---\ntype: Concept\n---\n# Published concept");
+		writeFileSync(join(cwd, "research/evidence/notes.md"), "# Ordinary evidence stays searchable");
+		const index = await service.index(cwd);
+		expect(index.texts.has("knowledge/evidence/source/original.md")).toBe(false);
+		expect(index.texts.has("knowledge/wiki/concept.md")).toBe(true);
+		expect(index.texts.has("research/evidence/notes.md")).toBe(true);
+		const evidence = await service.documentContent(cwd, "knowledge/evidence/source/original.md");
+		expect(evidence.text).toContain("Archived raw evidence");
+		expect(evidence.editable).toBe(false);
+		expect(() => service.write(cwd, "knowledge/evidence/source/original.md", "replacement", evidence.version)).toThrow(/read-only/);
+		expect((await service.directory(cwd, "knowledge")).entries.some(e => e.path === "knowledge/evidence")).toBe(true);
+		const snapshot = await service.begin(cwd);
+		expect(snapshot.files.has("knowledge/evidence/source/original.md")).toBe(false);
+		expect(snapshot.files.has("research/evidence/notes.md")).toBe(true);
+		service.cancel(cwd);
+		writeFileSync(join(cwd, "knowledge/manifest.json"), "{}");
+		expect((await service.index(cwd, true)).texts.has("knowledge/evidence/source/original.md")).toBe(true);
+	});
 	it("creates empty files exclusively and records undo/redo without overwriting", async () => {
 		const { cwd, service } = fixture();
 		mkdirSync(join(cwd, "docs"));

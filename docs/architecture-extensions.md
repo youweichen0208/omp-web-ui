@@ -1,5 +1,7 @@
 # Extensions 原生包管理
 
+应用内置的 PDF 转 Markdown 与 OKF 整理是具名 inline extension，随 server/dist 分发，不属于本页的原生安装包列表。开关、解析环境和使用命令见 [文档转换与 OKF](architecture-document-knowledge.md)。
+
 设置 › Extensions 对接 Pi 1.0.4 的 `DefaultPackageManager`、`SettingsManager` 和 `ProjectTrustStore`。安装、移除、更新与资源发现运行在独立 Node worker；浏览页面不执行扩展入口，缺失依赖采用 `resolve(() => "skip")`，不会因浏览自动安装。包变更在新会话生效，当前会话仅在用户点击重载时通过已有 `extensions_reload` 生效。宿主不向模型注册工具、注入消息或系统提示词。
 
 ## 请求与运行边界

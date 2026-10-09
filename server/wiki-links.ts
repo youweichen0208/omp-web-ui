@@ -77,6 +77,19 @@ export function wikiLinkIndex(paths: string[]): WikiLinkIndex {
 	for (const p of paths) { const name = linkName(p), list = byName.get(name); if (list) list.push(p); else byName.set(name, [p]); }
 	return { paths: new Set(paths), byName };
 }
+/** Explicit relative file links can address evidence excluded from background indexing.
+ * The document/media endpoint still verifies existence and real workspace ownership. */
+export function explicitWikiFilePath(source: string, target: string): string | undefined {
+	let raw: string;
+	try { raw = decodeURIComponent(target.split("#")[0]).replaceAll("\\", "/"); } catch { return; }
+	if (!/^(?:\.\/|\.\.\/)/.test(raw) || /[\0\r\n?:]/.test(raw) || !/\.[a-z0-9]+$/i.test(raw)) return;
+	const parts = source.split("/").slice(0, -1);
+	for (const part of raw.split("/")) {
+		if (part === "..") { if (!parts.length) return; parts.pop(); }
+		else if (part && part !== ".") parts.push(part);
+	}
+	return parts.join("/") || undefined;
+}
 export function resolveWikiLink(source: string, target: string, paths: string[] | WikiLinkIndex): string | undefined {
 	let raw: string;
 	try { raw = decodeURIComponent(target.split("|")[0].split("#")[0]).replaceAll("\\", "/"); } catch { return; }

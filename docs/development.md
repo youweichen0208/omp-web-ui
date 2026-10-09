@@ -101,3 +101,5 @@ SDK / pi-ai 当前精确锁定 1.0.4。升级前必须验证内部 prompt-templa
 Pi 1.0.4 专项：`pi-104-prompt-contract-test.mjs` 核对 Codemode on/only 的模型请求、getter、隐藏规则和技能；`pi-104-upstream-fixes-test.mjs` 验证初始化中的 MCP 关闭、Codemode 内建对象修改后结算及 read 图片，均进入零 token 冒烟。资源基准与已知问题复现另见 [原生能力与资源审查](pi-native-resource-review.md)，不在 CI 中运行长时间性能场景。
 
 原生计划回归：`plan-sdk-test.mjs` 与 `plan-settings-test.mjs` 纳入零 token 冒烟；浏览器单独执行 `node tests/plan-chat-browser-test.mjs`。均使用隔离目录与本地模拟模型，不调用真实服务。
+
+文档扩展回归：`document-extensions-sdk-test.mjs` 纳入零 token 冒烟，配合 document/okf 单测验证流程；真实 Docling/PDF 质量与平台资格单独验证，参见 [文档转换与 OKF](architecture-document-knowledge.md)。原生上下文基线同时关闭 plan、PDF 和 OKF 内置工具。

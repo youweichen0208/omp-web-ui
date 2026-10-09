@@ -7,7 +7,7 @@ import { FiPlus, FiCalendar, FiArrowUp, FiBookOpen, FiChevronDown, FiChevronRigh
 import { useI18n, useT } from "../i18n";
 import type { WikiState, WikiDirectory, WikiDocument, WikiDocumentContent, WikiDocumentReferences, WikiRevision, WikiChange, WikiSearchResult, UiMessage, ClientMessage, UiModelInfo, ToolStatus } from "../types";
 import { wikiRequest, wikiMedia } from "../wiki-api";
-import { wikiMetadata, resolveWikiLink, wikiPrompt } from "../wiki-document";
+import { wikiMetadata, resolveWikiLink, explicitWikiFilePath, wikiPrompt } from "../wiki-document";
 import { WikiResizeHandle, useWikiPanelWidth } from "./WikiResizeHandle";
 import { CreateFileForm } from "./CreateFileForm";
 import { WikiChatPanel } from "./WikiChatPanel";
@@ -263,7 +263,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const followLink = (href: string) => {
 		let reference = href;
 		try { if (href.startsWith("#wiki=")) reference = decodeURIComponent(href.slice(6)); } catch { return; }
-		const target = resolveWikiLink(path, reference, paths);
+		const target = resolveWikiLink(path, reference, paths) ?? explicitWikiFilePath(path, reference);
 		if (target) open(target); else setError(t("wikiMissingLink", { path: reference }));
 	};
 	const properties = useMemo(() => wikiProperties(draft).rows, [draft]);

@@ -23,8 +23,9 @@ const dataDir = join(base, "data");
 const agentDir = join(base, "agent");
 mkdirSync(workdir, { recursive: true });
 mkdirSync(dataDir, { recursive: true });
-// Compare the unextended native baseline; default-on plan is covered by plan-settings-test.
+// Compare the unextended native baseline; optional built-ins have separate SDK tests.
 writeFileSync(join(dataDir, "plan-settings.json"), JSON.stringify({ enabled: false }));
+writeFileSync(join(dataDir, "document-extensions.json"), JSON.stringify({ pdfEnabled: false, okfEnabled: false }));
 mkdirSync(agentDir, { recursive: true });
 mkdirSync(join(agentDir, "extensions"));
 writeFileSync(join(agentDir, "extensions", "cancel-new.ts"), `import { existsSync } from "node:fs"; import { join } from "node:path";

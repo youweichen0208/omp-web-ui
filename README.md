@@ -40,6 +40,18 @@ pi-harness --port 9000 --cwd /path/to/project
 - 中文和英文界面、声音提醒、可选插件及 pi 扩展。
 - CLI、开机自启服务、Docker 与 Electron 桌面版。
 
+## 文档转换与 OKF Wiki
+
+内置 PDF 转 Markdown 扩展支持扫描件 OCR、表格、代码和来源定位；OKF 扩展让当前 Agent 整理 PDF、Markdown、文本和 Office 文件，提取候选知识、核对重复与冲突，再生成带原文证据的 OKF Wiki。结果可在现有文档工作台中打开。
+
+```text
+/pdf-md setup
+/pdf-md convert ./raw/技术说明.pdf
+/okf ingest ./raw，输出到 ./knowledge
+```
+
+PDF 与 Office 解析需要单独的本机 Python 3.12 环境，首次运行 `setup` 会安装依赖并下载模型；可用 `/pdf-md cancel` 取消、`/pdf-md doctor` 检查。MD/TXT 不需要此环境。知识整理使用当前会话选定的模型，疑点与冲突保留草稿，原文快照随知识目录保存。设置、恢复与资料移交见 [文档知识扩展说明](https://github.com/youweichen0208/pi-harness/blob/develop/docs/architecture-document-knowledge.md)。
+
 ## 运行与部署
 
 ```bash
@@ -67,6 +79,8 @@ npm run test:smoke
 ## English
 
 pi-harness is an independently maintained web and Electron interface for the pi coding agent SDK. It includes chat, file browsing and editing, attachments, a local terminal, model management, and a built-in SSH node workbench with grouped hosts, multiple PTY tabs, SFTP files, and a separate Agent conversation for each node.
+
+Built-in document extensions provide local PDF-to-Markdown conversion and an Agent-driven OKF Wiki workflow for PDF, Markdown, text and Office files. Run `/pdf-md setup` to prepare the separate local parser, `/pdf-md convert <path>` to convert a PDF, or `/okf ingest <directory>` to organize sourced knowledge with the current conversation's model. See the [document extensions guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/architecture-document-knowledge.md).
 
 Requires Node.js **>= 22.19.0** and a configured pi model provider. Install with `npm install -g @youweichen/pi-harness`, then run `pi-harness`. See the [SSH workbench guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/ssh-workbench.md), [Xshell guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/xshell.md), and [deployment guide](https://github.com/youweichen0208/pi-harness/blob/develop/docs/deployment.md).
 

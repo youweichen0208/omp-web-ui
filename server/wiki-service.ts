@@ -13,8 +13,22 @@ const IGNORED = new Set([".git", "node_modules", ".pi-web", ".DS_Store"]);
 // Generated dependencies and duplicate checkouts must not consume the main
 // workspace's index or undo budget. Explicit directory/file requests stay usable.
 const TRAVERSAL_IGNORED_DIRS = new Set([".venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+function isKnowledgeManifest(contents: string | Buffer): boolean {
+	try {
+		const manifest = JSON.parse(contents.toString());
+		return manifest?.kind === "pi-harness-knowledge" && manifest.version === 1 && manifest.evidenceDirectory === "evidence";
+	} catch { return false; }
+}
 function skipTraversalDirectory(parent: string, name: string) {
-	return TRAVERSAL_IGNORED_DIRS.has(name) || (name === "worktrees" && basename(parent) === ".claude");
+	if (TRAVERSAL_IGNORED_DIRS.has(name) || (name === "worktrees" && basename(parent) === ".claude")) return true;
+	if (name !== "evidence") return false;
+	// Only the immutable evidence of a declared knowledge export is excluded.
+	// Ordinary user folders named evidence remain searchable and undoable.
+	try {
+		const marker = join(parent, "manifest.json"), info = lstatSync(marker);
+		if (!info.isFile() || info.size > 16 * 1024 * 1024) return false;
+		return isKnowledgeManifest(readFileSync(marker));
+	} catch { return false; }
 }
 const hash = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
 type Snapshot = { files: Map<string, Buffer>; skipped: string[]; limited?: boolean };
@@ -36,6 +50,10 @@ export function wikiPath(cwd: string, path: string): string {
 		p = dirname(p);
 	}
 	return absolute;
+}
+function isKnowledgeEvidence(cwd: string, path: string): boolean {
+	const root = realpathSync(cwd), parts = relative(root, wikiPath(cwd, path)).split(sep);
+	return parts.some((part, index) => part === "evidence" && skipTraversalDirectory(join(root, ...parts.slice(0, index)), part));
 }
 function kindOf(path: string, text: boolean): WikiEntry["kind"] {
 	if (/\.(md|markdown|txt)$/i.test(path)) return "document";
@@ -122,7 +140,7 @@ export class WikiService {
 			try { children = await readdir(wikiPath(cwd, path), { withFileTypes: true }); } catch { limited = true; status.totalIsLowerBound = true; status.issues.push({ path, reason: "unreadable", subtree: true }); return; }
 			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 			for (const child of children) {
-				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(path, child.name)) continue;
+				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(wikiPath(cwd, path), child.name)) continue;
 				if (visited >= 20000) { limited = true; status.totalIsLowerBound = true; status.issues.push({ path: path || ".", reason: "entry-limit", subtree: true }); break; }
 				visited++;
 				const p = path ? `${path}/${child.name}` : child.name;
@@ -200,7 +218,7 @@ export class WikiService {
 		const data = size <= MAX_FILE ? readFileSync(abs) : undefined;
 		const text = data && !/\.pdf$/i.test(path) && previewKind(path) !== "image" && looksLikeText(data) ? decodeText(data) : undefined;
 		const metadata = wikiMetadata(text ?? "");
-		return { entry: { path, name: basename(path), size, modified: info.mtimeMs, kind: kindOf(path, text !== undefined), tags: metadata.tags, title: metadata.title }, text, version: data ? hash(data) : "", editable: text !== undefined && Buffer.from(text).equals(data!) };
+		return { entry: { path, name: basename(path), size, modified: info.mtimeMs, kind: kindOf(path, text !== undefined), tags: metadata.tags, title: metadata.title }, text, version: data ? hash(data) : "", editable: text !== undefined && Buffer.from(text).equals(data!) && !isKnowledgeEvidence(cwd, path) };
 	}
 	async search(cwd: string, query: string): Promise<{ results: WikiSearchResult[]; limited: boolean }> {
 		const index = await this.index(cwd), q = query.trim().toLocaleLowerCase().slice(0, 200);
@@ -241,7 +259,7 @@ export class WikiService {
 			catch { skip(path); return; }
 			children.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 			for (const child of children) {
-				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(path, child.name)) continue;
+				if (IGNORED.has(child.name) || child.isDirectory() && skipTraversalDirectory(wikiPath(cwd, path), child.name)) continue;
 				if (visited++ >= 20000) { skip(path); break; }
 				const p = path ? `${path}/${child.name}` : child.name;
 				try {
@@ -300,6 +318,7 @@ export class WikiService {
 		return { path };
 	}
 	write(cwd: string, path: string, text: string, version: string) {
+		if (isKnowledgeEvidence(cwd, path)) throw new Error("Knowledge evidence snapshots are read-only; edit the source and ingest a new version");
 		if (this.busy(cwd)) throw new Error("Wait for the current Wiki request to finish");
 		const abs = wikiPath(cwd, path), data = readFileSync(abs), next = Buffer.from(text);
 		if (data.length > MAX_FILE || next.length > MAX_FILE || !looksLikeText(data) || !Buffer.from(decodeText(data)).equals(data)) throw new Error("File is read-only");
@@ -323,7 +342,9 @@ export class WikiService {
 			const current = existsSync(abs) ? readFileSync(abs) : null;
 			if ((current ? hash(current) : null) !== (undo ? blob.after : blob.before)) throw new Error(`File changed since this request: ${c.path}`);
 			const target = undo ? blob.before : blob.after;
-			return { abs, current, next: target ? readFileSync(join(this.folder(cwd), "blobs", target)) : null, c };
+			const next = target ? readFileSync(join(this.folder(cwd), "blobs", target)) : null;
+			if (basename(abs) === "manifest.json" && (current && isKnowledgeManifest(current) || next && isKnowledgeManifest(next))) throw new Error("Knowledge ingestion contains versioned evidence and cannot be undone as a Wiki request. Use a new ingestion or restore the complete knowledge directory with version control.");
+			return { abs, current, next, c };
 		});
 		const done: typeof writes = [];
 		try {

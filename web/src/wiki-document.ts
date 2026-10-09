@@ -1,4 +1,4 @@
-export { wikiMetadata, resolveWikiLink } from "../../server/wiki-links.js";
+export { wikiMetadata, resolveWikiLink, explicitWikiFilePath } from "../../server/wiki-links.js";
 import type { WikiEntry } from "../../server/protocol.js";
 
 /** Turn Wiki links into safe Markdown URLs outside fenced and inline code. */

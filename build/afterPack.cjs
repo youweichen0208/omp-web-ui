@@ -29,6 +29,12 @@ module.exports = async function afterPack(context) {
 	if (fs.existsSync(path.join(packagedRoot, "extensions")) || manifest.pi?.extensions?.length) {
 		throw new Error("Desktop must not bundle application extensions; load user Pi extensions instead");
 	}
+	for (const asset of ["bridge.py", "fixtures.py", "native_code.py"]) {
+		const file = path.join(packagedRoot, "dist/server/document-conversion/python", asset);
+		if (!fs.existsSync(file) || !fs.statSync(file).isFile() || !fs.statSync(file).size) {
+			throw new Error(`Packaged document conversion worker is missing: ${asset}; run build:server before packaging`);
+		}
+	}
 	const expectedSdk = manifest.dependencies?.["@earendil-works/pi-coding-agent"];
 	const actualSdk = JSON.parse(fs.readFileSync(path.join(sdkRoot, "package.json"), "utf8")).version;
 	if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(expectedSdk ?? "") || actualSdk !== expectedSdk) {
