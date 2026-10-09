@@ -11684,3 +11684,7 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 	.node-workspace-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, .7fr) minmax(300px, 1fr); overflow: auto; }
 	.node-workspace-split > .node-agent-container { border-left: 0; border-top: 1px solid var(--border); }
 }
+
+.wiki-model-controls .chip > span:not(.update-dot) { display: inline; }
+.wiki-model-controls .thinking-control { flex: none; }
+.wiki-model-controls .thinking-control .dd-menu { left: auto; right: 0; }

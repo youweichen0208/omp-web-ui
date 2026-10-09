@@ -109,6 +109,19 @@ jobs:
           ELECTRON_RUN_AS_NODE=1 "$executable" tests/provider-auth-test.mjs "$PWD/$root"
           codesign --verify --deep --strict "$app"
 
+      - name: Verify packaged extension worker and rendering
+        run: |
+          executable="release/mac-arm64/pi.app/Contents/MacOS/pi"
+          ELECTRON_RUN_AS_NODE=1 "$executable" tests/extensions-worker-test.mjs release/mac-arm64/pi.app/Contents/Resources/app
+          node tests/windows-rendering-test.mjs "$executable"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-rendering-macos
+          path: tests/scratch/rendering
+          if-no-files-found: warn
+
       - name: Verify DMG installation and previous-version data
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -196,6 +209,23 @@ jobs:
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $portable = Get-ChildItem release/*win-x64.exe | Select-Object -First 1
           ./tests/portable-relaunch-test.ps1 -PortableExe $portable.FullName
+
+      - name: Verify packaged extension worker and rendering
+        shell: pwsh
+        run: |
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          & ./release/win-unpacked/pi.exe tests/extensions-worker-test.mjs release/win-unpacked/resources/app
+          if ($LASTEXITCODE -ne 0) { throw "Packaged extension worker failed" }
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
+          node tests/windows-rendering-test.mjs release/win-unpacked/pi.exe
+          if ($LASTEXITCODE -ne 0) { throw "Packaged rendering failed" }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-rendering-windows
+          path: tests/scratch/rendering
+          if-no-files-found: warn
 
       - name: Verify NSIS installation and previous-version data
         shell: pwsh

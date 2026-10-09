@@ -25,7 +25,7 @@ writeFileSync(join(packagePath, 'index.js'), 'export default () => {};');
 writeFileSync(join(prefix, 'package.json'), JSON.stringify({ private: true, dependencies: { 'pi-worker-fixture': '1.0.0' } }));
 writeFileSync(join(agentDir, 'settings.json'), JSON.stringify({ packages: ['npm:pi-worker-fixture'] }));
 async function run(input) {
-	const child = fork(join(appRoot, 'dist/server/extensions-worker.js'), ['--extensions-worker'], { execArgv: input.action === 'mutate' ? ['--import', preload] : [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...process.env, npm_config_offline: 'true', npm_config_audit: 'false', npm_config_fund: 'false' } });
+	const child = fork(join(appRoot, 'dist/server/extensions-worker.js'), ['--extensions-worker'], { execArgv: input.action === 'mutate' ? ['--import', pathToFileURL(preload).href] : [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...process.env, npm_config_offline: 'true', npm_config_audit: 'false', npm_config_fund: 'false' } });
 	let result, error, logs = '';
 	child.stdout.on('data', value => logs += value); child.stderr.on('data', value => logs += value);
 	child.on('message', message => { if (message.progress) logs += message.progress + '\n'; if (message.state) result = message.state; if (message.error) error = message.error; });

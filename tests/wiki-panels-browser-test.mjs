@@ -96,6 +96,7 @@ try {
 		await page.locator('.wiki-chat-panel > header button').last().click();
 		assert(await toggle.evaluate(button => { const r = button.getBoundingClientRect(); return button.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), `reopen reachable at ${width}px`);
 		await toggle.click({timeout: 2000}); await page.locator('.wiki-chat-panel').waitFor();
+		assert(await page.locator('.wiki-model-controls .chip-model').isVisible(), `model name remains visible at ${width}px`);
 		assert(await page.locator('.wiki-chat-panel').evaluate(panel => panel.getBoundingClientRect().right <= innerWidth && panel.getBoundingClientRect().left >= 0));
 	}
 	mkdirSync('tests/scratch', {recursive:true});
