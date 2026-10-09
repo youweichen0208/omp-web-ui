@@ -31,6 +31,8 @@ try {
 	await page.keyboard.type('/code');
 	await page.getByRole('option', { name: '代码块', exact: true }).waitFor();
 	await page.keyboard.press('Enter');
+	await page.locator('.wiki-language-picker [role=option]').first().click();
+	assert.equal(await editor.locator('pre > code').count(), 2, 'language selection inserts a separate code block');
 	await editor.locator('select[data-code-language]').last().selectOption('java');
 	await page.keyboard.type('public class Demo {');
 	check(await editor.locator('pre').last().locator('code').evaluate(code => {
@@ -61,8 +63,9 @@ try {
 	await page.evaluate(() => document.execCommand('redo'));
 	check(await code.innerHTML() === edited, 'native redo restores highlighted code');
 	check(await code.evaluate(code => [...(CSS.highlights.get('rich-code-keyword') ?? [])].some(range => code.contains(range.startContainer) && range.toString() === 'return')), 'highlight offsets survive blank lines and redo');
-	await page.locator('.wiki-toolbar-actions').getByRole('button', { name: '编辑源码', exact: true }).click();
-	const source = await page.locator('.fp-editor').inputValue();
+	await page.keyboard.press('Meta+s');
+	await page.locator('.wiki-save-status.saved').waitFor();
+	const source = readFileSync(join(base, 'note.md'), 'utf8');
 	check(source.includes('public class Demo {\nx\n\nreturn 1;'), 'saved Markdown retains exactly one newline');
 	await page.keyboard.press('Meta+s');
 	for (let i = 0; i < 50 && readFileSync(join(base, 'note.md'), 'utf8') !== source; i++) await new Promise(r => setTimeout(r, 100));
