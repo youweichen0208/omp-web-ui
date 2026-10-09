@@ -63,6 +63,7 @@ const ALL = [
 	"provider-auth-test",
 	"model-config-preservation-test",
 	"node-workbench-test",
+	"node-agent-test",
 	"plugin-settings-test",
 	"plugin-test",
 	"plugin-update-test",

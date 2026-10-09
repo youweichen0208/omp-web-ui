@@ -57,6 +57,7 @@ export interface ControlStatus {
 /** Start the control socket; returns a stop function. */
 export function startControlServer(opts: {
 	service: AgentService;
+	additionalActiveConversations?: () => number;
 	dataDir: string;
 	port: number;
 }): () => void {
@@ -115,6 +116,7 @@ export function startControlServer(opts: {
 				switch (req.cmd) {
 					case "status":
 						resp = { ok: true, ...service.serviceStatus() };
+						resp.activeConversations = (resp.activeConversations ?? 0) + (opts.additionalActiveConversations?.() ?? 0);
 						break;
 					case "quiesce":
 						service.quiesce();

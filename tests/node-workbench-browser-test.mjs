@@ -15,7 +15,7 @@ const dataDir = mkdtempSync(join(tmpdir(), "pi-node-browser-"));
 const port = 8946, sshPort = 22946;
 const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs1", format: "pem" });
 const mock = await startMockSsh(root, sshPort, [ssh2.utils.parseKey(privateKey)]);
-const server = spawn(process.execPath, [join(root, "dist/server/index.js")], { cwd: root, env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: dataDir, PI_WEB_CWD: root }, stdio: "ignore" });
+const server = spawn(process.execPath, [join(root, "dist/server/index.js")], { cwd: root, env: { ...process.env, PORT: String(port), PI_WEB_DATA_DIR: dataDir, PI_WEB_CWD: root, PI_CODING_AGENT_DIR: join(dataDir, "agent") }, stdio: "ignore" });
 let browser;
 try {
 	for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
@@ -24,6 +24,7 @@ try {
 	const prompts = [];
 	await page.routeWebSocket("**/ws", (socket) => {
 		const upstream = socket.connectToServer();
+		upstream.onMessage(raw => { const message = JSON.parse(String(raw)); if (message.type === "snapshot" || message.type === "snapshot_delta") message.state.piConfigured = true; socket.send(JSON.stringify(message)); });
 		socket.onMessage((raw) => {
 			const message = JSON.parse(String(raw));
 			// Hold prompts locally: exercise latency and failures without spending model tokens.
@@ -64,11 +65,12 @@ try {
 	await form.getByRole("button", { name: "保存" }).click();
 	await page.locator(".node-sidebar section", { hasText: "开发" }).waitFor();
 	await page.locator(".node-item", { hasText: "alpha" }).locator("button").first().click();
-	await page.getByRole("button", { name: "打开终端", exact: true }).click();
+	await page.getByRole("button", { name: "打开工作台", exact: true }).click();
 	await page.locator(".node-main-head em", { hasText: "已连接" }).waitFor({ timeout: 10000 });
 
-	await page.locator(".node-tabs .active").waitFor();
-	assert(await page.locator(".node-agent").count() === 0, "custom node agent still visible");
+	await page.locator(".node-tabs .active").waitFor({ state: "attached" });
+	assert(await page.locator(".node-agent").count() === 1, "remote agent workbench missing");
+	await page.getByRole("button", { name: "终端与文件", exact: true }).click();
 	assert(prompts.length === 0, "opening nodes created an agent prompt");
 
 	await page.locator(".node-xterm").first().click();
@@ -91,7 +93,7 @@ try {
 	await second.getByRole("button", { name: "保存" }).click();
 	await page.locator(".node-item", { hasText: "beta" }).locator("button").first().click();
 	assert(await page.locator(".node-file-editor:visible").count() === 0, "file draft leaked to another node");
-	await page.getByRole("button", { name: "打开终端", exact: true }).click();
+	await page.getByRole("button", { name: "打开工作台", exact: true }).click();
 	await page.locator(".node-main-head em", { hasText: "已连接" }).waitFor({ timeout: 10000 });
 
 	await page.locator(".node-xterm:visible").click();
@@ -116,7 +118,7 @@ try {
 	await page.locator(".node-modal").getByRole("button", { name: "同步并保持更新" }).click();
 	await page.locator(".node-item", { hasText: "imported" }).getByRole("button").first().click();
 	await page.screenshot({ path: join(root, "tests/scratch/node-details.png") });
-	await page.getByRole("button", { name: "打开终端", exact: true }).click();
+	await page.getByRole("button", { name: "打开工作台", exact: true }).click();
 	await page.locator(".node-modal").getByRole("combobox").selectOption("key");
 	const importedKeyPath = join(dataDir, "imported_id_rsa"); writeFileSync(importedKeyPath, privateKey, { mode: 0o600 });
 	await page.locator(".node-modal").getByLabel("本机私钥路径").fill(importedKeyPath);
@@ -129,7 +131,7 @@ try {
 	writeFileSync(join(sourceDir, "public-key.xsh"), sourceText.replace("Method=0", "Method=1\nUserKey=xshell-key"));
 	const keyPath = join(dataDir, "id_rsa"); writeFileSync(keyPath, privateKey, { mode: 0o600 });
 	await page.locator(".node-item", { hasText: "public-key" }).getByRole("button").first().click({ timeout: 10000 });
-	await page.getByRole("button", { name: "打开终端", exact: true }).click();
+	await page.getByRole("button", { name: "打开工作台", exact: true }).click();
 	await page.locator(".node-modal").getByLabel("本机私钥路径").fill(keyPath);
 	assert(!(await page.locator(".node-modal input[type=password]").evaluate((input) => input.required)), "key passphrase must be optional");
 	await page.locator(".node-modal").getByRole("button", { name: "测试并保存" }).click();

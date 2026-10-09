@@ -608,7 +608,7 @@ wss.on("connection", (ws) => {
 			pending.push(msg);
 			return;
 		}
-		if (cs.switchingWorkspace && msg.type !== "set_cwd" && msg.type !== "get_state") {
+		if (cs.switchingWorkspace && msg.type !== "set_cwd" && msg.type !== "get_state" && msg.type !== "node_request") {
 			if (msg.type === "prompt" && msg.requestId) send({ type: "prompt_result", requestId: msg.requestId, ok: false });
 			if (msg.type === "read_file" || msg.type === "write_file") send({
 				type: "file_result", operation: msg.type === "read_file" ? "read" : "write",
@@ -619,6 +619,10 @@ wss.on("connection", (ws) => {
 		}
 		switch (msg.type) {
 			case "node_request":
+				if (service.quiesceInfo().quiesced && ["agent_start", "agent_prompt", "agent_new", "agent_model"].includes(msg.action)) {
+					send({ type: "node_event", event: "failure", requestId: msg.requestId, nodeId: msg.nodeId, conversationId: msg.conversationId, data: { action: msg.action, message: "服务暂停接收新操作。" } });
+					break;
+				}
 				void nodeWorkbench.handle(clientId, msg);
 				break;
 			case "prompt":
@@ -740,7 +744,7 @@ wss.on("connection", (ws) => {
 				void cs.checkComponentUpdates(msg.requestId);
 				break;
 			case "update_component":
-				if (service.quiesceInfo().quiesced || service.activeConversations() || service.pendingMessages()) {
+				if (service.quiesceInfo().quiesced || service.activeConversations() || nodeWorkbench.activeAgents() || service.pendingMessages()) {
 					send({ type: "component_updates", requestId: msg.requestId, cwd: cs.cwd, phase: "error", items: [], error: "请等待所有任务结束后再更新扩展" });
 				} else {
 					service.quiesce();
@@ -1010,7 +1014,7 @@ scheduleUploadCleanup();
 
 // Local control socket (status / quiesce / unquiesce) — same data dir the
 // CLI uses, so `pi-harness server status|quiesce|unquiesce` just works.
-const stopControl = startControlServer({ service, dataDir: DATA_DIR, port: PORT });
+const stopControl = startControlServer({ service, dataDir: DATA_DIR, port: PORT, additionalActiveConversations: () => nodeWorkbench.activeAgents() });
 
 let shuttingDown = false;
 async function shutdown(): Promise<void> {

@@ -1409,3 +1409,23 @@ export interface SystemPromptState {
 	tools: {name:string;custom:boolean;path?:string}[]; files: PromptFileView[]; opaque: boolean; forced: boolean;
 	custom: boolean; trusted: boolean; pending: boolean; reloadError?: string; busy: boolean;
 }
+
+/** One native Pi process on an SSH node, isolated from local conversations. */
+export interface NodeAgentState {
+	id: string;
+	cwd: string;
+	phase: "starting" | "ready" | "closed";
+	running: boolean;
+	sessionId?: string;
+	sessionFile?: string;
+	model?: { id: string; provider: string; name: string };
+	models: { id: string; provider: string; name: string }[];
+	thinkingLevel?: string;
+	messages: UiMessage[];
+	streamingMessage?: UiMessage;
+	tools: { id: string; name: string; running: boolean; isError: boolean }[];
+	dialogs: { id: string; method: "select" | "confirm" | "input" | "editor"; title: string; message?: string; options?: string[]; prefill?: string }[];
+	notice?: string;
+	error?: string;
+	editorText?: { id: string; text: string };
+}

@@ -1,9 +1,10 @@
+import { NodeAgentPanel } from "./NodeAgentPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { randomUuid } from "../uuid";
 import { useT } from "../i18n";
 import { RemoteTerminal } from "./node-terminal";
 
-import type { NodeProfile, NodeSource,   ClientMessage, ServerMessage } from "../types";
+import type { NodeAgentState, NodeProfile, NodeSource,   ClientMessage, ServerMessage } from "../types";
 
 type Event = Extract<ServerMessage, { type: "node_event" }>;
 type Node = NodeProfile;
@@ -21,6 +22,10 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 	const [search, setSearch] = useState("");
 	const [workspace, setWorkspace] = useState(false);
 	const [showFiles, setShowFiles] = useState(false);
+	const [workbenchMode, setWorkbenchMode] = useState<"agent" | "terminal">("agent");
+	const [agentDrafts, setAgentDrafts] = useState<Record<string, string>>({});
+	const consumedAgentEditors = useRef<Record<string, string>>({});
+	const [agents, setAgents] = useState<Record<string, NodeAgentState>>({});
 
 	const [credentialAuth, setCredentialAuth] = useState<"password" | "key">("password");
 	const [credentialKeyPath, setCredentialKeyPath] = useState("");
@@ -75,6 +80,12 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 			if (msg.event === "state") {
 				const list = (msg.data?.nodes ?? []) as Node[];
 				setNodes(list);
+				setAgents(before => {
+					const next: Record<string, NodeAgentState> = Object.fromEntries(Object.entries(before).map(([key, state]) => [key, { ...state, phase: "closed" as const, running: false, dialogs: [] }]));
+					for (const connection of (msg.data?.connections ?? []) as { nodeId: string; agent?: NodeAgentState }[]) if (connection.agent) next[connection.nodeId] = connection.agent;
+					for (const key of Object.keys(next)) if (!list.some(node => node.id === key)) delete next[key];
+					return next;
+				});
 				setTimings(Object.fromEntries(((msg.data?.connections ?? []) as { nodeId: string; connectedAt?: number; latencyMs?: number }[]).map((c) => [c.nodeId, c])));
 				setSources((msg.data?.sources ?? []) as NodeSource[]);
 
@@ -92,6 +103,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 				});
 				return;
 			}
+			if (msg.event === "agent_state" && msg.data?.agent) { const agent = msg.data.agent as NodeAgentState; setAgents(all => ({ ...all, [id]: agent })); return; }
 			if (msg.event === "terminal_output") {
 				const key = `${id}:${msg.terminalId}`;
 				terminalHistory.current.set(key, ((terminalHistory.current.get(key) ?? "") + String(msg.data?.text ?? "")).slice(-65536));
@@ -107,6 +119,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 				return;
 			}
 
+			if (msg.event === "failure" && String(msg.data?.action ?? "").startsWith("agent_")) return;
 			if (msg.event === "failure") { if (msg.requestId === pendingWrite.current) pendingWrite.current = null; const text = String(msg.data?.message ?? "");
 				if (!(msg.requestId && awaitingTrust.current.delete(msg.requestId))) { setError(text); setTesting(false); if (msg.data?.action === "credential_test") credentialAttempt.current = null; opening.current.delete(id); }
 				return; }
@@ -156,7 +169,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 		</section>)}
 		<div className="node-actions"><button onClick={() => setSourceDraft({ kind: "xshell", path: "" })}>{t("nodeAddSource")}</button><button onClick={() => request("source_detect")}>{t("nodeDetect")}</button>{addButton}{importButton}</div>
 	</div>;
-	return <div className={`node-workbench ${workspace && node ? "node-workspace-open" : ""}`}>
+	return <div className={`node-workbench ${workbenchMode === "agent" ? "node-agent-open" : ""} ${workspace && node ? "node-workspace-open" : ""}`}>
 		{error && <div className="node-global-message node-error" role="alert">{error}<button aria-label={t("close")} onClick={() => setError("")}>×</button></div>}
 		{notice && <div className="node-global-message node-notice" role="status">{notice}<button aria-label={t("close")} onClick={() => setNotice("")}>×</button></div>}
 		{!workspace && <aside className="node-sidebar"><header><strong>{t("nodeWorkbench")}</strong>{addButton}</header><input aria-label={t("nodeSearch")} placeholder={t("nodeSearch")} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -165,7 +178,7 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 			<footer><button onClick={() => setSourceView(true)}>{t("nodeSources")}</button>{importButton}<details><summary>⋯</summary><button onClick={() => request("import_legacy")}>{t("nodeImportLegacy")}</button><button onClick={() => { const clean = nodes.map(({ hasSecret, fingerprint, sourceId, sourceKey, sourceMissing, ...rest }) => rest); const url = URL.createObjectURL(new Blob([JSON.stringify({ nodes: clean }, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "pi-nodes.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>{t("nodeExport")}</button></details></footer>
 		</aside>}
 		{!workspace && (sourceView || !node ? sourceCards : <section className="node-detail">
-			<header className="node-detail-head"><div><div className="node-eyebrow">{node.group}</div><h2>{node.name}</h2><code>{node.username}@{node.host}:{node.port}</code></div><div className="node-actions">{source && <button onClick={() => request("source_reveal", undefined, { id: source.id })}>{t("nodeRevealSource")}</button>}{!node.sourceId && <button onClick={() => { setDraft(node); setSecret(""); }}>{t("nodeEdit")}</button>}<button className="node-primary" disabled={!!node.unsupported?.some((reason) => reason !== "key") || node.sourceMissing || connections[node.id] === "connecting"} onClick={() => openNode(node)}>{t("nodeOpenTerminal")}</button></div></header>
+			<header className="node-detail-head"><div><div className="node-eyebrow">{node.group}</div><h2>{node.name}</h2><code>{node.username}@{node.host}:{node.port}</code></div><div className="node-actions">{source && <button onClick={() => request("source_reveal", undefined, { id: source.id })}>{t("nodeRevealSource")}</button>}{!node.sourceId && <button onClick={() => { setDraft(node); setSecret(""); }}>{t("nodeEdit")}</button>}<button className="node-primary" disabled={!!node.unsupported?.some((reason) => reason !== "key") || node.sourceMissing || connections[node.id] === "connecting"} onClick={() => openNode(node)}>{t("nodeOpenWorkbench")}</button></div></header>
 			{node.sourceMissing && <p className="node-warning">{t("nodeSourceMissing")}</p>}{!!node.unsupported?.length && <p className="node-warning">{t("nodeUnsupported")}: {node.unsupported.join(", ")}</p>}
 			{<div className={node.hasSecret ? "node-credential-note" : "node-warning"}><div><strong>{t(node.auth === "agent" ? "nodeAgentAuth" : node.auth === "password" ? "nodePassword" : "nodePassphrase")}{!node.hasSecret && node.auth === "password" && ` · ${t("nodeMissingSecret")}`}</strong><p>{t("nodeCredentialHint")}</p></div><button onClick={() => { setCredentialAuth(node.auth === "key" ? "key" : "password"); setCredentialKeyPath(node.localKeyPath || node.keyPath || ""); setCredential(node.id); setSecret(""); setSameGroup(false); }}>{t("nodeFillSecret")}</button></div>}
 			<dl><dt>{t("nodeAuth")}</dt><dd>{t(node.auth === "key" ? "nodeKey" : node.auth === "agent" ? "nodeAgentAuth" : "nodePassword")}</dd>{(node.localKeyPath || node.keyPath) && <><dt>{t("nodeKeyPath")}</dt><dd><code>{node.localKeyPath || node.keyPath}</code></dd></>}{source && <><dt>{t("nodeSourceLocation")}</dt><dd><code>{source.path}{source.kind === "xshell" ? `/${node.sourceKey}` : ` · ${node.sourceKey}`}</code><small>{t("nodeSourceReadonly")}</small><button title={t("nodeSourceOpenHint")} onClick={() => void navigator.clipboard.writeText(source.kind === "xshell" ? `${source.path}/${node.sourceKey}` : source.path).then(() => setNotice(t("nodeCopied"))).catch((e) => setError(String(e)))}>{t("nodeCopy")}</button></dd></>}<dt>{t("nodeLastConnected")}</dt><dd>{node.lastConnected ? new Date(node.lastConnected).toLocaleString() : t("nodeNever")}</dd><dt>{t("nodeDefaultDir")}</dt><dd><code>{node.defaultDir}</code></dd></dl>
@@ -173,11 +186,15 @@ export function NodeWorkbench({ send, active }: { send: (msg: ClientMessage) => 
 		</section>)}
 		{workspace && node && <div className="node-connected"><nav className="node-connection-tabs"><button onClick={() => setWorkspace(false)}>{t("nodeBackList")}</button>{nodes.filter((n) => n.id === selected || connections[n.id] || tabs[n.id]?.length).map((n) => <button key={n.id} className={n.id === selected ? "active" : ""} onClick={() => setSelected(n.id)}><span className={`node-dot ${connections[n.id] ?? "offline"}`} />{n.name}</button>)}<button onClick={() => { setWorkspace(false); setSourceView(true); }} aria-label={t("nodeAdd")}>＋</button>{timings[selected]?.connectedAt && <span className="node-connection-timing">{t("nodeConnectionTiming", { ms: timings[selected].latencyMs ?? 0, duration: `${Math.floor(Math.max(0, now - timings[selected].connectedAt!) / 60000)}:${String(Math.floor(Math.max(0, now - timings[selected].connectedAt!) / 1000) % 60).padStart(2, "0")}` })}</span>}</nav>
 			<div className="node-connected-body"><section className="node-main"><header className="node-main-head"><strong>{node.name}</strong><span>{node.username}@{node.host}:{node.port}</span><em>{t(connections[selected] === "connected" ? "nodeConnected" : "nodeDisconnected")}</em><button onClick={() => connections[selected] === "connected" ? request("disconnect", selected) : openNode(node)}>{t(connections[selected] === "connected" ? "nodeDisconnect" : "nodeConnect")}</button></header>
+			<nav className="node-workbench-modes" aria-label={t("nodeWorkbench")}><button className={workbenchMode === "agent" ? "active" : ""} onClick={() => setWorkbenchMode("agent")}>{t("nodeAgentTitle")}</button><button className={workbenchMode === "terminal" ? "active" : ""} onClick={() => setWorkbenchMode("terminal")}>{t("nodeAgentTerminal")}</button></nav>
+			<div className="node-agent-container" hidden={workbenchMode !== "agent"}><NodeAgentPanel key={selected} nodeId={selected} defaultDir={node.defaultDir} connected={connections[selected] === "connected"} agent={agents[selected]} request={request} draft={agentDrafts[selected] ?? ""} setDraft={value => setAgentDrafts(all => ({ ...all, [selected]: typeof value === "function" ? value(all[selected] ?? "") : value }))} consumedEditors={consumedAgentEditors.current} /></div>
+			<div className="node-manual-workbench" hidden={workbenchMode !== "terminal"}>
 			<div className="node-tabs">{currentTabs.map((tab, i) => <div key={tab.id} className={activeTab?.id === tab.id ? "active" : ""}><button onClick={() => setActiveTabs((a) => ({ ...a, [selected]: tab.id }))}>{t("nodeTab", { n: i + 1 })}{tab.closed ? ` · ${t("nodeTabClosed")}` : tab.busy ? ` · ${t("nodeTabBusy")}` : ""}</button><button aria-label={t("nodeCloseTab")} onClick={() => { if (!tab.closed) request("terminal_close", selected, {}, tab.id, tab.conversationId); terminalHistory.current.delete(`${selected}:${tab.id}`); setTabs((all) => ({ ...all, [selected]: (all[selected] ?? []).filter((x) => x.id !== tab.id) })); }}>×</button></div>)}<button disabled={connections[selected] !== "connected"} onClick={() => request("terminal_open", selected, {}, randomUuid())}>＋</button></div>
-			<div className="node-terminals">{currentTabs.map((tab) => <RemoteTerminal key={`${selected}:${tab.id}`} nodeId={selected} tab={tab} active={active && activeTab?.id === tab.id} send={send} initialOutput={terminalHistory.current.get(`${selected}:${tab.id}`) ?? tab.output}  />)}{!currentTabs.length && <div className="node-empty">{t("nodeOpenHint")}</div>}</div>
+			<div className="node-terminals">{currentTabs.map((tab) => <RemoteTerminal key={`${selected}:${tab.id}`} nodeId={selected} tab={tab} active={active && workbenchMode === "terminal" && activeTab?.id === tab.id} send={send} initialOutput={terminalHistory.current.get(`${selected}:${tab.id}`) ?? tab.output}  />)}{!currentTabs.length && <div className="node-empty">{t("nodeOpenHint")}</div>}</div>
 			<div className="node-terminal-footer"><span>{t("nodeTerminalHint")}</span><button onClick={() => setShowFiles(!showFiles)}>{t("nodeShowFiles")}</button></div>
 			{showFiles && <><div className="node-filebar"><input value={path} onChange={(e) => setPath(e.target.value)} aria-label={t("nodeDefaultDir")} /><button disabled={connections[selected] !== "connected"} onClick={() => listFiles(path)}>{t("nodeBrowse")}</button></div><div className="node-files">{entries.map((entry) => { const target = `${path.replace(/\/$/, "")}/${entry.name}`; return <button key={entry.name} onClick={() => entry.type === "dir" ? (setPath(target), listFiles(target)) : openFile(target)}>{entry.type === "dir" ? "▸" : "·"} {entry.name}</button>; })}</div></>}
 			{file?.nodeId === selected && <div className="node-file-editor"><span>{file.path}</span><button onClick={saveFile}>{t("save")}</button><button onClick={() => setFile(null)}>{t("close")}</button><textarea value={file.text} onChange={(e) => setFile({ ...file, text: e.target.value })} /></div>}
+			</div>
 		</section></div>
 		</div>}
 		{sourceDraft && <div className="node-modal-backdrop"><form className="node-modal" onSubmit={(e) => { e.preventDefault(); request("source_add", undefined, { ...sourceDraft, enabled: true }); }}><h2>{t("nodeAddSource")}</h2><label>{t("nodeSources")}<select value={sourceDraft.kind} onChange={(e) => setSourceDraft({ ...sourceDraft, kind: e.target.value as "xshell" | "ssh" })}><option value="xshell">Xshell 8</option><option value="ssh">SSH config</option></select></label><label>{t("nodeSourcePath")}<input required autoFocus value={sourceDraft.path} onChange={(e) => setSourceDraft({ ...sourceDraft, path: e.target.value })} /></label><div className="node-modal-actions"><button type="button" onClick={() => setSourceDraft(null)}>{t("cancel")}</button><button type="submit">{t("nodeSyncKeep")}</button><button type="button" disabled={!sourceDraft.path.trim()} onClick={() => request("source_add", undefined, { ...sourceDraft, enabled: false })}>{t("nodeImportOnce")}</button></div></form></div>}

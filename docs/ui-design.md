@@ -180,3 +180,7 @@
 | 输出异常 | `tests/protocol-noise-ui-test.mjs`、leaked-thinking / tool-text 单测 |
 | 运行中输入框 | `tests/agent-working-ui-test.mjs` |
 | 右栏 | task-outputs 单测、plan-chat-browser |
+
+## SSH 节点工作台
+
+节点连接后默认显示「Agent 工作台」，旁边保留「终端与文件」页签。Agent 未启动时说明远端依赖和配置位置，允许选择远端工作目录；启动是显式操作。启动后按用户消息、助手回复、可展开的思考与工具结果显示对话。底部提供远端模型、输入、发送，以及运行时的排队/纠正与停止。扩展确认显示在当前节点的输入区上方，原请求等待时仍可回答。关闭 Agent 与 SSH 断开分别保留各自入口，错误保留输入并显示原因。窄屏操作换行，正文与参数限制在工作台内滚动。

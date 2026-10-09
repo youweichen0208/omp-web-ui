@@ -1,4 +1,5 @@
 /** Built-in SSH node workbench. All remote operations are scoped by node and client. */
+import { NodeAgent, nodeAgentCommand } from "./node-agent.js";
 import { execFile } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
@@ -17,7 +18,7 @@ function unsupportedOptions(node: Node): string[] {
 	return (node.unsupported ?? []).filter((reason) => reason !== "key" || ((node.localAuth ?? node.auth) === "key" && !node.localKeyPath));
 }
 type Terminal = { id: string; conversationId: string; stream: ClientChannel; busy: boolean; buffer: string; pending?: { marker: string; output: string; resolve: (value: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } };
-type Connection = { client: Client; nodeId: string; clientId: string; terminals: Map<string, Terminal>; sftp?: SFTPWrapper; ready: boolean; startedAt: number; connectedAt?: number };
+type Connection = { client: Client; nodeId: string; clientId: string; terminals: Map<string, Terminal>; agent?: NodeAgent; agentStarting?: boolean; sftp?: SFTPWrapper; ready: boolean; startedAt: number; connectedAt?: number };
 
 const MAX_OUTPUT = 64 * 1024;
 const MAX_FILE = 512 * 1024;
@@ -66,8 +67,9 @@ export class NodeWorkbench {
 		const msg: ServerMessage = { type: "node_event", event, data, nodeId: ids.nodeId, terminalId: ids.terminalId, conversationId: ids.conversationId, requestId: ids.requestId };
 		for (const sink of this.sinks.get(clientId) ?? []) sink(msg);
 	}
+	activeAgents(): number { return [...this.connections.values()].filter(connection => connection.agentStarting || connection.agent?.busy).length; }
 	private state(clientId: string): Record<string, unknown> {
-		return { sources: this.sources,   nodes: this.nodes.map((node) => ({ ...node, auth: node.localAuth ?? node.auth, unsupported: unsupportedOptions(node), hasSecret: this.secrets.has(`node:${node.id}:secret`) || this.transientSecrets.has(identity(clientId, node.id)), fingerprint: node.fingerprint })), connections: [...this.connections.values()].filter((c) => c.clientId === clientId).map((c) => ({ nodeId: c.nodeId, connectedAt: c.connectedAt, latencyMs: c.connectedAt ? c.connectedAt - c.startedAt : undefined, status: c.ready ? "connected" : "connecting", terminals: [...c.terminals.values()].map((t) => ({ id: t.id, conversationId: t.conversationId, busy: t.busy, output: t.buffer })) })) };
+		return { sources: this.sources,   nodes: this.nodes.map((node) => ({ ...node, auth: node.localAuth ?? node.auth, unsupported: unsupportedOptions(node), hasSecret: this.secrets.has(`node:${node.id}:secret`) || this.transientSecrets.has(identity(clientId, node.id)), fingerprint: node.fingerprint })), connections: [...this.connections.values()].filter((c) => c.clientId === clientId).map((c) => ({ nodeId: c.nodeId, connectedAt: c.connectedAt, latencyMs: c.connectedAt ? c.connectedAt - c.startedAt : undefined, status: c.ready ? "connected" : "connecting", agent: c.agent?.snapshot(), terminals: [...c.terminals.values()].map((t) => ({ id: t.id, conversationId: t.conversationId, busy: t.busy, output: t.buffer })) })) };
 	}
 	attach(clientId: string, sink: Sink): () => void {
 		let set = this.sinks.get(clientId);
@@ -87,6 +89,28 @@ export class NodeWorkbench {
 		if (!t || t.conversationId !== req.conversationId) throw new Error("终端身份已过期");
 		return t;
 	}
+	private agent(clientId: string, req: Request): NodeAgent {
+		const agent = this.connection(clientId, req.nodeId).agent;
+		if (!agent || agent.id !== req.conversationId) throw new Error("远端 Agent 会话身份已过期");
+		return agent;
+	}
+	private async startAgent(clientId: string, req: Request) {
+		const connection = this.connection(clientId, req.nodeId);
+		if (connection.agentStarting) throw new Error("远端 Agent 正在启动");
+		if (connection.agent && connection.agent.snapshot().phase !== "closed") return connection.agent.snapshot();
+		const cwd = safePath(req.payload?.cwd ?? this.node(req.nodeId).defaultDir);
+		connection.agentStarting = true;
+		try {
+			const stream = await new Promise<ClientChannel>((resolve, reject) => connection.client.exec(nodeAgentCommand(cwd), (error, stream) => error ? reject(error) : resolve(stream)));
+			try { this.ensureCurrent(connection); } catch (error) { stream.signal("TERM"); stream.end(); throw error; }
+			const agent = new NodeAgent(stream, cwd, state => {
+				if (connection.agent?.id === state.id && this.connections.get(identity(clientId, connection.nodeId)) === connection) this.emit(clientId, "agent_state", { agent: state }, { nodeId: connection.nodeId, conversationId: state.id });
+			});
+			connection.agent = agent; this.broadcastState();
+			await agent.start(); return agent.snapshot();
+		} finally { connection.agentStarting = false; }
+	}
+
 	async handle(clientId: string, req: Request): Promise<void> {
 		try {
 			const p = req.payload ?? {};
@@ -218,6 +242,13 @@ export class NodeWorkbench {
 					node.fingerprint = fp; this.save(); await this.connect(clientId, node, undefined, req); break;
 				}
 				case "disconnect": this.disconnect(clientId, req.nodeId); break;
+				case "agent_start": result = { agent: await this.startAgent(clientId, req) }; break;
+				case "agent_prompt": await this.agent(clientId, req).prompt(field(p.text, "消息", 200000), p.queue === "steer" || p.queue === "followUp" ? p.queue : undefined); break;
+				case "agent_abort": await this.agent(clientId, req).abort(); break;
+				case "agent_new": await this.agent(clientId, req).newSession(); break;
+				case "agent_model": await this.agent(clientId, req).model(field(p.provider, "服务商"), field(p.modelId, "模型")); break;
+				case "agent_close": this.agent(clientId, req).close(); break;
+				case "agent_dialog": this.agent(clientId, req).dialog(field(p.id, "对话框"), { cancelled: p.cancelled === true, confirmed: p.confirmed === true, value: typeof p.value === "string" ? p.value : undefined }); break;
 				case "terminal_open": result = await this.openTerminal(clientId, req); break;
 
 				case "terminal_input": {
@@ -370,7 +401,7 @@ export class NodeWorkbench {
 
 		this.connections.delete(identity(c.clientId, c.nodeId));
 		for (const t of c.terminals.values()) { t.pending?.reject(new Error("SSH 已断开")); this.emit(c.clientId, "terminal_exit", {}, { nodeId: c.nodeId, terminalId: t.id, conversationId: t.conversationId }); }
-		c.terminals.clear(); c.client.end(); this.broadcastState();
+		c.agent?.close(); c.terminals.clear(); c.client.end(); this.broadcastState();
 	}
 	private disconnect(clientId: string, nodeId: string | undefined): void { const c = this.connections.get(identity(clientId, nodeId ?? "")); if (c) this.drop(c); }
 	private async openTerminal(clientId: string, req: Request): Promise<Record<string, unknown>> {
