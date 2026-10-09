@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { useEffect, useState } from "react";
 import { FiCpu, FiRefreshCw, FiX } from "react-icons/fi";
 import type { ClientMessage, ProviderStatus } from "../types";
@@ -104,7 +105,7 @@ export function PiSetupModal({
 
 				{installFailed ? (
 					<div className="setup-failed">
-						<div className="setup-done">{t("installFailed")}</div>
+						<div className="setup-done"><UiIcon name="close" /> {t("installFailed")}</div>
 						<pre className="setup-detail">{installResult.detail}</pre>
 						<div className="setup-actions">
 							<button
@@ -123,7 +124,7 @@ export function PiSetupModal({
 				) : piAgentInstalled || installResult?.ok ? (
 					<div className="setup-key-form">
 						<div className="setup-done">
-							{installResult?.ok ? t("installDone") : t("cliReadyHint")}
+							<UiIcon name="check" /> {installResult?.ok ? t("installDone") : t("cliReadyHint")}
 						</div>
 						<label className="field">
 							<span className="field-label">{t("provider")}</span>

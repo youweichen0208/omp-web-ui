@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { useEffect, useState } from "react";
 import { useI18n, useT } from "../i18n";
 import type { ExtensionCatalog, ExtensionCatalogItem, ExtensionPackage, ExtensionPackageDetails } from "../types";
@@ -35,7 +36,7 @@ export function ExtensionCatalogList({ catalog, packages, working, inspect, upda
 				</div>
 				{open && <div className="ext-catalog-detail">
 					<div><p>{info?.description || item.description}</p>{info ? <div className="ext-resource-counts">{Object.entries(extensionResourceKeys).filter(([key]) => info.resources[key]?.length).map(([key, label]) => <span key={key}>{t(label)} {info.resources[key].length}</span>)}{!Object.values(info.resources).some(values => values.length) && <span>{t("extResourcesUnknown")}</span>}</div> : error ? <p role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>{t("extRetry")}</button></p> : <small role="status">{t("loading")}</small>}</div>
-					<aside><code>npm:{item.name}</code><span>{info?.license || (info ? t("extLicenseUnknown") : "")}</span>{(info?.repository || item.repository) && <a href={info?.repository || item.repository} target="_blank" rel="noreferrer">{t("extViewSource")} ↗</a>}<a href={item.url} target="_blank" rel="noreferrer">{t("extCatalogPage")} ↗</a></aside>
+					<aside><code>npm:{item.name}</code><span>{info?.license || (info ? t("extLicenseUnknown") : "")}</span>{(info?.repository || item.repository) && <a href={info?.repository || item.repository} target="_blank" rel="noreferrer">{t("extViewSource")} <UiIcon name="external" /></a>}<a href={item.url} target="_blank" rel="noreferrer">{t("extCatalogPage")} <UiIcon name="external" /></a></aside>
 				</div>}
 			</article>;
 		})}</div>

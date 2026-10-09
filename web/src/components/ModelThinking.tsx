@@ -206,7 +206,7 @@ export const ModelThinking = memo(function ModelThinking({ state, models, models
 								onManageModels();
 							}}
 						>
-							{t("manageModels")}
+							<UiIcon name="settings" /> {t("manageModels")}
 						</button>
 					</div>
 				</Dropdown>

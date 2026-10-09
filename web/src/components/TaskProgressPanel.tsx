@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { toolTextIncidents } from "../tool-text";
 import { conversationWait } from "../waiting-indicator";
 import { useEffect, useRef, useState } from "react";
@@ -63,7 +64,7 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, str
 								{!!item.blockedBy?.length && <p>{t("taskBlockedBy", { steps: item.blockedBy.join(", ") })}</p>}
 								{planStepArtifacts(task, item).map(({ artifact, messageId }) => <div className="task-artifact-row" key={artifact.toolCallId}>
 									{artifact.path && <button type="button" title={artifact.path} onClick={() => preview(artifact.path!)}>{artifact.path}</button>}
-									<button type="button" title={t("taskJumpToChat")} onClick={() => window.dispatchEvent(new CustomEvent("pi:jump-tool", { detail: { messageId, toolCallId: artifact.toolCallId } }))}>{artifact.path ? "↗" : artifact.label}</button>
+									<button type="button" title={t("taskJumpToChat")} onClick={() => window.dispatchEvent(new CustomEvent("pi:jump-tool", { detail: { messageId, toolCallId: artifact.toolCallId } }))}>{artifact.path ? <UiIcon name="external" /> : artifact.label}</button>
 								</div>)}
 								<button type="button" className="task-step-jump" onClick={() => window.dispatchEvent(new CustomEvent("pi:jump-message", { detail: { messageId: planSource?.id ?? task.sourceMessageId } }))}>{t("taskJumpToChat")} →</button>
 							</div>}

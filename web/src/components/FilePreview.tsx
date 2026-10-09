@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import type { CurrentFileContext, ReadCurrentFile, SaveCurrentFile } from "../current-file";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MutableRefObject } from "react";
@@ -494,7 +495,7 @@ export const FilePreviewContent = memo(function FilePreviewContent({
 				</div>
 				{externalChanged && dirty && <div className="fp-external-banner" role="alert">{t("fileExternalChanged")}<button type="button" onClick={() => guard.current?.(requestContent)}>{t("fileReload")}</button><button type="button" disabled={remoteText === null} onClick={() => setDiffMode("external")}>{t("fileCompare")}</button></div>}
 				{truncated && kind === "text" && !isBinary && (
-					<div className="fp-notice">{t("previewTruncated")}</div>
+					<div className="fp-notice"><UiIcon name="warning" /> {t("previewTruncated")}</div>
 				)}
 
 				{error && <div className="fp-notice" role="alert">{error}

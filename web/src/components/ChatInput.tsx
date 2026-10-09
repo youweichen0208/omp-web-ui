@@ -519,7 +519,7 @@ export const ChatInput = memo(function ChatInput({
 						onClick={(e) => e.stopPropagation()}
 					>
 						<div className="slash-help-head">
-							<span>⚡ {t("slashHelpTitle")}</span>
+							<span><UiIcon name="zap" /> {t("slashHelpTitle")}</span>
 							<button
 								type="button"
 								className="btn"

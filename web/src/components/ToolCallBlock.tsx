@@ -635,7 +635,7 @@ function TerminalCommand({ args, cwd }: { args: string; cwd: string }) {
 			<span className="termline-icon">$</span>
 			<code title={parsed.command}>{displayBashCommand(parsed.command, cwd)}</code>
 			{typeof parsed.timeout === "number" && (
-				<span className="termline-timeout">⏱ {parsed.timeout}s</span>
+				<span className="termline-timeout"><UiIcon name="timer" /> {parsed.timeout}s</span>
 			)}
 		</div>
 	);

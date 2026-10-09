@@ -1007,7 +1007,7 @@ export function App() {
 				{switching && <div className="protocol-banner" role="status">{t("switchingProject")} {switching}</div>}
 				{chat.protocolMismatch && (
 					<div className="protocol-banner">
-						⚠ {t("protocolMismatch")}
+						<UiIcon name="warning" /> {t("protocolMismatch")}
 					</div>
 				)}
 				{view !== "chat" && chat.notices.length > 0 && <div className="notices notices-overlay">

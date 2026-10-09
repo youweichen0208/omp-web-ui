@@ -742,7 +742,7 @@ export const MessageList = memo(function MessageList({ recovery, state, connecte
 				)}
 				{timeline.map((item) => {
 					if (item.kind === "reload") return <ReloadEvent key={`reload-${item.event.requestId}`} event={item.event} />;
-					if (item.kind === "cwd") return <div key={`cwd-${item.event.timestamp}`} className="goal-event cwd-event" role="status"><span aria-hidden="true">↪</span><span>{t("cwdSwitchEvent", { path: item.event.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~") })}</span></div>;
+					if (item.kind === "cwd") return <div key={`cwd-${item.event.timestamp}`} className="goal-event cwd-event" role="status"><UiIcon name="turn" /><span>{t("cwdSwitchEvent", { path: item.event.cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~") })}</span></div>;
 					const { message: m, index: i } = item;
 					if (goalEvents.absorbed.has(m.id)) return null;
 					if (m.origin === "auto-reminder") return <Message key={m.id} message={m} toolResults={toolResults} liveOutputs={EMPTY_LIVE} toolStatuses={toolStatuses} streaming={false} isLast={false} />;
