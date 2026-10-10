@@ -1,3 +1,4 @@
+import { FluidDrawer } from "./components/FluidDrawer";
 import { UiIcon } from "./components/UiIcon";
 import { isLegacyMcpNotice } from "./notices";
 import { ChangesProvider } from "./changes-context";
@@ -181,27 +182,42 @@ function ResizeHandle({
 	onReset?: () => void;
 }) {
 	const t = useT();
+	const cleanup = useRef<() => void>(() => {});
+	useEffect(() => () => cleanup.current(), []);
 	const onPointerDown = useCallback(
 		(e: ReactPointerEvent<HTMLDivElement>) => {
+			if (e.button !== 0) return;
+			cleanup.current();
 			e.preventDefault();
+			const handle = e.currentTarget;
+			handle.setPointerCapture(e.pointerId);
 			const startX = e.clientX;
 			const startW = side === "editor" ? e.currentTarget.nextElementSibling?.getBoundingClientRect().width ?? width : width;
 			const maxWidth = side === "editor" ? Math.max(PANEL_MIN, startW + (e.currentTarget.previousElementSibling?.getBoundingClientRect().width ?? 0) - 180) : PANEL_MAX;
 			let last = startW;
 			const move = (ev: PointerEvent) => {
+				if (ev.pointerId !== e.pointerId) return;
 				// 左侧手柄向右拖变宽，右侧相反
 				const delta = side === "left" ? ev.clientX - startX : startX - ev.clientX;
 				last = Math.min(maxWidth, Math.max(PANEL_MIN, Math.round(startW + delta)));
 				onResize(last);
 			};
-			const up = () => {
+			const up = (event?: PointerEvent) => {
+				if (event && event.pointerId !== e.pointerId) return;
 				window.removeEventListener("pointermove", move);
 				window.removeEventListener("pointerup", up);
+				window.removeEventListener("pointercancel", up);
+				handle.removeEventListener("lostpointercapture", up);
+				if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
 				document.body.classList.remove("panel-resizing");
 				localStorage.setItem(panelWidthKey(side), String(last));
+				cleanup.current = () => {};
 			};
 			window.addEventListener("pointermove", move);
 			window.addEventListener("pointerup", up);
+			window.addEventListener("pointercancel", up);
+			handle.addEventListener("lostpointercapture", up);
+			cleanup.current = up;
 			document.body.classList.add("panel-resizing");
 		},
 		[side, width, onResize],
@@ -210,6 +226,17 @@ function ResizeHandle({
 		<div
 			className={`resize-handle resize-${side === "editor" ? "right" : side}`}
 			title={t("dragToResize")}
+			role="separator" tabIndex={0} aria-orientation="vertical" aria-label={t("dragToResize")}
+			aria-valuenow={width} aria-valuemin={PANEL_MIN}
+			onKeyDown={event => {
+				if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+				event.preventDefault();
+				const current = side === "editor" ? event.currentTarget.nextElementSibling?.getBoundingClientRect().width ?? width : width;
+				const delta = (event.key === "ArrowRight" ? 16 : -16) * (side === "left" ? 1 : -1);
+				const maximum = side === "editor" ? Math.max(PANEL_MIN, current + (event.currentTarget.previousElementSibling?.getBoundingClientRect().width ?? 0) - 180) : PANEL_MAX;
+				const next = Math.max(PANEL_MIN, Math.min(maximum, current + delta));
+				onResize(next); localStorage.setItem(panelWidthKey(side), String(next));
+			}}
 			onPointerDown={onPointerDown}
 			onDoubleClick={() => {
 				if (onReset) { onReset(); return; }
@@ -928,7 +955,7 @@ export function App() {
 					<span><UiIcon name="paperclip" /> {t("dropHereToAttach")}</span>
 				</div>
 			)}
-			{view !== "nodes" && view !== "wiki" && <div
+			{view !== "nodes" && view !== "wiki" && <FluidDrawer side="left" onOpen={() => setDrawer("left")} open={drawer === "left"} overlay={isMobile} label={t("workspaceProjects")} onClose={() => setDrawer(null)}
 				className={`panel-drawer drawer-left ${drawer === "left" ? "open" : ""}`}
 			>
 				<LeftPanel
@@ -949,7 +976,7 @@ export function App() {
 					dirBrowse={chat.dirBrowse}
 					activeConversationId={chat.activeConversationId}
 				/>
-			</div>}
+			</FluidDrawer>}
 			{view !== "nodes" && view !== "wiki" && !isMobile && !leftCollapsed && (
 				<ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />
 			)}
@@ -1086,7 +1113,7 @@ export function App() {
 						{!isMobile && (!isNarrow || !!previewFile) && (!filesCollapsed || !!previewFile) && (
 							<ResizeHandle side={previewFile ? "editor" : "right"} width={previewFile ? 480 : rightWidth} onResize={previewFile ? resizeEditor : resizeRight} onReset={previewFile ? () => { setEditorShare(0.45); localStorage.setItem("pi-harness:editor-share", "0.45"); } : undefined} />
 						)}
-						<div
+						<FluidDrawer side="right" onOpen={() => setDrawer("right")} open={drawer === "right"} overlay={isNarrow && !previewFile} label={t("workspaceFiles")} onClose={() => setDrawer(null)}
 							className={`panel-drawer drawer-right ${filesCollapsed && !previewFile ? "files-collapsed" : ""} ${drawer === "right" ? "open" : ""}`}
 						>
 							<div className="file-list-host" hidden={!!previewFile}>
@@ -1134,7 +1161,7 @@ export function App() {
 									onClose={closePreview}
 								/>
 							)}
-						</div>
+						</FluidDrawer>
 					</div>
 					<div className={`view-pane ${view === "wiki" ? "" : "hidden"}`}>{visited.current.has("wiki") && chat.state && <WikiWorkbench modelControls={<ModelThinking key={chat.activeConversationId} state={wikiSessionReady ? modelState : null} models={chat.models} modelsLoading={chat.modelsLoading} send={message => wikiSessionReady && chat.ready && view === "wiki" && !switching ? send(message) : false} onManageModels={openManageModels} compact segmented />} recovery={conversationState?.recovery} key={chat.state.cwd} cwd={chat.state.cwd} conversationId={chat.activeConversationId} fileRequest={wikiFileRequest?.cwd === chat.state.cwd ? wikiFileRequest : null} messages={wikiConversationMatches ? chat.state.messages : []} streaming={wikiSessionReady && chat.state.isStreaming} live={wikiSessionReady ? chat.state.streamingMessage : null} model={chat.state.model} contextPercent={chat.state.stats.contextUsage.percent} toolStatuses={chat.toolStatuses} active={view === "wiki"} ready={wikiSessionReady} onContentRequested={setWikiContentToken} sessionError={wikiSessionError} writingBlocked={!!switching || chat.state.isStreaming} openDocument={openWikiDocument} thinkingWrap={chat.settings?.thinkingWrap ?? false} connected={chat.ready} silenceNotified={chat.agentSilence?.conversationId === chat.state.conversationId && chat.agentSilence.phase === "silent"} send={send} guard={wikiGuard} />}</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
