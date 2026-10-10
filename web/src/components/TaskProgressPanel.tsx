@@ -1,7 +1,7 @@
 import { UiIcon } from "./UiIcon";
 import { toolTextIncidents } from "../tool-text";
 import { conversationWait } from "../waiting-indicator";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FiChevronRight, FiFile } from "react-icons/fi";
 import type { ServerMessage, TaskProgress, UiMessage } from "../types";
 import { useT } from "../i18n";
@@ -12,7 +12,6 @@ type Silence = Extract<ServerMessage, { type: "agent_silence" }> | null;
 
 export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, streaming, live }: { task?: TaskProgress | null; streaming?: boolean; live?: UiMessage | null; silence: Silence; cwd: string; messages: UiMessage[]; onPreview: (path: string, name: string) => void }) {
 	const t = useT();
-	const sectionId = useId();
 	const incident = toolTextIncidents(live ? [...messages, live] : messages, streaming ?? task?.status === "running").current;
 	const interrupted = incident?.state === "stopped";
 	const reminding = incident?.state === "reminding";
@@ -30,7 +29,6 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, str
 	const [expanded, setExpanded] = useState<string | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const items = task?.plan?.items.filter(item => item.status !== "removed") ?? [];
-	const completedCount = items.filter(item => item.status === "done").length;
 	const currentId = items.find(item => item.status === "running")?.id;
 	useEffect(() => {
 		if (!progressOpen || !currentId) return;
@@ -51,8 +49,8 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, str
 	return <div className={`task-progress task-sections ${interrupted ? "interrupted" : reminding ? "reminding" : task?.status ?? "empty"}`} tabIndex={-1} aria-label={t("taskProgress")}>
 		<div className="task-sections-scroll" ref={scrollRef}>
 			<section className="task-section">
-				<button type="button" className="task-section-heading" aria-expanded={progressOpen} aria-controls={`${sectionId}-progress`} onClick={() => setProgressOpen(value => !value)}><FiChevronRight className={progressOpen ? "open" : ""} />{t("taskProgressHeading")}{items.length > 0 && <span className="task-section-count" aria-label={t("taskStepCount", { done: completedCount, total: items.length })}>{completedCount}/{items.length}</span>}</button>
-				{progressOpen && <div id={`${sectionId}-progress`} className="task-section-content">
+				<button type="button" className="task-section-heading" aria-expanded={progressOpen} onClick={() => setProgressOpen(value => !value)}><FiChevronRight className={progressOpen ? "open" : ""} />{t("taskProgressHeading")}</button>
+				{progressOpen && <div className="task-section-content">
 					{status && (!interrupted || !!task?.plan) && <p className={`task-progress-status task-progress-source ${interrupted ? "interrupted" : reminding ? "reminding" : task?.status}`} role="status">{reminding && <i aria-hidden="true" />}{status}</p>}
 					{task?.plan && items.length ? <>
 						{task.plan.completionCriteria && <p className="task-outline-criteria">{t("taskCompletionCriteria")}：{task.plan.completionCriteria}</p>}
@@ -71,15 +69,15 @@ export function TaskProgressPanel({ task, silence, cwd, messages, onPreview, str
 								<button type="button" className="task-step-jump" onClick={() => window.dispatchEvent(new CustomEvent("pi:jump-message", { detail: { messageId: planSource?.id ?? task.sourceMessageId } }))}>{t("taskJumpToChat")} →</button>
 							</div>}
 						</div>)}</div>
-					</> : interrupted ? <div className="task-interrupted-hint"><strong>● {t("taskInterruptedTitle")}</strong><p>{t("taskInterruptedHint")}</p></div> : reminding ? null : <div className="task-section-empty"><p>{t("taskProgressEmpty")}</p></div>}
+					</> : interrupted ? <div className="task-interrupted-hint"><strong>● {t("taskInterruptedTitle")}</strong><p>{t("taskInterruptedHint")}</p></div> : reminding ? null : <div className="task-section-empty"><div className="task-empty-circles" aria-hidden="true"><i /><i /><i /></div><p>{t("taskProgressEmpty")}</p></div>}
 				</div>}
 			</section>
 			<section className="task-section">
-				<button type="button" className="task-section-heading" aria-expanded={outputsOpen} aria-controls={`${sectionId}-outputs`} onClick={() => setOutputsOpen(value => !value)}><FiChevronRight className={outputsOpen ? "open" : ""} />{t("taskOutputsHeading")}{files.length > 0 && <span className="task-section-count" aria-label={t("taskFileCount", { n: files.length })}>{files.length}</span>}</button>
-				{outputsOpen && <div id={`${sectionId}-outputs`} className="task-section-content">{files.length ? <div className="task-file-results">{files.map(file => <div className="task-file-result" key={file.path}>
+				<button type="button" className="task-section-heading" aria-expanded={outputsOpen} onClick={() => setOutputsOpen(value => !value)}><FiChevronRight className={outputsOpen ? "open" : ""} />{t("taskOutputsHeading")}</button>
+				{outputsOpen && <div className="task-section-content">{files.length ? <div className="task-file-results">{files.map(file => <div className="task-file-result" key={file.path}>
 					<FiFile aria-hidden="true" /><button type="button" title={file.path} onClick={() => preview(file.path)}><span>{file.path.split("/").at(-1)}</span>{file.path.includes("/") && <small>{file.path}</small>}</button>
 					{file.counted && <span className="task-file-counts"><span>+{file.added}</span> <span>−{file.removed}</span></span>}
-				</div>)}</div> : <div className="task-section-empty"><p>{t("taskOutputsEmpty")}</p></div>}</div>}
+				</div>)}</div> : <div className="task-section-empty"><FiFile className="task-empty-file" aria-hidden="true" /><p>{t("taskOutputsEmpty")}</p></div>}</div>}
 			</section>
 		</div>
 	</div>;
