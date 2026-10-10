@@ -566,6 +566,7 @@ export function App() {
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
 	// Global search panel (sessions / projects / workspace files).
 	const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+	const [searchFilesOnly, setSearchFilesOnly] = useState(false);
 
 	// 插件视图桥：插件无 chat 上下文，通过窗口事件请求在可见终端执行命令
 	// （与 SCM 面板同款：已有同名 tab 原地重跑，否则新建并自动切到终端视图）。
@@ -610,9 +611,10 @@ export function App() {
 	// Ctrl+K / Cmd+K opens global search (also reachable via the topbar button).
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (view === "wiki" || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
+			if (view === "wiki" || !(e.ctrlKey || e.metaKey) || !["k", "p"].includes(e.key.toLowerCase())) return;
 			e.preventDefault();
-			setGlobalSearchOpen((v) => !v);
+			setSearchFilesOnly(e.key.toLowerCase() === "p");
+			setGlobalSearchOpen(true);
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
@@ -1018,7 +1020,7 @@ export function App() {
 					onManageModels={() => setManageModelsOpen(true)}
 					onOpenSettings={() => { setSettingsInitialTab("prompt"); setSettingsOpen(true); }}
 					onOpenBgTasks={() => setBgTasksOpen(true)}
-					onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+					onOpenGlobalSearch={() => { setSearchFilesOnly(false); setGlobalSearchOpen(true); }}
 					sound={sound}
 					onSoundChange={setSound}
 					onSoundPreview={(kind: SoundKind) => playSound(kind, sound)}
@@ -1118,6 +1120,7 @@ export function App() {
 						>
 							<div className="file-list-host" hidden={!!previewFile}>
 								<RightPanel
+									onSearchFiles={() => { setSearchFilesOnly(true); setGlobalSearchOpen(true); }}
 									active={!filesCollapsed && !previewFile && !switching && view === "chat" && ((!isMobile && !isNarrow) || drawer === "right")}
 									send={send}
 									files={chat.files}
@@ -1238,6 +1241,8 @@ export function App() {
 			)}
 			{globalSearchOpen && (
 				<GlobalSearchModal
+					key={String(searchFilesOnly)}
+					filesOnly={searchFilesOnly}
 					send={send}
 					sessions={chat.sessions}
 					projects={chat.projects}

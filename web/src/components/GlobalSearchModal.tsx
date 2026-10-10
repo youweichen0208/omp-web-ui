@@ -19,6 +19,7 @@ import { skillAwarePreview } from "../skill-block";
 import { useT } from "../i18n";
 
 interface GlobalSearchModalProps {
+	filesOnly?: boolean;
 	send: (msg: ClientMessage) => boolean;
 	/** Persisted session history (lazy — requested on open). */
 	sessions: SessionSummary[];
@@ -54,6 +55,7 @@ function matches(text: string, q: string): boolean {
  *    点击打开文件预览）。↑↓/Enter 键盘导航，Esc 关闭。
  */
 export function GlobalSearchModal({
+	filesOnly = false,
 	send,
 	sessions,
 	projects,
@@ -78,8 +80,10 @@ export function GlobalSearchModal({
 
 	// Lazy-load sessions + projects once on open (same probes as LeftPanel).
 	useEffect(() => {
-		send({ type: "list_sessions" });
-		send({ type: "list_projects" });
+		if (!filesOnly) {
+			send({ type: "list_sessions" });
+			send({ type: "list_projects" });
+		}
 		requestAnimationFrame(() => inputRef.current?.focus());
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only probes
 	}, []);
@@ -108,7 +112,7 @@ export function GlobalSearchModal({
 
 	const sessionHits = useMemo(
 		() =>
-			q
+			q && !filesOnly
 				? sessions.filter(
 						(s) =>
 							matches(s.firstMessage ?? "", q) ||
@@ -116,14 +120,14 @@ export function GlobalSearchModal({
 							matches(s.path.split(/[\\/]/).pop() ?? "", q),
 					).slice(0, 20)
 				: [],
-		[sessions, q],
+		[sessions, q, filesOnly],
 	);
 	const projectHits = useMemo(
 		() =>
-			q
+			q && !filesOnly
 				? projects.filter((p) => matches(p.path, q)).slice(0, 10)
 				: [],
-		[projects, q],
+		[projects, q, filesOnly],
 	);
 	const fileHits = useMemo(() => {
 		if (!q || !fileSearch || fileSearch.reqId !== lastReqRef.current || !fileSearch.ok)
@@ -218,7 +222,7 @@ export function GlobalSearchModal({
 						ref={inputRef}
 						type="text"
 						value={query}
-						placeholder={t("gsPlaceholder")}
+						placeholder={t(filesOnly ? "treeSearchFiles" : "gsPlaceholder")}
 						onChange={(e) => setQuery(e.target.value)}
 					/>
 					<button type="button" className="gs-close" title={t("close")} onClick={onClose}>
@@ -227,7 +231,7 @@ export function GlobalSearchModal({
 				</div>
 
 				<div className="gs-results">
-					{!q && <div className="gs-empty">{t("gsHint")}</div>}
+					{!q && <div className="gs-empty">{t(filesOnly ? "treeSearchHint" : "gsHint")}</div>}
 					{q && total === 0 && !fileTruncated && (
 						<div className="gs-empty">
 						{filesPending ? t("gsSearching") : t("gsNoResults")}

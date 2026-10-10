@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { FiChevronRight, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import { FiChevronRight, FiFolder, FiFile, FiSearch, FiDownload, FiLink, FiMaximize2, FiMoreHorizontal, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import type { FileEntry, FileListing, ScmFileEntry, ServerMessage, TaskProgress, UiMessage } from "../types";
 import { useT } from "../i18n";
 import { downloadFile } from "../download";
@@ -10,6 +10,7 @@ import { TaskProgressPanel } from "./TaskProgressPanel";
 type AttachMode = "inline" | "reference";
 interface RightPanelProps {
 	active: boolean;
+	onSearchFiles: () => void;
 	files: FileListing | null;
 	fileChanged: { path: string } | null;
 	changed: ScmFileEntry[];
@@ -28,8 +29,10 @@ interface RightPanelProps {
 	onNotice: (level: "info" | "warning" | "error", text: string) => void;
 }
 
-export const RightPanel = memo(function RightPanel({ active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, isStreaming, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
+export const RightPanel = memo(function RightPanel({ onSearchFiles, active, files, fileChanged, changed, notRepo, widgets, messages, streamingMessage, isStreaming, taskProgress, conversationId, agentSilence, cwd, send, onAttach, onPreview, onNotice }: RightPanelProps) {
 	const t = useT();
+	const [rootOpen, setRootOpen] = useState(true);
+	useEffect(() => setRootOpen(true), [cwd]);
 	const [creating, setCreating] = useState(false);
 	useEffect(() => setCreating(false), [cwd, conversationId, active]);
 	const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
@@ -138,9 +141,10 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 		const mentioned = dir && entry.name.startsWith(".") && hiddenMentioned.has(entry.name);
 		if ((!showHidden && entry.name.startsWith(".") || onlyChanged && !count) && !mentioned) return null;
 		return <div key={entry.path} role="treeitem" aria-expanded={dir ? open : undefined}>
-			<div className={`file-item ${dir ? "dir" : "file"}`} style={{ paddingLeft: 6 + depth * 16 }}>
+			<div className={`file-item ${dir ? "dir" : "file"}`} style={{ paddingLeft: 26 + depth * 18 }}>
 				<button type="button" data-tree-node={entry.path} className={dir ? "file-dir-main" : "file-name"} title={entry.path} disabled={virtual && !dir} onClick={() => dir ? virtual ? setExpanded((previous) => { const next = new Set(previous); if (next.has(entry.path)) next.delete(entry.path); else next.add(entry.path); return next; }) : toggle(entry.path) : onPreview(entry.path, entry.name)}>
 					<span className={`tree-caret ${open ? "open" : ""}`}>{dir && <FiChevronRight />}</span>
+					{dir ? <FiFolder className="tree-entry-icon" aria-hidden="true" /> : <FiFile className="tree-entry-icon" aria-hidden="true" />}
 					<span className={dir ? "file-name" : "file-name-text"}>{entry.name}</span>
 				</button>
 				{dir && count > 0 && <span className="tree-modified-count" title={t("workspaceChanges", { n: count })}>{count}</span>}
@@ -164,17 +168,21 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 	return <aside className="panel panel-right has-task-progress">
 		<div className="panel-title"><span>{t("workspaceFiles")}</span>{!notRepo && changed.length > 0 && <button type="button" className="tree-filter" aria-pressed={onlyChanged} onClick={() => setOnlyChanged(value => !value)}>{t("changedCount", { n: changed.length })}</button>}<button type="button" className="tree-menu-trigger" aria-label={t("newWorkspaceFile")} title={t("newWorkspaceFile")} disabled={isStreaming || !cwd} onClick={() => setCreating(value => !value)}><FiPlus /></button><button type="button" className="tree-menu-trigger" aria-label={t("refreshWorkspaceFiles")} title={t("refreshWorkspaceFiles")} onClick={refreshFiles}><FiRefreshCw /></button><div className="tree-controls" ref={controlsRef}><button type="button" className="tree-menu-trigger" aria-label={t("more")} aria-expanded={controlsOpen} onClick={() => setControlsOpen(value => !value)}><FiMoreHorizontal /></button>{controlsOpen && <div className="tree-controls-menu"><button type="button" className="tree-hidden-toggle" role="switch" aria-checked={showHidden} onClick={() => setShowHidden(value => !value)}><span>{t("showHiddenFiles")}</span><span className="tree-switch-track" /></button></div>}</div></div>
 		{creating && <CreateFileForm key={`${cwd}:${conversationId}`} cwd={cwd} conversationId={conversationId} disabled={isStreaming} onCancel={() => setCreating(false)} onCreated={path => { setCreating(false); refreshFiles(); onPreview(path, path.split("/").at(-1)!); }} />}
+		<button type="button" className="tree-search" onClick={onSearchFiles}><FiSearch aria-hidden="true" /><span>{t("treeSearchFiles")}</span><kbd>{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ P" : "Ctrl P"}</kbd></button>
 		<div className="panel-body" role="tree" aria-label={t("workspaceFiles")} onKeyDown={(event) => {
 			const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tree-node]");
 			if (!button) return;
 			const path = button.dataset.treeNode!;
 			const isDirectory = button.classList.contains("file-dir-main");
+			if (path === "") {
+				if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); setRootOpen(event.key === "ArrowRight"); return; }
+			}
 			if (event.key === "ArrowRight" && isDirectory && !expanded.has(path)) { event.preventDefault(); toggle(path); }
 			if (event.key === "ArrowLeft") {
 				event.preventDefault();
 				if (isDirectory && expanded.has(path)) toggle(path);
 				else {
-					const parent = path.slice(0, path.lastIndexOf("/"));
+					const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 					Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button[data-tree-node]")).find((node) => node.dataset.treeNode === parent)?.focus();
 				}
 			}
@@ -184,8 +192,13 @@ export const RightPanel = memo(function RightPanel({ active, files, fileChanged,
 				nodes[nodes.indexOf(button) + (event.key === "ArrowDown" ? 1 : -1)]?.focus();
 			}
 		}}>
+			<div role="treeitem" aria-expanded={rootOpen}>
+			<button type="button" className="tree-root file-dir-main" data-tree-node="" title={cwd} onClick={() => setRootOpen(value => !value)}><span className={`tree-caret ${rootOpen ? "open" : ""}`}><FiChevronRight /></span><FiFolder className="tree-entry-icon" aria-hidden="true" /><strong>{cwd.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || cwd}</strong></button>
+			{rootOpen && <div role="group">
 			{onlyChanged && changed.length === 0 ? <div className="panel-empty">{t("noChangedFiles")}</div> : directories[""] ? renderDirectory("", 0) : <div className="panel-empty">{t("loading")}</div>}
 			{compactTree && !onlyChanged && otherDirectories > 0 && <button type="button" className="tree-other-directories" onClick={() => setShowOtherDirectories(true)}>{t("otherDirectories", { n: otherDirectories })}</button>}
+			</div>}
+			</div>
 		</div>
 		<div className="panel-lower"><TaskProgressPanel key={conversationId} task={taskProgress} streaming={isStreaming} live={streamingMessage} silence={agentSilence ?? null} cwd={cwd} messages={messages} onPreview={onPreview} /></div>
 			{widgets.filter((w) => w.lines.length > 0).length > 0 && (

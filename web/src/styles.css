@@ -11757,6 +11757,7 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 .modal { animation: surface-arrive 160ms ease-out; }
 @keyframes surface-arrive { from { opacity: 0; transform: translateY(4px) scale(0.99); } to { opacity: 1; transform: none; } }
 .design-workspace :is(button, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.design-workspace .inputbox textarea:focus-visible { outline: none; }
 .design-workspace :is(.view-switch button, .project-panel-toggle, .panel-toggle, .empty-example, .workspace-groups button, .sidebar-footer button):active:not(:disabled) { background: var(--accent-soft); color: var(--accent); scale: 0.98; transition: none; }
 .design-workspace :is(.project-item, .session-item):active { background: var(--row-active); }
 .design-workspace .resize-handle { touch-action: none; }
@@ -11783,3 +11784,23 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 	.design-workspace *, .modal { animation: none !important; scroll-behavior: auto !important; transition-duration: 0s !important; }
 	.design-workspace button:active { scale: 1 !important; }
 }
+
+/* File explorer: search, workspace root and a quiet, indented tree. */
+.design-workspace .panel-right .tree-search { display: flex; align-items: center; gap: 10px; flex: none; margin: 12px 14px 10px; padding: 9px 12px; min-height: 36px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); color: var(--text-faint); font: 500 13px/1.4 var(--sans); text-align: left; cursor: pointer; }
+.tree-search > svg { width: 17px; height: 17px; flex: none; }
+.tree-search > span { flex: 1; }
+.tree-search kbd { font: 500 11px var(--sans); white-space: nowrap; }
+.design-workspace .panel-right .panel-body { padding: 0 12px 12px; }
+.design-workspace .panel-right .tree-root { display: flex; gap: 9px; min-height: 36px; width: 100%; padding: 0 6px; color: var(--text); border-radius: var(--r-sm); font: 13px var(--sans); }
+.tree-root strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.design-workspace .panel-right .file-item { height: 32px; min-height: 32px; gap: 8px; padding-right: 8px; }
+.design-workspace .panel-right .file-item > .file-name, .design-workspace .panel-right .file-dir-main { font-family: var(--sans); font-size: 13px; color: var(--text-dim); gap: 9px; }
+.design-workspace .panel-right .file-dir-main > .file-name { color: inherit; font: inherit; }
+.design-workspace .panel-right .tree-root { color: var(--text); }
+.tree-entry-icon { width: 16px; height: 16px; flex: none; stroke-width: 1.7; }
+.design-workspace .panel-right .tree-caret { display: grid; place-items: center; width: 12px; height: 16px; color: var(--text-faint); }
+.design-workspace .panel-right .tree-caret svg { width: 12px; height: 14px; }
+.design-workspace .panel-right .tree-root .tree-caret { color: var(--text); }
+.design-workspace .panel-right .tree-modified-count { min-width: 20px; padding: 3px 5px; border-radius: var(--r-md); background: var(--yellow-bg); color: var(--yellow-fg); font: 11px/1.3 var(--sans); text-align: center; }
+.design-workspace .panel-right .tree-root:hover { background: var(--row-hover); }
+.design-workspace .panel-right :is(.tree-search, .tree-root):active { background: var(--row-active); }

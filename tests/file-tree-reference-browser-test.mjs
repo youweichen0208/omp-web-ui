@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {setTimeout as sleep} from 'node:timers/promises';
+import {chromium} from 'playwright-core';
+import {CHROME_PATH} from './lib/chrome.mjs';
+import {portUp} from './lib/port-utils.mjs';
+const port=9252, root=mkdtempSync(join(tmpdir(),'pi-fluid-'));
+const cwd=join(root,'pi-harness');mkdirSync(cwd);writeFileSync(join(cwd,'README.md'),'# Project\n');
+for(const name of ['.claude','.github','.pytest_cache','.ruff_cache','.svelte-kit','.venv-workbench','backend','build','docs','ops','scripts']) mkdirSync(join(cwd,name));
+writeFileSync(join(cwd,'docs','example.ts'),'export const example = true;');
+let server,browser;
+try {
+	assert.equal(await portUp(port),false);
+	server=spawn(process.execPath,['dist/server/index.js'],{env:{...process.env,PORT:String(port),PI_WEB_CWD:cwd,PI_WEB_DATA_DIR:join(root,'data'),PI_CODING_AGENT_DIR:join(root,'agent')},stdio:'ignore'});
+	for(let i=0;i<100&&!await portUp(port);i++)await sleep(150);
+	assert(await portUp(port));
+	browser=await chromium.launch({executablePath:CHROME_PATH});
+	mkdirSync('tests/scratch',{recursive:true});
+	const page=await browser.newPage({viewport:{width:1440,height:960}});
+	const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+	await page.routeWebSocket('**/ws', route => {
+		const upstream = route.connectToServer();
+		route.onMessage(wire => upstream.send(wire));
+		upstream.onMessage(wire => {
+			const message = JSON.parse(wire.toString());
+			if (message.type === 'git_branch') message.notRepo = false;
+			if (message.type === 'scm_data' && message.kind === 'status') Object.assign(message, {ok:true,notRepo:false,files:[{path:'docs/example.ts',x:' ',y:'M'}]});
+			route.send(JSON.stringify(message));
+		});
+	});
+	await page.goto(`http://localhost:${port}`);
+	await page.locator('.setup-modal .modal-close').click();
+	await page.locator('.workspace-group-manager input').fill('Engineering');
+	await page.locator('.workspace-group-actions button[type=submit]').click();
+	await page.locator('.workspace-outside button').click();
+	await page.locator('.project-item.active').waitFor();
+	const rootButton=page.locator('.tree-root');
+	const docs=page.locator('button[data-tree-node="docs"]');
+	await docs.waitFor();
+	assert.equal(await docs.locator('.file-name').evaluate(el=>getComputedStyle(el).fontFamily),await docs.evaluate(el=>getComputedStyle(el).fontFamily));
+	assert.equal(await rootButton.textContent(),'pi-harness');
+	await rootButton.focus(); await page.keyboard.press('ArrowLeft');
+	assert.equal(await docs.count(),0);
+	await page.keyboard.press('ArrowRight'); await docs.waitFor();
+	await docs.focus();await page.keyboard.press('ArrowLeft');
+	assert(await rootButton.evaluate(el=>el===document.activeElement));
+	await docs.click();
+	await page.locator('button[data-tree-node="docs/example.ts"]').waitFor();
+	await docs.click();
+	await page.locator('.tree-search').click();
+	await page.locator('.gs-input-row input').fill('example');
+	await page.locator('.gs-item', {hasText:'example.ts'}).waitFor();
+	await page.locator('.gs-item', {hasText:'example.ts'}).click();
+	await page.waitForFunction(()=>!document.querySelector('.gs-modal'));
+	await page.keyboard.press('Control+p');
+	await page.locator('.gs-input-row input[placeholder="搜索文件"]').waitFor();
+	await page.locator('.gs-close').click();
+	await page.reload();
+	await page.locator('.tree-root').waitFor();
+	await page.locator('.setup-modal .modal-close').click();
+	await page.locator('button[data-tree-node="docs"]').waitFor();
+	for(const theme of ['light','dark']) {
+		await page.evaluate(theme=>document.documentElement.dataset.appearance=theme,theme);
+		await sleep(350);
+		await page.locator('.panel-right').screenshot({path:`tests/scratch/file-tree-${theme}.png`});
+	}
+	assert.deepEqual(errors,[]);
+	console.log('PASS file tree: root and child keyboard navigation, file search, result open and shortcut');
+} finally { await browser?.close();server?.kill('SIGTERM');await sleep(300);rmSync(root,{recursive:true,force:true}); }

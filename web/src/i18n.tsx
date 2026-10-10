@@ -1399,6 +1399,8 @@ const zh = {
 	/* model dropdown filter + global search */
 	searchModels: "搜索模型…",
 	noModelMatches: "无匹配模型",
+	treeSearchFiles: "搜索文件",
+	treeSearchHint: "输入文件名，搜索当前项目中的文件",
 	searchGlobal: "搜索",
 	searchGlobalTip: "全局搜索：对话 / 项目 / 文件（Ctrl+K）",
 	gsPlaceholder: "搜索项目、历史对话、工作区文件…",
@@ -3103,6 +3105,8 @@ const en: Record<keyof typeof zh, string> = {
 	/* model dropdown filter + global search */
 	searchModels: "Filter models…",
 	noModelMatches: "No matching models",
+	treeSearchFiles: "Search files",
+	treeSearchHint: "Type a filename to search the current project",
 	searchGlobal: "Search",
 	searchGlobalTip: "Global search: sessions / projects / files (Ctrl+K)",
 	gsPlaceholder: "Search projects, past conversations, workspace files…",
