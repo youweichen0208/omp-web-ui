@@ -1,5 +1,9 @@
 # 发布流程
 
+## 1.3.0 项目分组与节点聊天恢复
+
+从 develop 发布，包含 #53 的项目分组、#54 的本机 Agent + SSH 聊天恢复和 #55 的单行历史摘要。SDK 1.0.4 不变，协议 v42。GitHub 三平台桌面附件通过检查后公开；本次不发布 npm。说明见 `.github/release-notes/v1.3.0.md`。
+
 ## 1.2.1 文档转换与桌面修复
 
 从 develop 的 1.2.0 合入未发布改动，拆分文档转换和 OKF 知识蒸馏，增加 CHM、证据包与本地上下文评测。修复扩展 worker 生命周期及重复刷新、Windows 字体与布局、SSH/Agent 双栏、Wiki 模型选择（#46–#50）。SDK 1.0.4、协议 v41 不变。`verify-rendering.yml` 验证实际 Windows 100%/125% 和 macOS 打包版字体及截图；本机 macOS 补充原生 1440×900 窗口。npm 使用网页登录验证发布。
