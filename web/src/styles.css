@@ -9035,7 +9035,7 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { position: fix
 .design-workspace .toolcall > .toolcall-head > .toolcall-kill { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .design-workspace .toolcall > .toolcall-head > button { opacity: 1; pointer-events: auto; } }
 .bash-output-lines.has-overflow:not(.wrap) { mask-image: linear-gradient(to right, var(--shadow-color) calc(100% - 20px), transparent); }
-.design-workspace .sidebar-footer { justify-content: flex-start; padding: 10px 16px; }
+.design-workspace .sidebar-footer { justify-content: flex-start; margin-top: auto; padding: 10px 16px; }
 .design-workspace .sidebar-footer #sidebar-settings-slot { margin-left: 0; }
 .design-workspace #sidebar-settings-slot:not(:has(.topbar-more)) > button { display: inline-flex; align-items: center; gap: 7px; }
 .design-workspace #sidebar-settings-slot > button svg { width: 14px; height: 14px; }
