@@ -1,88 +1,94 @@
-/** Native Pi RPC over one SSH exec channel. No local model or terminal injection. */
+/** Local native Pi session whose only tools operate on one captured SSH connection. */
 import { randomUUID } from "node:crypto";
-import { StringDecoder } from "node:string_decoder";
-import type { ClientChannel } from "ssh2";
-import { serializeMessage, type AgentMessage } from "./serialize.js";
-import type { NodeAgentState, UiMessage, UiContentBlock } from "./protocol.js";
+import { mkdirSync } from "node:fs";
+import { Type } from "typebox";
+import { createAgentSession, DefaultResourceLoader, getAgentDir, SettingsManager, SessionManager, type AgentSession, type AgentSessionEvent, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { serializeMessage } from "./serialize.js";
+import type { NodeAgentState, UiMessage } from "./protocol.js";
 
-const MAX_RECORD = 16 * 1024 * 1024;
-const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
-export function nodeAgentCommand(cwd: string): string {
-	if (!cwd.startsWith("/") || /[\0\r\n]/.test(cwd) || cwd.length > 4096) throw new Error("Invalid remote working directory");
-	return `sh -lc ${quote(`cd ${quote(cwd)} && exec pi --mode rpc`)}`;
+export interface NodeAgentOperations {
+	command(command: string, timeout: number, signal?: AbortSignal): Promise<string>;
+	read(path: string, signal?: AbortSignal): Promise<string>;
+	write(path: string, text: string, signal?: AbortSignal): Promise<void>;
 }
 
-type RecordValue = Record<string, any>;
 export class NodeAgent {
 	readonly id = randomUUID();
-	private buffer = "";
-	private decoder = new StringDecoder("utf8");
-	private stderr = "";
-	private seq = 0;
-	private revision = 0;
-	private dialogTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	private timer?: ReturnType<typeof setTimeout>;
-	private pending = new Map<string, { resolve: (data: RecordValue) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 	private state: NodeAgentState;
-	constructor(private stream: ClientChannel, cwd: string, private changed: (state: NodeAgentState) => void) {
+	private session?: AgentSession;
+	private unsubscribe?: () => void;
+	private timer?: ReturnType<typeof setTimeout>;
+	private generation = 0;
+	private changing = false;
+	private promptCancellation?: AbortController;
+	private readonly lifetime = new AbortController();
+	constructor(private readonly sessionDir: string, cwd: string, private readonly operations: NodeAgentOperations, private readonly changed: (state: NodeAgentState) => void) {
 		this.state = { id: this.id, cwd, phase: "starting", running: false, messages: [], tools: [], models: [], dialogs: [] };
-		stream.on("data", (data: Buffer | string) => this.receive(this.decoder.write(Buffer.isBuffer(data) ? data : Buffer.from(data))));
-		stream.stderr.on("data", data => { this.stderr = (this.stderr + data.toString()).slice(-8000); });
-		stream.on("error", (error: Error) => this.finish(error.message));
-		stream.on("close", () => this.finish(this.stderr || "Remote Pi exited"));
 	}
-	get busy(): boolean { return this.state.phase !== "closed" && (this.state.phase === "starting" || this.state.running || this.pending.size > 0 || this.state.dialogs.length > 0); }
+	get busy(): boolean { return this.state.phase !== "closed" && (this.state.phase === "starting" || this.state.running || this.changing); }
 	snapshot(): NodeAgentState { return this.state; }
-	private publish(immediate = false) {
+	private set(patch: Partial<NodeAgentState>, immediate = false) {
+		this.state = { ...this.state, ...patch };
 		if (this.timer) { if (!immediate) return; clearTimeout(this.timer); this.timer = undefined; }
 		if (immediate) this.changed(this.state);
 		else this.timer = setTimeout(() => { this.timer = undefined; this.changed(this.state); }, 60);
 	}
-	private set(patch: Partial<NodeAgentState>, immediate = false) { this.state = { ...this.state, ...patch }; this.publish(immediate); }
-	private finish(error?: string) {
-		if (this.state.phase === "closed") return;
-		for (const task of this.pending.values()) { clearTimeout(task.timer); task.reject(new Error(error || "Remote Pi closed")); }
-		this.pending.clear();
-		for (const timer of this.dialogTimers.values()) clearTimeout(timer); this.dialogTimers.clear();
-		this.set({ phase: "closed", running: false, dialogs: [], error }, true);
+	private tools(): ToolDefinition[] {
+		const signalFor = (signal?: AbortSignal) => signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
+		const commandParams = Type.Object({ command: Type.String({ minLength: 1, maxLength: 100000 }), timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 600, description: "Timeout in seconds (default 120)" })) });
+		const readParams = Type.Object({ path: Type.String() });
+		const writeParams = Type.Object({ path: Type.String(), text: Type.String() });
+		const command: ToolDefinition<typeof commandParams> = {
+			name: "remote_command", label: "SSH command",
+			description: `Execute a shell command on this SSH node. Each command starts in ${JSON.stringify(this.state.cwd)}; use cd explicitly within a command to change directories. This is an independent exec channel, not the user's interactive terminal. Output is limited to 64 KiB.`,
+			parameters: commandParams,
+			execute: async (_id, p, signal) => ({ content: [{ type: "text", text: await this.operations.command(p.command, p.timeout ?? 120, signalFor(signal)) }], details: undefined }),
+		};
+		const read: ToolDefinition<typeof readParams> = {
+			name: "remote_read", label: "SSH read", description: "Read a UTF-8 file on this SSH node via SFTP (up to 512 KiB). Path must be absolute.", parameters: readParams,
+			execute: async (_id, p, signal) => ({ content: [{ type: "text", text: await this.operations.read(p.path, signalFor(signal)) }], details: undefined }),
+		};
+		const write: ToolDefinition<typeof writeParams> = {
+			name: "remote_write", label: "SSH write", description: "Write a UTF-8 file on this SSH node via SFTP (up to 512 KiB). Path must be absolute. Existing content is replaced.", parameters: writeParams,
+			execute: async (_id, p, signal) => { await this.operations.write(p.path, p.text, signalFor(signal)); return { content: [{ type: "text", text: "文件已写入节点" }], details: undefined }; },
+		};
+		return [command, read, write];
 	}
-	close() {
-		this.finish();
-		try { this.stream.signal("TERM"); } catch { /* SSH may already be gone. */ }
-		this.stream.end(); this.stream.destroy();
-	}
-	private receive(chunk: string) {
-		if (this.state.phase === "closed") return;
-		this.buffer += chunk;
-		let index: number;
-		while ((index = this.buffer.indexOf("\n")) >= 0) {
-			const line = this.buffer.slice(0, index); this.buffer = this.buffer.slice(index + 1);
-			if (line.length > MAX_RECORD) { this.finish("Remote Pi response exceeds 16 MiB"); this.close(); return; }
-			if (!line.trim()) continue;
-			try { this.event(JSON.parse(line)); }
-			catch (error) { this.finish(`Invalid remote Pi RPC response: ${(error as Error).message}`); this.close(); return; }
-		}
-		if (this.buffer.length > MAX_RECORD) { this.finish("Remote Pi response exceeds 16 MiB"); this.close(); }
-	}
-	private request(type: string, fields: RecordValue = {}): Promise<RecordValue> {
-		if (this.state.phase === "closed") return Promise.reject(new Error("Remote Pi is not running"));
-		if (this.pending.size >= 32) return Promise.reject(new Error("Too many pending remote commands"));
-		const id = randomUUID();
-		return new Promise((resolve, reject) => {
-			const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`Remote Pi ${type} timed out`)); }, 30000);
-			this.pending.set(id, { resolve, reject, timer });
-			try { this.stream.write(JSON.stringify({ ...fields, id, type }) + "\n"); }
-			catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
-		});
+	private async create(fresh: boolean) {
+		const generation = ++this.generation;
+		mkdirSync(this.sessionDir, { recursive: true, mode: 0o700 });
+		const agentDir = getAgentDir();
+		const settings = SettingsManager.create(this.sessionDir, agentDir);
+		const loader = new DefaultResourceLoader({ cwd: this.sessionDir, agentDir, settingsManager: settings, noExtensions: true, noSkills: true, noPromptTemplates: true, noContextFiles: true,
+			systemPrompt: `You are the assistant for one connected SSH node. All provided tools operate only on that node. Remote working directory: ${JSON.stringify(this.state.cwd)}. Use remote_command, remote_read and remote_write for node tasks. Commands run with the SSH user's permissions. You have no local filesystem or local shell tools. Ask before destructive operations when the user has not authorized them. Never assume a previous command's cd persists.`, appendSystemPrompt: [] });
+		await loader.reload();
+		const { session } = await createAgentSession({ cwd: this.sessionDir, agentDir, resourceLoader: loader, settingsManager: settings,
+			sessionManager: fresh ? SessionManager.create(this.sessionDir, this.sessionDir) : SessionManager.continueRecent(this.sessionDir, this.sessionDir),
+			model: this.session?.model, noTools: "all", tools: ["remote_command", "remote_read", "remote_write"], excludeTools: ["mcp__*"], customTools: this.tools() });
+		if (this.state.phase === "closed" || generation !== this.generation) { session.dispose(); throw new Error("节点 Agent 已关闭"); }
+		this.unsubscribe?.(); this.session?.dispose();
+		this.session = session;
+		this.unsubscribe = session.subscribe(event => { if (this.session === session && this.state.phase !== "closed") this.event(event); });
+		this.refresh();
+		this.set({ phase: "ready", running: false, error: undefined, tools: [], streamingMessage: undefined }, true);
 	}
 	async start() {
-		try {
-			await this.refresh();
-			const available = await this.request("get_available_models");
-			this.set({ phase: "ready", models: (available.models ?? []).map((m: RecordValue) => ({ id: String(m.id), provider: String(m.provider), name: String(m.name ?? m.id) })) }, true);
-		} catch (error) { this.finish(`${(error as Error).message}${this.stderr ? `\n${this.stderr}` : ""}`); this.close(); throw error; }
+		try { await this.create(false); }
+		catch (error) { if (this.state.phase !== "closed") { this.set({ error: (error as Error).message }); this.close(); } throw error; }
 	}
-	private retainMessages(messages: UiMessage[]): UiMessage[] {
+	close() {
+		if (this.state.phase === "closed") return;
+		this.generation++; this.lifetime.abort();
+		this.unsubscribe?.(); this.unsubscribe = undefined;
+		const session = this.session; this.session = undefined;
+		if (session) void session.abort().catch(() => {}).finally(() => session.dispose());
+		this.set({ phase: "closed", running: false, streamingMessage: undefined, dialogs: [], tools: this.state.tools.map(tool => ({ ...tool, running: false })) }, true);
+	}
+	private ready(): AgentSession {
+		if (this.state.phase !== "ready" || !this.session || this.changing) throw new Error("节点 Agent 尚未就绪");
+		return this.session;
+	}
+	private retain(messages: UiMessage[]): UiMessage[] {
 		let bytes = 0, start = messages.length;
 		while (start > 0 && messages.length - start < 200) {
 			const size = Buffer.byteLength(JSON.stringify(messages[start - 1]));
@@ -91,86 +97,64 @@ export class NodeAgent {
 		}
 		return messages.slice(start);
 	}
-	private async refresh() {
-		const revision = this.revision;
-		const state = await this.request("get_state");
-		if (typeof state.sessionId !== "string" || typeof state.isStreaming !== "boolean") throw new Error("Remote Pi must support the native 1.0.4 RPC protocol");
-		const history = await this.request("get_messages");
-		const messages = (history.messages ?? []).slice(-200).map((m: AgentMessage, index: number) => serializeMessage(m, index)).filter((m: UiMessage | null): m is UiMessage => !!m);
-		if (this.revision !== revision) return;
-		this.seq = messages.length;
-		this.set({ sessionId: state.sessionId, sessionFile: state.sessionFile, model: state.model ? { id: String(state.model.id), provider: String(state.model.provider), name: String(state.model.name ?? state.model.id) } : undefined, thinkingLevel: state.thinkingLevel, running: state.isStreaming || state.isCompacting, messages: this.retainMessages(messages) });
+	private refresh() {
+		const session = this.session;
+		if (!session) return;
+		this.set({ messages: this.retain(session.messages.slice(-200).map((message, index) => serializeMessage(message, Math.max(0, session.messages.length - 200) + index)).filter((message): message is UiMessage => !!message)),
+			model: session.model ? { id: session.model.id, provider: session.model.provider, name: session.model.name } : undefined,
+			models: session.modelRuntime.getAvailableSnapshot().map(model => ({ id: model.id, provider: model.provider, name: model.name })) });
 	}
 	async prompt(text: string, queue?: "steer" | "followUp") {
-		if (this.state.phase !== "ready") throw new Error("Remote Pi is not ready");
-		if (!text.trim() || text.length > 200000) throw new Error("Invalid remote prompt");
-		this.set({ error: undefined });
-		await this.request("prompt", { message: text, ...(queue ? { streamingBehavior: queue } : {}) });
+		const session = this.ready();
+		if (!text.trim() || text.length > 200000) throw new Error("消息无效");
+		if (!session.model) throw new Error("请先在本机设置中配置模型，再重新打开节点 Agent");
+		if (this.state.running) {
+			if (!queue || !session.isStreaming) throw new Error("节点 Agent 正在处理请求，请稍后或排队发送");
+			await session.prompt(text, { streamingBehavior: queue, expandPromptTemplates: false }); return;
+		}
+		this.set({ running: true, error: undefined, tools: [] }, true);
+		const cancellation = new AbortController();
+		this.promptCancellation = cancellation;
+		const signal = AbortSignal.any([cancellation.signal, this.lifetime.signal]);
+		await new Promise<void>((resolve, reject) => {
+			void session.prompt(text, { expandPromptTemplates: false, preflightResult: disposition => {
+				// Abort during asynchronous auth/compaction must prevent a later model call.
+				signal.throwIfAborted();
+				if (disposition !== "started" && !session.isStreaming) this.set({ running: false });
+				resolve();
+			} }).catch(error => {
+				reject(error);
+				if (this.session === session && this.state.phase !== "closed" && this.promptCancellation === cancellation) {
+					this.refresh(); this.set({ running: false, error: signal.aborted ? undefined : (error as Error).message }, true);
+				}
+			});
+		});
 	}
-	async abort() { await this.request("abort"); }
+	async abort() {
+		const session = this.ready();
+		this.promptCancellation?.abort();
+		await session.abort();
+		if (this.session === session && this.state.phase === "ready") this.set({ running: false }, true);
+	}
 	async newSession() {
-		if (this.state.running || this.state.dialogs.length) throw new Error("Stop the remote task first");
-		const result = await this.request("new_session");
-		if (result.cancelled) return;
-		this.set({ tools: [], streamingMessage: undefined }); await this.refresh();
+		this.ready(); if (this.busy) throw new Error("请先停止当前任务");
+		this.changing = true;
+		try { await this.create(true); } finally { this.changing = false; }
 	}
 	async model(provider: string, modelId: string) {
-		if (this.state.running) throw new Error("Stop the remote task first");
-		if (!this.state.models.some(m => m.id === modelId && m.provider === provider)) throw new Error("Unknown remote model");
-		await this.request("set_model", { provider, modelId }); await this.refresh();
+		const session = this.ready(); if (this.busy) throw new Error("请先停止当前任务");
+		const model = session.modelRuntime.getAvailableSnapshot().find(model => model.provider === provider && model.id === modelId);
+		if (!model) throw new Error("本机模型不可用");
+		this.changing = true;
+		try { await session.setModel(model, { persist: false }); if (this.session === session) this.refresh(); } finally { this.changing = false; }
 	}
-	dialog(id: string, response: { cancelled?: boolean; value?: string; confirmed?: boolean }) {
-		const dialog = this.state.dialogs.find(d => d.id === id);
-		if (!dialog) throw new Error("Remote dialog expired");
-		if (!response.cancelled && dialog.method === "select" && !dialog.options?.includes(response.value ?? "")) throw new Error("Invalid remote selection");
-		if (response.value && response.value.length > 200000) throw new Error("Remote response too large");
-		clearTimeout(this.dialogTimers.get(id)); this.dialogTimers.delete(id);
-		this.stream.write(JSON.stringify({ type: "extension_ui_response", id, ...response }) + "\n");
-		this.set({ dialogs: this.state.dialogs.filter(d => d.id !== id) });
-	}
-	private event(event: RecordValue) {
-		if (!event || typeof event.type !== "string") throw new Error("Missing RPC record type");
-		if (event.type === "response") {
-			const task = this.pending.get(event.id); if (!task) return;
-			clearTimeout(task.timer); this.pending.delete(event.id);
-			if (event.success) task.resolve(event.data ?? {}); else task.reject(new Error(String(event.error ?? "Remote Pi command failed")));
-			return;
-		}
-		if (["agent_start", "compaction_start", "auto_retry_start"].includes(event.type)) { this.revision++; this.set({ running: true, error: undefined, tools: [] }); }
-		if (event.type === "agent_settled") {
-			this.set({ running: false });
-			void this.refresh().catch(error => this.set({ error: error.message }));
-		}
-		if (event.type === "message_start" && event.message?.role === "assistant") this.set({ streamingMessage: serializeMessage(event.message, this.seq) ?? undefined });
-		if (event.type === "message_update") {
-			const delta = event.assistantMessageEvent, current = this.state.streamingMessage;
-			if (!current || !delta || !Number.isInteger(delta.contentIndex) || delta.contentIndex < 0 || delta.contentIndex > 4096) return;
-			const content = [...current.content], index = delta.contentIndex, previous = content[index];
-			if (delta.type === "text_delta") content[index] = { type: "text", text: (String(previous && "text" in previous ? previous.text ?? "" : "") + String(delta.delta ?? "")).slice(-200000) };
-			else if (delta.type === "thinking_delta") content[index] = { type: "thinking", thinking: (String(previous && "thinking" in previous ? previous.thinking ?? "" : "") + String(delta.delta ?? "")).slice(-200000) };
-			else if (delta.type === "toolcall_start") content[index] = { type: "toolCall", id: String(delta.id), name: String(delta.toolName), argumentsText: "" };
-			else if (delta.type === "toolcall_delta" && previous?.type === "toolCall") content[index] = { ...previous, argumentsText: (String(previous.argumentsText ?? "") + String(delta.delta ?? "")).slice(0, 20000) };
-			else return;
-			this.set({ streamingMessage: { ...current, content: content.filter(Boolean) as UiContentBlock[] } });
-		}
-		if (event.type === "message_end") {
-			this.revision++;
-			const message = serializeMessage(event.message, this.seq++);
-			if (message) this.set({ messages: this.retainMessages([...this.state.messages, message]), ...(event.message.role === "assistant" ? { streamingMessage: undefined } : {}) });
-		}
-		if (event.type === "tool_execution_start" || event.type === "tool_execution_end") {
-			const tools = this.state.tools.filter(t => t.id !== event.toolCallId);
-			tools.push({ id: String(event.toolCallId), name: String(event.toolName), running: event.type === "tool_execution_start", isError: !!event.isError });
-			this.set({ tools: tools.slice(-256) });
-		}
-		if (event.type === "extension_ui_request") {
-			if (["select", "confirm", "input", "editor"].includes(event.method)) {
-				if (this.state.dialogs.length >= 32) { this.stream.write(JSON.stringify({ type: "extension_ui_response", id: event.id, cancelled: true }) + "\n"); return; }
-				if (typeof event.timeout === "number" && event.timeout >= 0 && event.timeout <= 2147483647) this.dialogTimers.set(String(event.id), setTimeout(() => { this.dialogTimers.delete(String(event.id)); this.set({ dialogs: this.state.dialogs.filter(d => d.id !== event.id) }); }, event.timeout));
-				this.set({ dialogs: [...this.state.dialogs, { id: String(event.id), method: event.method, title: String(event.title ?? ""), message: String(event.message ?? ""), options: Array.isArray(event.options) ? event.options.map(String) : undefined, prefill: typeof event.prefill === "string" ? event.prefill : undefined }] }, true);
-			}
-			if (event.method === "notify") this.set({ notice: String(event.message ?? "").slice(0, 8000) });
-			if (event.method === "set_editor_text") this.set({ editorText: { id: String(event.id), text: String(event.text ?? "").slice(0, 200000) } });
-		}
+	dialog(_id: string, _response: { cancelled?: boolean; value?: string; confirmed?: boolean }) { throw new Error("节点对话框已过期"); }
+	private event(event: AgentSessionEvent) {
+		if (["agent_start", "compaction_start", "auto_retry_start"].includes(event.type)) this.set({ running: true });
+		if (event.type === "message_start" && event.message.role === "assistant") this.set({ streamingMessage: serializeMessage(event.message, this.session!.messages.length) ?? undefined });
+		if (event.type === "message_update") this.set({ streamingMessage: serializeMessage(event.message, this.session!.messages.length) ?? undefined });
+		if (event.type === "message_end") { this.refresh(); if (event.message.role === "assistant") this.set({ streamingMessage: undefined }); }
+		if (event.type === "tool_execution_start" || event.type === "tool_execution_end") this.set({ tools: [...this.state.tools.filter(tool => tool.id !== event.toolCallId), { id: event.toolCallId, name: event.toolName, running: event.type === "tool_execution_start", isError: event.type === "tool_execution_end" && event.isError }].slice(-256) });
+		if (event.type === "agent_settled") { this.refresh(); this.set({ running: false, streamingMessage: undefined }, true); }
 	}
 }
