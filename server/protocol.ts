@@ -1434,7 +1434,7 @@ export interface SystemPromptState {
 	custom: boolean; trusted: boolean; pending: boolean; reloadError?: string; busy: boolean;
 }
 
-/** One native Pi process on an SSH node, isolated from local conversations. */
+/** One local native Pi session with SSH-only tools, isolated from the main chat. */
 export interface NodeAgentState {
 	id: string;
 	cwd: string;

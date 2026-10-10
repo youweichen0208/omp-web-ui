@@ -625,7 +625,7 @@ wss.on("connection", (ws) => {
 		}
 		switch (msg.type) {
 			case "node_request":
-				if (service.quiesceInfo().quiesced && ["agent_start", "agent_prompt", "agent_new", "agent_model"].includes(msg.action)) {
+				if (service.quiesceInfo().quiesced && ["connect", "trust", "credential_test", "agent_start", "agent_prompt", "agent_new", "agent_model"].includes(msg.action)) {
 					send({ type: "node_event", event: "failure", requestId: msg.requestId, nodeId: msg.nodeId, conversationId: msg.conversationId, data: { action: msg.action, message: "服务暂停接收新操作。" } });
 					break;
 				}

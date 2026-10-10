@@ -1,5 +1,6 @@
 /** Built-in SSH node workbench. All remote operations are scoped by node and client. */
-import { NodeAgent, nodeAgentCommand } from "./node-agent.js";
+import { runNodeCommand } from "./node-command.js";
+import { NodeAgent } from "./node-agent.js";
 import { execFile } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
@@ -33,6 +34,15 @@ const safePath = (value: unknown): string => {
 	if (!path.startsWith("/") || path.includes("\0")) throw new Error("需要远端绝对路径");
 	return path;
 };
+/** Stop waiting for read-only SSH setup/metadata without closing the shared SFTP channel. */
+function waitNodeIO<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
+	if (!signal) return task;
+	return new Promise((resolve, reject) => {
+		const abort = () => reject(new Error("SSH operation aborted"));
+		if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
+		task.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+	});
+}
 const tail = (value: string) => value.length > MAX_OUTPUT ? `[输出已截断]\n${value.slice(-MAX_OUTPUT)}` : value;
 
 export class NodeWorkbench {
@@ -91,23 +101,27 @@ export class NodeWorkbench {
 	}
 	private agent(clientId: string, req: Request): NodeAgent {
 		const agent = this.connection(clientId, req.nodeId).agent;
-		if (!agent || agent.id !== req.conversationId) throw new Error("远端 Agent 会话身份已过期");
+		if (!agent || agent.id !== req.conversationId) throw new Error("节点 Agent 会话身份已过期");
 		return agent;
 	}
 	private async startAgent(clientId: string, req: Request) {
 		const connection = this.connection(clientId, req.nodeId);
-		if (connection.agentStarting) throw new Error("远端 Agent 正在启动");
+		if (connection.agentStarting) throw new Error("节点 Agent 正在准备");
 		if (connection.agent && connection.agent.snapshot().phase !== "closed") return connection.agent.snapshot();
 		const cwd = safePath(req.payload?.cwd ?? this.node(req.nodeId).defaultDir);
 		connection.agentStarting = true;
 		try {
-			const stream = await new Promise<ClientChannel>((resolve, reject) => connection.client.exec(nodeAgentCommand(cwd), (error, stream) => error ? reject(error) : resolve(stream)));
-			try { this.ensureCurrent(connection); } catch (error) { stream.signal("TERM"); stream.end(); throw error; }
-			const agent = new NodeAgent(stream, cwd, state => {
+			const sessionDir = join(this.dataDir, "node-sessions", createHash("sha256").update(clientId).digest("hex"), connection.nodeId);
+			const check = (signal?: AbortSignal) => { signal?.throwIfAborted(); this.ensureCurrent(connection); };
+			const agent = new NodeAgent(sessionDir, cwd, {
+				command: async (command, timeout, signal) => { check(signal); const output = await runNodeCommand(connection.client, cwd, command, timeout, signal); check(signal); return output; },
+				read: async (path, signal) => { check(signal); const text = await this.read(connection, safePath(path), signal); check(signal); return text; },
+				write: async (path, text, signal) => { check(signal); await this.write(connection, safePath(path), text, signal); check(signal); },
+			}, state => {
 				if (connection.agent?.id === state.id && this.connections.get(identity(clientId, connection.nodeId)) === connection) this.emit(clientId, "agent_state", { agent: state }, { nodeId: connection.nodeId, conversationId: state.id });
 			});
 			connection.agent = agent; this.broadcastState();
-			await agent.start(); return agent.snapshot();
+			await agent.start(); this.ensureCurrent(connection); return agent.snapshot();
 		} finally { connection.agentStarting = false; }
 	}
 
@@ -394,6 +408,10 @@ export class NodeWorkbench {
 			});
 			if (this.connections.get(key) !== c) throw new Error("连接已被新的请求替代");
 			c.ready = true; c.connectedAt = Date.now(); node.lastConnected = c.connectedAt; this.save(); this.broadcastState();
+			// Preparing the local SDK session performs no model request. An Agent
+			// configuration failure must leave SSH and the manual terminal usable.
+			try { await this.startAgent(clientId, { type: "node_request", action: "agent_start", requestId: randomUUID(), nodeId: node.id }); }
+			catch (error) { this.ensureCurrent(c); this.emit(clientId, "failure", { action: "agent_start", message: (error as Error).message }, { nodeId: node.id }); }
 		} catch (e) { this.drop(c); client.end(); if (keyChanged) throw new Error("主机密钥已变化，连接已阻止；请核实节点身份"); throw e; }
 	}
 	private drop(c: Connection): void {
@@ -464,18 +482,29 @@ export class NodeWorkbench {
 		const entries = await new Promise<import("ssh2").FileEntryWithStats[]>((ok, reject) => s.readdir(path, (e, list) => e ? reject(e) : ok(list)));
 		return entries.map((e) => ({ name: e.filename, type: e.attrs.isDirectory() ? "dir" : "file", size: e.attrs.size }));
 	}
-	private async read(c: Connection, path: string): Promise<string> {
-		const s = await this.sftp(c);
-		const st = await new Promise<{ size: number }>((ok, reject) => s.stat(path, (e, attrs) => e ? reject(e) : ok(attrs)));
+	private async read(c: Connection, path: string, signal?: AbortSignal): Promise<string> {
+		const s = await waitNodeIO(this.sftp(c), signal);
+		const st = await waitNodeIO(new Promise<{ size: number }>((ok, reject) => s.stat(path, (e, attrs) => e ? reject(e) : ok(attrs))), signal);
 		if (st.size > MAX_FILE) throw new Error("文件超过 512 KiB");
+		signal?.throwIfAborted(); this.ensureCurrent(c);
 		const chunks: Buffer[] = []; let size = 0;
-		for await (const chunk of s.createReadStream(path)) { const b = Buffer.from(chunk); size += b.length; if (size > MAX_FILE) throw new Error("文件超过 512 KiB"); chunks.push(b); }
+		const stream = s.createReadStream(path);
+		const abort = () => { stream.destroy(new Error("SSH read aborted")); };
+		signal?.addEventListener("abort", abort, { once: true });
+		try { for await (const chunk of stream) { const b = Buffer.from(chunk); size += b.length; if (size > MAX_FILE) throw new Error("文件超过 512 KiB"); chunks.push(b); } }
+		finally { signal?.removeEventListener("abort", abort); }
 		return Buffer.concat(chunks).toString("utf8");
 	}
-	private async write(c: Connection, path: string, text: string): Promise<void> {
+	private async write(c: Connection, path: string, text: string, signal?: AbortSignal): Promise<void> {
 		if (Buffer.byteLength(text) > MAX_FILE) throw new Error("文件超过 512 KiB");
-		const s = await this.sftp(c);
-		await new Promise<void>((ok, reject) => { const stream = s.createWriteStream(path, { flags: "w" }); stream.once("error", reject); stream.once("close", ok); stream.end(text); });
+		const s = await waitNodeIO(this.sftp(c), signal);
+		signal?.throwIfAborted(); this.ensureCurrent(c);
+		await new Promise<void>((ok, reject) => {
+			const stream = s.createWriteStream(path, { flags: "w" });
+			const abort = () => { reject(new Error("SSH write aborted")); stream.destroy(); };
+			signal?.addEventListener("abort", abort, { once: true });
+			stream.once("error", reject); stream.once("close", () => { signal?.removeEventListener("abort", abort); ok(); }); stream.end(text);
+		});
 	}
 
 }
