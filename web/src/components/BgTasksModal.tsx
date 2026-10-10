@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { UiIcon } from "./UiIcon";
 import { useEffect, useState } from "react";
 import { FiLayers, FiRefreshCw, FiSquare, FiTerminal, FiX } from "react-icons/fi";
@@ -30,6 +31,7 @@ function formatSince(since: number, t: ReturnType<typeof useT>): string {
  */
 export function BgTasksModal({ servers, send, onClose }: BgTasksModalProps) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	// Which tasks have their command line expanded (default: one truncated line
 	// + hover tooltip; click toggles full wrap so long commands stay readable).
 	// 插件任务无 port——用 taskId 作展开键。
@@ -50,7 +52,7 @@ export function BgTasksModal({ servers, send, onClose }: BgTasksModalProps) {
 
 	return (
 		<div className="modal-backdrop" onClick={onClose}>
-			<div className="bg-task-modal" onClick={(e) => e.stopPropagation()}>
+			<div className="bg-task-modal" role="dialog" aria-modal="true" aria-label={t("bgTasks")} ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
 				<div className="bg-task-head">
 					<span className="bg-task-title">
 						<FiLayers /> {t("bgTasks")}

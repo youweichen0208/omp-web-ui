@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { ComponentUpdatesPanel } from "./ComponentUpdatesPanel";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ExtensionsPanel } from "./ExtensionsPanel";
@@ -26,6 +27,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ chat, send, onClose, initialTab = "prompt" }: SettingsModalProps) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	const [extensionUpdates,setExtensionUpdates]=useState(0);
 	const canLeave=()=>!document.querySelector('.ext-editor[data-dirty="true"], .prompt-editor[data-dirty="true"], .mcp-workbench[data-dirty="true"]')||window.confirm(t("extDiscard"));
 	const close=()=>{if(canLeave())onClose();};
@@ -42,10 +44,10 @@ export function SettingsModal({ chat, send, onClose, initialTab = "prompt" }: Se
 	];
 	const updates = chat.componentUpdates?.cwd === chat.state?.cwd ? chat.componentUpdates : null;
 	return <div className="modal-backdrop" onClick={close}>
-		<div className="modal settings-modal" role="dialog" aria-modal="true" aria-label={t("settingsTitle")} onClick={event => event.stopPropagation()}>
+		<div className="modal settings-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t("settingsTitle")} onClick={event => event.stopPropagation()}>
 			<div className="modal-head"><button className="icon-btn" aria-label={t("close")} onClick={close}><FiX /></button></div>
 			<div className="settings-layout">
-				<nav className="settings-rail" aria-label={t("settingsTitle")}><h2>{t("settingsTitle")}</h2>{tabs.map(item => <button key={item.id} title={item.label} className={`settings-tab${tab === item.id ? " active" : ""}`} onClick={() => { if(canLeave())setTab(item.id); }}><span className="settings-tab-icon">{item.icon}</span><span className="settings-tab-label">{item.label}{item.id === "updates" && extensionUpdates > 0 && <span className="ext-rail-badge">{extensionUpdates}</span>}</span></button>)}</nav>
+				<nav className="settings-rail" aria-label={t("settingsTitle")}><h2>{t("settingsTitle")}</h2>{tabs.map(item => <button key={item.id} title={item.label} aria-current={tab === item.id ? "page" : undefined} className={`settings-tab${tab === item.id ? " active" : ""}`} onClick={() => { if(canLeave())setTab(item.id); }}><span className="settings-tab-icon">{item.icon}</span><span className="settings-tab-label">{item.label}{item.id === "updates" && extensionUpdates > 0 && <span className="ext-rail-badge">{extensionUpdates}</span>}</span></button>)}</nav>
 				<div className="modal-body"><div className="set-section">
 					{!settings ? <p>{t("loading")}</p> : <>
 						<label className="tree-edit-preference"><input type="checkbox" checked={settings.editResendNewSession ?? false} onChange={event => send({ type: "set_settings", editResendNewSession: event.target.checked })} />{t("treeEditNewSession")}</label>

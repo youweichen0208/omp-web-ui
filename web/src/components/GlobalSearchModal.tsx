@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import {
 	useCallback,
 	useDeferredValue,
@@ -67,6 +68,7 @@ export function GlobalSearchModal({
 	onPreviewFile,
 }: GlobalSearchModalProps) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	const inputRef = useRef<HTMLInputElement>(null);
 	const [query, setQuery] = useState("");
 	const deferredQuery = useDeferredValue(query);
@@ -215,13 +217,14 @@ export function GlobalSearchModal({
 
 	return (
 		<div className="modal-backdrop gs-backdrop" onClick={onClose}>
-			<div className="gs-modal" onClick={(e) => e.stopPropagation()}>
+			<div className="gs-modal" role="dialog" aria-modal="true" aria-label={t(filesOnly ? "treeSearchFiles" : "searchGlobal")} ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
 				<div className="gs-input-row">
 					<FiSearch />
 					<input
 						ref={inputRef}
 						type="text"
 						value={query}
+						aria-label={t(filesOnly ? "treeSearchFiles" : "searchGlobal")}
 						placeholder={t(filesOnly ? "treeSearchFiles" : "gsPlaceholder")}
 						onChange={(e) => setQuery(e.target.value)}
 					/>

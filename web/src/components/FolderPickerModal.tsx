@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { useEffect, useState } from "react";
 import {
 	FiCheck,
@@ -38,6 +39,7 @@ export function FolderPickerModal({
 	pickLabel?: string;
 }) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	const [manual, setManual] = useState("");
 
 	// Open on the home directory (server decides what that is).
@@ -69,7 +71,7 @@ export function FolderPickerModal({
 		<div className="modal-backdrop" onClick={onClose}>
 			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop-only affordance */}
 			<div
-				className="fpk-modal"
+				className="fpk-modal" ref={dialogRef} tabIndex={-1}
 				role="dialog"
 				aria-modal="true"
 				onClick={(e) => e.stopPropagation()}

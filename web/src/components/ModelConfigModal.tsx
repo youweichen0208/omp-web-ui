@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { useEffect, useRef, useState } from "react";
 import {
 	FiCopy,
@@ -124,6 +125,7 @@ export function ModelConfigModal({
 	onClose,
 }: ModelConfigModalProps) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	const [editing, setEditing] = useState<Draft | null>(null);
 	/** Built-in provider rows: providerId → inline key being typed. */
 	const [keys, setKeys] = useState<Record<string, string>>({});
@@ -342,7 +344,7 @@ export function ModelConfigModal({
 
 	return (
 		<div className="modal-backdrop" onClick={onClose}>
-			<div className="modal model-modal" onClick={(e) => e.stopPropagation()}>
+			<div className="modal model-modal" role="dialog" aria-modal="true" aria-label={t("manageModelsTitle")} ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
 				<button
 					type="button"
 					className="modal-close"

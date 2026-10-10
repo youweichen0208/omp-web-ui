@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { UiIcon } from "./UiIcon";
 import { useEffect, useState } from "react";
 import { FiCpu, FiRefreshCw, FiX } from "react-icons/fi";
@@ -32,6 +33,7 @@ export function PiSetupModal({
 	onClose,
 }: PiSetupModalProps) {
 	const t = useT();
+	const dialogRef = useDialogFocus();
 	const [installing, setInstalling] = useState(false);
 	const [provider, setProvider] = useState("");
 	const [apiKey, setApiKey] = useState("");
@@ -88,7 +90,7 @@ export function PiSetupModal({
 
 	return (
 		<div className="modal-backdrop">
-			<div className="modal setup-modal">
+			<div className="modal setup-modal" role="dialog" aria-modal="true" aria-label={t("setupTitle")} ref={dialogRef} tabIndex={-1}>
 				<button
 					type="button"
 					className="modal-close"

@@ -11804,3 +11804,25 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 .design-workspace .panel-right .tree-modified-count { min-width: 20px; padding: 3px 5px; border-radius: var(--r-md); background: var(--yellow-bg); color: var(--yellow-fg); font: 11px/1.3 var(--sans); text-align: center; }
 .design-workspace .panel-right .tree-root:hover { background: var(--row-hover); }
 .design-workspace .panel-right :is(.tree-search, .tree-root):active { background: var(--row-active); }
+
+/* UI/UX polish — shared dialogs and responsive settings navigation. */
+.modal-backdrop :is(button, a[href], input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.modal-backdrop :is(.modal, .gs-modal, .fpk-modal, .bg-task-modal):focus { outline: none; }
+.modal-backdrop :is(input, select, textarea) { scroll-margin-block: 16px; }
+.settings-modal .settings-tab { min-height: 38px; }
+.settings-modal .settings-tab-icon { display: inline-flex; width: 16px; height: 16px; align-items: center; }
+.settings-modal .settings-tab[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.settings-modal .settings-rail { gap: 4px; }
+.settings-modal .modal-body { scroll-padding-block: 24px; }
+@media (max-width: 640px) {
+	.settings-modal { padding: 0; }
+	.settings-modal .settings-layout { flex-direction: column; }
+	.settings-modal .settings-rail { width: 100%; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; padding: 52px 12px 12px; gap: 6px; border-right: 0; border-bottom: 1px solid var(--border-soft); }
+	.settings-modal .settings-rail > h2 { position: absolute; top: 18px; left: 16px; margin: 0; font-size: 14px; }
+	.settings-modal .settings-tab { width: auto; flex: none; min-height: 40px; padding: 8px 12px; justify-content: flex-start; }
+	.settings-modal .settings-tab-label { display: flex; overflow: visible; }
+	.settings-modal .modal-body { padding: 20px 16px; }
+	.settings-modal > .modal-head { top: 10px; right: 12px; }
+	.settings-modal > .modal-head button { min-width: 36px; min-height: 36px; }
+	.modal-backdrop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+}
