@@ -608,6 +608,7 @@ export function ScmPanel({
 					</span>
 					<select
 						className="scm-select"
+						aria-label={t("scmSelectBranch")}
 						value={branchSel}
 						disabled={notRepo || branches.length === 0}
 						title={t("scmSwitchBranch")}
@@ -663,6 +664,7 @@ export function ScmPanel({
 					</button>
 					<input
 						className="scm-commit-input"
+						aria-label={t("scmCommitPlaceholder")}
 						value={commitMsg}
 						placeholder={t("scmCommitPlaceholder")}
 						disabled={notRepo}
@@ -826,7 +828,7 @@ export function ScmPanel({
 					<div className="scm-diff-body">
 						{viewMode === "history" ? (
 							<>
-								{error && <div className="scm-error">{error}</div>}
+								{error && <div className="scm-error" role="alert">{error}</div>}
 								{!selectedCommit && !error && (
 									<div className="scm-empty">{t("scmSelectCommitHint")}</div>
 								)}
@@ -839,7 +841,7 @@ export function ScmPanel({
 							</>
 						) : (
 							<>
-								{error && <div className="scm-error">{error}</div>}
+								{error && <div className="scm-error" role="alert">{error}</div>}
 								{!selected && !error && (
 									<div className="scm-empty">{t("scmSelectFileHint")}</div>
 								)}

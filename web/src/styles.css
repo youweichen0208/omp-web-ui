@@ -11826,3 +11826,33 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 	.settings-modal > .modal-head button { min-width: 36px; min-height: 36px; }
 	.modal-backdrop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
 }
+
+/* Workbenches: keep navigation legible and diffs usable on narrow screens. */
+.scm-branch-current { min-width: 0; overflow-wrap: anywhere; }
+.scm-select, .scm-commit-input { min-width: 0; }
+.node-source-card > code, .node-detail dd { overflow-wrap: anywhere; }
+.node-source-card .node-actions { row-gap: 8px; }
+@media (max-width: 700px) {
+	.scm-body { flex-direction: column; }
+	.scm-body > :is(.scm-files, .scm-history) { width: 100%; flex: 0 1 180px; min-height: 88px; border-right: 0; border-bottom: 1px solid var(--border-soft); }
+	.scm-diff { width: 100%; flex: 1 1 180px; min-height: 120px; }
+	.scm-diff-header { overflow-wrap: anywhere; }
+	.scm-row { gap: 8px; }
+	.scm-row .scm-branch-current { flex-basis: 100%; }
+	.scm-row .scm-commit-input { flex: 1 1 65%; }
+	.scm-row :is(input, select), .node-workbench :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea), .cmd-input { font-size: 16px; }
+}
+@media (pointer: coarse) {
+	:is(.scm-row, .scm-view-tabs, .node-actions, .node-filebar) button, .node-sidebar > header button, .node-sidebar > input { min-height: 44px; }
+	.scm-file, .scm-commit { min-height: 44px; }
+	.term-side-toggle, .terminal-view :is(.panel-refresh, .panel-new, .cmd-act) { min-width: 44px; min-height: 44px; }
+	.terminal-view .cmd-act { opacity: 1; }
+	.term-main { padding-top: 62px; }
+}
+
+@media (max-width: 760px) {
+	.wiki-workbench { --wiki-title: 28px; --wiki-body: 16px; }
+	.wiki-workbench .wiki-document { padding-inline: 20px; }
+	.wiki-chat-panel textarea, .wiki-composer textarea { font-size: 16px; }
+	.wiki-document-heading h1 { overflow-wrap: anywhere; }
+}

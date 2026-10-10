@@ -40,3 +40,12 @@
 - 已实现设置小屏顶部文字导航、选中状态语义和弹窗表单 16px 字号。
 - `tests/ui-ux-polish-browser-test.mjs` 通过：设置/搜索焦点进入、双向 Tab 边界、关闭恢复；设置 5 页 × 375/768/1440 × light/dark 的渲染与截图（tests/scratch/polish-settings-*）。这些仅证明基础布局与导航，不代表安装/保存/信任等功能流程已验收。已人工检查 375px 浅色提示词页面截图。
 - 当前仍需逐页检查真实内容、错误状态、长文本、横屏/放大及功能回归；未完成整个目标。
+
+### Workbench verification checkpoint
+
+- Git below 700px now stacks the file/history list above the diff, retaining independent scrolling. Branch and commit inputs have accessible names; errors use alerts. Long node paths wrap, touch workbench targets are at least 44px, and small-screen form inputs use 16px text.
+- Wiki opens with the document visible at widths <=760px. Desktop still opens chat by default. Resizing alone does not override the user's panel choice. Mobile body/title sizes are 16/28px with 20px horizontal gutters.
+- PASS: `tests/ui-workbenches-browser-test.mjs`: terminal/nodes/Git/Wiki at 375/768/1440 in light/dark; actual temporary Git diff; stacked diff geometry; mobile file-search navigation to Wiki and chat toggle. Screenshots: `tests/scratch/workbench-*`. Visually inspected phone Git, nodes, terminal, Wiki reading, and desktop dark Wiki.
+- PASS: `tests/wiki-panels-browser-test.mjs` (simulated Windows shell panel reopening/resizing).
+- PASS: `tests/node-workbench-browser-test.mjs` (local mock SSH connection, credentials, PTY input/output, SFTP, node isolation, source sync). Replaced the obsolete manual-workbench tab click with an assertion that manual terminal and Agent are simultaneously visible.
+- PASS: typecheck, build, design tokens. This is partial evidence, not completion of the page checklist above. Next: file previews, session tree, settings detail/error states, remaining dialog families, landscape/text scaling/reduced-motion, and final regression.

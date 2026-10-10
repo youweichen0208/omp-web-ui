@@ -44,7 +44,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	const [error, setError] = useState(""), [nav, setNav] = useState<(() => void) | null>(null);
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const [showHidden, setShowHidden] = useState(() => localStorage.getItem(`pi-wiki-hidden:${cwd}`) === "true");
-	const [chatOpen, setChatOpen] = useState(true);
+	const [chatOpen, setChatOpen] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
 	const [sidebarWidth, resizeSidebar] = useWikiPanelWidth("sidebar");
 	const [chatWidth, resizeChat] = useWikiPanelWidth("chat");
 	const [focused, setFocused] = useState(false);
@@ -128,7 +128,7 @@ export function WikiWorkbench({ cwd, conversationId, messages, streaming, live, 
 	useEffect(() => {
 		if (!fileRequest) return;
 		if (docRef.current?.entry.path === fileRequest.path) onContentRequested(fileRequest.token);
-		setFocused(false); setChatOpen(true); setDrawer(null); setPath(fileRequest.path); setSource(false); setSearch(false); setSidebar(false); setSelection(""); setSelectionMenu(null);
+		setFocused(false); setChatOpen(!window.matchMedia("(max-width: 760px)").matches); setComposerOpen(false); setDrawer(null); setPath(fileRequest.path); setSource(false); setSearch(false); setSidebar(false); setSelection(""); setSelectionMenu(null);
 	}, [fileRequest, onContentRequested, doc?.entry.path]);
 	useEffect(() => { if (active) void loadDirectory(""); }, [active, loadDirectory]);
 	useEffect(() => { if (active && path && !fileRequest) void openDocument(path); }, [active, path, fileRequest, openDocument]);

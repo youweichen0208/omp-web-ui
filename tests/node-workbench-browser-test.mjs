@@ -70,7 +70,7 @@ try {
 
 	await page.locator(".node-tabs .active").waitFor({ state: "attached" });
 	assert(await page.locator(".node-agent").count() === 1, "remote agent workbench missing");
-	await page.getByRole("button", { name: "终端与文件", exact: true }).click();
+	assert(await page.locator(".node-manual-workbench").isVisible(), "manual terminal must remain visible beside the agent");
 	assert(prompts.length === 0, "opening nodes created an agent prompt");
 
 	await page.locator(".node-xterm").first().click();
