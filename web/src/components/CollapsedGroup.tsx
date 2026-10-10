@@ -117,21 +117,13 @@ export const CollapsedGroup = memo(function CollapsedGroup({
 			type="button"
 			className="msg-collapsed"
 			data-msg-id={head.id}
-			title={`${t("expandMsg")} · ${preview || chips.map((c) => c.label).join(" · ") || head.role}`}
+			title={[t("expandMsg"), preview, chips.map((c) => c.label).join(" · ")].filter(Boolean).join(" · ")}
+			aria-expanded={false}
 			onClick={() => onExpand(ids)}
 		>
 			<span className={`msg-collapsed-role role-${head.role}`}>{label}</span>
 			<span className="msg-collapsed-body">
-				{preview && <span className="msg-collapsed-preview">{preview}</span>}
-				{chips.length > 0 && (
-					<span className="msg-collapsed-chips">
-						{chips.map((c) => (
-							<span key={c.key} className={`msg-collapsed-chip is-${c.kind}`}>
-								{c.label}
-							</span>
-						))}
-					</span>
-				)}
+				<span className="msg-collapsed-preview">{preview || chips.map((c) => c.label).join(" · ") || label}</span>
 			</span>
 			{head.timestamp ? (
 				<span className="msg-collapsed-time">{formatTime(head.timestamp)}</span>
