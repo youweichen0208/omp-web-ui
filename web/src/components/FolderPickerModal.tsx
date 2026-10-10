@@ -25,11 +25,17 @@ export function FolderPickerModal({
 	onBrowse,
 	onPick,
 	onClose,
+	busy = false,
+	error,
+	pickLabel,
 }: {
 	dirBrowse: DirBrowse | null;
 	onBrowse: (path?: string) => void;
 	onPick: (path: string) => void;
 	onClose: () => void;
+	busy?: boolean;
+	error?: string;
+	pickLabel?: string;
 }) {
 	const t = useT();
 	const [manual, setManual] = useState("");
@@ -70,7 +76,7 @@ export function FolderPickerModal({
 			>
 				<div className="fpk-modal-head">
 					<FiFolder className="modal-head-icon" />
-					<h2>{t("openFolder")}</h2>
+					<h2>{pickLabel ?? t("openFolder")}</h2>
 					<span className="toolcall-spacer" />
 					<button
 						type="button"
@@ -142,12 +148,13 @@ export function FolderPickerModal({
 					)}
 				</div>
 
+				{error && <p className="workspace-group-error" role="alert">{error}</p>}
 				<form
 					className="fpk-modal-foot"
 					onSubmit={(e) => {
 						e.preventDefault();
 						const path = manual.trim() || here;
-						if (path) onPick(path);
+						if (path && !busy) onPick(path);
 					}}
 				>
 					<input
@@ -156,9 +163,9 @@ export function FolderPickerModal({
 						value={manual}
 						onChange={(e) => setManual(e.target.value)}
 					/>
-					<button type="submit" className="fpk-open-btn" disabled={!here && !manual.trim()}>
+					<button type="submit" className="fpk-open-btn" disabled={busy || (!here && !manual.trim())}>
 						<FiCheck />
-						<span>{manual.trim() ? t("openTypedPath") : t("openThisFolder")}</span>
+						<span>{pickLabel ?? (manual.trim() ? t("openTypedPath") : t("openThisFolder"))}</span>
 					</button>
 				</form>
 			</div>

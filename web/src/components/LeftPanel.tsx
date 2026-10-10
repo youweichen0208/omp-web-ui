@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
 	FiCheck,
 	FiChevronDown,
@@ -12,8 +12,14 @@ import type {
 	ConversationSummary,
 	DirBrowse,
 	ProjectSummary,
+	ProjectWorkspaceCatalog,
+	ProjectWorkspaceAction,
+	ServerMessage,
+	ClientMessage,
 	SessionSummary,
 } from "../types";
+import { workspaceProjects } from "../project-workspaces";
+import { randomUuid } from "../uuid";
 import { FolderPickerModal } from "./FolderPickerModal";
 import type { ConnStatus } from "../use-chat";
 import { skillAwarePreview } from "../skill-block";
@@ -36,6 +42,8 @@ interface LeftPanelProps {
 	conversations: ConversationSummary[];
 	sessions: SessionSummary[];
 	projects: ProjectSummary[];
+	projectWorkspaces: ProjectWorkspaceCatalog | null;
+	projectWorkspaceResult: Extract<ServerMessage, { type: "project_workspace_result" }> | null;
 	/** Latest workspace-picker listing (drives FolderPickerModal). */
 	dirBrowse: DirBrowse | null;
 	activeConversationId: string;
@@ -44,6 +52,7 @@ interface LeftPanelProps {
 			| { type: "new_chat" }
 			| { type: "list_sessions" }
 			| { type: "list_projects" }
+			| Extract<ClientMessage, { type: "list_project_workspaces" | "project_workspace_action" }>
 			| { type: "switch_session"; path: string }
 			| { type: "switch_conversation"; id: string }
 			| { type: "set_cwd"; path: string; source?: "ui" }
@@ -71,8 +80,57 @@ function formatModified(ts: number, yesterday: string): string {
 }
 
 export const LeftPanel = memo(function LeftPanel({
-	incidentState, onOpenSettings, onNewChat, ready, status, cwd, sessionFile, conversations, sessions, projects, dirBrowse, activeConversationId, send, active }: LeftPanelProps) {
+	incidentState, onOpenSettings, onNewChat, ready, status, cwd, sessionFile, conversations, sessions, projects, projectWorkspaces, projectWorkspaceResult, dirBrowse, activeConversationId, send, active }: LeftPanelProps) {
 	const { t, locale } = useI18n();
+	const [selectedWorkspace, setSelectedWorkspace] = useState(() => {
+		try { return localStorage.getItem("pi-harness:project-workspace") ?? ""; } catch { return ""; }
+	});
+	const [managingWorkspace, setManagingWorkspace] = useState(false);
+	const [workspaceName, setWorkspaceName] = useState("");
+	const previousWorkspaceName = useRef({ id: "", name: "" });
+	const [workspaceQuery, setWorkspaceQuery] = useState("");
+	const [workspaceError, setWorkspaceError] = useState("");
+	const [deletingWorkspace, setDeletingWorkspace] = useState(false);
+	const [workspacePending, setWorkspacePending] = useState<{ requestId: string; kind: ProjectWorkspaceAction["kind"] } | null>(null);
+	const selectedGroup = projectWorkspaces?.workspaces.find((group) => group.id === selectedWorkspace);
+	const workspaceBusy = !ready || status !== "open" || !projectWorkspaces || !!workspacePending;
+	const chooseWorkspace = (id: string) => {
+		setSelectedWorkspace(id); setWorkspaceQuery(""); setDeletingWorkspace(false); setWorkspaceError("");
+		try { localStorage.setItem("pi-harness:project-workspace", id); } catch { /* optional preference */ }
+	};
+	useEffect(() => {
+		if (projectWorkspaces && selectedWorkspace && !selectedGroup) chooseWorkspace("");
+	}, [projectWorkspaces, selectedWorkspace, selectedGroup]);
+	useEffect(() => {
+		const previous = previousWorkspaceName.current;
+		const next = { id: selectedGroup?.id ?? "", name: selectedGroup?.name ?? "" };
+		// A remote rename updates an untouched form, preserving a local draft.
+		setWorkspaceName((draft) => previous.id !== next.id || draft === previous.name ? next.name : draft);
+		previousWorkspaceName.current = next;
+		setDeletingWorkspace(false);
+	}, [selectedGroup?.id, selectedGroup?.name]);
+	useEffect(() => {
+		if (!workspacePending || projectWorkspaceResult?.requestId !== workspacePending.requestId) return;
+		if (projectWorkspaceResult.ok) {
+			if (workspacePending.kind === "create") chooseWorkspace(projectWorkspaceResult.workspaceId ?? "");
+			if (workspacePending.kind === "add") setPicking(false);
+			setWorkspaceError("");
+		} else setWorkspaceError(projectWorkspaceResult.error ?? t("workspaceSaveFailed"));
+		setWorkspacePending(null);
+	}, [projectWorkspaceResult, workspacePending, t]);
+	useEffect(() => {
+		if (status !== "open") {
+			setWorkspacePending(null);
+			setWorkspaceError("");
+		}
+	}, [status]);
+	const changeWorkspace = (action: ProjectWorkspaceAction) => {
+		if (workspaceBusy || !projectWorkspaces) return;
+		const requestId = randomUuid();
+		if (send({ type: "project_workspace_action", requestId, revision: projectWorkspaces.revision, action })) {
+			setWorkspacePending({ requestId, kind: action.kind }); setWorkspaceError("");
+		} else setWorkspaceError(t("workspaceSaveFailed"));
+	};
 	const currentFile = sessionFile;
 	const currentCwd = cwd;
 	// Two-step delete confirm: which row ("proj:<path>" / "sess:<path>") is
@@ -126,6 +184,7 @@ export const LeftPanel = memo(function LeftPanel({
 		if (!cwd) return;
 		send({ type: "list_sessions" });
 		send({ type: "list_projects" });
+		send({ type: "list_project_workspaces" });
 	}, [active, ready, status, cwd, send]);
 
 	const displayName = (s: SessionSummary): string => {
@@ -168,7 +227,7 @@ export const LeftPanel = memo(function LeftPanel({
 		project.lastConversationAt ?? 0,
 		project.path === currentCwd && sessions.length ? Math.max(...sessions.map((session) => session.modified)) : 0,
 	);
-	const sortedProjects = [...projects].sort((a, b) =>
+	const sortedProjects = workspaceProjects(projects, projectWorkspaces, selectedWorkspace, workspaceQuery).sort((a, b) =>
 		Number(b.path === currentCwd) - Number(a.path === currentCwd) ||
 		projectActivity(b) - projectActivity(a) || a.path.localeCompare(b.path),
 	);
@@ -315,6 +374,32 @@ export const LeftPanel = memo(function LeftPanel({
 		<aside className="panel panel-left">
 			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/icon/1a-mark.svg" alt="" /></span><strong>pi-harness</strong></div>
 			<div className="sidebar-new"><button type="button" onClick={onNewChat}><span><FiPlus />{t("newChat")}</span><kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}N</kbd></button></div>
+			<div className="workspace-groups">
+				<div className="workspace-group-row">
+					<select aria-label={t("workspaceSelect")} value={selectedGroup?.id ?? ""} disabled={!projectWorkspaces || !!workspacePending} onChange={(event) => chooseWorkspace(event.target.value)}>
+						<option value="">{t("workspaceAll")}</option>
+						{projectWorkspaces?.workspaces.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+					</select>
+					<button type="button" aria-label={t("workspaceManage")} title={t("workspaceManage")} aria-expanded={managingWorkspace} onClick={() => setManagingWorkspace((value) => !value)}><FiSettings /></button>
+				</div>
+				{managingWorkspace && <div className="workspace-group-manager">
+					<form onSubmit={(event) => { event.preventDefault(); if (workspaceName.trim()) changeWorkspace({ kind: "create", name: workspaceName }); }}>
+						<input aria-label={t("workspaceName")} placeholder={t("workspaceName")} value={workspaceName} maxLength={80} disabled={workspaceBusy} onChange={(event) => setWorkspaceName(event.target.value)} />
+						<div className="workspace-group-actions">
+							<button type="submit" disabled={workspaceBusy || !workspaceName.trim()}>{t("workspaceCreate")}</button>
+							{selectedGroup && <button type="button" disabled={workspaceBusy || !workspaceName.trim()} onClick={() => changeWorkspace({ kind: "rename", id: selectedGroup.id, name: workspaceName })}>{t("workspaceRename")}</button>}
+						</div>
+					</form>
+					{selectedGroup && <>
+						<button type="button" disabled={workspaceBusy || !cwd || selectedGroup.paths.includes(cwd)} onClick={() => changeWorkspace({ kind: "add", id: selectedGroup.id, path: cwd })}>{t("workspaceAddCurrent")}</button>
+						<button type="button" className="workspace-group-delete" disabled={workspaceBusy} onClick={() => deletingWorkspace ? changeWorkspace({ kind: "delete", id: selectedGroup.id }) : setDeletingWorkspace(true)}>{t(deletingWorkspace ? "workspaceDeleteConfirm" : "workspaceDelete")}</button>
+						{deletingWorkspace && <p>{t("workspaceDeleteHint")}</p>}
+					</>}
+				</div>}
+				{workspaceError && <p className="workspace-group-error" role="alert">{workspaceError}</p>}
+				<input className="workspace-project-search" type="search" aria-label={t("workspaceSearch")} placeholder={t("workspaceSearch")} value={workspaceQuery} onChange={(event) => setWorkspaceQuery(event.target.value)} />
+				{selectedGroup && !selectedGroup.paths.includes(currentCwd) && <div className="workspace-outside"><span>{t("workspaceOutside")}</span><button type="button" onClick={() => chooseWorkspace("")}>{t("workspaceShowCurrent")}</button></div>}
+			</div>
 			<div className="panel-projects">
 				{/* 加项目收进分组标题行：它是个偶尔用一次的动作，不值得在列表
 				    最上面常驻一整行。 */}
@@ -323,14 +408,16 @@ export const LeftPanel = memo(function LeftPanel({
 					<button
 						type="button"
 						className="lp-add-project"
-						title={t("openFolder")}
-						aria-label={t("openFolder")}
+						title={t(selectedGroup ? "workspaceAddProject" : "openFolder")}
+						aria-label={t(selectedGroup ? "workspaceAddProject" : "openFolder")}
+						disabled={selectedGroup ? workspaceBusy : !ready}
 						onClick={() => setPicking(true)}
 					>
 						<FiPlus />
 					</button>
 				</div>
 				<div className="projects-scroll">
+					{sortedProjects.length === 0 && <div className="panel-empty">{t(workspaceQuery ? "workspaceNoMatches" : "workspaceEmpty")}</div>}
 					{sortedProjects.map((p) => {
 						const active = currentCwd === p.path;
 						const pending = !active && pendingCwd === p.path;
@@ -366,17 +453,19 @@ export const LeftPanel = memo(function LeftPanel({
 										<span className="thinking-spinner project-spinner" aria-hidden="true" />
 									) : (
 										<span className="project-time">
-											{formatModified(projectActivity(p), t("yesterday"))}
+											{projectActivity(p) ? formatModified(projectActivity(p), t("yesterday")) : ""}
 										</span>
 									)}
 								</button>
 								<div className={`lp-menu-zone${openMenu === `proj:${p.path}` ? " is-open" : ""}`} data-menu-key={`proj:${p.path}`}>
 									<button type="button" className="lp-menu-trigger" aria-label={`${projectName(p.path)} · ${t("more")}`} aria-haspopup="menu" aria-expanded={openMenu === `proj:${p.path}`} onClick={() => setOpenMenu((key) => key === `proj:${p.path}` ? null : `proj:${p.path}`)}><FiMoreHorizontal /></button>
-									{openMenu === `proj:${p.path}` && <div className="lp-menu-popover" role="menu">
-										<button type="button" role="menuitem" className={confirmDel === `proj:${p.path}` ? "danger" : ""} onClick={() => {
-											if (confirmDel === `proj:${p.path}`) { send({ type: "remove_project", path: p.path }); setConfirmDel(null); setOpenMenu(null); }
+									{openMenu === `proj:${p.path}` && <div className="lp-menu-popover workspace-project-menu" role="menu">
+										{!selectedGroup && projectWorkspaces?.workspaces.map((group) => <button key={group.id} type="button" role="menuitemcheckbox" aria-checked={group.paths.includes(p.path)} disabled={workspaceBusy} onClick={() => changeWorkspace({ kind: group.paths.includes(p.path) ? "remove" : "add", id: group.id, path: p.path })}>{group.paths.includes(p.path) && <FiCheck />} {group.name}</button>)}
+										{(selectedGroup || !projectWorkspaces?.workspaces.some((group) => group.paths.includes(p.path))) && <>
+										<button type="button" role="menuitem" disabled={selectedGroup ? workspaceBusy : false} className={confirmDel === `proj:${p.path}` ? "danger" : ""} onClick={() => {
+											if (confirmDel === `proj:${p.path}`) { if (selectedGroup) changeWorkspace({ kind: "remove", id: selectedGroup.id, path: p.path }); else send({ type: "remove_project", path: p.path }); setConfirmDel(null); setOpenMenu(null); }
 											else setConfirmDel(`proj:${p.path}`);
-										}}>{confirmDel === `proj:${p.path}` ? t("deleteProjectConfirm") : t("deleteProject")}</button>
+										}}>{confirmDel === `proj:${p.path}` ? t("deleteProjectConfirm") : t(selectedGroup ? "workspaceRemoveProject" : "deleteProject")}</button></>}
 									</div>}
 								</div>
 								{expanded && history}
@@ -386,7 +475,7 @@ export const LeftPanel = memo(function LeftPanel({
 				</div>
 			</div>
 
-			{!projects.some((project) => project.path === currentCwd) && history}
+			{!selectedGroup && !workspaceQuery && !sortedProjects.some((project) => project.path === currentCwd) && history}
 			<div className="sidebar-footer">
 				<span className="sidebar-connection"><i className={ready ? "ok" : "busy"} />{t(ready ? "connected" : "connecting")}</span>
 				<span id="sidebar-settings-slot"><button type="button" onClick={onOpenSettings}><FiSettings aria-hidden="true" /> {t("settings")}</button></span>
@@ -395,11 +484,17 @@ export const LeftPanel = memo(function LeftPanel({
 			{picking && (
 				<FolderPickerModal
 					dirBrowse={dirBrowse}
+					busy={selectedGroup ? workspaceBusy : false}
+					error={selectedGroup ? workspaceError : undefined}
+					pickLabel={selectedGroup ? t("workspaceAddProject") : undefined}
 					onBrowse={(path) => send({ type: "browse_dirs", path })}
 					onPick={(path) => {
-						setPendingCwd(path);
-						send({ type: "set_cwd", path, source: "ui" });
-						setPicking(false);
+						if (selectedGroup) changeWorkspace({ kind: "add", id: selectedGroup.id, path });
+						else {
+							setPendingCwd(path);
+							send({ type: "set_cwd", path, source: "ui" });
+							setPicking(false);
+						}
 					}}
 					onClose={() => setPicking(false)}
 				/>

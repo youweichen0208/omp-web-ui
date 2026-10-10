@@ -128,6 +128,16 @@ serialize.ts 投影 edit 的 diff/firstChangedLine、bash 的退出码和截断�
 
 `snapshot` 里 `streamingMessage` 是进行中的消息（60ms 粒度流式），`messages` 是已落盘的。
 
+## Workspace 项目分组
+
+Workspace 是共享的项目分组，不是 SDK 工作目录或多根 Agent 会话。`server/project-workspaces.ts` 独立保存 `<dataDir>/project-workspaces.json`（原子写入）；同一项目允许属于多个分组，删除分组和移除成员只改索引。每组最多 1000 个路径、最多 100 组，添加时校验绝对路径和目录存在，失效路径仍可移除。
+
+协议 v42：`list_project_workspaces` 返回 `project_workspaces` 并订阅该服务的后续变化；`project_workspace_action` 提交 create/rename/delete/add/remove，携带 revision 和 requestId，`project_workspace_result` 确认结果。过期 revision 拒绝写入并返回当前 catalog。写入失败不提交内存状态；损坏索引保留并报错，避免覆盖用户数据。断线取消订阅，重连重新读取。分组操作不访问 SDK、不生成模型调用，项目切换期间也可处理。
+
+浏览器本地保存当前分组选择，服务器 catalog 在各客户端共享。`web/src/project-workspaces.ts` 合并最近项目与分组成员，确保超过最近项目 20 条限制的成员仍可见。过滤及搜索不改变 cwd；点击项目仍使用 `set_cwd` 和原有草稿保护。移动端分组操作和目录浏览保持抽屉打开。
+
+回归：`tests/unit/project-workspaces.test.ts`（持久化、超过 20 项、过期写入、损坏/写入失败、非破坏删除），`tests/project-workspaces-test.mjs`（双客户端协议），加 `--browser` 验证侧栏交互。
+
 ## 项目切换与展示缓存
 
 `set_cwd` 可携带 `requestId`，服务端通过 `cwd_result` 明确确认成功或失败。界面手动切换还携带 `source: "ui"`，成功后只更新工作区状态；命令切换在目标会话的 transcript 中追加不进入模型上下文的 custom entry，快照通过 `cwdEvents` 传给前端并以居中事件显示，不弹成功通知。
