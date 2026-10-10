@@ -200,8 +200,11 @@
 	--highlight-fg: #242424;
 	--waiting-coral: #ee8c7c;
 	--waiting-blue: #3e8fc0;
-	--shadow-color: #000;
-	--shadow-soft: #0000000a;
+		--shadow-color: #000;
+		--shadow-soft: #0000000a;
+		--shadow-panel: rgba(15, 23, 42, 0.08);
+		--shadow-input: rgba(15, 23, 42, 0.07);
+		--shadow-focus: rgba(37, 99, 235, 0.11);
 	--r-switch: 999px;
 	--r-waiting: 1.5px;
 	--r-sm: 6px;
@@ -216,21 +219,21 @@
 	--input-border: oklch(0.88 0.005 80);
 	--send-disabled-bg: oklch(0.9 0.004 80);
 	--stop-bg: oklch(0.24 0.01 80);
-	--bg: #fbf9f6;
-	--bg-elev: oklch(0.995 0.002 80);
-	--bg-elev2: oklch(0.95 0.004 80);
-	--border: oklch(0.91 0.005 80);
-	--border-soft: oklch(0.92 0.005 80);
-	--text: oklch(0.24 0.01 80);
-	--text-dim: oklch(0.48 0.01 80);
-	--text-faint: oklch(0.52 0.01 80);
-	--heading: oklch(0.22 0.01 80);
-	--accent: #2f7aae;
-	--accent-soft: #eaf2f8;
-	--link: #2f7aae;
-	--sidebar-bg: oklch(0.965 0.003 80);
-	--row-active: oklch(0.93 0.006 80);
-	--bubble-bg: #f1eeea;
+		--bg: #f6f8fb;
+		--bg-elev: #ffffff;
+		--bg-elev2: #eef2f7;
+		--border: #dce3ec;
+		--border-soft: #e8edf3;
+		--text: #1f2937;
+		--text-dim: #64748b;
+		--text-faint: #94a3b8;
+		--heading: #0f172a;
+		--accent: #2563eb;
+		--accent-soft: #eaf2ff;
+		--link: #1d4ed8;
+		--sidebar-bg: #f0f4f8;
+		--row-active: #e5edf9;
+		--bubble-bg: #eef2f7;
 	--code-chip-bg: oklch(0.95 0.004 80);
 	--green: #3e9b5f;
 	--green-soft: #e6f4ea;
@@ -5221,7 +5224,7 @@ span.msg-editor-hint svg {
 
 /* 会话中途"助手正在处理"内联提示（与上面的 .streaming-wait 互补：那个只在
  * 全新空会话时居中大字出现，这个覆盖其余情况——历史消息之后、真正开始吐字
- * 之前的空档，避免看起来像卡住）。 */
+ * 之前的空��，避免看起来像卡住）。 */
 .assistant-wait {
 	display: inline-flex;
 	align-items: center;
@@ -8317,6 +8320,82 @@ html.pi-desktop .desktop-window-controls {
 	html.pi-desktop .view-switch button:not(.plugin-tab) > span { display: none; }
 	html.pi-desktop .topbar-actions { gap: 4px; }
 	html.pi-desktop .topbar-desktop .dropdown:nth-of-type(2) { display: none; }
+}
+
+/* ---- Desktop workspace refinement ---- */
+@media (min-width: 769px) {
+	html.pi-desktop body {
+		background: var(--bg);
+		letter-spacing: -0.005em;
+	}
+	html.pi-desktop .topbar {
+		min-height: 54px;
+		background: color-mix(in srgb, var(--bg-elev) 94%, transparent);
+		border-bottom-color: var(--border);
+		box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 7%, transparent);
+		backdrop-filter: blur(16px);
+	}
+	html.pi-desktop .brand-logo {
+		width: 28px;
+		height: 28px;
+		padding: 5px;
+		background: var(--accent-soft);
+		border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+	}
+	html.pi-desktop .desktop-window-title { color: var(--heading); letter-spacing: -0.01em; }
+	html.pi-desktop .view-switch {
+		padding: 3px;
+		border: 1px solid var(--border);
+		background: var(--bg-elev2);
+		border-radius: var(--r-md);
+	}
+	html.pi-desktop .view-switch button.active {
+		background: var(--bg-elev);
+		color: var(--accent);
+		box-shadow: 0 1px 3px var(--shadow-panel);
+	}
+	html.pi-desktop .panel {
+		background: var(--sidebar-bg);
+		border-color: var(--border);
+	}
+	html.pi-desktop .panel-header {
+		min-height: 48px;
+		padding-inline: 16px;
+		background: color-mix(in srgb, var(--sidebar-bg) 82%, var(--bg-elev));
+	}
+	html.pi-desktop .panel-title {
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: .08em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+	}
+	html.pi-desktop .project-item,
+	html.pi-desktop .session-item,
+	html.pi-desktop .file-item {
+		transition: background .16s ease, color .16s ease, transform .16s ease;
+	}
+	html.pi-desktop .project-item:hover,
+	html.pi-desktop .session-item:hover,
+	html.pi-desktop .file-item:hover { background: color-mix(in srgb, var(--accent-soft) 58%, transparent); }
+	html.pi-desktop .project-item.active,
+	html.pi-desktop .session-item.active { box-shadow: inset 2px 0 var(--accent); }
+	html.pi-desktop .main { background: var(--bg-elev); }
+	html.pi-desktop .messages { padding-top: 30px; }
+	html.pi-desktop .messages > * { max-width: 880px; margin-inline: auto; width: min(100% - 64px, 880px); }
+	html.pi-desktop .chat-input-wrap {
+		padding: 12px 32px 18px;
+		background: linear-gradient(to top, var(--bg-elev) 74%, transparent);
+	}
+	html.pi-desktop .inputbox {
+		max-width: 880px;
+		margin-inline: auto;
+		border-color: var(--border);
+		background: var(--bg-elev);
+		box-shadow: 0 8px 28px var(--shadow-input);
+	}
+	html.pi-desktop .inputbox:focus-within { box-shadow: 0 8px 28px var(--shadow-focus), 0 0 0 3px var(--accent-soft); }
+	html.pi-desktop .statusbar { border-top-color: var(--border-soft); background: var(--bg-elev); }
 }
 
 /* ---- Footer Git branch ---- */
