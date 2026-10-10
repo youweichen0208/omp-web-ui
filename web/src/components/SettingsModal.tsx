@@ -1,4 +1,4 @@
-import { useDialogFocus } from "../use-dialog-focus";
+import { isTopDialog, useDialogFocus } from "../use-dialog-focus";
 import { ComponentUpdatesPanel } from "./ComponentUpdatesPanel";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ExtensionsPanel } from "./ExtensionsPanel";
@@ -31,7 +31,7 @@ export function SettingsModal({ chat, send, onClose, initialTab = "prompt" }: Se
 	const [extensionUpdates,setExtensionUpdates]=useState(0);
 	const canLeave=()=>!document.querySelector('.ext-editor[data-dirty="true"], .prompt-editor[data-dirty="true"], .mcp-workbench[data-dirty="true"]')||window.confirm(t("extDiscard"));
 	const close=()=>{if(canLeave())onClose();};
-	useEffect(() => { const handle = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) close(); }; window.addEventListener("keydown", handle); return () => window.removeEventListener("keydown", handle); }, [onClose]);
+	useEffect(() => { const handle = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented && isTopDialog(dialogRef.current)) close(); }; window.addEventListener("keydown", handle); return () => window.removeEventListener("keydown", handle); }, [onClose]);
 	const [tab, setTab] = useState<Tab>(initialTab);
 	const settings = chat.settings;
 	useEffect(() => { if (tab === "updates" && chat.ready) send({ type: "check_component_updates", requestId: randomUuid() }); }, [tab, chat.ready, chat.state?.cwd, send]);

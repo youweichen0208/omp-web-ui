@@ -19,6 +19,8 @@ try {
 	mkdirSync('tests/scratch',{recursive:true});
 	const page=await browser.newPage({viewport:{width:1440,height:960}});
 	const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+	let wire;
+	await page.routeWebSocket('**/ws', route => { wire=route; route.connectToServer(); });
 	await page.goto(`http://localhost:${port}`);
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.workspace-group-manager input').fill('Engineering');
@@ -32,6 +34,15 @@ try {
 	await modal.waitFor();
 	await sleep(100);
 	assert(await modal.evaluate(el=>el.contains(document.activeElement)), 'opening settings moves keyboard focus inside');
+	for(const requestId of ['auth-one','auth-two']) {
+		wire.send(JSON.stringify({type:'provider_auth',state:{requestId,provider:'fixture',phase:'error',message:'Local authentication fixture'}}));
+		const auth=page.locator('.provider-auth-modal');await auth.waitFor();
+		await auth.locator('.modal-actions button').focus();await page.keyboard.press('Tab');
+		assert(await auth.evaluate(el=>el.contains(document.activeElement)));
+		await page.keyboard.press('Escape');await auth.waitFor({state:'detached'});
+		assert(await modal.isVisible(),'Escape closes only the top dialog');
+		assert(await modal.evaluate(el=>el.contains(document.activeElement)));
+	}
 	const last=modal.locator('button:visible').last();await last.focus();
 	await page.keyboard.press('Tab');
 	assert(await modal.evaluate(el=>el.contains(document.activeElement)), 'Tab stays in the dialog');

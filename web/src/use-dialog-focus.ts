@@ -1,16 +1,23 @@
 import { useEffect, useRef } from "react";
 
 const dialogs: HTMLElement[] = [];
+export const isTopDialog = (root: HTMLElement | null) => !!root && dialogs.at(-1) === root;
 const focusable = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /** Keep keyboard traversal in the topmost dialog and restore its opener. */
-export function useDialogFocus() {
-	const ref = useRef<HTMLDivElement>(null);
+export function useDialogFocus<T extends HTMLElement = HTMLDivElement>(active = true) {
+	const ref = useRef<T>(null);
 	const openerRef = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
 	const menuTriggerRef = useRef(openerRef.current?.closest(".dropdown")?.querySelector<HTMLElement>(":scope > button") ?? null);
+	const previouslyActive = useRef(false);
+	if (active && !previouslyActive.current) {
+		openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		menuTriggerRef.current = openerRef.current?.closest(".dropdown")?.querySelector<HTMLElement>(":scope > button") ?? null;
+	}
+	previouslyActive.current = active;
 	useEffect(() => {
 		const root = ref.current;
-		if (!root) return;
+		if (!active || !root) return;
 		const opener = openerRef.current;
 		dialogs.push(root);
 		const controls = () => Array.from(root.querySelectorAll<HTMLElement>(focusable)).filter(element =>
@@ -39,6 +46,6 @@ export function useDialogFocus() {
 			const restore = opener?.isConnected ? opener : menuTriggerRef.current;
 			if (topmost && restore?.isConnected) restore.focus({ preventScroll: true });
 		};
-	}, []);
+	}, [active]);
 	return ref;
 }

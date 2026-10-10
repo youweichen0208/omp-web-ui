@@ -225,7 +225,13 @@ try {
 		await page.getByRole("textbox", { name: "搜索会话树" }).fill("root question");
 		await wait(async () => (await page.locator(".tree-node").count()) === 1);
 		await page.getByRole("button", { name: "设置书签", exact: true }).click();
-		await page.getByRole("dialog", { name: "设置书签" }).getByRole("textbox").fill("browser checkpoint");
+		const bookmarkDialog = page.getByRole("dialog", { name: "设置书签" });
+		await bookmarkDialog.getByRole("textbox").fill("browser checkpoint");
+		await bookmarkDialog.getByRole("button", { name: "保存", exact: true }).focus();
+		await page.keyboard.press("Tab");
+		assert(await bookmarkDialog.evaluate(el => el.contains(document.activeElement)));
+		await page.keyboard.press("Shift+Tab");
+		assert(await bookmarkDialog.evaluate(el => el.contains(document.activeElement)));
 		await page.getByRole("dialog", { name: "设置书签" }).getByRole("button", { name: "保存", exact: true }).click();
 		await page.getByText("browser checkpoint", { exact: true }).first().waitFor();
 		await page.locator(".tree-node-preview").click();

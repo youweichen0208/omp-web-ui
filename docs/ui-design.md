@@ -232,3 +232,7 @@ Wiki 对话面板和展开的底部输入卡片复用聊天的模型、思考强
 Git 工作台在 700px 以下将改动/历史列表放在 diff 上方，各自滚动，避免手机上两列挤压。分支与提交输入保留可访问名称，错误使用 alert。触屏终端工具按钮、Git 行及节点主要操作最小 44px；手机表单输入 16px，长路径可换行。
 
 手机（≤760px）打开 Wiki 文档默认先显示正文，聊天收起为底部输入入口，可通过顶栏「对话」或 Cmd/Ctrl+J 展开；桌面仍默认展开聊天。切换文档重新按当前窗口宽度选择初始布局；单纯缩放窗口不覆盖用户手动展开/收起。手机文档正文为 16px，标题 28px，左右留白 20px。
+
+### Secondary dialogs and previews
+
+Node source/credential/edit forms, session-tree navigation/bookmark/content dialogs, and provider authentication use the shared focus boundary. Conditional dialogs register only while visible; reopening captures the new trigger. Escape in provider authentication closes only that topmost dialog, leaving settings underneath open. Small-screen secondary dialog fields use 16px text; action rows wrap and touch targets have at least 44px height. SQLite tables retain their own horizontal scrolling.

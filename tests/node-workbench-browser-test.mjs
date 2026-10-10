@@ -55,6 +55,12 @@ try {
 	await page.getByRole("tab", { name: "节点" }).click();
 	await page.locator(".node-sidebar header button").click();
 	const form = page.locator(".node-modal");
+	await page.waitForFunction(() => document.querySelector('.node-modal')?.contains(document.activeElement));
+	await form.getByRole('button', { name: '保存', exact: true }).focus();
+	await page.keyboard.press('Tab');
+	assert(await form.evaluate(el => el.contains(document.activeElement)), 'node dialog must retain Tab focus');
+	await page.keyboard.press('Shift+Tab');
+	assert(await form.evaluate(el => el.contains(document.activeElement)), 'node dialog must retain reverse Tab focus');
 	await form.getByLabel("分组").fill("开发");
 	await form.getByLabel("名称").fill("alpha");
 	await form.getByLabel("地址").fill("127.0.0.1");

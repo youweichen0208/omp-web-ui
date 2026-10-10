@@ -49,3 +49,14 @@
 - PASS: `tests/wiki-panels-browser-test.mjs` (simulated Windows shell panel reopening/resizing).
 - PASS: `tests/node-workbench-browser-test.mjs` (local mock SSH connection, credentials, PTY input/output, SFTP, node isolation, source sync). Replaced the obsolete manual-workbench tab click with an assertion that manual terminal and Agent are simultaneously visible.
 - PASS: typecheck, build, design tokens. This is partial evidence, not completion of the page checklist above. Next: file previews, session tree, settings detail/error states, remaining dialog families, landscape/text scaling/reduced-motion, and final regression.
+
+### Third checkpoint: previews, session tree and remaining shared dialogs
+
+- Extended the focus hook to conditional dialogs and generic element roots; node source/credentials/edit, session-tree navigation/bookmark/content, and provider authentication now retain keyboard focus and restore their opener. Settings and authentication check the active dialog before handling Escape.
+- Improved small-screen tree/secondary-dialog input sizes, wrapped action rows, scrollable long content, and coarse-pointer preview controls.
+- PASS: node browser regression including forward/reverse Tab in the new-node form; native session-tree protocol and browser suite including bookmark focus, branch navigation, summary outcomes, external changes, and draft protection.
+- PASS: SQLite browser suite (tables/views, pagination, empty/corrupt data, int64/blob/null, read-only, workspace isolation and late responses).
+- PASS: new `ui-preview-polish-browser-test.mjs`: edit and save a real code file, verify disk contents, verify editor intersects the viewport at 375/768/1440 in light/dark, landscape and reduced-motion. Visually inspected the mobile preview screenshot. Resizing to mobile requires opening the existing file drawer; the test verifies the actual viewport, not merely Playwright visibility of offscreen elements.
+- PASS: shared dialog suite, now including repeated authentication dialogs above settings and Escape preserving the underlying settings dialog. Typecheck/build/design pass.
+- Legacy `file-editor-ui-test.mjs` remains stale: it expects the removed thinking-segments control, fixed-time drawer animation, and Markdown inside the old preview rather than Wiki. Its source was left unchanged. Current preview test covers real code saves; comprehensive conflict/guard evidence still needs the current protocol tests in final regression.
+- Still incomplete: settings detail workflows, Wiki search/edit flows, chat/error/queue states, plugin host, remaining accessibility/layout matrix and final regression. Do not treat this checkpoint as completion.
