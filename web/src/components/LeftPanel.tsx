@@ -99,7 +99,10 @@ export const LeftPanel = memo(function LeftPanel({
 		try { localStorage.setItem("pi-harness:project-workspace", id); } catch { /* optional preference */ }
 	};
 	useEffect(() => {
-		if (projectWorkspaces && selectedWorkspace && !selectedGroup) chooseWorkspace("");
+		if (projectWorkspaces && !selectedGroup) {
+			const next = projectWorkspaces.workspaces[0]?.id ?? "";
+			if (next !== selectedWorkspace) chooseWorkspace(next);
+		}
 	}, [projectWorkspaces, selectedWorkspace, selectedGroup]);
 	useEffect(() => {
 		const previous = previousWorkspaceName.current;
@@ -373,16 +376,16 @@ export const LeftPanel = memo(function LeftPanel({
 	return (
 		<aside className="panel panel-left">
 			<div className="sidebar-brand"><span className="sidebar-logo"><img src="/icon/1a-mark.svg" alt="" /></span><strong>pi-harness</strong></div>
-			<div className="sidebar-new"><button type="button" onClick={onNewChat}><span><FiPlus />{t("newChat")}</span><kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}N</kbd></button></div>
 			<div className="workspace-groups">
 				<div className="workspace-group-row">
 					<select aria-label={t("workspaceSelect")} value={selectedGroup?.id ?? ""} disabled={!projectWorkspaces || !!workspacePending} onChange={(event) => chooseWorkspace(event.target.value)}>
-						<option value="">{t("workspaceAll")}</option>
+						{!selectedGroup && <option value="" disabled>{t("workspaceSelect")}</option>}
 						{projectWorkspaces?.workspaces.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
 					</select>
-					<button type="button" aria-label={t("workspaceManage")} title={t("workspaceManage")} aria-expanded={managingWorkspace} onClick={() => setManagingWorkspace((value) => !value)}><FiSettings /></button>
+					<button type="button" aria-label={t("workspaceManage")} title={t("workspaceManage")} aria-expanded={managingWorkspace || projectWorkspaces?.workspaces.length === 0} onClick={() => setManagingWorkspace((value) => !value)}><FiSettings /></button>
 				</div>
-				{managingWorkspace && <div className="workspace-group-manager">
+				{projectWorkspaces && (managingWorkspace || projectWorkspaces.workspaces.length === 0) && <div className="workspace-group-manager">
+					{projectWorkspaces.workspaces.length === 0 && <p>{t("workspaceFirstStart")}</p>}
 					<form onSubmit={(event) => { event.preventDefault(); if (workspaceName.trim()) changeWorkspace({ kind: "create", name: workspaceName }); }}>
 						<input aria-label={t("workspaceName")} placeholder={t("workspaceName")} value={workspaceName} maxLength={80} disabled={workspaceBusy} onChange={(event) => setWorkspaceName(event.target.value)} />
 						<div className="workspace-group-actions">
@@ -397,10 +400,10 @@ export const LeftPanel = memo(function LeftPanel({
 					</>}
 				</div>}
 				{workspaceError && <p className="workspace-group-error" role="alert">{workspaceError}</p>}
-				<input className="workspace-project-search" type="search" aria-label={t("workspaceSearch")} placeholder={t("workspaceSearch")} value={workspaceQuery} onChange={(event) => setWorkspaceQuery(event.target.value)} />
-				{selectedGroup && !selectedGroup.paths.includes(currentCwd) && <div className="workspace-outside"><span>{t("workspaceOutside")}</span><button type="button" onClick={() => chooseWorkspace("")}>{t("workspaceShowCurrent")}</button></div>}
+				{selectedGroup && <input className="workspace-project-search" type="search" aria-label={t("workspaceSearch")} placeholder={t("workspaceSearch")} value={workspaceQuery} onChange={(event) => setWorkspaceQuery(event.target.value)} />}
+				{selectedGroup && !selectedGroup.paths.includes(currentCwd) && <div className="workspace-outside"><span>{t("workspaceOutside")}</span><button type="button" disabled={workspaceBusy} onClick={() => changeWorkspace({ kind: "add", id: selectedGroup.id, path: currentCwd })}>{t("workspaceAddCurrent")}</button></div>}
 			</div>
-			<div className="panel-projects">
+			{selectedGroup && <div className="panel-projects">
 				{/* 加项目收进分组标题行：它是个偶尔用一次的动作，不值得在列表
 				    最上面常驻一整行。 */}
 				<div className="panel-section-title">
@@ -408,9 +411,9 @@ export const LeftPanel = memo(function LeftPanel({
 					<button
 						type="button"
 						className="lp-add-project"
-						title={t(selectedGroup ? "workspaceAddProject" : "openFolder")}
-						aria-label={t(selectedGroup ? "workspaceAddProject" : "openFolder")}
-						disabled={selectedGroup ? workspaceBusy : !ready}
+						title={t("workspaceAddProject")}
+						aria-label={t("workspaceAddProject")}
+						disabled={workspaceBusy}
 						onClick={() => setPicking(true)}
 					>
 						<FiPlus />
@@ -460,12 +463,11 @@ export const LeftPanel = memo(function LeftPanel({
 								<div className={`lp-menu-zone${openMenu === `proj:${p.path}` ? " is-open" : ""}`} data-menu-key={`proj:${p.path}`}>
 									<button type="button" className="lp-menu-trigger" aria-label={`${projectName(p.path)} · ${t("more")}`} aria-haspopup="menu" aria-expanded={openMenu === `proj:${p.path}`} onClick={() => setOpenMenu((key) => key === `proj:${p.path}` ? null : `proj:${p.path}`)}><FiMoreHorizontal /></button>
 									{openMenu === `proj:${p.path}` && <div className="lp-menu-popover workspace-project-menu" role="menu">
-										{!selectedGroup && projectWorkspaces?.workspaces.map((group) => <button key={group.id} type="button" role="menuitemcheckbox" aria-checked={group.paths.includes(p.path)} disabled={workspaceBusy} onClick={() => changeWorkspace({ kind: group.paths.includes(p.path) ? "remove" : "add", id: group.id, path: p.path })}>{group.paths.includes(p.path) && <FiCheck />} {group.name}</button>)}
-										{(selectedGroup || !projectWorkspaces?.workspaces.some((group) => group.paths.includes(p.path))) && <>
-										<button type="button" role="menuitem" disabled={selectedGroup ? workspaceBusy : false} className={confirmDel === `proj:${p.path}` ? "danger" : ""} onClick={() => {
-											if (confirmDel === `proj:${p.path}`) { if (selectedGroup) changeWorkspace({ kind: "remove", id: selectedGroup.id, path: p.path }); else send({ type: "remove_project", path: p.path }); setConfirmDel(null); setOpenMenu(null); }
+										{active && <button type="button" role="menuitem" disabled={!ready} onClick={() => { setOpenMenu(null); onNewChat(); }}>{t("newChat")}</button>}
+										<button type="button" role="menuitem" disabled={workspaceBusy} className={confirmDel === `proj:${p.path}` ? "danger" : ""} onClick={() => {
+											if (confirmDel === `proj:${p.path}`) { changeWorkspace({ kind: "remove", id: selectedGroup.id, path: p.path }); setConfirmDel(null); setOpenMenu(null); }
 											else setConfirmDel(`proj:${p.path}`);
-										}}>{confirmDel === `proj:${p.path}` ? t("deleteProjectConfirm") : t(selectedGroup ? "workspaceRemoveProject" : "deleteProject")}</button></>}
+										}}>{confirmDel === `proj:${p.path}` ? t("deleteProjectConfirm") : t("workspaceRemoveProject")}</button>
 									</div>}
 								</div>
 								{expanded && history}
@@ -473,28 +475,21 @@ export const LeftPanel = memo(function LeftPanel({
 						);
 					})}
 				</div>
-			</div>
-
-			{!selectedGroup && !workspaceQuery && !sortedProjects.some((project) => project.path === currentCwd) && history}
+			</div>}
 			<div className="sidebar-footer">
 				<span className="sidebar-connection"><i className={ready ? "ok" : "busy"} />{t(ready ? "connected" : "connecting")}</span>
 				<span id="sidebar-settings-slot"><button type="button" onClick={onOpenSettings}><FiSettings aria-hidden="true" /> {t("settings")}</button></span>
 			</div>
 
-			{picking && (
+			{picking && selectedGroup && (
 				<FolderPickerModal
 					dirBrowse={dirBrowse}
-					busy={selectedGroup ? workspaceBusy : false}
-					error={selectedGroup ? workspaceError : undefined}
-					pickLabel={selectedGroup ? t("workspaceAddProject") : undefined}
+					busy={workspaceBusy}
+					error={workspaceError}
+					pickLabel={t("workspaceAddProject")}
 					onBrowse={(path) => send({ type: "browse_dirs", path })}
 					onPick={(path) => {
-						if (selectedGroup) changeWorkspace({ kind: "add", id: selectedGroup.id, path });
-						else {
-							setPendingCwd(path);
-							send({ type: "set_cwd", path, source: "ui" });
-							setPicking(false);
-						}
+						changeWorkspace({ kind: "add", id: selectedGroup.id, path });
 					}}
 					onClose={() => setPicking(false)}
 				/>
