@@ -91,12 +91,11 @@ try {
 	assert.notEqual(await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).borderColor),idleBorder);
 	assert.equal(await page.locator('.msg-collapsed-role.role-assistant').first().evaluate(e=>getComputedStyle(e,'::before').content),'"π"');
 	assert.equal(await page.locator('.msg-collapsed-action svg polyline').first().getAttribute('points'),'9 18 15 12 9 6');
-	const foldedMeta = await page.locator('.msg-collapsed-role.role-assistant').first().locator('..').evaluate((row) => {
-		const preview = row.querySelector('.msg-collapsed-preview').getBoundingClientRect();
-		const chips = row.querySelector('.msg-collapsed-chips').getBoundingClientRect();
-		return {previewBottom:preview.bottom, chipsTop:chips.top};
-	});
-	assert(foldedMeta.chipsTop >= foldedMeta.previewBottom, 'folded metadata sits below the message preview');
+	const foldedRow = page.locator('.msg-collapsed-role.role-assistant').first().locator('..');
+	assert.equal(await foldedRow.locator('.msg-collapsed-chips').count(), 0, 'statistics do not occupy a second line');
+	assert((await foldedRow.getAttribute('title')).includes('思考'), 'statistics remain available in the tooltip');
+	assert((await foldedRow.boundingBox()).height <= 30, 'history summaries stay compact');
+	assert.equal(await foldedRow.getAttribute('aria-expanded'), 'false');
 	const lines=page.locator('.bash-output-line');
 	assert.equal(await lines.first().locator('.bash-line-number').textContent(),'15');
 	assert.equal(await lines.nth(1).locator('.bash-line-number').textContent(),'27');

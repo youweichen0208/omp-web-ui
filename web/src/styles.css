@@ -9077,7 +9077,7 @@ html.pi-desktop-linux .design-workspace .desktop-window-controls { position: fix
 /* Folded turns share the same rail as full turns and the composer. */
 .design-workspace .msg-collapsed,
 .design-workspace .msg-lazy-ph { width: 100%; max-width: 780px; }
-.design-workspace .msg-collapsed { align-items: flex-start; padding: 8px 28px; border-left: 0; }
+.design-workspace .msg-collapsed { align-items: center; padding: 4px 28px; border-left: 0; }
 .design-workspace .msg-collapsed-role { display: inline-flex; align-items: center; flex: 0 0 60px; min-width: 0; font: 500 12.5px var(--sans); text-transform: none; letter-spacing: 0; color: var(--text-faint); }
 .design-workspace .msg-collapsed-role.role-assistant { color: var(--text); }
 .design-workspace .msg-collapsed-role.role-assistant::before { content: "π"; width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: var(--r-sm); margin-right: 8px; background: var(--accent); color: var(--accent-fg); font-size: 12px; }
