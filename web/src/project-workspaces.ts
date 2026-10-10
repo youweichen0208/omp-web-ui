@@ -9,7 +9,8 @@ export function workspaceProjects(projects: ProjectSummary[], catalog: ProjectWo
 		}
 	}
 	const group = catalog?.workspaces.find((entry) => entry.id === selectedId);
-	const members = group ? new Set(group.paths) : null;
+	if (!group) return [];
+	const members = new Set(group.paths);
 	const needle = query.trim().toLowerCase();
-	return [...all.values()].filter((project) => (!members || members.has(project.path)) && project.path.toLowerCase().includes(needle));
+	return [...all.values()].filter((project) => members.has(project.path) && project.path.toLowerCase().includes(needle));
 }

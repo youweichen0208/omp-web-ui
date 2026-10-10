@@ -24,11 +24,20 @@ describe("persistent project workspaces", () => {
 		const reopened = new ProjectWorkspaceStore(file);
 		expect(reopened.read().workspaces[0].name).toBe("Work");
 		expect(workspaceProjects([], reopened.read(), a, "")).toHaveLength(25);
-		expect(workspaceProjects([], reopened.read(), "", "project-24").map((p) => p.path)).toEqual([paths[24]]);
+		expect(workspaceProjects([], reopened.read(), a, "project-24").map((p) => p.path)).toEqual([paths[24]]);
 		reopened.apply(reopened.read().revision, { kind: "delete", id: a });
 		expect(reopened.read().workspaces).toEqual([{ id: b, name: "Personal", paths: [paths[0]] }]);
 		for (const path of paths) expect(readFileSync(join(path, "history.jsonl"), "utf8")).toBe("original");
 	});
+	it("never imports recent projects without explicit workspace membership", () => {
+		const recent = [{ path: "/old/project", firstAdded: 1, lastUsed: 2 }];
+		expect(workspaceProjects(recent, null, "", "")).toEqual([]);
+		expect(workspaceProjects(recent, {revision: 0, workspaces: []}, "", "")).toEqual([]);
+		const catalog = {revision: 1, workspaces: [{id: "new", name: "New", paths: []}]};
+		expect(workspaceProjects(recent, catalog, "new", "")).toEqual([]);
+		expect(workspaceProjects(recent, catalog, "deleted", "")).toEqual([]);
+	});
+
 	it("rejects stale writes and invalid input without modifying the stored catalog", () => {
 		const { root, file, store } = fixture();
 		const id = store.apply(0, { kind: "create", name: "Team" }).workspaceId;

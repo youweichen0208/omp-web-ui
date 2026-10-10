@@ -41,6 +41,26 @@ try {
 		if (i === 149 || server.exitCode !== null) throw new Error(logs);
 		await sleep(100);
 	}
+	if (process.argv.includes("--browser")) {
+		const { chromium } = await import("playwright-core");
+		const { CHROME_PATH } = await import("./lib/chrome.mjs");
+		assert(CHROME_PATH, "Chrome unavailable");
+		browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
+		const first = await browser.newPage();
+		await first.addInitScript(() => localStorage.setItem("pi-harness:project-workspace", "deleted-workspace"));
+		await first.goto(`http://127.0.0.1:${port}`);
+		await first.locator(".setup-modal .modal-close").waitFor(); await first.locator(".setup-modal .modal-close").click();
+		await first.locator(".workspace-group-manager input").waitFor();
+		assert.equal(await first.locator(".project-item, .session-item, .sidebar-new").count(), 0);
+		assert.equal(await first.getByText("全部项目", {exact:true}).count(), 0);
+		assert.equal(await first.locator(".lp-add-project").count(), 0);
+		await first.reload();
+		await first.locator(".setup-modal .modal-close").waitFor(); await first.locator(".setup-modal .modal-close").click();
+		await first.locator(".workspace-group-manager input").waitFor();
+		assert.equal(await first.locator(".project-item, .session-item").count(), 0);
+		await first.screenshot({path: join(tmpdir(), "pi-workspace-first-start.png")});
+		await first.close();
+	}
 	const a = await client("workspace-test-a");
 	const b = await client("workspace-test-b");
 	a.send({ type: "project_workspace_action", requestId: "create", revision: 0, action: { kind: "create", name: "Work" } });
@@ -60,10 +80,6 @@ try {
 	assert.deepEqual(disk.workspaces[0].paths, [projects[1]]);
 	console.log("PASS workspace protocol: shared catalog, conflict recovery, persisted membership, unchanged cwd");
 	if (process.argv.includes("--browser")) {
-		const { chromium } = await import("playwright-core");
-		const { CHROME_PATH } = await import("./lib/chrome.mjs");
-		assert(CHROME_PATH, "Chrome unavailable");
-		browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
 		const page = await browser.newPage();
 		const outgoing = [];
 		page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => outgoing.push(JSON.parse(String(payload)))));
@@ -73,7 +89,8 @@ try {
 		await selector.locator(`option[value="${id}"]`).waitFor({ state: "attached" });
 		const switches = () => outgoing.filter((m) => m.type === "set_cwd").length;
 		const before = switches();
-		await selector.selectOption(id);
+		assert.equal(await selector.inputValue(), id, "select the first existing workspace automatically");
+		assert.equal(await selector.locator('option[value=""]').count(), 0);
 		await page.locator(`.project-item[title="${projects[1]}"]`).waitFor();
 		assert.equal(await page.locator(`.project-item[title="${projects[0]}"]`).count(), 0);
 		assert.equal(await page.locator(".workspace-outside").count(), 1);
@@ -95,10 +112,14 @@ try {
 		await page.locator(`.project-item[title="${projects[1]}"]`).click();
 		await page.locator(`.project-item.active[title="${projects[1]}"]`).waitFor();
 		assert.equal(switches(), before + 1);
+		await page.locator(`.lp-menu-zone[data-menu-key="proj:${projects[1]}"] .lp-menu-trigger`).click();
+		assert.equal(await page.getByRole("menuitem", {name:"新对话", exact:true}).count(), 1);
+		await page.keyboard.press("Escape");
 		await page.screenshot({ path: join(tmpdir(), "pi-53-workspaces-desktop.png") });
 		await page.locator(".workspace-group-delete").click(); await page.locator(".workspace-group-delete").click();
 		await page.waitForFunction(() => document.querySelector(".workspace-group-row select")?.value === "");
 		assert(existsSync(projects[1]));
+		assert.equal(await page.locator(".project-item, .session-item, .sidebar-new").count(), 0, "deleting the last workspace does not expose recent projects");
 		// Manage a group on a narrow viewport without closing the drawer.
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.locator(".topbar .brand .panel-toggle").click();
@@ -106,6 +127,7 @@ try {
 		await page.locator(".workspace-group-actions button[type=submit]").click();
 		await page.waitForFunction(() => document.querySelector(".workspace-group-row select")?.selectedOptions[0]?.textContent === "Mobile");
 		assert.equal(await page.locator(".drawer-left.open").count(), 1);
+		assert.equal(await page.locator(".project-item").count(), 0, "new workspaces start empty");
 		await page.locator(".lp-add-project").click();
 		await page.locator(".fpk-modal-foot input").fill(join(base, "missing"));
 		await page.locator(".fpk-open-btn").click();
