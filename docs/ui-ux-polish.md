@@ -10,21 +10,21 @@
 
 | 页面族 | 检查和优化范围 | 状态 / 证据 |
 | --- | --- | --- |
-| 应用外壳 | 顶栏/侧栏/状态栏、主题、窄屏导航、窗口控件 | 待验收 |
-| 聊天 | 空态、消息、输入、附件、模型选择、队列、工具、等待、错误、任务产出 | 待验收 |
-| 文件 | 搜索、树、创建、代码/媒体/SQLite预览、编辑和保存状态 | 文件树参考图已验证；其余待验收 |
-| Wiki | 阅读/编辑/工具栏、目录、索引/搜索、右侧聊天、双链 | 待验收 |
-| 终端 | 标签、连接状态、命令配置、空态 | 待验收 |
-| Git / 改动 | 状态/分支/历史、diff、本轮/分支/工作区、窄屏 | 待验收 |
-| SSH 节点 | 来源/列表/详情、连接表单、Agent/终端/SFTP、错误状态 | 待验收 |
-| 会话树 | 树/搜索/分支、label/摘要/草稿恢复 | 待验收 |
-| 设置 · 提示词 | 导航、分段、编辑器、状态、保存/重载 | 待验收 |
-| 设置 · 技能 | 搜索/筛选、详情、启停 | 待验收 |
-| 设置 · Extensions | 包列表、资源、编辑、安装/更新表单 | 待验收 |
-| 设置 · MCP/Codemode | 作用域、自动保存/高级选项、服务器表单/信任 | 待验收 |
-| 设置 · 更新 | 版本、检查中/成功/错误状态 | 待验收 |
-| 配置和弹窗 | 首次配置、模型/服务商、OAuth、目录选择、搜索、后台任务、扩展确认 | 待验收 |
-| 插件宿主 | 宿主空态/错误/设置容器（第三方插件内容不重写） | 待验收 |
+| 应用外壳 | 顶栏/侧栏/状态栏、主题、窄屏导航、窗口控件 | 已验收共享前端；fluid-interface / desktop-toolbar 浏览器回归，Windows/macOS 为模拟壳 |
+| 聊天 | 空态、消息、输入、附件、模型选择、队列、工具、等待、错误、任务产出 | brand-command-groups / changes-panel / model-config-ui 已通过；扩展内联确认的键盘检查待补 |
+| 文件 | 搜索、树、创建、代码/媒体/SQLite预览、编辑和保存状态 | 文件树、真实代码保存、SQLite 和 file-editor-protocol 通过；媒体交互视觉抽查待补 |
+| Wiki | 阅读/编辑/工具栏、目录、索引/搜索、右侧聊天、双链 | wiki-ui / wiki-panels / ui-workbenches 通过；专有嵌套弹窗焦点待补 |
+| 终端 | 标签、连接状态、命令配置、空态 | ui-workbenches 四档明暗布局及 terminal-smoke 通过 |
+| Git / 改动 | 状态/分支/历史、diff、本轮/分支/工作区、窄屏 | 真实临时 Git diff、375px 上下布局和 changes-panel-ui 通过 |
+| SSH 节点 | 来源/列表/详情、连接表单、Agent/终端/SFTP、错误状态 | node-workbench-browser 本地 mock 及四档布局通过；未连接真实节点 |
+| 会话树 | 树/搜索/分支、label/摘要/草稿恢复 | session-tree 协议及浏览器、bookmark 双向 Tab 通过 |
+| 设置 · 提示词 | 导航、分段、编辑器、状态、保存/重载 | system-prompt 浏览器流程和四档明暗布局通过 |
+| 设置 · 技能 | 搜索/筛选、详情、启停 | extensions 浏览器搜索、启停落盘、重载与小屏通过 |
+| 设置 · Extensions | 包列表、资源、编辑、安装/更新表单 | extensions 功能回归通过；安装嵌套弹窗双向 Tab 待补 |
+| 设置 · MCP/Codemode | 作用域、自动保存/高级选项、服务器表单/信任 | codemode-mcp 浏览器及 extensions 的 JSON 保存通过；专有弹窗焦点待补 |
+| 设置 · 更新 | 版本、检查中/成功/错误状态 | 当前 extensions 更新页面自动检查偏好、503 错误及刷新恢复通过 |
+| 配置和弹窗 | 首次配置、模型/服务商、OAuth、目录选择、搜索、后台任务、扩展确认 | 共用焦点及 OAuth 嵌套通过，模型获取/元数据/错误通过；剩余专有弹窗待审查 |
+| 插件宿主 | 宿主空态/错误/设置容器（第三方插件内容不重写） | ui-plugin-polish 的挂载失败、重试恢复、小屏和切页保留状态通过 |
 
 ## 验证规则
 
@@ -60,3 +60,14 @@
 - PASS: shared dialog suite, now including repeated authentication dialogs above settings and Escape preserving the underlying settings dialog. Typecheck/build/design pass.
 - Legacy `file-editor-ui-test.mjs` remains stale: it expects the removed thinking-segments control, fixed-time drawer animation, and Markdown inside the old preview rather than Wiki. Its source was left unchanged. Current preview test covers real code saves; comprehensive conflict/guard evidence still needs the current protocol tests in final regression.
 - Still incomplete: settings detail workflows, Wiki search/edit flows, chat/error/queue states, plugin host, remaining accessibility/layout matrix and final regression. Do not treat this checkpoint as completion.
+
+
+### Fourth checkpoint: current workflows and final shared checks
+
+- Added a recoverable plugin mount-error surface, composer accessible name, readable skill descriptions, wrapped settings errors, and touch-visible message actions. Preserved the requested absence of an inner composer focus outline.
+- Extended settings, workbench and file-preview matrices to 375/768/1024/1440 in both themes. The settings suite additionally checks 844×390 landscape, 20px root text, reduced motion, and computed text/dim/faint contrast >=4.5 on both page and elevated backgrounds. These are shared layout checks, not proof of every state in every page.
+- PASS: typecheck, build, protocol sync, design tokens, 104 unit files (599 tests passed, 1 skipped), and the full zero-token smoke runner (72/72). Logs are local `/tmp/pi-polish-*`; screenshots are in ignored `tests/scratch/`.
+- PASS browser workflows: system-prompt; extensions (now including an injected 503 during check, mobile error display, and refresh recovery); codemode-mcp; wiki-ui; changes-panel-ui; model-config-ui; brand-command-groups-ui; desktop-toolbar; fluid-interface; plugin host; preview; workbenches. Model test now joins a workspace and selects the visible composer menu before exercising its existing metadata/error assertions.
+- The old component-updates browser case still targets removed application-update UI, old skill disclosure markup, and the former tab title. It was not rewritten to mask the obsolete assumptions. Current extensions browser tests cover the replacement update page. The smoke runner's component version protocol checks pass.
+- The old agent-working browser case targets a removed Bash DOM class. Current brand-command-groups tests cover the active command, failure, queue and composer presentations. The old file-editor browser case remains obsolete as recorded above; code save, file-version conflicts and Wiki guards have current replacement coverage.
+- Visually inspected skill contents, dark mobile updates, and landscape/scaled settings in addition to the previously recorded screens. Full completion is still unproven: audit nested extension/MCP/Wiki focus interaction, inline extension requests, remaining media/configuration states, then reconcile this checklist. No release or remote push performed.

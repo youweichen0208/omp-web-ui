@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useT } from "../i18n";
+import { useEffect, useRef, useState } from "react";
 import {
 	makePluginContext,
 	type LoadedPluginView,
@@ -16,10 +17,14 @@ interface PluginViewProps {
  */
 export function PluginView({ entry, send }: PluginViewProps) {
 	const ref = useRef<HTMLDivElement>(null);
+	const t = useT();
+	const [failed, setFailed] = useState(false);
+	const [attempt, setAttempt] = useState(0);
 	useEffect(() => {
 		const el = ref.current;
 		if (!el) return;
 		let cleanup: void | (() => void);
+		setFailed(false);
 		try {
 			cleanup = entry.module.mount(
 				el,
@@ -27,7 +32,8 @@ export function PluginView({ entry, send }: PluginViewProps) {
 			);
 		} catch (err) {
 			console.error(`[plugin:${entry.info.id}] mount failed:`, err);
-			el.textContent = `插件 ${entry.info.name} 挂载失败`;
+			el.textContent = "";
+			setFailed(true);
 		}
 		return () => {
 			if (typeof cleanup === "function") {
@@ -39,6 +45,6 @@ export function PluginView({ entry, send }: PluginViewProps) {
 			}
 			el.textContent = "";
 		};
-	}, [entry, send]);
-	return <div className="plugin-view" ref={ref} />;
+	}, [entry, send, attempt]);
+	return <div className="plugin-view-host">{failed && <div className="plugin-view-error" role="alert"><p>{t("pluginViewFailed", { name: entry.info.name })}</p><button type="button" className="btn" onClick={() => setAttempt(value => value + 1)}>{t("retry")}</button></div>}<div className="plugin-view" ref={ref} hidden={failed} /></div>;
 }

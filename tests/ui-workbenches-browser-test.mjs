@@ -36,7 +36,7 @@ try {
 		await page.locator(selector).waitFor();
 		if(label==='Git') { await page.locator('.scm-file').first().click();await page.locator('.scm-diff-pre').first().waitFor(); }
 		await sleep(500);
-		for(const width of [1440,768,375]) {
+		for(const width of [1440,1024,768,375]) {
 			await page.setViewportSize({width,height:900});
 			for(const theme of ['light','dark']) {
 				await page.evaluate(theme=>document.documentElement.dataset.appearance=theme,theme);await sleep(350);
@@ -53,7 +53,7 @@ try {
 	await page.getByRole('tab',{name:'对话',exact:true}).click();
 	await page.locator('[data-tree-node="README.md"]').click();
 	await page.locator('.wiki-document').waitFor();
-	for(const width of [1440,768,375]) {
+	for(const width of [1440,1024,768,375]) {
 		await page.setViewportSize({width,height:900});
 		for(const theme of ['light','dark']) {
 			await page.evaluate(theme=>document.documentElement.dataset.appearance=theme,theme);await sleep(350);
@@ -72,5 +72,5 @@ try {
 	await page.locator('.wiki-chat-toggle').click();
 	await page.locator('.wiki-chat-panel').waitFor();
 	assert.deepEqual(errors,[]);
-	console.log('PASS workbench layouts: terminal, nodes and Git at 375/768/1440 light/dark');
+	console.log('PASS workbench layouts: terminal, nodes and Git at 375/768/1024/1440 light/dark');
 } finally { await browser?.close();server?.kill('SIGTERM');await sleep(300);rmSync(root,{recursive:true,force:true}); }

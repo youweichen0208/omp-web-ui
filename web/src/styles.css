@@ -11875,3 +11875,25 @@ html.pi-desktop-linux .design-workspace.wiki-mode .topbar { padding-right: 148px
 	:is(.node-modal-actions, .tree-dialog-actions, .sqlite-pagination) button, .fp-header-action, .fp-header-save, .fp-more summary { min-height: 44px; }
 	.session-tree-panel header button { min-width: 44px; min-height: 44px; }
 }
+
+/* Shared work surfaces: readable metadata, feedback and touch access. */
+.plugin-view-host { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
+.plugin-view-error { padding: 24px; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.plugin-view[hidden] { display: none; }
+.settings-skill-info small { white-space: normal; overflow-wrap: anywhere; line-height: 1.6; }
+.settings-modal :is(.prompt-editor, .ext-editor, .mcp-editor) textarea { line-height: 1.6; tab-size: 4; }
+.settings-modal :is(.settings-error, .ext-error, .mcp-error) { overflow-wrap: anywhere; }
+.design-workspace .inputbox:has(textarea:focus-visible) { border-color: var(--text-dim); }
+.design-workspace .inputbox.has-draft:has(textarea:focus-visible) { border-color: var(--accent); }
+@media (hover: none) {
+	.reply-actions { opacity: 1; }
+	.reply-actions button { min-height: 44px; padding-inline: 8px; }
+}
+@media (pointer: coarse) {
+	.settings-modal :is(.settings-tab, .settings-heading-actions button, .ext-header button, .mcp-page-head button) { min-height: 44px; }
+	.settings-modal .settings-segment button { min-height: 36px; }
+}
+@media (max-width: 600px) {
+	.design-workspace .inputbox textarea { font-size: 16px; }
+	.settings-modal :is(.ext-editor, .prompt-editor, .mcp-editor) { min-width: 0; }
+}

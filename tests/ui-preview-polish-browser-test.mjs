@@ -32,7 +32,7 @@ try {
 	await page.locator('.fp-header-save').click();
 	await page.waitForFunction(()=>!document.querySelector('.fp-header-save'));
 	assert.equal(readFileSync(join(cwd,'sample.ts'),'utf8'),'export const ready = false;\n');
-	for(const width of [1440,768,375]) {
+	for(const width of [1440,1024,768,375]) {
 		await page.setViewportSize({width,height:900});
 		await sleep(350);
 		if(width<=768) {

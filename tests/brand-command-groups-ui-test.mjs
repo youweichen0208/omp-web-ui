@@ -158,8 +158,11 @@ try {
 	await page.locator('.usage-popover').waitFor();
 	await page.keyboard.press('Escape');
 
+	await page.locator('.inputbox textarea').first().blur();
+	const restingShadow=await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).boxShadow);
 	await page.locator('.inputbox textarea').first().focus();
-	assert.match(await page.locator('.inputbox').evaluate(el => getComputedStyle(el).boxShadow), /^(none|rgba\(0, 0, 0, 0\) 0px 0px 0px 0px)$/); // CSS minification may serialize none as a transparent zero-sized shadow.
+	assert.equal(await page.locator('.inputbox').evaluate(el=>getComputedStyle(el).boxShadow),restingShadow,'focus must not add a glow');
+	assert.equal(await page.locator('.inputbox textarea').first().evaluate(el=>getComputedStyle(el).outlineStyle),'none');
 	await page.evaluate(() => document.documentElement.dataset.appearance = 'light');
 	await page.screenshot({ path: '/tmp/pi-command-refinement-light.png' });
 	for (const width of [900, 390]) {

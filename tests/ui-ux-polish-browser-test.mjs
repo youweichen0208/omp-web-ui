@@ -49,10 +49,17 @@ try {
 	await modal.locator('.modal-head button').focus();
 	await page.keyboard.press('Shift+Tab');
 	assert(await modal.evaluate(el=>el.contains(document.activeElement)), 'Shift+Tab stays in the dialog');
-	for(const width of [1440,768,375]) {
+	for(const width of [1440,1024,768,375]) {
 		await page.setViewportSize({width,height:900});
 		for(const theme of ['light','dark']) {
 			await page.evaluate(theme=>document.documentElement.dataset.appearance=theme,theme);
+			const contrasts=await page.evaluate(()=>{
+				const probe=document.createElement('span');document.body.append(probe);
+				const ctx=document.createElement('canvas').getContext('2d');
+				const luminance=token=>{probe.style.color=`var(${token})`;ctx.fillStyle=getComputedStyle(probe).color;ctx.fillRect(0,0,1,1);const rgb=[...ctx.getImageData(0,0,1,1).data].slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};
+				const results=[];for(const bg of ['--bg','--bg-elev'])for(const fg of ['--text','--text-dim','--text-faint']){const a=luminance(bg),b=luminance(fg);results.push({bg,fg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)});}probe.remove();return results;
+			});
+			for(const result of contrasts)assert(result.ratio>=4.5,`${theme} ${result.fg}/${result.bg} contrast ${result.ratio}`);
 			for(const index of [0,1,2,3,4]) {
 				const tab=modal.locator('.settings-tab').nth(index);
 				await tab.click();
@@ -64,6 +71,13 @@ try {
 			}
 		}
 	}
+	await page.emulateMedia({reducedMotion:'reduce'});
+	await page.setViewportSize({width:844,height:390});
+	await page.evaluate(()=>document.documentElement.style.fontSize='20px');
+	assert(await modal.locator('.modal-head button').isVisible());
+	assert(await modal.evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight));
+	await page.screenshot({path:'tests/scratch/polish-settings-landscape-scaled.png'});
+	await page.evaluate(()=>document.documentElement.style.fontSize='');
 	await page.setViewportSize({width:1440,height:900});
 	await modal.locator('.modal-head button').click();
 	assert(await settings.evaluate(el=>document.activeElement===el), 'closing restores opener focus');
@@ -74,5 +88,5 @@ try {
 	await page.locator('.gs-close').click();
 	assert(await page.locator('.tree-search').evaluate(el=>document.activeElement===el));
 	assert.deepEqual(errors,[]);
-	console.log('PASS polish dialogs: focus entry, tab boundaries, opener restoration, settings pages at 375/768/1440 light/dark');
+	console.log('PASS polish dialogs: focus entry, tab boundaries, opener restoration, settings pages at 375/768/1024/1440 light/dark');
 } finally { await browser?.close();server?.kill('SIGTERM');await sleep(300);rmSync(root,{recursive:true,force:true}); }

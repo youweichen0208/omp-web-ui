@@ -646,6 +646,7 @@ export const ChatInput = memo(function ChatInput({
 					</button>
 													<textarea
 														ref={taRef}
+					aria-label={t("composerPlaceholder")}
 														value={text}
 														rows={1}
 														placeholder={

@@ -90,6 +90,21 @@ try{
   await panel.getByRole('switch').check();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===true);
   await panel.getByRole('switch').uncheck();await wait(()=>JSON.parse(readFileSync(join(agent,'webui-extensions.json'),'utf8')).autoCheck===false);
   await page.screenshot({path:'tests/scratch/settings-v2-updates.png',fullPage:true});
+  const failedCheck = async route => {
+   if(route.request().postDataJSON().action==='check') return route.fulfill({status:503,json:{error:'Fixture registry unavailable'}});
+   return route.fallback();
+  };
+  await page.route('**/api/extensions**',failedCheck);
+  await panel.getByRole('button',{name:'立即检查',exact:true}).click();
+  await panel.getByRole('alert').getByText('Fixture registry unavailable',{exact:false}).waitFor();
+  await page.setViewportSize({width:375,height:844});
+  assert(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+  await page.screenshot({path:'tests/scratch/settings-updates-error-mobile.png',fullPage:true});
+  await page.unroute('**/api/extensions**',failedCheck);
+  await panel.getByRole('alert').getByRole('button',{name:'刷新',exact:true}).click();
+  await panel.getByRole('alert').waitFor({state:'hidden'});
+  await page.setViewportSize({width:1440,height:1050});
+
   await page.getByRole('button',{name:'MCP 与 Codemode',exact:true}).click();
   const mcp=page.locator('.mcp-workbench');await mcp.getByRole('button',{name:'编辑 mcp.json',exact:true}).click();
   const json=mcp.locator('.mcp-json-dialog');await json.locator('textarea').fill('{"mcpServers":{},"autoEnableCodemode":false}');
