@@ -515,6 +515,8 @@ export type ClientMessage =
 	| { type: "switch_session"; path: string }
 	| { type: "switch_conversation"; id: string }
 	| { type: "list_projects" }
+	| { type: "list_project_workspaces" }
+	| { type: "project_workspace_action"; requestId: string; revision: number; action: ProjectWorkspaceAction }
 	| { type: "list_files"; path?: string }
 	/** Confirm conversation file candidates against the current workspace. */
 	| { type: "check_conversation_files"; cwd: string; reqId: number; paths: string[] }
@@ -650,6 +652,22 @@ export interface SessionSummary {
 	/** Where the session lives: this UI's per-client dir, or the pi CLI/TUI dir. */
 	source?: "web" | "tui";
 }
+
+/** Persistent project groups; selecting one never changes the Agent cwd. */
+export interface ProjectWorkspace {
+	id: string;
+	name: string;
+	paths: string[];
+}
+export interface ProjectWorkspaceCatalog {
+	revision: number;
+	workspaces: ProjectWorkspace[];
+}
+export type ProjectWorkspaceAction =
+	| { kind: "create"; name: string }
+	| { kind: "rename"; id: string; name: string }
+	| { kind: "delete"; id: string }
+	| { kind: "add" | "remove"; id: string; path: string };
 
 /**
  * A workspace directory this client has opened before (persisted per client in
@@ -1116,6 +1134,8 @@ export type ServerMessage =
 			truncated?: boolean;
 	  }
 	| { type: "projects"; projects: ProjectSummary[] }
+	| { type: "project_workspaces"; catalog: ProjectWorkspaceCatalog }
+	| { type: "project_workspace_result"; requestId: string; ok: boolean; error?: string; workspaceId?: string }
 	| { type: "conversation_files_checked"; cwd: string; reqId: number; paths: string[] }
 	| { type: "git_branch"; cwd: string; branch: string | null; detached: boolean; notRepo?: boolean }
 	/** Directory listing for the workspace picker (see `browse_dirs`). */

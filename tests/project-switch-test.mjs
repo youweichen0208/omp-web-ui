@@ -116,20 +116,22 @@ try {
 	const scrollAfter = await page.locator(".messages").evaluate((el) => el.scrollTop);
 	assert(Math.abs(scrollBefore - scrollAfter) < 5, `scroll restored: ${scrollBefore} -> ${scrollAfter}`);
 	// Repeated view switches must preserve the terminal instance and render content.
-	await page.getByRole("tab").nth(1).click();
+	await page.getByRole("tab", { name: /^(终端|Terminal)$/ }).click();
 	await page.waitForSelector(".xterm-screen");
-	await page.getByRole("tab").nth(2).click();
+	await page.getByRole("tab", { name: "Git", exact: true }).click();
 	await page.waitForSelector(".scm-view");
 	const viewTimes = [];
 	for (let n = 0; n < 20; n++) {
-		viewTimes.push(await page.evaluate(async (index) => {
+		viewTimes.push(await page.evaluate(async (view) => {
 			const start = performance.now();
-			document.querySelectorAll('[role="tab"]')[index].click();
+			const tab = [...document.querySelectorAll('.topbar [role="tab"]')].find((item) => view === "terminal" ? /^(终端|Terminal)$/.test(item.textContent.trim()) : item.getAttribute("aria-label") === "Git");
+			if (!tab) throw new Error(`Missing ${view} tab`);
+			tab.click();
 			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-			const content = document.querySelector(index === 1 ? ".xterm-screen" : ".scm-view");
+			const content = document.querySelector(view === "terminal" ? ".xterm-screen" : ".scm-view");
 			if (!content?.getBoundingClientRect().height) throw new Error("view content is hidden");
 			return performance.now() - start;
-		}, n % 2 ? 2 : 1));
+		}, n % 2 ? "git" : "terminal"));
 	}
 	viewTimes.sort((a, b) => a - b);
 	assert.equal(outgoing.filter((m) => m.type === "terminal_create").length, 1);

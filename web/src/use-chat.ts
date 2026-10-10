@@ -21,6 +21,7 @@ import type {
 	ModelInfo,
 	DirBrowse,
 	ProjectSummary,
+	ProjectWorkspaceCatalog,
 	ProviderStatus,
 	ServerMessage,
 	SessionSummary,
@@ -89,6 +90,8 @@ export interface ChatState {
 	activeConversationId: string;
 	/** Recent workspaces this client opened (left panel project picker). */
 	projects: ProjectSummary[];
+	projectWorkspaces: ProjectWorkspaceCatalog | null;
+	projectWorkspaceResult: Extract<ServerMessage, { type: "project_workspace_result" }> | null;
 	/** Latest workspace-picker listing (see browse_dirs), null until opened. */
 	dirBrowse: DirBrowse | null;
 	/** Workspace file listing for the right panel. */
@@ -237,6 +240,7 @@ type Action =
 			activeId: string;
 	  }
 	| { type: "projects"; projects: ProjectSummary[] }
+	| Extract<ServerMessage, { type: "project_workspaces" | "project_workspace_result" }>
 	| { type: "dir_browse"; dirBrowse: DirBrowse }
 	| { type: "files"; files: FileListing }
 	| { type: "conversation_files_checked"; result: Extract<ServerMessage, { type: "conversation_files_checked" }> }
@@ -551,6 +555,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 				conversations: action.conversations,
 				activeConversationId: action.activeId,
 			};
+		case "project_workspaces": return { ...state, projectWorkspaces: action.catalog };
+		case "project_workspace_result": return { ...state, projectWorkspaceResult: action };
 		case "projects":
 			return { ...state, projects: action.projects };
 		case "dir_browse":
@@ -725,6 +731,8 @@ export function useChat() {
 		conversations: [],
 		activeConversationId: "",
 		projects: [],
+		projectWorkspaces: null,
+		projectWorkspaceResult: null,
 		dirBrowse: null,
 		files: null,
 		conversationFilesChecked: null,
@@ -877,7 +885,7 @@ export function useChat() {
 				performance.clearMarks("project-switch:click");
 				performance.mark("project-switch:click");
 				msg = { ...msg, requestId: id };
-			} else if (switchRef.current && msg.type !== "get_state") {
+			} else if (switchRef.current && msg.type !== "get_state" && msg.type !== "list_project_workspaces" && msg.type !== "project_workspace_action") {
 				return false;
 			}
 			ws.send(JSON.stringify(msg));
@@ -1036,6 +1044,10 @@ export function useChat() {
 						conversations: msg.conversations,
 						activeId: msg.activeId,
 					});
+					break;
+				case "project_workspaces":
+				case "project_workspace_result":
+					dispatch(msg);
 					break;
 				case "projects":
 					dispatch({ type: "projects", projects: msg.projects });

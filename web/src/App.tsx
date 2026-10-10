@@ -691,7 +691,7 @@ export function App() {
 			// drawer opens and immediately snaps shut.
 			if (
 				!msg.type.startsWith("list_") &&
-				!msg.type.startsWith("get_")
+				!msg.type.startsWith("get_") && msg.type !== "project_workspace_action" && msg.type !== "browse_dirs"
 			) {
 				setDrawer(null);
 			}
@@ -944,6 +944,8 @@ export function App() {
 					conversations={chat.conversations}
 					sessions={chat.sessions}
 					projects={chat.projects}
+					projectWorkspaces={chat.projectWorkspaces}
+					projectWorkspaceResult={chat.projectWorkspaceResult}
 					dirBrowse={chat.dirBrowse}
 					activeConversationId={chat.activeConversationId}
 				/>

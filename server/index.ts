@@ -54,6 +54,7 @@ import { needsTokenCookie, tokenCookie, tokenMatches } from "./token-auth.js";
 import { createOriginPolicy } from "./origin-policy.js";
 import { PluginManager, resolvePluginClientFile } from "./plugins.js";
 
+import { ProjectWorkspaceStore } from "./project-workspaces.js";
 import { NodeWorkbench } from "./node-workbench.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 
@@ -444,6 +445,8 @@ const service = new AgentService(
 );
 
 const nodeWorkbench = new NodeWorkbench(DATA_DIR);
+const projectWorkspaces = new ProjectWorkspaceStore(join(DATA_DIR, "project-workspaces.json"));
+const workspaceSubscribers = new Set<(message: ServerMessage) => void>();
 
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
 // attach so freshly dropped plugins appear without a server restart.
@@ -611,7 +614,7 @@ wss.on("connection", (ws) => {
 			pending.push(msg);
 			return;
 		}
-		if (cs.switchingWorkspace && msg.type !== "set_cwd" && msg.type !== "get_state" && msg.type !== "node_request") {
+		if (cs.switchingWorkspace && msg.type !== "set_cwd" && msg.type !== "get_state" && msg.type !== "node_request" && msg.type !== "list_project_workspaces" && msg.type !== "project_workspace_action") {
 			if (msg.type === "prompt" && msg.requestId) send({ type: "prompt_result", requestId: msg.requestId, ok: false });
 			if (msg.type === "read_file" || msg.type === "write_file") send({
 				type: "file_result", operation: msg.type === "read_file" ? "read" : "write",
@@ -674,6 +677,23 @@ wss.on("connection", (ws) => {
 			case "list_sessions":
 				void cs.refreshSessions();
 				break;
+			case "list_project_workspaces":
+				workspaceSubscribers.add(send);
+				send({ type: "project_workspaces", catalog: projectWorkspaces.read() });
+				break;
+			case "project_workspace_action": {
+				if (typeof msg.requestId !== "string" || !msg.requestId || msg.requestId.length > 200) throw new Error("Invalid request ID");
+				try {
+					const result = projectWorkspaces.apply(msg.revision, msg.action);
+					workspaceSubscribers.add(send);
+					for (const subscriber of workspaceSubscribers) subscriber({ type: "project_workspaces", catalog: result.catalog });
+					send({ type: "project_workspace_result", requestId: msg.requestId, ok: true, workspaceId: result.workspaceId });
+				} catch (error) {
+					try { send({ type: "project_workspaces", catalog: projectWorkspaces.read() }); } catch { /* preserve corrupt catalog for recovery */ }
+					send({ type: "project_workspace_result", requestId: msg.requestId, ok: false, error: error instanceof Error ? error.message : String(error) });
+				}
+				break;
+			}
 			case "list_projects":
 				void cs.pushProjects();
 				break;
@@ -968,6 +988,7 @@ wss.on("connection", (ws) => {
 		closed = true;
 		pending = [];
 		removePluginSender();
+		workspaceSubscribers.delete(send);
 		detachNodes?.();
 		if (snapshotRetryTimer) {
 			clearTimeout(snapshotRetryTimer);
