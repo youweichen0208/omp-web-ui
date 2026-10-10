@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { FiX } from "react-icons/fi";
@@ -6,19 +7,10 @@ import { wikiIndexIssueGroups } from "../wiki-index-summary";
 import { useI18n, useT } from "../i18n";
 
 export function WikiReadingDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-	const t = useT(), dialog = useRef<HTMLElement>(null);
-	useEffect(() => {
-		const previous = document.activeElement as HTMLElement | null;
-		(dialog.current?.querySelector<HTMLElement>("input") ?? dialog.current?.querySelector<HTMLElement>("button"))?.focus();
-		return () => { if (previous?.isConnected) previous.focus(); };
-	}, []);
+	const t = useT(), dialog = useDialogFocus<HTMLElement>();
 	return createPortal(<div className="wiki-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
 		<section ref={dialog} className="wiki-reading-dialog" role="dialog" aria-modal="true" aria-label={title} onKeyDown={e => {
 			if (e.key === "Escape") { e.stopPropagation(); onClose(); }
-			if (e.key !== "Tab") return;
-			const items = [...(dialog.current?.querySelectorAll<HTMLElement>("button, input, [tabindex='0']") ?? [])];
-			if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
-			else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
 		}}>
 			<header><h2>{title}</h2><button aria-label={t("close")} onClick={onClose}><FiX /></button></header>
 			{children}

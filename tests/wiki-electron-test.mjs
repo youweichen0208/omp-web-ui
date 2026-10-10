@@ -23,6 +23,10 @@ try {
 	assert.equal(await page.evaluate(async () => { try { await window.electronAPI.appUpdate('arbitrary'); return false; } catch { return true; } }), true);
 	await page.locator('.setup-modal').waitFor();
 	await page.locator('.setup-modal .modal-close').click();
+	await page.locator('.workspace-group-manager input').fill('Desktop');
+	await page.locator('.workspace-group-actions button[type=submit]').click();
+	await page.locator('.workspace-outside button').click();
+	await page.locator('.project-item.active').waitFor();
 	assert(existsSync(marker), 'Desktop discovers user-local Pi extensions');
 	const initialLoads = readFileSync(marker, 'utf8').length;
 	assert(!existsSync(disabledMarker), 'native extension disable rules remain authoritative');

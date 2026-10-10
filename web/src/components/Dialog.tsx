@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ClientMessage } from "../types";
 import { useT } from "../i18n";
 
@@ -20,6 +20,7 @@ interface DialogProps {
  */
 export function Dialog({ dialog, send }: DialogProps) {
 	const t = useT();
+	const rootRef = useRef<HTMLDivElement>(null);
 	const [inputValue, setInputValue] = useState("");
 	const [sel, setSel] = useState(0);
 
@@ -31,6 +32,7 @@ export function Dialog({ dialog, send }: DialogProps) {
 		setInputValue(dialog.kind === "editor" ? String(dialog.args[0] ?? "") : "");
 		setSel(0);
 		const onKey = (e: KeyboardEvent) => {
+			if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('[role="dialog"]') && !rootRef.current?.contains(e.target))) return;
 			if (e.key === "Escape") respond(null);
 		};
 		document.addEventListener("keydown", onKey);
@@ -45,7 +47,7 @@ export function Dialog({ dialog, send }: DialogProps) {
 		typeof dialog.args[0] === "string" ? (dialog.args[0] as string) : "";
 
 	return (
-		<div className="dialog-inline" data-dialog-kind={dialog.kind}>
+		<div ref={rootRef} className="dialog-inline" role="region" aria-label={dialog.title || t("pluginRequest")} data-dialog-kind={dialog.kind}>
 			<div className="dialog-head">
 				<span className="dialog-badge">{t("pluginRequest")}</span>
 				{dialog.title && dialog.title !== t("pluginRequest") && (
@@ -104,8 +106,9 @@ export function Dialog({ dialog, send }: DialogProps) {
 
 			{(dialog.kind === "input" || dialog.kind === "editor") && (
 				<div className="dialog-body">
-					{dialog.kind === "editor" ? <textarea className="dialog-input" rows={8} value={inputValue} autoFocus onChange={e => setInputValue(e.target.value)} /> : <input
+					{dialog.kind === "editor" ? <textarea aria-label={dialog.title || t("inputPlaceholder")} className="dialog-input" rows={8} value={inputValue} autoFocus onChange={e => setInputValue(e.target.value)} /> : <input
 						className="dialog-input"
+						aria-label={dialog.title || t("inputPlaceholder")}
 						value={inputValue}
 						placeholder={message || t("inputPlaceholder")}
 						autoFocus

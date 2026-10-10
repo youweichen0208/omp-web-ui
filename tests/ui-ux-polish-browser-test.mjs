@@ -19,8 +19,12 @@ try {
 	mkdirSync('tests/scratch',{recursive:true});
 	const page=await browser.newPage({viewport:{width:1440,height:960}});
 	const errors=[];page.on('pageerror',e=>errors.push(String(e)));
-	let wire;
-	await page.routeWebSocket('**/ws', route => { wire=route; route.connectToServer(); });
+	let wire,conversationId;const responses=[];
+	await page.routeWebSocket('**/ws', route => {
+		wire=route;const upstream=route.connectToServer();
+		upstream.onMessage(raw=>{const message=JSON.parse(String(raw));if(message.type==='snapshot')conversationId=message.state.conversationId;route.send(raw);});
+		route.onMessage(raw=>{const message=JSON.parse(String(raw));if(message.type==='dialog_response'){responses.push(message);route.send(JSON.stringify({type:'dialog_closed',id:message.id,conversationId:message.conversationId}));}else upstream.send(raw);});
+	});
 	await page.goto(`http://localhost:${port}`);
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.workspace-group-manager input').fill('Engineering');
@@ -87,6 +91,19 @@ try {
 	assert(await page.locator('.gs-modal').evaluate(el=>el.contains(document.activeElement)));
 	await page.locator('.gs-close').click();
 	assert(await page.locator('.tree-search').evaluate(el=>document.activeElement===el));
+	for(const kind of ['select','confirm','input','editor']) {
+		wire.send(JSON.stringify({type:'dialog',conversationId,source:'fixture',id:kind,kind,title:'Local request',args:kind==='select'?[['First','Second']]:['Initial text']}));
+		const panel=page.locator('.dialog-inline');await panel.waitFor();
+		assert.equal(await panel.getAttribute('role'),'region');
+		if(kind==='input'||kind==='editor') {
+			await panel.getByRole('textbox',{name:'Local request'}).fill(kind==='editor'?'Line one\nLine two':'Answer');
+			await panel.getByRole('button',{name:'确定',exact:true}).focus();await page.keyboard.press('Enter');
+		} else if(kind==='select') {await panel.getByRole('button',{name:'Second',exact:true}).focus();await page.keyboard.press('Enter');}
+		else {await panel.getByRole('button',{name:'确定',exact:true}).focus();await page.keyboard.press('Enter');}
+		await panel.waitFor({state:'detached'});
+		assert.equal(responses.at(-1).value,{select:'Second',confirm:true,input:'Answer',editor:'Line one\nLine two'}[kind]);
+		assert.equal(responses.at(-1).conversationId,conversationId);
+	}
 	assert.deepEqual(errors,[]);
 	console.log('PASS polish dialogs: focus entry, tab boundaries, opener restoration, settings pages at 375/768/1024/1440 light/dark');
 } finally { await browser?.close();server?.kill('SIGTERM');await sleep(300);rmSync(root,{recursive:true,force:true}); }

@@ -1,3 +1,10 @@
+async function checkDialogFocus(page, dialog) {
+	const controls = dialog.locator('button:enabled:visible, input:enabled:visible, textarea:enabled:visible, select:enabled:visible, a[href]:visible');
+	await controls.last().focus();await page.keyboard.press('Tab');
+	assert(await controls.first().evaluate(el=>el===document.activeElement));
+	await page.keyboard.press('Shift+Tab');
+	assert(await controls.last().evaluate(el=>el===document.activeElement));
+}
 // Real workspace + SDK + local provider, isolated from the user's files/configuration.
 import assert from 'node:assert/strict';
 import { checkWikiV2 } from './lib/wiki-v2-checks.mjs';
@@ -149,6 +156,7 @@ try {
 	await page.locator('.wiki-index-status').click();
 	await page.getByRole('dialog').getByText('large.md', { exact: true }).waitFor();
 	await page.getByRole('dialog').getByText('单个文件超过 2 MB', { exact: true }).waitFor();
+	await checkDialogFocus(page,page.getByRole('dialog'));
 	await page.keyboard.press('Escape');
 	assert(await page.getByRole('button', { name: '展开提问框', exact: true }).isVisible());
 	assert.equal(await page.locator('.wiki-composer-pill').evaluate(el => getComputedStyle(el).borderRadius), '8px');
@@ -230,6 +238,7 @@ try {
 	await page.keyboard.press('Meta+k');
 	await page.locator('.wiki-search-modal input').fill('阈值');
 	await page.locator('.wiki-search-results strong', { hasText: '参数配置.md' }).waitFor();
+	await checkDialogFocus(page,page.locator('.wiki-search-modal'));
 	await page.keyboard.press('Escape');
 	// Markdown is editable immediately in its rendered layout; both modes share the draft.
 	const rendered = page.locator('.wiki-prose [contenteditable="true"][role="textbox"]');
@@ -292,6 +301,7 @@ try {
 	await page.locator('.wiki-message-actions summary').first().click();
 	await page.getByRole('menuitem', { name: '查看完整发送内容', exact: true }).click();
 	await page.getByRole('dialog', { name: '查看完整发送内容', exact: true }).waitFor();
+	await checkDialogFocus(page,page.getByRole('dialog', { name: '查看完整发送内容', exact: true }));
 	assert((await page.locator('.wiki-full-request').innerText()).includes('选中内容'));
 	await page.keyboard.press('Escape');
 	await page.getByRole('button', { name: '跳到 §2', exact: true }).waitFor();

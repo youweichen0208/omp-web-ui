@@ -21,6 +21,24 @@ try {
 	mkdirSync('tests/scratch',{recursive:true});
 	const page=await browser.newPage({viewport:{width:1440,height:960}});
 	const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+	// Generate deterministic media locally; no downloads or external encoders.
+	const fixtures=await page.evaluate(async()=>{
+		const canvas=document.createElement('canvas');canvas.width=2400;canvas.height=1600;
+		const ctx=canvas.getContext('2d');ctx.fillStyle='#e8f1f7';ctx.fillRect(0,0,2400,1600);
+		ctx.fillStyle='#2f7aae';ctx.fillRect(120,120,2160,1360);ctx.fillStyle='white';ctx.font='90px sans-serif';ctx.fillText('Preview · 2400 × 1600',220,800);
+		const png=canvas.toDataURL('image/png').split(',')[1];
+		canvas.width=640;canvas.height=360;
+		const stream=canvas.captureStream(10),chunks=[];
+		const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'});
+		const stopped=new Promise(resolve=>{recorder.onstop=resolve;});
+		recorder.ondataavailable=e=>chunks.push(e.data);recorder.start();
+		for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#2f7aae':'#e8f1f7';ctx.fillRect(0,0,640,360);await new Promise(r=>setTimeout(r,100));}
+		recorder.stop();await stopped;stream.getTracks().forEach(track=>track.stop());
+		return {png,video:Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()))};
+	});
+	writeFileSync(join(cwd,'landscape.png'),Buffer.from(fixtures.png,'base64'));
+	writeFileSync(join(cwd,'clip.webm'),Buffer.from(fixtures.video));
+
 	await page.goto(`http://localhost:${port}`);
 	await page.locator('.setup-modal .modal-close').click();
 	await page.locator('.workspace-group-manager input').fill('Engineering');
@@ -54,11 +72,12 @@ try {
 
 	await page.setViewportSize({width:1440,height:960});await sleep(350);
 	await page.keyboard.press('Control+p');
-	await page.locator('.gs-input-row input').fill('pixel.png');
-	await page.locator('.gs-item',{hasText:'pixel.png'}).click();
+	await page.locator('.gs-input-row input').fill('landscape.png');
+	await page.locator('.gs-item',{hasText:'landscape.png'}).click();
 	const media=page.locator('.fp-media');await media.waitFor();
 	await page.waitForFunction(()=>{const img=document.querySelector('img.fp-media');return img?.complete && img.naturalWidth>0;});
-	assert.equal(await media.getAttribute('alt'),'pixel.png');
+	assert.equal(await media.getAttribute('alt'),'landscape.png');
+	assert.equal(await page.locator('.fp-header-status').count(),0,'read-only media has no save status');
 	for(const width of [1440,1024,768,375]) {
 		await page.setViewportSize({width,height:900});await sleep(350);
 		let box=await media.boundingBox();
@@ -69,6 +88,20 @@ try {
 			await page.screenshot({path:`tests/scratch/polish-image-${width}-${theme}.png`});
 		}
 	}
+	await page.setViewportSize({width:1440,height:960});await sleep(350);
+	await page.keyboard.press('Control+p');await page.locator('.gs-input-row input').fill('clip.webm');
+	await page.locator('.gs-item',{hasText:'clip.webm'}).click();
+	const video=page.locator('video.fp-media');await video.waitFor();
+	await page.waitForFunction(()=>document.querySelector('video.fp-media')?.readyState>=2);
+	assert(await video.evaluate(async el=>{el.muted=true;await el.play();return !el.paused&&el.videoWidth===640&&el.controls;}));
+	await page.waitForFunction(()=>document.querySelector('video.fp-media')?.currentTime>0);
+	await video.evaluate(el=>el.pause());
+	for(const width of [1440,1024,768,375]) {
+		await page.setViewportSize({width,height:900});await sleep(350);
+		let box=await video.boundingBox();if(box.x>=width||box.x+box.width<=0){await page.locator('.topbar-actions > .panel-toggle').click();await sleep(350);}
+		box=await video.boundingBox();assert(box.x>=0&&box.x+box.width<=width&&box.y>=0&&box.y+box.height<=900);
+		for(const theme of ['light','dark']){await page.evaluate(theme=>document.documentElement.dataset.appearance=theme,theme);await page.screenshot({path:`tests/scratch/polish-video-${width}-${theme}.png`});}
+	}
 	assert.deepEqual(errors,[]);
-	console.log('PASS code preview: editing and disk save, four widths, decoded image, light/dark, landscape and reduced motion');
+	console.log('PASS code preview: editing and disk save, four widths, large image and playable video, light/dark, landscape and reduced motion');
 } finally { await browser?.close();server?.kill('SIGTERM');await sleep(300);rmSync(root,{recursive:true,force:true}); }

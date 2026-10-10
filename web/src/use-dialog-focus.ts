@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 const dialogs: HTMLElement[] = [];
 export const isTopDialog = (root: HTMLElement | null) => !!root && dialogs.at(-1) === root;
@@ -15,7 +15,7 @@ export function useDialogFocus<T extends HTMLElement = HTMLDivElement>(active = 
 		menuTriggerRef.current = openerRef.current?.closest(".dropdown")?.querySelector<HTMLElement>(":scope > button") ?? null;
 	}
 	previouslyActive.current = active;
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const root = ref.current;
 		if (!active || !root) return;
 		const opener = openerRef.current;
@@ -23,9 +23,7 @@ export function useDialogFocus<T extends HTMLElement = HTMLDivElement>(active = 
 		const controls = () => Array.from(root.querySelectorAll<HTMLElement>(focusable)).filter(element =>
 			!element.matches(':disabled, [aria-disabled="true"]') && !element.closest('[inert]') && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden",
 		);
-		const frame = requestAnimationFrame(() => {
-			if (dialogs.at(-1) === root && !root.contains(document.activeElement)) (controls()[0] ?? root).focus();
-		});
+		if (dialogs.at(-1) === root && !root.contains(document.activeElement)) (controls()[0] ?? root).focus();
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Tab" || dialogs.at(-1) !== root) return;
 			const items = controls();
@@ -38,7 +36,6 @@ export function useDialogFocus<T extends HTMLElement = HTMLDivElement>(active = 
 		};
 		document.addEventListener("keydown", onKey, true);
 		return () => {
-			cancelAnimationFrame(frame);
 			document.removeEventListener("keydown", onKey, true);
 			const topmost = dialogs.at(-1) === root;
 			const index = dialogs.indexOf(root);

@@ -71,6 +71,15 @@ try {
 	failWrite = true; await endParagraph(); await page.keyboard.type(' Retained after failure.');
 	await page.getByRole('button', { name: '保存失败 · 重试', exact: true }).waitFor();
 	const attempts = writes.length; await sleep(1000); assert.equal(writes.length, attempts);
+	await page.locator('.wiki-tree-row[title="other.md"]').click();
+	const confirm=page.locator('.wiki-confirm');await confirm.waitFor();
+	assert(await confirm.evaluate(el=>el.contains(document.activeElement)),'save failure moves focus into navigation guard');
+	const controls=confirm.locator('button:enabled');
+	await controls.last().focus();await page.keyboard.press('Tab');assert(await controls.first().evaluate(el=>el===document.activeElement));
+	await page.keyboard.press('Shift+Tab');assert(await controls.last().evaluate(el=>el===document.activeElement));
+	await confirm.getByRole('button',{name:'取消',exact:true}).click();await confirm.waitFor({state:'detached'});
+	assert((await editor.innerText()).includes('Retained after failure.'));
+
 	failWrite = false; await page.getByRole('button', { name: '保存失败 · 重试', exact: true }).click(); await saved();
 	assert(disk().includes('Retained after failure.'));
 	// External edit preserves the draft, then explicitly rebases its CAS version.
