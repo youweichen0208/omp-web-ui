@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../use-dialog-focus";
 import { Dialog } from "./Dialog";
 import { LinkedText } from "./LinkedText";
 import { useEffect, useState, useRef } from "react";
@@ -28,6 +29,7 @@ export function NativeMcpPanel({ cwd, send, dialog }: { dialog: { id: string; co
 	const [importText, setImportText] = useState<string>();
 	const [log, setLog] = useState<string>();
 	const [advanced, setAdvanced] = useState(false);
+	const advancedRef = useDialogFocus(advanced);
 	const dirty = !!state && text !== JSON.stringify(state.document, null, 2);
 	const mutating = useRef(false);
 	const requests = useRef(new Map<string, { action: Action; preserve: boolean }>());
@@ -106,7 +108,7 @@ export function NativeMcpPanel({ cwd, send, dialog }: { dialog: { id: string; co
 			<label className="mcp-setting-row"><span title={t("mcpAutoHelp")}>{t("settingsAutoCodemode")}<small className="settings-description">{t("v2AutoHint")}</small></span><input className="settings-switch" type="checkbox" role="switch" aria-label="autoEnableCodemode" disabled={!state || busy} checked={typeof document.autoEnableCodemode === "boolean" ? document.autoEnableCodemode : state?.inheritedAutoEnableCodemode ?? true} onChange={e => change(doc => { doc.autoEnableCodemode = e.target.checked; })} /></label>
 		</div>
 		<footer className="settings-paths">{state?.paths?<><code>{t("mcpGlobal")} · {state.paths.global}</code><code>{t("mcpProject")} · {state.paths.project}</code></>:<code>{state?.path}</code>}</footer>
-		{advanced&&<div className="ext-dialog-backdrop"><div className="ext-dialog mcp-json-dialog" role="dialog" aria-modal="true" aria-label={t("v2EditMcp")} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}><header><h3>{t("v2EditMcp")}</h3></header><p>{t("mcpJsonHelp")}</p><code>{state?.path}</code><textarea aria-label={t("mcpConfig")} rows={15} value={text} disabled={busy} onChange={e=>setText(e.target.value)} spellCheck={false}/>{error&&<p className="mcp-error" role="alert">{error}</p>}<footer><button disabled={busy} onClick={()=>{if(!dirty||window.confirm(t("mcpDiscard"))){setText(JSON.stringify(state?.document,null,2));setAdvanced(false);}}}>{t("close")}</button><button disabled={busy||!dirty} onClick={save}>{t("save")}</button></footer></div></div>}
+		{advanced&&<div className="ext-dialog-backdrop"><div ref={advancedRef} className="ext-dialog mcp-json-dialog" role="dialog" aria-modal="true" aria-label={t("v2EditMcp")} onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}><header><h3>{t("v2EditMcp")}</h3></header><p>{t("mcpJsonHelp")}</p><code>{state?.path}</code><textarea aria-label={t("mcpConfig")} rows={15} value={text} disabled={busy} onChange={e=>setText(e.target.value)} spellCheck={false}/>{error&&<p className="mcp-error" role="alert">{error}</p>}<footer><button disabled={busy} onClick={()=>{if(!dirty||window.confirm(t("mcpDiscard"))){setText(JSON.stringify(state?.document,null,2));setAdvanced(false);}}}>{t("close")}</button><button disabled={busy||!dirty} onClick={save}>{t("save")}</button></footer></div></div>}
 
 		{log !== undefined && <details className="mcp-advanced" open><summary>mcp.log</summary><pre>{log}</pre><button onClick={() => setLog(undefined)}>{t("close")}</button></details>}
 	</section>;

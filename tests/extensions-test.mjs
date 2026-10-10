@@ -51,6 +51,13 @@ try{
  const edited='export default () => {}; // editor fixture';assert.equal((await req('save-file',{id:file.id,version:opened.version,content:edited})).status,200);assert.equal(readFileSync(file.path,'utf8'),edited);
  assert.equal((await req('file',{id:item.id})).status,400);
  assert.equal((await req('preferences',{enabled:false})).autoCheck,false);
+ const assertFocusLoop = async (page, dialog) => {
+  const controls=dialog.locator('button:enabled:visible, input:enabled:visible, textarea:enabled:visible, select:enabled:visible, a[href]:visible');
+  await controls.last().focus();await page.keyboard.press('Tab');
+  assert(await controls.first().evaluate(el=>el===document.activeElement),'forward Tab stays in nested dialog');
+  await page.keyboard.press('Shift+Tab');
+  assert(await controls.last().evaluate(el=>el===document.activeElement),'reverse Tab stays in nested dialog');
+ };
  if(process.argv.includes('--browser')){
   browser=await chromium.launch({executablePath:CHROME_PATH||chromium.executablePath()});const page=await browser.newPage({viewport:{width:1440,height:1050}});page.setDefaultTimeout(20000);const errors=[];page.on('response',async res=>{if(res.url().includes('/api/extensions')&&res.status()>=400)console.error('API',await res.text());});page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(id=>{sessionStorage.setItem('pi-web-client-id',id);localStorage.setItem('pi-extensions-autocheck','false');},clientId);
@@ -63,12 +70,12 @@ try{
   await panel.getByRole('switch',{name:'启用 local-tools',exact:true}).click();await wait(async()=>Array.isArray(JSON.parse(readFileSync(join(agent,'settings.json'),'utf8')).packages[0].extensions)&&!JSON.parse(readFileSync(join(agent,'settings.json'),'utf8')).packages[0].extensions.length);
   await panel.getByText('操作完成',{exact:true}).waitFor();await wait(async()=>!await panel.getByRole('switch',{name:'启用 local-tools',exact:true}).isChecked());await panel.getByRole('switch',{name:'启用 local-tools',exact:true}).click();await wait(async()=>await panel.getByRole('switch',{name:'启用 local-tools',exact:true}).isChecked());
   await panel.getByRole('button',{name:'从 npm / git 安装',exact:true}).click();await panel.locator('.ext-dialog input').fill(another);await panel.getByRole('button',{name:'查看安装信息',exact:true}).click();await panel.locator('.ext-security').waitFor();await page.screenshot({path:'tests/scratch/extensions-install.png',fullPage:true});
-  const dialog=panel.locator('.ext-dialog');await dialog.getByRole('button',{name:'关闭',exact:true}).focus();await page.keyboard.press('Shift+Tab');assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'安装');
+  const dialog=panel.locator('.ext-dialog');await assertFocusLoop(page,dialog);await dialog.getByRole('button',{name:'关闭',exact:true}).focus();await page.keyboard.press('Shift+Tab');assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'安装');
   let failedOnce=false;const failInstall=async route=>{const body=route.request().postDataJSON();if(body.action==='start'&&body.operation?.action==='install'&&!failedOnce){failedOnce=true;return route.fulfill({json:{id:'failed-fixture',phase:'error',error:'Fixture install failure',log:'Step one\nFixture install failure'}});}return route.continue();};
   await page.route('**/api/extensions**',failInstall);await dialog.getByRole('button',{name:'安装',exact:true}).click();await dialog.getByRole('alert').filter({hasText:'Fixture install failure'}).waitFor();assert(await dialog.isVisible());
   await dialog.getByRole('button',{name:'重试',exact:true}).click();await dialog.waitFor({state:'hidden'});await page.unroute('**/api/extensions**',failInstall);
   await panel.getByRole('tab',{name:'已安装 · 2',exact:true}).waitFor();await panel.locator('.ext-new').waitFor();assert((await req('list')).packages.some(p=>p.name==='another-package'&&p.scope==='user'));
-  await panel.getByRole('button',{name:'查看详情 footer',exact:true}).click();await panel.getByRole('button',{name:'编辑文件',exact:true}).click();await panel.getByRole('textbox',{name:'编辑文件',exact:true}).fill('export default () => {}; // browser editor');await panel.getByRole('button',{name:'保存文件',exact:true}).click();await panel.locator('.ext-editor').waitFor({state:'hidden'});assert(readFileSync(file.path,'utf8').includes('browser editor'));
+  await panel.getByRole('button',{name:'查看详情 footer',exact:true}).click();await panel.getByRole('button',{name:'编辑文件',exact:true}).click();await assertFocusLoop(page,panel.locator('.ext-editor'));await panel.getByRole('textbox',{name:'编辑文件',exact:true}).fill('export default () => {}; // browser editor');await panel.getByRole('button',{name:'保存文件',exact:true}).click();await panel.locator('.ext-editor').waitFor({state:'hidden'});assert(readFileSync(file.path,'utf8').includes('browser editor'));
   await page.route('**/api/extensions**',async route=>{const body=route.request().postDataJSON();if(body.action==='details')return route.fulfill({json:{source:body.source,name:'fixture-catalog',description:'Native extension catalog fixture.',license:'MIT',repository:'https://example.com/source',resources:{extensions:['main.ts'],skills:['skills/one','skills/two']},canPin:true}});
   if(body.action!=='search')return route.continue();return route.fulfill({json:{page:1,pages:1,items:[{name:'fixture-catalog',description:'Native extension catalog fixture.',version:'1.2.3',author:'Pi community',downloads:12500,date:Date.now(),types:['extension','skill'],url:'https://pi.dev/packages/fixture-catalog'}]}});});
   await panel.getByRole('tab',{name:/浏览 pi.dev/}).click();await panel.getByText('fixture-catalog',{exact:true}).waitFor();await panel.getByRole('button',{name:'查看详情 fixture-catalog',exact:true}).click();await panel.getByText('MIT',{exact:true}).waitFor();assert.equal(await panel.locator('.ext-catalog-detail .ext-resource-counts').innerText(),'扩展 1\n技能 2');
@@ -107,7 +114,7 @@ try{
 
   await page.getByRole('button',{name:'MCP 与 Codemode',exact:true}).click();
   const mcp=page.locator('.mcp-workbench');await mcp.getByRole('button',{name:'编辑 mcp.json',exact:true}).click();
-  const json=mcp.locator('.mcp-json-dialog');await json.locator('textarea').fill('{"mcpServers":{},"autoEnableCodemode":false}');
+  const json=mcp.locator('.mcp-json-dialog');await assertFocusLoop(page,json);await json.locator('textarea').fill('{"mcpServers":{},"autoEnableCodemode":false}');
   await json.getByRole('button',{name:'保存',exact:true}).click();await wait(()=>JSON.parse(readFileSync(join(agent,'mcp.json'),'utf8')).autoEnableCodemode===false);
   await wait(async()=>await json.getByRole('button',{name:'保存',exact:true}).isDisabled());await json.getByRole('button',{name:'关闭',exact:true}).click();
   assert.equal(await mcp.locator('textarea').count(),0);await page.screenshot({path:'tests/scratch/settings-v2-mcp.png',fullPage:true});

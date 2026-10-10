@@ -20,8 +20,8 @@
 | 会话树 | 树/搜索/分支、label/摘要/草稿恢复 | session-tree 协议及浏览器、bookmark 双向 Tab 通过 |
 | 设置 · 提示词 | 导航、分段、编辑器、状态、保存/重载 | system-prompt 浏览器流程和四档明暗布局通过 |
 | 设置 · 技能 | 搜索/筛选、详情、启停 | extensions 浏览器搜索、启停落盘、重载与小屏通过 |
-| 设置 · Extensions | 包列表、资源、编辑、安装/更新表单 | extensions 功能回归通过；安装嵌套弹窗双向 Tab 待补 |
-| 设置 · MCP/Codemode | 作用域、自动保存/高级选项、服务器表单/信任 | codemode-mcp 浏览器及 extensions 的 JSON 保存通过；专有弹窗焦点待补 |
+| 设置 · Extensions | 包列表、资源、编辑、安装/更新表单 | extensions 功能回归通过；安装/确认、编辑器共享焦点栈，安装和编辑双向 Tab 已通过 |
+| 设置 · MCP/Codemode | 作用域、自动保存/高级选项、服务器表单/信任 | codemode-mcp 浏览器及 extensions 的 JSON 保存通过；JSON 编辑器双向 Tab 已通过 |
 | 设置 · 更新 | 版本、检查中/成功/错误状态 | 当前 extensions 更新页面自动检查偏好、503 错误及刷新恢复通过 |
 | 配置和弹窗 | 首次配置、模型/服务商、OAuth、目录选择、搜索、后台任务、扩展确认 | 共用焦点及 OAuth 嵌套通过，模型获取/元数据/错误通过；剩余专有弹窗待审查 |
 | 插件宿主 | 宿主空态/错误/设置容器（第三方插件内容不重写） | ui-plugin-polish 的挂载失败、重试恢复、小屏和切页保留状态通过 |
@@ -71,3 +71,10 @@
 - The old component-updates browser case still targets removed application-update UI, old skill disclosure markup, and the former tab title. It was not rewritten to mask the obsolete assumptions. Current extensions browser tests cover the replacement update page. The smoke runner's component version protocol checks pass.
 - The old agent-working browser case targets a removed Bash DOM class. Current brand-command-groups tests cover the active command, failure, queue and composer presentations. The old file-editor browser case remains obsolete as recorded above; code save, file-version conflicts and Wiki guards have current replacement coverage.
 - Visually inspected skill contents, dark mobile updates, and landscape/scaled settings in addition to the previously recorded screens. Full completion is still unproven: audit nested extension/MCP/Wiki focus interaction, inline extension requests, remaining media/configuration states, then reconcile this checklist. No release or remote push performed.
+
+
+### Fifth checkpoint: nested settings focus
+
+- Replaced the extension install/confirmation dialog's independent focus trap with the shared dialog stack. Added the same stack participation to the extension file editor and MCP JSON editor. The parent Settings dialog no longer owns Tab traversal while these nested editors are open.
+- PASS: typecheck, build, design tokens, extensions browser suite with explicit forward/reverse Tab assertions in install preview, file editor and MCP JSON editor; existing installation retry, editor persistence, and MCP JSON save assertions still pass.
+- Extended preview coverage to a real decoded PNG, alt text, file-search navigation, and viewport containment at all four widths in both themes. The fixture is intentionally tiny: it proves decode and placement, not large-image scaling or video playback. Mobile dark image layout inspected. Those remaining media states and Wiki-specific dialogs still require inspection before completion.

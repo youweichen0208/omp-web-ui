@@ -236,3 +236,5 @@ Git 工作台在 700px 以下将改动/历史列表放在 diff 上方，各自�
 ### Secondary dialogs and previews
 
 Node source/credential/edit forms, session-tree navigation/bookmark/content dialogs, and provider authentication use the shared focus boundary. Conditional dialogs register only while visible; reopening captures the new trigger. Escape in provider authentication closes only that topmost dialog, leaving settings underneath open. Small-screen secondary dialog fields use 16px text; action rows wrap and touch targets have at least 44px height. SQLite tables retain their own horizontal scrolling.
+
+扩展安装/确认、单文件编辑与 MCP 原始 JSON 编辑使用共享弹窗焦点栈；Tab 和 Shift+Tab 仅在最上层弹窗循环，关闭后恢复触发入口，保留原有保存及草稿丢弃确认。
